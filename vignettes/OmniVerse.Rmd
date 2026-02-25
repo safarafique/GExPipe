@@ -1,0 +1,73 @@
+---
+title: "OmniVerse: Multi-Omics RNA Analysis Workflow"
+author: "Safa Rafique"
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+vignette: >
+  %\VignetteIndexEntry{OmniVerse: Multi-Omics RNA Analysis Workflow}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Introduction
+
+**OmniVerse** is a Shiny application for high-throughput genomic analysis of bulk RNA-seq and microarray data. It integrates with the Bioconductor ecosystem (GEOquery, Biobase, limma, DESeq2, edgeR, clusterProfiler, and others) to provide a single workflow: from GEO download and QC, through normalization and differential expression, to pathway enrichment, WGCNA, protein–protein interaction, machine learning, and optional immune deconvolution.
+
+This vignette describes the workflow and how to run the app.
+
+# Installation
+
+Install OmniVerse from source (e.g. after cloning the repository or unpacking the release):
+
+```{r install, eval=FALSE}
+install.packages(".", repos = NULL, type = "source")
+# Or with devtools:
+# devtools::install()
+```
+
+Load the package:
+
+```{r load}
+library(OmniVerse)
+packageVersion("OmniVerse")
+```
+
+# Running the application
+
+Launch the Shiny app. It opens in your default browser and listens on port 3838 by default.
+
+```{r run-app, eval=FALSE}
+runOmniVerse()
+runOmniVerse(launch.browser = TRUE, port = 3838, host = "127.0.0.1")
+```
+
+# Workflow overview
+
+The app guides you through:
+
+1. **Download** — Fetch GEO series (GSE) and platform (GPL) data; optional CEL file download for microarrays.
+2. **QC** — Sample and gene-level QC, PCA, correlation.
+3. **Normalization** — RMA (oligo/affy) for microarrays; TMM/DESeq2-style for RNA-seq.
+4. **Batch correction** — Optional ComBat (sva) when multiple batches are present.
+5. **Differential expression** — limma (microarray and RNA-seq) or DESeq2/edgeR for RNA-seq.
+6. **Downstream** — WGCNA, pathway enrichment (clusterProfiler), PPI (STRINGdb), ML (e.g. random forest, XGBoost), optional immune deconvolution, validation.
+
+Data are kept in memory as Bioconductor-friendly structures (e.g. `ExpressionSet`, count matrices, and design tables) and can be saved/loaded as RDS for later use.
+
+# Interoperability with Bioconductor
+
+OmniVerse uses standard Bioconductor classes and accessors:
+
+- **Microarray:** `Biobase::ExpressionSet`, `exprs()`, `fData()`, `GEOquery::getGEO()` and `Table()` for GPL annotations.
+- **RNA-seq:** `edgeR::DGEList`, `DESeq2::DESeqDataSetFromMatrix()` and related DESeq2/edgeR workflows.
+
+This allows pipelines and custom scripts to consume the same objects produced or used by the app.
+
+# Session info
+
+```{r session-info}
+sessionInfo()
+```
