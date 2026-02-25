@@ -23,7 +23,17 @@ library(OmniVerse)
 runOmniVerse()
 ```
 
-First run may install Bioconductor and CRAN dependencies; later runs start immediately.
+Install OmniVerse (e.g. `BiocManager::install("OmniVerse")`) so all dependencies are installed; the app does not install packages at runtime.
+
+## Bioconductor submission checklist
+
+- **High-throughput genomic analysis**: RNA-seq, microarrays (GEO), differential expression, pathways, WGCNA, PPI.
+- **Interoperability**: Uses Bioconductor data structures (`ExpressionSet`, `DGEList`, GEOquery, limma, DESeq2, edgeR, clusterProfiler).
+- **No runtime installs**: All dependencies are in DESCRIPTION; no `install.packages()` or `BiocManager::install()` in package code.
+- **CRAN/Bioconductor only**: Every dependency is on CRAN or Bioconductor (no Remotes, no GitHub-only dependencies in Imports).
+- **Documentation**: Vignette (`vignettes/OmniVerse.Rmd`), man pages, NEWS.md.
+- **Not on CRAN**: Submit only to Bioconductor (not to CRAN).
+- Before submitting: run `R CMD check` then `BiocCheck("<tarball_or_dir>")` and address ERRORs and WARNINGs.
 
 ## Building for Bioconductor submission
 
@@ -54,4 +64,4 @@ Resolve any ERRORs or WARNINGs before submission. NOTEs may be acceptable.
 
 ## Optional
 
-Immune deconvolution uses the optional package `immunedeconv` (GitHub). The app runs without it. To enable: `remotes::install_github("omnideconv/immunedeconv")`.
+Immune deconvolution can use the package `immunedeconv` if installed by the user (it is not on CRAN/Bioconductor). The app runs fully without it.

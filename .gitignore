@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+# Build and check artifacts
+OmniVerse.Rcheck/
+OmniVerse.BiocCheck/
+*.tar.gz
+# App runtime (do not commit)
+inst/shinyapp/micro_data/
+inst/shinyapp/saved_workspaces/
+inst/shinyapp/*.log
+app/

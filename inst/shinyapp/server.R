@@ -868,15 +868,15 @@ server <- function(input, output, session) {
         style = "font-size: 16px;",
         tags$p(tags$strong("Clear all previous data and analysis?"), 
                style = "color: #e74c3c; margin-bottom: 10px;"),
-        tags$p("All downloaded data and results will be removed. You can then enter new GSE IDs and run again from Step 1."),
+        tags$p("All downloaded files and in-memory results will be deleted. The app stays open so you can start a new analysis from Step 1."),
         tags$p(tags$em("Save your workspace first (sidebar or Results tab) if you want to keep the current analysis."), style = "color: #7f8c8d; margin-bottom: 10px;"),
-        tags$p("This will clear:"),
+        tags$p("This will:"),
         tags$ul(
-          tags$li("Downloaded datasets and normalized data"),
-          tags$li("Group selections and batch correction"),
-          tags$li("Differential expression, WGCNA, PPI, ML, ROC, GSEA, Immune deconvolution results")
+          tags$li("Delete downloaded files (micro_data, rna_data, ext_val_rna folders)"),
+          tags$li("Clear all in-app data: datasets, normalization, groups, batch, DE, WGCNA, PPI, ML, ROC, GSEA, Immune, etc."),
+          tags$li("Reset inputs to defaults and return you to Step 1 (Download)")
         ),
-        tags$p(tags$strong("This action cannot be undone."), 
+        tags$p(tags$strong("The app remains open. This action cannot be undone."), 
                style = "color: #c0392b; margin-top: 12px; font-weight: bold;")
       ),
       footer = tagList(
@@ -901,12 +901,26 @@ server <- function(input, output, session) {
     showNotification(
       tags$div(
         icon("spinner", class = "fa-spin"),
-        tags$strong("Restarting application and clearing previous analysis...")
+        tags$strong("Clearing all data and deleting previous files...")
       ),
       type = "default",
       duration = 2
     )
     
+    # Delete all previous downloaded/cached files (app stays open)
+    data_dirs <- c(
+      file.path(getwd(), "micro_data"),
+      file.path(getwd(), "rna_data"),
+      file.path(getwd(), "ext_val_rna")
+    )
+    for (d in data_dirs) {
+      tryCatch({
+        if (dir.exists(d)) {
+          unlink(d, recursive = TRUE, force = TRUE)
+        }
+      }, error = function(e) NULL)
+    }
+
     # Reset PPI module state (app_ppi is created in server_ppi.R, same environment)
     tryCatch({
       if (exists("app_ppi")) {
@@ -922,14 +936,31 @@ server <- function(input, output, session) {
     rv$micro_eset_list <- list()
     rv$micro_metadata_list <- list()
     rv$micro_cel_paths <- list()
+    rv$platform_per_gse <- list()
     rv$rna_counts_list <- list()
     rv$rna_metadata_list <- list()
     rv$all_genes_list <- list()
     rv$common_genes <- NULL
     rv$combined_expr_raw <- NULL
     rv$combined_expr <- NULL
+    rv$combined_expr_before_global_norm <- NULL
+    rv$all_expr_norm_list <- list()
+    rv$normalization_stats <- list()
+    rv$normalization_summary_table <- NULL
+    rv$normalization_caption <- NULL
     rv$unified_metadata <- NULL
     rv$expr_filtered <- NULL
+    rv$qc_pca_scores <- NULL
+    rv$qc_pca_distances <- NULL
+    rv$qc_pca_threshold <- NULL
+    rv$qc_pca_outliers <- character(0)
+    rv$qc_pca_var_explained <- NULL
+    rv$qc_conn_k <- NULL
+    rv$qc_conn_threshold <- NULL
+    rv$qc_conn_outliers <- character(0)
+    rv$qc_all_outliers <- character(0)
+    rv$qc_outlier_detection_complete <- FALSE
+    rv$qc_excluded_samples <- character(0)
     rv$batch_corrected <- NULL
     rv$de_results <- NULL
     rv$sig_genes <- NULL
@@ -960,6 +991,10 @@ server <- function(input, output, session) {
     rv$geneModuleMembership <- NULL
     rv$MMPvalue <- NULL
     rv$wgcna_log_messages <- character(0)
+    rv$wgcna_datExpr_before_exclude <- NULL
+    rv$wgcna_sample_info_before_exclude <- NULL
+    rv$wgcna_excluded_samples <- character(0)
+    rv$wgcna_suggested_outliers <- character(0)
     rv$ME_correlation <- NULL
     rv$ME_tree <- NULL
     rv$significant_modules <- NULL
@@ -1052,6 +1087,8 @@ server <- function(input, output, session) {
     rv$gsea_result <- NULL
     rv$gsea_target_genes <- NULL
     rv$gsea_results_by_gene <- NULL
+    rv$gsea_collection_lookup <- NULL
+    rv$gsea_collections_used <- NULL
     rv$gsea_complete <- FALSE
     rv$immune_raw <- NULL
     rv$immune_matrix <- NULL
@@ -1084,17 +1121,18 @@ server <- function(input, output, session) {
     updateNumericInput(session, "logfc_cutoff", value = 0.5)
     updateNumericInput(session, "padj_cutoff", value = 0.05)
     updateNumericInput(session, "top_genes", value = 50)
+    tryCatch(shinyjs::reset("upload_workspace_file"), error = function(e) NULL)
     
     # Navigate to Step 1 (Download) so user starts from the beginning
     updateTabItems(session, "sidebar_menu", "download")
     
-    # Success: previous analysis removed; user can add new GSE and run again
+    # Success: previous files deleted, state cleared; app remains open for new analysis
     Sys.sleep(0.5)
     showNotification(
       tags$div(
         icon("check-circle"),
-        tags$strong("Reset complete."),
-        tags$p("All previous data cleared. Enter new GSE IDs above and click Start Processing to run again.", style = "margin-top: 5px;")
+        tags$strong("Reset complete. App remains open."),
+        tags$p("All previous files and data have been deleted. Enter new GSE IDs in Step 1 and click Start Processing to run from the start.", style = "margin-top: 5px;")
       ),
       type = "success",
       duration = 6

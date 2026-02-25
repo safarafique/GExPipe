@@ -39,9 +39,11 @@ packageVersion("OmniVerse")
 
 Launch the Shiny app. It opens in your default browser and listens on port 3838 by default.
 
-```{r run-app, eval=FALSE}
-runOmniVerse()
-runOmniVerse(launch.browser = TRUE, port = 3838, host = "127.0.0.1")
+```{r run-app, eval=TRUE}
+if (interactive()) {
+  runOmniVerse()
+  runOmniVerse(launch.browser = TRUE, port = 3838, host = "127.0.0.1")
+}
 ```
 
 # Workflow overview
