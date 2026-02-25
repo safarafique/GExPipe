@@ -239,137 +239,164 @@ server_batch <- function(input, output, session, rv) {
     rv$batch_running <- FALSE
   })
   
-  # PCA Before Batch Correction - Colored by Dataset
+  # PCA Before Batch Correction - Colored by Dataset (circular / polar)
   output$pca_before_dataset <- renderPlot({
     req(rv$expr_filtered)
-    
+
     pca <- prcomp(t(rv$expr_filtered), scale. = TRUE)
     var_exp <- round(100 * pca$sdev^2 / sum(pca$sdev^2), 1)
-    
-    df <- data.frame(PC1 = pca$x[, 1], PC2 = pca$x[, 2],
-                     Dataset = rv$unified_metadata$Dataset)
-    
-    ggplot(df, aes(PC1, PC2, color = Dataset)) +
+    pc1 <- pca$x[, 1]
+    pc2 <- pca$x[, 2]
+    theta <- atan2(pc2, pc1)
+    r <- sqrt(pc1^2 + pc2^2)
+    if (max(r) > 0) r <- r / max(r)
+    df <- data.frame(theta = theta, r = r, Dataset = rv$unified_metadata$Dataset)
+
+    ggplot(df, aes(x = theta, y = r, color = Dataset)) +
       geom_point(size = 3.5, alpha = 0.7) +
+      coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+      scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                        labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+      scale_y_continuous(limits = c(0, NA)) +
       theme_bw(base_size = 14) +
       labs(title = "Before Batch Correction - By Dataset",
-           subtitle = "Batch effects visible as dataset separation",
-           x = paste0("PC1 (", var_exp[1], "%)"),
-           y = paste0("PC2 (", var_exp[2], "%)"),
-           color = "Dataset") +
+           subtitle = "Batch effects visible as dataset separation (circular)",
+           x = "Angle (PC1–PC2)", y = "Radius", color = "Dataset") +
       theme(
         plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
         plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-        legend.position = "right"
+        legend.position = "right",
+        panel.grid.minor = element_blank()
       )
   })
   
-  # PCA Before Batch Correction - Colored by Condition
+  # PCA Before Batch Correction - Colored by Condition (circular / polar)
   output$pca_before_condition <- renderPlot({
     req(rv$expr_filtered)
-    
+
     pca <- prcomp(t(rv$expr_filtered), scale. = TRUE)
     var_exp <- round(100 * pca$sdev^2 / sum(pca$sdev^2), 1)
-    
-    df <- data.frame(PC1 = pca$x[, 1], PC2 = pca$x[, 2],
+    pc1 <- pca$x[, 1]
+    pc2 <- pca$x[, 2]
+    theta <- atan2(pc2, pc1)
+    r <- sqrt(pc1^2 + pc2^2)
+    if (max(r) > 0) r <- r / max(r)
+    df <- data.frame(theta = theta, r = r,
                      Condition = rv$unified_metadata$Condition,
                      Dataset = rv$unified_metadata$Dataset)
-    
-    # Only plot if conditions are available
+
     if (all(is.na(df$Condition)) || length(unique(df$Condition[!is.na(df$Condition)])) < 2) {
-      ggplot(df, aes(PC1, PC2)) +
+      ggplot(df, aes(x = theta, y = r)) +
         geom_point(size = 3.5, alpha = 0.7, color = "gray60") +
+        coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                          labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        scale_y_continuous(limits = c(0, NA)) +
         theme_bw(base_size = 14) +
         labs(title = "Before Batch Correction - By Condition",
-             subtitle = "Conditions not yet assigned",
-             x = paste0("PC1 (", var_exp[1], "%)"),
-             y = paste0("PC2 (", var_exp[2], "%)")) +
-        theme(
-          plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-          plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50")
-        )
+             subtitle = "Conditions not yet assigned (circular)",
+             x = "Angle (PC1–PC2)", y = "Radius") +
+        theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+              plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
+              panel.grid.minor = element_blank())
     } else {
-      ggplot(df, aes(PC1, PC2, color = Condition)) +
+      ggplot(df, aes(x = theta, y = r, color = Condition)) +
         geom_point(size = 3.5, alpha = 0.7) +
         scale_color_manual(values = c("Normal" = "#3498db", "Disease" = "#e74c3c", "None" = "#95a5a6"),
                           na.value = "gray60") +
+        coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                          labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        scale_y_continuous(limits = c(0, NA)) +
         theme_bw(base_size = 14) +
         labs(title = "Before Batch Correction - By Condition",
-             subtitle = "Biological signal may be obscured by batch effects",
-             x = paste0("PC1 (", var_exp[1], "%)"),
-             y = paste0("PC2 (", var_exp[2], "%)"),
-             color = "Condition") +
+             subtitle = "Biological signal may be obscured by batch effects (circular)",
+             x = "Angle (PC1–PC2)", y = "Radius", color = "Condition") +
         theme(
           plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
           plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-          legend.position = "right"
+          legend.position = "right",
+          panel.grid.minor = element_blank()
         )
     }
   })
   
-  # PCA After Batch Correction - Colored by Dataset
+  # PCA After Batch Correction - Colored by Dataset (circular / polar)
   output$pca_after_dataset <- renderPlot({
     req(rv$batch_corrected)
-    
+
     pca <- prcomp(t(rv$batch_corrected), scale. = TRUE)
     var_exp <- round(100 * pca$sdev^2 / sum(pca$sdev^2), 1)
-    
-    df <- data.frame(PC1 = pca$x[, 1], PC2 = pca$x[, 2],
-                     Dataset = rv$unified_metadata$Dataset)
-    
-    ggplot(df, aes(PC1, PC2, color = Dataset)) +
+    pc1 <- pca$x[, 1]
+    pc2 <- pca$x[, 2]
+    theta <- atan2(pc2, pc1)
+    r <- sqrt(pc1^2 + pc2^2)
+    if (max(r) > 0) r <- r / max(r)
+    df <- data.frame(theta = theta, r = r, Dataset = rv$unified_metadata$Dataset)
+
+    ggplot(df, aes(x = theta, y = r, color = Dataset)) +
       geom_point(size = 3.5, alpha = 0.7) +
+      coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+      scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                        labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+      scale_y_continuous(limits = c(0, NA)) +
       theme_bw(base_size = 14) +
       labs(title = "After Batch Correction - By Dataset",
-           subtitle = "Datasets should be intermingled (batch effects removed)",
-           x = paste0("PC1 (", var_exp[1], "%)"),
-           y = paste0("PC2 (", var_exp[2], "%)"),
-           color = "Dataset") +
+           subtitle = "Datasets should be intermingled (batch effects removed) (circular)",
+           x = "Angle (PC1–PC2)", y = "Radius", color = "Dataset") +
       theme(
         plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
         plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-        legend.position = "right"
+        legend.position = "right",
+        panel.grid.minor = element_blank()
       )
   })
   
-  # PCA After Batch Correction - Colored by Condition
+  # PCA After Batch Correction - Colored by Condition (circular / polar)
   output$pca_after_condition <- renderPlot({
     req(rv$batch_corrected)
-    
+
     pca <- prcomp(t(rv$batch_corrected), scale. = TRUE)
     var_exp <- round(100 * pca$sdev^2 / sum(pca$sdev^2), 1)
-    
-    df <- data.frame(PC1 = pca$x[, 1], PC2 = pca$x[, 2],
-                     Condition = rv$unified_metadata$Condition)
-    
-    # Only plot if conditions are available
+    pc1 <- pca$x[, 1]
+    pc2 <- pca$x[, 2]
+    theta <- atan2(pc2, pc1)
+    r <- sqrt(pc1^2 + pc2^2)
+    if (max(r) > 0) r <- r / max(r)
+    df <- data.frame(theta = theta, r = r, Condition = rv$unified_metadata$Condition)
+
     if (all(is.na(df$Condition)) || length(unique(df$Condition[!is.na(df$Condition)])) < 2) {
-      ggplot(df, aes(PC1, PC2)) +
+      ggplot(df, aes(x = theta, y = r)) +
         geom_point(size = 3.5, alpha = 0.7, color = "gray60") +
+        coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                          labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        scale_y_continuous(limits = c(0, NA)) +
         theme_bw(base_size = 14) +
         labs(title = "After Batch Correction - By Condition",
-             subtitle = "Conditions not yet assigned",
-             x = paste0("PC1 (", var_exp[1], "%)"),
-             y = paste0("PC2 (", var_exp[2], "%)")) +
-        theme(
-          plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-          plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50")
-        )
+             subtitle = "Conditions not yet assigned (circular)",
+             x = "Angle (PC1–PC2)", y = "Radius") +
+        theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+              plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
+              panel.grid.minor = element_blank())
     } else {
-      ggplot(df, aes(PC1, PC2, color = Condition)) +
+      ggplot(df, aes(x = theta, y = r, color = Condition)) +
         geom_point(size = 3.5, alpha = 0.7) +
         scale_color_manual(values = c("Normal" = "#3498db", "Disease" = "#e74c3c", "None" = "#95a5a6"),
                           na.value = "gray60") +
+        coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                          labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        scale_y_continuous(limits = c(0, NA)) +
         theme_bw(base_size = 14) +
         labs(title = "After Batch Correction - By Condition",
-             subtitle = "Biological signal should be clearly visible",
-             x = paste0("PC1 (", var_exp[1], "%)"),
-             y = paste0("PC2 (", var_exp[2], "%)"),
-             color = "Condition") +
+             subtitle = "Biological signal should be clearly visible (circular)",
+             x = "Angle (PC1–PC2)", y = "Radius", color = "Condition") +
         theme(
           plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
           plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-          legend.position = "right"
+          legend.position = "right",
+          panel.grid.minor = element_blank()
         )
     }
   })

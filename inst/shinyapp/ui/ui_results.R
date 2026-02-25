@@ -46,31 +46,30 @@ box(
                    `data-toggle` = "tooltip", `data-placement` = "top",
                    title = "Number of top differentially expressed genes to display in the heatmap, ranked by adjusted p-value.<br><b>50</b> is a good default; use 20-30 for cleaner plots, 100+ for comprehensive views.")),
             50, step = 10)),
-        column(3, br(), actionButton("run_de", "Run DE Analysis", 
+        column(3, br(), actionButton("run_de", "Run DE Analysis",
                                      icon = icon("rocket"), class = "btn-success btn-lg",
                                      style = "width:100%;"))
-        ,
-        tags$div(
-          class = "step-timer",
-          tags$span(class = "label", "Elapsed:"),
-          textOutput("de_timer", inline = TRUE)
-        )
       )
     ),
     
     fluidRow(
-      box(title = tags$span(icon("mountain"), " Volcano Plot"), 
+      box(title = tags$span(icon("mountain"), " Volcano Plot"),
           width = 8, status = "danger", solidHeader = TRUE,
-          plotOutput("volcano_plot", height = "550px")),
-      box(title = tags$span(icon("list-ol"), " Top DEGs"), 
+          plotOutput("volcano_plot", height = "550px"),
+          tags$div(style = "margin-top: 10px;",
+            downloadButton("download_volcano_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_volcano_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))),
+      box(title = tags$span(icon("list-ol"), " Top DEGs"),
           width = 4, status = "info", solidHeader = TRUE,
           DTOutput("top_degs_table"))
     ),
-    
     fluidRow(
-      box(title = tags$span(icon("th"), " Heatmap - Top DE Genes"), 
+      box(title = tags$span(icon("th"), " Heatmap - Top DE Genes"),
           width = 12, status = "success", solidHeader = TRUE,
-          plotOutput("heatmap_plot", height = "600px"))
+          plotOutput("heatmap_plot", height = "600px"),
+          tags$div(style = "margin-top: 10px;",
+            downloadButton("download_heatmap_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")))
     ),
     
     fluidRow(

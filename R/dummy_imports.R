@@ -1,0 +1,52 @@
+#' Dummy function to satisfy R CMD check that packages in Imports are used
+#'
+#' @keywords internal
+#' @name dummy_imports
+dummy_imports <- function() {
+  shiny::shinyApp
+  shinydashboard::dashboardPage
+  shinyjs::useShinyjs
+  DT::datatable
+  Biobase::exprs
+  GEOquery::getGEO
+  limma::lmFit
+  AnnotationDbi::mapIds
+  org.Hs.eg.db::org.Hs.eg.db
+  dplyr::mutate
+  data.table::fread
+  edgeR::DGEList
+  sva::ComBat
+  ggplot2::ggplot
+  gridExtra::grid.arrange
+  RColorBrewer::brewer.pal
+  pheatmap::pheatmap
+  ggrepel::geom_text_repel
+  VennDiagram::venn.diagram
+  UpSetR::upset
+  WGCNA::blockwiseModules
+  parallel::detectCores
+  clusterProfiler::enrichGO
+  enrichplot::dotplot
+  circlize::chordDiagram
+  STRINGdb::STRINGdb
+  DESeq2::DESeqDataSetFromMatrix
+  igraph::graph_from_data_frame
+  ggraph::ggraph
+  tidygraph::as_tbl_graph
+  tidyr::gather
+  randomForest::randomForest
+  caret::train
+  e1071::svm
+  glmnet::cv.glmnet
+  pROC::roc
+  kernlab::ksvm
+  tibble::tibble
+  msigdbr::msigdbr
+  ggpubr::ggboxplot
+  reshape2::melt
+  corrplot::corrplot
+  R.utils::gunzip
+  dynamicTreeCut::cutreeDynamic
+  scales::comma
+  invisible(NULL)
+}

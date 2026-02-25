@@ -10,9 +10,9 @@
 #' @return Invisible. Runs the Shiny app.
 #' @export
 #' @examples
-#' \dontrun{
-#' runOmniVerse()
-#' runOmniVerse(launch.browser = TRUE, port = 3838)
+#' if (interactive()) {
+#'   runOmniVerse()
+#'   runOmniVerse(launch.browser = TRUE, port = 3838)
 #' }
 runOmniVerse <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
   app_dir <- system.file("shinyapp", package = "OmniVerse")

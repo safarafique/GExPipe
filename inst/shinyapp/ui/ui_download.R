@@ -39,6 +39,7 @@ ui_download <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         tags$p(tags$strong("Purpose:"), " Download expression data from NCBI GEO for RNA-seq and/or microarray. Data are mapped to gene symbols and merged to a common gene set for downstream analysis.", style = "margin-bottom: 8px;"),
         tags$p(tags$strong("Methods:"), " RNA-seq uses NCBI-provided raw counts with TMM normalization; microarray uses GEO Series Matrix with platform-specific annotation. Common genes (intersection across datasets) are retained.", style = "margin-bottom: 8px;"),
+        tags$p(tags$strong("Storage:"), " Downloaded files are stored in ", tags$code("micro_data"), " (microarray/CEL) and ", tags$code("rna_data"), " (bulk RNA-seq). These folders are cleared at the start of each new run and when you click Reset, so only the current run's data is kept—no accumulation across multiple uses.", style = "margin-bottom: 8px;"),
         tags$p(tags$strong("Output:"), " Combined expression matrix (genes × samples), sample metadata, and gene overlap statistics for QC.", style = "margin-bottom: 0;")
       )
     ),

@@ -2,56 +2,15 @@
 # GLOBAL.R - Libraries, Functions, and Global Variables
 # ==============================================================================
 
-# Longer timeout for package installs (avoid download timeouts on first run)
+# Timeout for GEO/downloads (user data), not for package installation
 options(timeout = 600)
 
 # ==============================================================================
-# INSTALL AND LOAD PACKAGES (R 4.5.2: compact & complete; no extra steps)
+# LOAD PACKAGES (Bioconductor-compliant: no runtime install; use BiocManager::install("OmniVerse"))
 # ==============================================================================
 cat("Loading packages (R ", R.version.string, ")...\n")
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager", repos = "https://cloud.r-project.org")
-BIOC_VERSION <- "3.22"
-.r_minor <- as.integer(strsplit(R.version$minor, "\\.")[[1]][1])
-if (as.integer(R.version$major) == 4L && .r_minor < 5L)
-  BIOC_VERSION <- c("3.18", "3.20")[min(.r_minor - 2L, 2L)]
-message("Bioconductor ", BIOC_VERSION)
 
-# Core Bioconductor (install missing; one failure does not stop others)
-bioc_core <- c("Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
-               "edgeR", "sva", "VennDiagram", "clusterProfiler", "enrichplot", "STRINGdb", "DESeq2")
-for (pkg in bioc_core) {
-  if (!requireNamespace(pkg, quietly = TRUE))
-    tryCatch(BiocManager::install(pkg, version = BIOC_VERSION, update = FALSE, ask = FALSE), error = function(e) message("Install failed for ", pkg, ": ", conditionMessage(e)))
-}
-if (!requireNamespace("WGCNA", quietly = TRUE)) {
-  tryCatch(install.packages("WGCNA", dependencies = TRUE, repos = "https://cloud.r-project.org"),
-           error = function(e) tryCatch(BiocManager::install("WGCNA", version = BIOC_VERSION, update = FALSE, ask = FALSE), error = function(e2) message("WGCNA install failed: ", conditionMessage(e2))))
-}
-# Core CRAN (install missing; one failure does not stop others)
-cran_core <- c("shiny", "shinydashboard", "shinyjs", "DT", "ggplot2", "gridExtra", "RColorBrewer",
-               "pheatmap", "ggrepel", "dplyr", "data.table", "UpSetR", "circlize", "igraph", "ggraph",
-               "tidygraph", "tidyr", "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
-               "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils", "dynamicTreeCut", "scales")
-for (pkg in cran_core) {
-  if (!requireNamespace(pkg, quietly = TRUE))
-    tryCatch(install.packages(pkg, dependencies = TRUE, repos = "https://cloud.r-project.org"), error = function(e) message("Install failed for ", pkg, ": ", conditionMessage(e)))
-}
-# Optional (do not block app)
-# Optional Bioc packages (all on Bioconductor). immunedeconv is GitHub-only; not auto-installed.
-bioc_opt <- c("mixOmics", "biomaRt", "hugene10sttranscriptcluster.db",
-              "hugene20sttranscriptcluster.db", "hta20transcriptcluster.db", "affy", "oligo")
-for (pkg in bioc_opt) {
-  if (!requireNamespace(pkg, quietly = TRUE))
-    tryCatch(BiocManager::install(pkg, version = BIOC_VERSION, update = FALSE, ask = FALSE), error = function(e) NULL)
-}
-cran_opt <- c("Boruta", "xgboost", "SHAPforxgboost", "Hmisc", "rms", "rmda", "cicerone")
-for (pkg in cran_opt) {
-  if (!requireNamespace(pkg, quietly = TRUE))
-    tryCatch(install.packages(pkg, dependencies = TRUE, repos = "https://cloud.r-project.org"), error = function(e) NULL)
-}
-
-# Load core + optional (car: use car::vif() in nomogram when needed)
+# Load Imports (required). Do not install at runtime; dependencies must be declared in DESCRIPTION.
 suppressPackageStartupMessages({
   library(shiny); library(shinydashboard); library(shinyjs); library(DT)
   library(Biobase); library(GEOquery); library(limma); library(AnnotationDbi); library(org.Hs.eg.db)
@@ -63,37 +22,30 @@ suppressPackageStartupMessages({
   library(randomForest); library(caret); library(e1071); library(glmnet); library(pROC); library(kernlab)
   library(tibble); library(msigdbr); library(ggpubr); library(reshape2); library(corrplot)
   library(R.utils); library(dynamicTreeCut); library(scales)
-  if (requireNamespace("Boruta", quietly = TRUE)) library(Boruta)
-  if (requireNamespace("mixOmics", quietly = TRUE)) library(mixOmics)
-  if (requireNamespace("xgboost", quietly = TRUE)) library(xgboost)
-  if (requireNamespace("SHAPforxgboost", quietly = TRUE)) library(SHAPforxgboost)
-  if (requireNamespace("immunedeconv", quietly = TRUE)) library(immunedeconv)
-  if (requireNamespace("rms", quietly = TRUE)) library(rms)
-  if (requireNamespace("rmda", quietly = TRUE)) library(rmda)
-  if (requireNamespace("cicerone", quietly = TRUE)) library(cicerone)
-  if (requireNamespace("biomaRt", quietly = TRUE)) library(biomaRt)
 })
+# Optional Suggests (loaded only if present)
+if (requireNamespace("Boruta", quietly = TRUE)) suppressPackageStartupMessages(library(Boruta))
+if (requireNamespace("mixOmics", quietly = TRUE)) suppressPackageStartupMessages(library(mixOmics))
+if (requireNamespace("xgboost", quietly = TRUE)) suppressPackageStartupMessages(library(xgboost))
+if (requireNamespace("SHAPforxgboost", quietly = TRUE)) suppressPackageStartupMessages(library(SHAPforxgboost))
+if (requireNamespace("immunedeconv", quietly = TRUE)) suppressPackageStartupMessages(library(immunedeconv))
+if (requireNamespace("rms", quietly = TRUE)) suppressPackageStartupMessages(library(rms))
+if (requireNamespace("rmda", quietly = TRUE)) suppressPackageStartupMessages(library(rmda))
+if (requireNamespace("cicerone", quietly = TRUE)) suppressPackageStartupMessages(library(cicerone))
+if (requireNamespace("biomaRt", quietly = TRUE)) suppressPackageStartupMessages(library(biomaRt))
 
-# Optional: check that core packages are loaded (warn only so app still starts)
-tryCatch({
-  required_loaded <- c("shiny", "shinydashboard", "shinyjs", "DT", "Biobase", "GEOquery", "limma",
-    "AnnotationDbi", "org.Hs.eg.db", "dplyr", "data.table", "edgeR", "sva", "ggplot2", "gridExtra",
-    "RColorBrewer", "pheatmap", "ggrepel", "VennDiagram", "UpSetR", "WGCNA", "clusterProfiler",
-    "enrichplot", "circlize", "STRINGdb", "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
-    "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab", "tibble", "msigdbr", "ggpubr",
-    "reshape2", "corrplot", "R.utils", "dynamicTreeCut", "scales")
-  missing <- required_loaded[!sapply(required_loaded, function(p) isNamespaceLoaded(p) || requireNamespace(p, quietly = TRUE))]
-  if (length(missing) > 0L) {
-    bioc_core_vec <- c("Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db", "edgeR", "sva",
-      "VennDiagram", "clusterProfiler", "enrichplot", "STRINGdb", "DESeq2", "WGCNA")
-    bioc_miss <- intersect(missing, bioc_core_vec)
-    cran_miss <- setdiff(missing, bioc_miss)
-    msg <- paste0("OmniVerse: some packages could not be loaded (", paste(missing, collapse = ", "), "). In R run: ")
-    if (length(cran_miss) > 0L) msg <- paste0(msg, "install.packages(c(\"", paste(cran_miss, collapse = "\", \""), "\"), repos = \"https://cloud.r-project.org\"); ")
-    if (length(bioc_miss) > 0L) msg <- paste0(msg, "BiocManager::install(c(\"", paste(bioc_miss, collapse = "\", \""), "\")). Then restart the app.")
-    warning(msg)
-  }
-}, error = function(e) message("Package check skipped: ", conditionMessage(e)))
+# If any required package failed to load, warn with Bioconductor-friendly message
+required_loaded <- c("shiny", "shinydashboard", "shinyjs", "DT", "Biobase", "GEOquery", "limma",
+  "AnnotationDbi", "org.Hs.eg.db", "dplyr", "data.table", "edgeR", "sva", "ggplot2", "gridExtra",
+  "RColorBrewer", "pheatmap", "ggrepel", "VennDiagram", "UpSetR", "WGCNA", "clusterProfiler",
+  "enrichplot", "circlize", "STRINGdb", "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
+  "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab", "tibble", "msigdbr", "ggpubr",
+  "reshape2", "corrplot", "R.utils", "dynamicTreeCut", "scales")
+missing <- required_loaded[!sapply(required_loaded, function(p) isNamespaceLoaded(p) || requireNamespace(p, quietly = TRUE))]
+if (length(missing) > 0L) {
+  warning("OmniVerse: required packages missing (", paste(missing, collapse = ", "), "). ",
+          "Install with: BiocManager::install(\"OmniVerse\") then restart the app.")
+}
 
 # Allow large workspace .rds uploads (default Shiny limit is 5 MB)
 options(shiny.maxRequestSize = 500 * 1024^2)  # 500 MB
@@ -601,10 +553,7 @@ probe_ids_to_symbol_hugene_db <- function(probe_ids, gpl_id = NULL) {
   if (length(pkgs_to_try) == 0)
     pkgs_to_try <- HUGENE_DB_PACKAGES
   for (pkg in pkgs_to_try) {
-    if (!requireNamespace(pkg, quietly = TRUE)) {
-      tryCatch(BiocManager::install(pkg, update = FALSE, ask = FALSE), error = function(e) NULL)
-      if (!requireNamespace(pkg, quietly = TRUE)) next
-    }
+    if (!requireNamespace(pkg, quietly = TRUE)) next
     suppressPackageStartupMessages(library(pkg, character.only = TRUE))
     env <- get(pkg)
     # Bioconductor .db packages use numeric PROBEID (e.g. 2824546), not 2824546_st - try stripped FIRST
@@ -846,10 +795,7 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset, gse_id = NULL) {
   }
   platform_id <- annotation(micro_eset)
   annot_pkg <- platform_to_annot[[platform_id]]
-  if (!is.null(annot_pkg) && !is.na(annot_pkg)) {
-    if (!requireNamespace(annot_pkg, quietly = TRUE)) {
-      BiocManager::install(annot_pkg, update = FALSE, ask = FALSE)
-    }
+  if (!is.null(annot_pkg) && !is.na(annot_pkg) && requireNamespace(annot_pkg, quietly = TRUE)) {
     suppressPackageStartupMessages(library(annot_pkg, character.only = TRUE))
     gene_symbols <- tryCatch({
       mapIds(get(annot_pkg), keys = probe_ids, column = "SYMBOL",
@@ -1032,7 +978,9 @@ read_count_matrix <- function(file_path) {
     df <- tryCatch(
       read_with_suppress(file_path),
       error = function(e) {
-        if (!requireNamespace("R.utils", quietly = TRUE)) install.packages("R.utils")
+        if (!requireNamespace("R.utils", quietly = TRUE)) {
+          stop("Cannot read .gz file: R.utils is required. Install OmniVerse with BiocManager::install(\"OmniVerse\").")
+        }
         R.utils::gunzip(file_path, remove = FALSE, overwrite = TRUE)
         tmp <- gsub("\\.gz$", "", file_path, ignore.case = TRUE)
         out <- suppressWarnings(data.table::fread(tmp, data.table = FALSE))
@@ -1065,12 +1013,12 @@ classify_groups <- function(group_info, normal_keywords, disease_keywords) {
 normalize_microarray <- function(expr_matrix, dataset_name = NULL, method = "quantile") {
   # Track initial state
   initial_genes <- nrow(expr_matrix)
-  
+
   expr_matrix <- expr_matrix[rowSums(is.na(expr_matrix)) < ncol(expr_matrix), ]
   expr_matrix <- expr_matrix[, colSums(is.na(expr_matrix)) < nrow(expr_matrix)]
-  
+
   genes_after_na_removal <- nrow(expr_matrix)
-  
+
   max_val <- max(expr_matrix, na.rm = TRUE)
   log2_applied <- FALSE
   if (max_val > 50) {
@@ -1079,9 +1027,9 @@ normalize_microarray <- function(expr_matrix, dataset_name = NULL, method = "qua
     expr_matrix <- log2(expr_matrix + 1)
     log2_applied <- TRUE
   }
-  
+
   expr_norm <- normalizeBetweenArrays(expr_matrix, method = "quantile")
-  
+
   # Store normalization info as attribute
   attr(expr_norm, "normalization_info") <- list(
     initial_genes = initial_genes,
@@ -1090,7 +1038,7 @@ normalize_microarray <- function(expr_matrix, dataset_name = NULL, method = "qua
     log2_applied = log2_applied,
     method = method
   )
-  
+
   return(expr_norm)
 }
 
@@ -1139,26 +1087,26 @@ normalize_microarray_rma <- function(cel_paths, platform_id, dataset_name = NULL
 normalize_rnaseq <- function(count_matrix, dataset_name = NULL, method = "TMM") {
   # Track initial state
   initial_genes <- nrow(count_matrix)
-  
+
   count_matrix <- as.matrix(count_matrix)
   mode(count_matrix) <- "numeric"
   count_matrix <- round(count_matrix)
   count_matrix[count_matrix < 0] <- 0
-  
+
   # Filter: keep genes with counts >= 10 in at least 3 samples
   keep <- rowSums(count_matrix >= 10) >= 3
   count_matrix <- count_matrix[keep, ]
-  
+
   genes_after_filtering <- nrow(count_matrix)
   genes_removed <- initial_genes - genes_after_filtering
-  
+
   dge <- DGEList(counts = count_matrix)
   if (method == "TMM") {
     dge <- calcNormFactors(dge, method = "TMM")
   }
   # log2(CPM+1): same call; when norm.factors are 1 (no TMM), this is simple log2(CPM+1)
   logcpm_matrix <- cpm(dge, log = TRUE, prior.count = 1)
-  
+
   # Store normalization info as attribute
   attr(logcpm_matrix, "normalization_info") <- list(
     initial_genes = initial_genes,
@@ -1167,7 +1115,7 @@ normalize_rnaseq <- function(count_matrix, dataset_name = NULL, method = "TMM") 
     final_genes = nrow(logcpm_matrix),
     method = method
   )
-  
+
   return(logcpm_matrix)
 }
 
