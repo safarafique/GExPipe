@@ -1,5 +1,6 @@
 ^\.Rbuildignore$
 ^\.git$
+^\.gitignore$
 ^\.Rproj\.user$
 ^.*\.Rproj$
 ^tests$
@@ -9,3 +10,10 @@
 ^OmniVerse\.BiocCheck$
 ^OmniVerse\.Rcheck$
 ^OmniVerse_.*\.tar\.gz$
+^app$
+^OmniVerse/
+^inst/shinyapp/micro_data
+^inst/shinyapp/rna_data
+^inst/shinyapp/saved_workspaces
+^inst/shinyapp/.*\.log$
+^vignettes/OmniVerse\.Rmd$
