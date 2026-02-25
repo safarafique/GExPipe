@@ -25,6 +25,15 @@ runOmniVerse()
 
 Install OmniVerse (e.g. `BiocManager::install("OmniVerse")`) so all dependencies are installed; the app does not install packages at runtime.
 
+## Package versions (tested with)
+
+A full list of package names and versions the app was tested with is in the installed package:
+
+- **`inst/pkg_versions.txt`** — tab-separated list (package, version) for scripting or pasting.
+- **`inst/PACKAGE_VERSIONS.md`** — same info plus how to get it from R: `system.file("pkg_versions.txt", package = "OmniVerse")`.
+
+Use these when reporting issues or when you need complete info about which packages and versions are used.
+
 ## Bioconductor submission checklist
 
 - **High-throughput genomic analysis**: RNA-seq, microarrays (GEO), differential expression, pathways, WGCNA, PPI.
