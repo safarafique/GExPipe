@@ -26,8 +26,8 @@ microarray, GEO download, QC, normalization, differential expression,
 WGCNA, pathway enrichment, PPI, machine learning, and more).
 }
 \examples{
-\dontrun{
-runOmniVerse()
-runOmniVerse(launch.browser = TRUE, port = 3838)
+if (interactive()) {
+  runOmniVerse()
+  runOmniVerse(launch.browser = TRUE, port = 3838)
 }
 }

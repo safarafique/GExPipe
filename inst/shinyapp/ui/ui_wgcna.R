@@ -472,6 +472,10 @@ ui_wgcna <- tabItem(
             )
           ),
           tags$hr(),
+          tags$h5(icon("chart-scatter"), " Gene Significance vs Module Membership (selected module)",
+                 style = "color: #2c3e50; margin-bottom: 15px;"),
+          plotOutput("gs_mm_plot", height = "420px"),
+          tags$hr(),
           DT::dataTableOutput("module_genes_table"),
           tags$hr(),
           fluidRow(

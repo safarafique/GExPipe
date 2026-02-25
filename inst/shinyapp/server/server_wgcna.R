@@ -136,20 +136,26 @@ server_wgcna <- function(input, output, session, rv) {
         }
         
         gene_mode <- if (!is.null(input$wgcna_gene_mode)) input$wgcna_gene_mode else "top_variable"
+        # Variance is needed later for wgcna_gene_variance_table in both modes
+        vars <- apply(expr_mat, 1, var, na.rm = TRUE)
         if (gene_mode == "all_common") {
           expr_top <- expr_mat
           add_wgcna_log(paste("Using all common genes:", nrow(expr_top), "genes"))
         } else {
-          # Select top variable genes
-          vars <- apply(expr_mat, 1, var, na.rm = TRUE)
-          top_n <- min(input$wgcna_top_genes, length(vars))
+          # Select top variable genes (wgcna_top_genes only exists when top_variable is selected)
+          top_n <- min(
+            if (!is.null(input$wgcna_top_genes)) as.integer(input$wgcna_top_genes) else 5000L,
+            length(vars)
+          )
           keep_genes <- names(sort(vars, decreasing = TRUE))[1:top_n]
           expr_top <- expr_mat[keep_genes, , drop = FALSE]
           add_wgcna_log(paste("Selected top", top_n, "most variable genes"))
         }
         
-        # Filter by minimum samples
-        min_samples <- ceiling(input$wgcna_min_samples * ncol(expr_top))
+        # Filter by minimum samples (use safe default if input not set)
+        min_frac <- if (!is.null(input$wgcna_min_samples)) as.numeric(input$wgcna_min_samples) else 0.5
+        min_frac <- max(0.1, min(1, min_frac))
+        min_samples <- ceiling(min_frac * ncol(expr_top))
         keep <- rowSums(!is.na(expr_top)) >= min_samples
         expr_top <- expr_top[keep, , drop = FALSE]
         
@@ -1396,6 +1402,39 @@ server_wgcna <- function(input, output, session, rv) {
         tags$p("Significant genes: ", n_sig)
       }
     )
+  })
+  
+  # GS vs MM scatter for selected module (e.g. when a significant module is selected)
+  output$gs_mm_plot <- renderPlot({
+    req(input$select_module, rv$gene_metrics)
+    gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
+    mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
+    module_genes <- rv$gene_metrics[rv$gene_metrics$Module == input$select_module, ]
+    if (nrow(module_genes) == 0) {
+      plot.new()
+      title(main = paste("No genes in module", input$select_module))
+      return(invisible(NULL))
+    }
+    module_genes <- as.data.frame(module_genes)
+    module_genes$Significant <- (module_genes$GS.pvalue < gs_pval & abs(module_genes$MM) >= mm_cor)
+    mod_color <- input$select_module
+    if (!requireNamespace("ggplot2", quietly = TRUE)) {
+      plot(module_genes$MM, module_genes$GS,
+           xlab = "Module Membership (MM)", ylab = "Gene Significance (GS)",
+           main = paste("GS vs MM — Module:", mod_color),
+           col = if (mod_color == "grey") "grey50" else mod_color, pch = 19)
+      return(invisible(NULL))
+    }
+    p <- ggplot2::ggplot(module_genes, ggplot2::aes(x = MM, y = GS)) +
+      ggplot2::geom_point(ggplot2::aes(color = Significant), alpha = 0.7, size = 2) +
+      ggplot2::scale_color_manual(values = c("TRUE" = "darkred", "FALSE" = "grey70"), name = "GS/MM significant") +
+      ggplot2::labs(
+        title = paste0("Gene Significance vs Module Membership — Module: ", mod_color),
+        x = "Module Membership (MM)", y = "Gene Significance (GS)"
+      ) +
+      ggplot2::theme_minimal(base_size = 12) +
+      ggplot2::theme(legend.position = "top", plot.title = ggplot2::element_text(hjust = 0.5))
+    print(p)
   })
   
   output$module_genes_table <- DT::renderDataTable({

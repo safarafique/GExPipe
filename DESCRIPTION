@@ -2,14 +2,19 @@ Package: OmniVerse
 Title: Multi-Omics RNA Analysis Shiny Application
 Version: 0.1.0
 Authors@R: person("Safa", "Rafique", email = "safa.res.sbb@pu.edu.pk", role = c("aut", "cre"))
-BugReports: https://github.com/yourname/OmniVerse/issues
-Description: Compact Shiny app for bulk RNA-seq and microarray analysis (GEO). No extra
-  setup on R 4.5.2: dependencies auto-install. Download, QC, normalization, DE, WGCNA,
-  pathways, PPI, ML, immune deconvolution, validation. Auto-saves 5 min after download.
-biocViews: Software, GeneExpression, RNASeq, Microarray, DifferentialExpression, Pathways, Network, Visualization, GUI
+Description: Shiny application for high-throughput genomic analysis of bulk RNA-seq and
+  microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase,
+  limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
+  normalization, batch correction, differential expression, WGCNA, pathway enrichment,
+  PPI, machine learning, and optional immune deconvolution. Uses common data structures
+  (ExpressionSet, DGEList) for interoperability. Install with BiocManager::install("OmniVerse").
 License: MIT + file LICENSE
 Encoding: UTF-8
-Depends: R (>= 4.5.2)
+Depends: R (>= 4.5.0)
+biocViews: Software, GeneExpression, RNASeq, Microarray, DifferentialExpression,
+    Pathways, Network, Visualization
+URL: https://bioconductor.org/packages/OmniVerse
+BugReports: https://support.bioconductor.org/tag/OmniVerse
 Imports:
     shiny,
     shinydashboard,
@@ -68,7 +73,9 @@ Suggests:
     oligo,
     affy,
     knitr,
-    rmarkdown
+    rmarkdown,
+    BiocCheck
 VignetteBuilder: knitr
 SystemRequirements: GNU make
 Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3

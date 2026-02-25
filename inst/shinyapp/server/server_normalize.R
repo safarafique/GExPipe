@@ -43,16 +43,14 @@ server_normalize <- function(input, output, session, rv) {
     )
     
     withProgress(message = 'Normalizing...', value = 0, {
-      
       log_text <- "Normalizing data...\n\n"
-      
       all_expr_norm <- list()
       normalization_stats <- list()
-      
+
       # Normalization method choices (defaults if not set)
       micro_norm_method <- if (!is.null(input$micro_norm_method)) input$micro_norm_method else "quantile"
       rnaseq_norm_method <- if (!is.null(input$rnaseq_norm_method)) input$rnaseq_norm_method else "TMM"
-      
+
       # Normalize microarray
       if (length(rv$micro_expr_list) > 0) {
         log_text <- paste0(log_text, "Microarray normalization (method: ", micro_norm_method, "):\n")
@@ -140,17 +138,16 @@ server_normalize <- function(input, output, session, rv) {
       log_text <- paste0(log_text, "\nAutomatic gene filtering (background process):\n")
       log_text <- paste0(log_text, "  Filtering to common genes ensures consistent gene sets across datasets.\n")
       log_text <- paste0(log_text, "  This is required for accurate batch correction and differential expression analysis.\n")
-      
-      # Filter to common genes (intersection) - always done automatically
+
       rv$common_genes <- Reduce(intersect, gene_lists)
       for (i in seq_along(all_expr_norm)) {
         all_expr_norm[[i]] <- all_expr_norm[[i]][rv$common_genes, ]
       }
-      
+
       filter_status <- "Filtered to common genes (intersection)"
       filter_note <- paste0("  Common genes retained: ", format(length(rv$common_genes), big.mark = ","), "\n")
       final_count <- length(rv$common_genes)
-      
+
       log_text <- paste0(log_text, "  ✓ Common genes identified: ", format(length(rv$common_genes), big.mark = ","), "\n")
       
       # Store statistics for reporting
@@ -164,13 +161,14 @@ server_normalize <- function(input, output, session, rv) {
       
       # Store pre-combined normalized data for visualization
       rv$all_expr_norm_list <- all_expr_norm
-      
+
       # Combine individual normalized datasets (before global normalization)
       combined_before_global <- do.call(cbind, all_expr_norm)
-      
-      # Store before global normalization for comparison plot
       rv$combined_expr_before_global_norm <- combined_before_global
-      
+
+      # Apply global quantile normalization
+      rv$combined_expr <- normalizeBetweenArrays(combined_before_global, method = "quantile")
+
       # ====================================================================
       # SAVE RAW COUNTS FOR DESeq2 (before global quantile normalization)
       # ====================================================================
@@ -197,9 +195,6 @@ server_normalize <- function(input, output, session, rv) {
                             format(ncol(rv$raw_counts_for_deseq2), big.mark = ","), " samples\n")
         }
       }
-      
-      # Apply global quantile normalization
-      rv$combined_expr <- normalizeBetweenArrays(combined_before_global, method = "quantile")
       
       # Create metadata
       micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
@@ -285,16 +280,16 @@ server_normalize <- function(input, output, session, rv) {
       
       # Generate report caption
       rv$normalization_caption <- paste0(
-        "Gene Expression Normalization Pipeline: Starting with ", 
-        format(initial_total, big.mark = ","), " total genes across ", 
+        "Gene Expression Normalization Pipeline: Starting with ",
+        format(initial_total, big.mark = ","), " total genes across ",
         length(all_expr_norm), " dataset(s)",
         if (rnaseq_removed > 0) {
-          paste0(", ", format(rnaseq_removed, big.mark = ","), 
+          paste0(", ", format(rnaseq_removed, big.mark = ","),
                  " genes were removed due to low-expression filtering (RNA-seq)")
         },
         ", resulting in ", format(after_filter_total, big.mark = ","),
         " genes after individual dataset normalization. ",
-        "After automatic filtering to common genes (intersection), ", 
+        "After automatic filtering to common genes (intersection), ",
         format(final_count, big.mark = ","),
         " high-confidence genes present in all datasets were retained for downstream analysis."
       )
@@ -317,7 +312,7 @@ server_normalize <- function(input, output, session, rv) {
         tags$div(
           tags$strong("✓ Normalization complete!"),
           tags$br(),
-          tags$span("Genes: ", format(total_genes, big.mark = ","), 
+          tags$span("Genes: ", format(total_genes, big.mark = ","),
                     " | Samples: ", format(total_samples, big.mark = ",")),
           style = "font-size: 13px;"
         ),
@@ -365,7 +360,7 @@ server_normalize <- function(input, output, session, rv) {
       for (i in seq_along(all_expr_norm)) {
         all_expr_norm[[i]] <- all_expr_norm[[i]][rv$common_genes, ]
       }
-      
+
       # Save raw counts for DESeq2 before global normalization
       if (length(rv$rna_counts_list) > 0) {
         raw_counts_list <- list()

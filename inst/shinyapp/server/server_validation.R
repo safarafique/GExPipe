@@ -133,12 +133,18 @@ server_validation <- function(input, output, session, rv) {
         else if (platform == "microarray") { micro_ids <- gse_ids }
         else { rnaseq_ids <- gse_ids; micro_ids <- gse_ids }
 
+        # Clear previous external validation cache so this run doesn't mix with old files
+        rna_dir <- file.path(getwd(), "ext_val_rna")
+        if (dir.exists(rna_dir) && length(rnaseq_ids) > 0) {
+          tryCatch({ unlink(rna_dir, recursive = TRUE, force = TRUE) }, error = function(e) NULL)
+        }
+        if (length(rnaseq_ids) > 0) dir.create(rna_dir, showWarnings = FALSE, recursive = TRUE)
+
         # ---- Download RNA-seq ----
         for (gse_id in rnaseq_ids) {
           incProgress(0.2 / max(1, length(gse_ids)), detail = paste0(gse_id, " (RNA-seq)"))
           ext_log <- paste0(ext_log, gse_id, " (RNA-seq)... ")
-          rna_dir <- file.path(getwd(), "ext_val_rna")
-          dir.create(rna_dir, showWarnings = FALSE, recursive = TRUE)
+          if (!dir.exists(rna_dir)) dir.create(rna_dir, showWarnings = FALSE, recursive = TRUE)
           gse_dir <- file.path(rna_dir, gse_id)
           dir.create(gse_dir, showWarnings = FALSE)
           count_file <- tryCatch(download_ncbi_raw_counts(gse_id, gse_dir), error = function(e) NULL)

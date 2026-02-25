@@ -4,13 +4,6 @@
 
 server_results <- function(input, output, session, rv) {
 
-  output$de_timer <- renderText({
-    if (!isTRUE(rv$de_running) || is.null(rv$de_start)) return("00:00")
-    invalidateLater(1000, session)
-    elapsed <- as.integer(difftime(Sys.time(), rv$de_start, units = "secs"))
-    sprintf("%02d:%02d", elapsed %/% 60, elapsed %% 60)
-  })
-  
   # ---------- METHOD BANNER (shows active DE method on Step 6) ----------
   output$de_method_banner <- renderUI({
     method <- rv$de_method
@@ -573,7 +566,162 @@ server_results <- function(input, output, session, rv) {
            cex = 1.0, col = "#e74c3c")
     })
   })
-  
+
+  # Download volcano plot (PNG)
+  output$download_volcano_png <- downloadHandler(
+    filename = function() "Volcano_Plot.png",
+    content = function(file) {
+      req(rv$de_results)
+      volcano_data <- as.data.frame(rv$de_results, stringsAsFactors = FALSE)
+      if (!"Gene" %in% names(volcano_data)) volcano_data$Gene <- rownames(rv$de_results)
+      volcano_data$Gene <- as.character(volcano_data$Gene)
+      if (!"Significance" %in% names(volcano_data)) volcano_data$Significance <- "Not Significant"
+      volcano_data$Significance <- as.character(volcano_data$Significance)
+      volcano_data$Significance[!volcano_data$Significance %in% c("Up-regulated", "Down-regulated", "Not Significant")] <- "Not Significant"
+      volcano_data$Significance <- factor(volcano_data$Significance, levels = c("Not Significant", "Down-regulated", "Up-regulated"))
+      min_padj <- min(volcano_data$adj.P.Val[volcano_data$adj.P.Val > 0], na.rm = TRUE)
+      if (is.infinite(min_padj) || is.na(min_padj)) min_padj <- 1e-300
+      volcano_data$adj.P.Val[volcano_data$adj.P.Val == 0] <- min_padj
+      volcano_data$neg_log10_padj <- -log10(volcano_data$adj.P.Val)
+      max_finite <- max(volcano_data$neg_log10_padj[is.finite(volcano_data$neg_log10_padj)], na.rm = TRUE)
+      if (is.finite(max_finite)) volcano_data$neg_log10_padj[!is.finite(volcano_data$neg_log10_padj)] <- max_finite + 1
+      volcano_data <- volcano_data[is.finite(volcano_data$logFC) & is.finite(volcano_data$neg_log10_padj), ]
+      volcano_data$Label <- ""
+      top_genes_to_label <- rbind(
+        head(volcano_data[order(volcano_data$adj.P.Val), ], 15),
+        head(volcano_data[order(-abs(volcano_data$logFC)), ], 15)
+      )
+      volcano_data$Label[volcano_data$Gene %in% top_genes_to_label$Gene] <- volcano_data$Gene[volcano_data$Gene %in% top_genes_to_label$Gene]
+      n_up <- sum(volcano_data$Significance == "Up-regulated", na.rm = TRUE)
+      n_down <- sum(volcano_data$Significance == "Down-regulated", na.rm = TRUE)
+      n_sig <- n_up + n_down
+      logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
+      padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
+      p <- ggplot(volcano_data, aes(x = logFC, y = neg_log10_padj, color = Significance)) +
+        geom_point(alpha = 0.6, size = 2) +
+        scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
+        theme_bw(base_size = 14) +
+        labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        geom_text_repel(aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
+        theme(plot.title = element_text(face = "bold", size = 16), plot.subtitle = element_text(size = 12), legend.position = "right")
+      ggsave(file, plot = p, device = "png", width = 10, height = 7, dpi = 150, bg = "white")
+    }
+  )
+
+  # Download volcano plot (PDF)
+  output$download_volcano_pdf <- downloadHandler(
+    filename = function() "Volcano_Plot.pdf",
+    content = function(file) {
+      req(rv$de_results)
+      volcano_data <- as.data.frame(rv$de_results, stringsAsFactors = FALSE)
+      if (!"Gene" %in% names(volcano_data)) volcano_data$Gene <- rownames(rv$de_results)
+      volcano_data$Gene <- as.character(volcano_data$Gene)
+      if (!"Significance" %in% names(volcano_data)) volcano_data$Significance <- "Not Significant"
+      volcano_data$Significance <- as.character(volcano_data$Significance)
+      volcano_data$Significance[!volcano_data$Significance %in% c("Up-regulated", "Down-regulated", "Not Significant")] <- "Not Significant"
+      volcano_data$Significance <- factor(volcano_data$Significance, levels = c("Not Significant", "Down-regulated", "Up-regulated"))
+      min_padj <- min(volcano_data$adj.P.Val[volcano_data$adj.P.Val > 0], na.rm = TRUE)
+      if (is.infinite(min_padj) || is.na(min_padj)) min_padj <- 1e-300
+      volcano_data$adj.P.Val[volcano_data$adj.P.Val == 0] <- min_padj
+      volcano_data$neg_log10_padj <- -log10(volcano_data$adj.P.Val)
+      max_finite <- max(volcano_data$neg_log10_padj[is.finite(volcano_data$neg_log10_padj)], na.rm = TRUE)
+      if (is.finite(max_finite)) volcano_data$neg_log10_padj[!is.finite(volcano_data$neg_log10_padj)] <- max_finite + 1
+      volcano_data <- volcano_data[is.finite(volcano_data$logFC) & is.finite(volcano_data$neg_log10_padj), ]
+      volcano_data$Label <- ""
+      top_genes_to_label <- rbind(head(volcano_data[order(volcano_data$adj.P.Val), ], 15), head(volcano_data[order(-abs(volcano_data$logFC)), ], 15))
+      volcano_data$Label[volcano_data$Gene %in% top_genes_to_label$Gene] <- volcano_data$Gene[volcano_data$Gene %in% top_genes_to_label$Gene]
+      n_up <- sum(volcano_data$Significance == "Up-regulated", na.rm = TRUE)
+      n_down <- sum(volcano_data$Significance == "Down-regulated", na.rm = TRUE)
+      n_sig <- n_up + n_down
+      logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
+      padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
+      p <- ggplot(volcano_data, aes(x = logFC, y = neg_log10_padj, color = Significance)) +
+        geom_point(alpha = 0.6, size = 2) +
+        scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
+        theme_bw(base_size = 14) +
+        labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        geom_text_repel(aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
+        theme(plot.title = element_text(face = "bold", size = 16), plot.subtitle = element_text(size = 12), legend.position = "right")
+      ggsave(file, plot = p, device = "pdf", width = 10, height = 7, bg = "white")
+    }
+  )
+
+  # Download heatmap (PNG)
+  output$download_heatmap_png <- downloadHandler(
+    filename = function() "DE_Heatmap_Top_Genes.png",
+    content = function(file) {
+      req(rv$de_results, rv$batch_corrected)
+      top <- head(rv$de_results[order(rv$de_results$adj.P.Val), ], input$top_genes)
+      valid_genes <- intersect(top$Gene, rownames(rv$batch_corrected))
+      if (length(valid_genes) == 0) {
+        bc_genes_upper <- toupper(rownames(rv$batch_corrected)); names(bc_genes_upper) <- rownames(rv$batch_corrected)
+        top_upper <- toupper(top$Gene); matched <- bc_genes_upper[bc_genes_upper %in% top_upper]; valid_genes <- names(matched)
+      }
+      if (length(valid_genes) < 2) return()
+      expr <- rv$batch_corrected[valid_genes, , drop = FALSE]
+      row_vars <- apply(expr, 1, var, na.rm = TRUE)
+      expr <- expr[!is.na(row_vars) & row_vars > 0, , drop = FALSE]
+      if (nrow(expr) < 2) return()
+      expr_scaled <- t(scale(t(expr)))
+      samp <- colnames(expr_scaled)
+      meta <- rv$unified_metadata
+      idx <- match(samp, rownames(meta))
+      if (any(is.na(idx)) && "SampleID" %in% names(meta)) idx <- match(samp, as.character(meta$SampleID))
+      cond <- if ("Condition" %in% names(meta) && all(!is.na(idx))) meta$Condition[idx] else rep(NA_character_, length(samp))
+      dset <- if ("Dataset" %in% names(meta) && all(!is.na(idx))) meta$Dataset[idx] else rep(NA_character_, length(samp))
+      if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
+      if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
+      annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
+      annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
+      png(file, width = 1200, height = 800, res = 150, bg = "white")
+      pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
+               color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
+               show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
+               main = paste0("Top ", nrow(expr), " DE Genes (of ", input$top_genes, " requested)"), border_color = NA)
+      dev.off()
+    }
+  )
+
+  # Download heatmap (PDF)
+  output$download_heatmap_pdf <- downloadHandler(
+    filename = function() "DE_Heatmap_Top_Genes.pdf",
+    content = function(file) {
+      req(rv$de_results, rv$batch_corrected)
+      top <- head(rv$de_results[order(rv$de_results$adj.P.Val), ], input$top_genes)
+      valid_genes <- intersect(top$Gene, rownames(rv$batch_corrected))
+      if (length(valid_genes) == 0) {
+        bc_genes_upper <- toupper(rownames(rv$batch_corrected)); names(bc_genes_upper) <- rownames(rv$batch_corrected)
+        top_upper <- toupper(top$Gene); matched <- bc_genes_upper[bc_genes_upper %in% top_upper]; valid_genes <- names(matched)
+      }
+      if (length(valid_genes) < 2) return()
+      expr <- rv$batch_corrected[valid_genes, , drop = FALSE]
+      row_vars <- apply(expr, 1, var, na.rm = TRUE)
+      expr <- expr[!is.na(row_vars) & row_vars > 0, , drop = FALSE]
+      if (nrow(expr) < 2) return()
+      expr_scaled <- t(scale(t(expr)))
+      samp <- colnames(expr_scaled)
+      meta <- rv$unified_metadata
+      idx <- match(samp, rownames(meta))
+      if (any(is.na(idx)) && "SampleID" %in% names(meta)) idx <- match(samp, as.character(meta$SampleID))
+      cond <- if ("Condition" %in% names(meta) && all(!is.na(idx))) meta$Condition[idx] else rep(NA_character_, length(samp))
+      dset <- if ("Dataset" %in% names(meta) && all(!is.na(idx))) meta$Dataset[idx] else rep(NA_character_, length(samp))
+      if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
+      if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
+      annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
+      annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
+      pdf(file, width = 10, height = 7, bg = "white")
+      pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
+               color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
+               show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
+               main = paste0("Top ", nrow(expr), " DE Genes (of ", input$top_genes, " requested)"), border_color = NA)
+      dev.off()
+    }
+  )
+
   output$top_degs_table <- renderDT({
     req(rv$sig_genes)
     

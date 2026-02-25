@@ -107,6 +107,28 @@ server_download <- function(input, output, session, rv) {
       }
 
       # --------------------------------------------------------------------------
+      # MANAGE STORED FILES: clear download dirs at start of each run so multiple
+      # runs don't accumulate old GSE data. Only current run's bulk/microarray
+      # files are kept; Reset also deletes these dirs.
+      # --------------------------------------------------------------------------
+      if (length(micro_ids) > 0) {
+        micro_dir <- file.path(getwd(), "micro_data")
+        if (dir.exists(micro_dir)) {
+          tryCatch({ unlink(micro_dir, recursive = TRUE, force = TRUE) }, error = function(e) NULL)
+          log_text <- paste0(log_text, "Cleared previous microarray cache (micro_data).\n")
+        }
+        dir.create(micro_dir, showWarnings = FALSE, recursive = TRUE)
+      }
+      if (length(rnaseq_ids) > 0) {
+        rna_dir <- file.path(getwd(), "rna_data")
+        if (dir.exists(rna_dir)) {
+          tryCatch({ unlink(rna_dir, recursive = TRUE, force = TRUE) }, error = function(e) NULL)
+          log_text <- paste0(log_text, "Cleared previous RNA-seq cache (rna_data).\n")
+        }
+        dir.create(rna_dir, showWarnings = FALSE, recursive = TRUE)
+      }
+
+      # --------------------------------------------------------------------------
       # STEP 1: AUTOMATED DATA DOWNLOAD (pipeline: store raw, no mapping yet)
       # --------------------------------------------------------------------------
 
@@ -228,9 +250,8 @@ server_download <- function(input, output, session, rv) {
       # --- Download RNA-seq (your code: NCBI raw first, then supp; fread; map; all_genes_list = rownames) ---
       if (length(rnaseq_ids) > 0) {
         log_text <- paste0(log_text, "\nDownloading RNA-seq Datasets...\n")
-        # Store all raw RNA-seq download files under the app working directory
         rna_dir <- file.path(getwd(), "rna_data")
-        dir.create(rna_dir, showWarnings = FALSE, recursive = TRUE)
+        if (!dir.exists(rna_dir)) dir.create(rna_dir, showWarnings = FALSE, recursive = TRUE)
 
         for (i in seq_along(rnaseq_ids)) {
           incProgress(1 / (length(rnaseq_ids) + length(micro_ids)))
