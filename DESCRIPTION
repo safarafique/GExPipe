@@ -1,0 +1,74 @@
+Package: OmniVerse
+Title: Multi-Omics RNA Analysis Shiny Application
+Version: 0.1.0
+Authors@R: person("Safa", "Rafique", email = "safa.res.sbb@pu.edu.pk", role = c("aut", "cre"))
+BugReports: https://github.com/yourname/OmniVerse/issues
+Description: Compact Shiny app for bulk RNA-seq and microarray analysis (GEO). No extra
+  setup on R 4.5.2: dependencies auto-install. Download, QC, normalization, DE, WGCNA,
+  pathways, PPI, ML, immune deconvolution, validation. Auto-saves 5 min after download.
+biocViews: Software, GeneExpression, RNASeq, Microarray, DifferentialExpression, Pathways, Network, Visualization, GUI
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.5.2)
+Imports:
+    shiny,
+    shinydashboard,
+    shinyjs,
+    DT,
+    Biobase,
+    GEOquery,
+    limma,
+    AnnotationDbi,
+    org.Hs.eg.db,
+    dplyr,
+    data.table,
+    edgeR,
+    sva,
+    ggplot2,
+    gridExtra,
+    RColorBrewer,
+    pheatmap,
+    ggrepel,
+    VennDiagram,
+    UpSetR,
+    WGCNA,
+    parallel,
+    clusterProfiler,
+    enrichplot,
+    circlize,
+    STRINGdb,
+    DESeq2,
+    igraph,
+    ggraph,
+    tidygraph,
+    tidyr,
+    randomForest,
+    caret,
+    e1071,
+    glmnet,
+    pROC,
+    kernlab,
+    tibble,
+    msigdbr,
+    ggpubr,
+    reshape2,
+    corrplot,
+    R.utils,
+    dynamicTreeCut,
+    scales
+Suggests:
+    Boruta,
+    mixOmics,
+    xgboost,
+    SHAPforxgboost,
+    rms,
+    rmda,
+    cicerone,
+    biomaRt,
+    oligo,
+    affy,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+SystemRequirements: GNU make
+Roxygen: list(markdown = TRUE)
