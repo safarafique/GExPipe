@@ -68,7 +68,7 @@ server_validation <- function(input, output, session, rv) {
         fluidRow(
           column(4,
             textAreaInput("ext_val_gse_ids", "Validation GSE IDs:",
-              value = "", rows = 2, placeholder = "e.g. GSE12345, GSE67890")
+              value = "GSE142279", rows = 2, placeholder = "e.g. GSE142279")
           ),
           column(3,
             radioButtons("ext_val_platform", "Platform Type:",
