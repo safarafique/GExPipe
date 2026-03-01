@@ -164,7 +164,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("chart-area"), " Elastic Net (gene list)"),
         width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_elastic_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_elastic", "Download Elastic Net (CSV)", class = "btn-info btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_elastic", tagList(icon("download"), " Elastic Net (CSV)"), class = "btn-info btn-sm"))
       )
     )
   ),
@@ -200,7 +200,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("fire"), " Boruta (gene list)"),
         width = NULL, status = "danger", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_boruta_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_boruta", "Download Boruta (CSV)", class = "btn-danger btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_boruta", tagList(icon("download"), " Boruta (CSV)"), class = "btn-danger btn-sm"))
       )
     )
   ),

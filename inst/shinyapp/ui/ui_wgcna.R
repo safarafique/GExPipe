@@ -36,6 +36,10 @@ ui_wgcna <- tabItem(
         width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE,
         tags$div(
           style = "padding: 15px 0;",
+          tags$p(
+            style = "color: #495057; margin-bottom: 18px;",
+            "Choose how many genes to use, prepare the expression matrix, check the sample dendrogram for outliers, and optionally exclude bad samples. The gene set and sample list below are what WGCNA will use in Steps 2–3."
+          ),
           fluidRow(
             column(12,
               radioButtons("wgcna_gene_mode",
@@ -99,17 +103,17 @@ ui_wgcna <- tabItem(
           tags$div(
             class = "alert alert-warning",
             style = "margin: 15px 0 10px 0; padding: 12px 15px;",
-            tags$strong(icon("exclamation-triangle"), " Check for outliers"),
+            tags$strong(icon("exclamation-triangle"), " Outlier check (recommended before Step 2)"),
             tags$br(),
             tags$small(
-              "One bad sample can ruin a WGCNA network. ",
-              "If no outliers: skip and go to Step 2. If outliers: exclude them, then go to Step 3."
+              "One outlier sample can distort the whole co-expression network. ",
+              "Use the sample dendrogram (left) to spot outliers; optionally exclude them (right), then proceed to Step 2."
             ),
             tags$ul(
               style = "margin: 8px 0 0 18px; padding: 0;",
-              tags$li(tags$strong("How to find outliers:"), " In the dendrogram, look for a ", tags$em("long vertical branch"), " before a sample joins the rest — that sample is far from others."),
-              tags$li(tags$strong("If you see such a branch:"), " Note the sample ID at the bottom of that branch, then exclude it (right panel)."),
-              tags$li(tags$strong("If all samples cluster without a very long single branch:"), " No outliers — click ", tags$em("No outliers — proceed"), " below.")
+              tags$li(tags$strong("Spot outliers:"), " In the dendrogram, look for a ", tags$em("long vertical branch"), " before one sample joins the rest — that sample is far from the others."),
+              tags$li(tags$strong("To exclude:"), " Enter that sample ID in the box (right), or use ", tags$em("Detect"), " to get suggestions from the dendrogram. Then click ", tags$em("Exclude & update"), "."),
+              tags$li(tags$strong("No outliers?"), " If all samples cluster without a very long single branch, click ", tags$em("No outliers — proceed to Step 2"), " to continue.")
             )
           ),
           fluidRow(
@@ -117,13 +121,17 @@ ui_wgcna <- tabItem(
               tags$div(
                 style = "margin-top: 8px; width: 100%; overflow: hidden;",
                 plotOutput("wgcna_sample_tree", height = "420px", width = "100%")
+              ),
+              tags$div(style = "margin-top: 8px;",
+                downloadButton("download_wgcna_sample_tree_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                downloadButton("download_wgcna_sample_tree_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
               )
             ),
             column(4,
               tags$div(
                 style = "margin-top: 8px;",
                 tags$label(tags$strong("Exclude outlier samples (optional):"), style = "display: block; margin-bottom: 6px;"),
-                tags$small("Comma-separated sample IDs to remove. Or use \"Detect\" to suggest outliers by tree height.", style = "color: #6c757d; display: block; margin-bottom: 8px;"),
+                tags$small("Enter sample IDs to remove (comma-separated). Or click \"Detect\" to get suggestions from the sample dendrogram (samples that join the tree at a high height are flagged).", style = "color: #6c757d; display: block; margin-bottom: 8px;"),
                 textInput("wgcna_exclude_samples",
                           label = NULL,
                           placeholder = "e.g. Sample_12, GSM123",
@@ -149,7 +157,7 @@ ui_wgcna <- tabItem(
                              tagList(icon("forward"), " No outliers — proceed to Step 2"),
                              class = "btn-success btn-sm",
                              style = "margin-top: 4px; width: 100%;",
-                             title = "No outliers in my data; continue workflow")
+                             title = "Continue to Step 2 (soft threshold). Use this when no samples need to be excluded.")
               )
             )
           ),
@@ -187,11 +195,15 @@ ui_wgcna <- tabItem(
             )
           ),
           tags$hr(),
-          plotOutput("soft_threshold_plot", height = "400px")
+          plotOutput("soft_threshold_plot", height = "400px"),
+          tags$div(style = "margin-top: 8px;",
+            downloadButton("download_soft_threshold_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_soft_threshold_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
+          )
         )
       )
     ),
-    
+
     # ========== STEP 3: NETWORK CONSTRUCTION ==========
     fluidRow(
       box(
@@ -255,11 +267,15 @@ ui_wgcna <- tabItem(
           tags$div(
             style = "margin-top: 15px;",
             plotOutput("wgcna_dendrogram", height = "500px")
+          ),
+          tags$div(style = "margin-top: 8px;",
+            downloadButton("download_wgcna_dendrogram_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_wgcna_dendrogram_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
           )
         )
       )
     ),
-    
+
     # ========== STEP 4: MODULE-TRAIT ANALYSIS ==========
     fluidRow(
       box(
@@ -341,12 +357,20 @@ ui_wgcna <- tabItem(
             column(6,
               tags$h5(icon("th"), " ME Correlation Heatmap",
                      style = "color: #2c3e50; margin-bottom: 15px;"),
-              plotOutput("me_correlation_heatmap", height = "500px")
+              plotOutput("me_correlation_heatmap", height = "500px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("download_me_correlation_heatmap_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_correlation_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+              )
             ),
             column(6,
               tags$h5(icon("sitemap"), " ME Dendrogram",
                      style = "color: #2c3e50; margin-bottom: 15px;"),
-              plotOutput("me_dendrogram_plot", height = "500px")
+              plotOutput("me_dendrogram_plot", height = "500px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("download_me_dendrogram_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_dendrogram_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+              )
             )
           ),
           tags$hr(),
@@ -354,12 +378,20 @@ ui_wgcna <- tabItem(
             column(6,
               tags$h5(icon("dot-circle"), " Module Eigengene Scatter Plot (ME1 vs ME2)",
                      style = "color: #2c3e50; margin-bottom: 15px;"),
-              plotOutput("me_scatter_plot", height = "400px")
+              plotOutput("me_scatter_plot", height = "400px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("download_me_scatter_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_scatter_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+              )
             ),
             column(6,
               tags$h5(icon("th"), " Eigengene Distance Heatmap",
                      style = "color: #2c3e50; margin-bottom: 15px;"),
-              plotOutput("eigengene_distance_heatmap", height = "400px")
+              plotOutput("eigengene_distance_heatmap", height = "400px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("download_eigengene_distance_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_eigengene_distance_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+              )
             )
           )
         )
@@ -411,12 +443,20 @@ ui_wgcna <- tabItem(
             column(6,
               tags$h5(icon("chart-bar"), " Module Significance Barplot",
                      style = "color: #2c3e50; margin-bottom: 15px;"),
-              plotOutput("module_significance_barplot", height = "400px")
+              plotOutput("module_significance_barplot", height = "400px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("download_module_significance_barplot_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_module_significance_barplot_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+              )
             ),
             column(6,
               tags$h5(icon("chart-line"), " Module Size vs Correlation",
                      style = "color: #2c3e50; margin-bottom: 15px;"),
-              plotOutput("module_size_correlation_plot", height = "400px")
+              plotOutput("module_size_correlation_plot", height = "400px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("download_module_size_correlation_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_module_size_correlation_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+              )
             )
           ),
           tags$hr(),
@@ -471,10 +511,29 @@ ui_wgcna <- tabItem(
               uiOutput("module_gene_stats")
             )
           ),
+          fluidRow(
+            column(6,
+              uiOutput("wgcna_gs_mm_trait_ui")
+            ),
+            column(6,
+              tags$div(style = "margin-top: 25px;",
+                actionButton("generate_gs_mm_all_modules",
+                             tagList(icon("chart-scatter"), " Generate GS vs MM for all modules"),
+                             class = "btn-info btn-sm",
+                             title = "Create GS vs MM plot for each signed module (using selected trait)")
+              )
+            )
+          ),
           tags$hr(),
           tags$h5(icon("chart-scatter"), " Gene Significance vs Module Membership (selected module)",
                  style = "color: #2c3e50; margin-bottom: 15px;"),
           plotOutput("gs_mm_plot", height = "420px"),
+          tags$div(style = "margin-top: 8px;",
+            downloadButton("download_gs_mm_plot_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_gs_mm_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
+          ),
+          tags$hr(),
+          uiOutput("wgcna_gs_mm_all_download_ui"),
           tags$hr(),
           DT::dataTableOutput("module_genes_table"),
           tags$hr(),

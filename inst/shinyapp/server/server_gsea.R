@@ -175,7 +175,7 @@ server_gsea <- function(input, output, session, rv) {
       id_table <- paste0("gsea_table_", i)
       left_col <- column(8,
         tags$p(tags$strong("Enrichment plot"), style = "margin-bottom: 6px;"),
-        plotOutput(id_plot, height = "500px"))
+        plotOutput(id_plot, height = "640px"))
       right_col <- column(4,
         tags$p(tags$strong("Enriched pathways (complete table)"), style = "margin-bottom: 6px; font-size: 12px;"),
         DT::dataTableOutput(id_table, height = "500px"))
@@ -226,14 +226,21 @@ server_gsea <- function(input, output, session, rv) {
               base_size = 11,
               subplots = 1:3,
               pvalue_table = FALSE,
-              rel_heights = c(1.2, 0.3, 0.5)
+              rel_heights = c(1.5, 0.3, 0.5)
             )
-            if (inherits(p, "ggplot")) print(p) else if (inherits(p, "list")) do.call(gridExtra::grid.arrange, p) else grid::grid.draw(p)
+            if (inherits(p, "ggplot")) {
+              p <- p + ggplot2::theme(plot.margin = ggplot2::margin(t = 50, r = 12, b = 12, l = 12, unit = "pt"))
+              print(p)
+            } else if (inherits(p, "list")) {
+              do.call(gridExtra::grid.arrange, p)
+            } else {
+              grid::grid.draw(p)
+            }
           }, error = function(e) {
             plot.new()
             text(0.5, 0.5, paste("Plot error:", conditionMessage(e)), cex = 0.9, col = "red")
           })
-        }, width = 700, height = 500, res = 96)
+        }, width = 700, height = 640, res = 96)
 
         output[[paste0("gsea_table_", ii)]] <- DT::renderDataTable({
           out <- as.data.frame(res_df)

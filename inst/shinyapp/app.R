@@ -20,8 +20,6 @@ source("ui.R")
 source("server.R")
 cat("  ✓ Ready. Starting Shiny app...\n\n")
 
-# Force app to open in the default web browser (not RStudio viewer)
-options(shiny.launch.browser = TRUE)
-
-# Run the app
-shinyApp(ui = ui, server = server)
+# Run the app and open in your default browser (browser interface, not RStudio Viewer)
+app <- shinyApp(ui = ui, server = server)
+runApp(app, launch.browser = TRUE)

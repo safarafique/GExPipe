@@ -18,18 +18,32 @@ ui_qc <- tabItem(
       box(title = tags$span(icon("venus-mars"), " Venn Diagram - Gene Overlap"), 
           width = 6, status = "primary", solidHeader = TRUE,
           plotOutput("venn_plot", height = "500px"),
+          tags$div(style = "margin-top: 6px;",
+            downloadButton("dl_qc_venn_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+            downloadButton("dl_qc_venn_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")),
           tags$p(icon("info-circle"), " Counts are per-dataset gene lists from Step 1 (Download). Overlap = ", tags$strong("exact match of rownames"), " (gene symbols or probe IDs). ", "If 4-way overlap is 0, datasets likely use ", tags$strong("different platforms"), " (different probe IDs); use same GPL or ensure all are mapped to gene symbols.", style = "margin-top: 8px; font-size: 12px; color: #555;")),
       box(title = tags$span(icon("project-diagram"), " UpSet Plot - Gene Intersections"), 
           width = 6, status = "info", solidHeader = TRUE,
-          plotOutput("upset_plot", height = "500px"))
+          plotOutput("upset_plot", height = "500px"),
+          tags$div(style = "margin-top: 6px;",
+            downloadButton("dl_qc_upset_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+            downloadButton("dl_qc_upset_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")))
     ),
     
     fluidRow(
       box(title = tags$span(icon("chart-line"), " Quality Control Plots"), 
           width = 12, status = "warning", solidHeader = TRUE,
           tabsetPanel(
-            tabPanel("Boxplot", plotOutput("qc_boxplot", height = "400px")),
-            tabPanel("Density", plotOutput("qc_density", height = "400px"))
+            tabPanel("Boxplot",
+              plotOutput("qc_boxplot", height = "400px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("dl_qc_boxplot_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+                downloadButton("dl_qc_boxplot_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))),
+            tabPanel("Density",
+              plotOutput("qc_density", height = "400px"),
+              tags$div(style = "margin-top: 6px;",
+                downloadButton("dl_qc_density_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+                downloadButton("dl_qc_density_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")))
           )
       )
     ),

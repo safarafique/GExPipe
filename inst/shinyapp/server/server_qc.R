@@ -97,42 +97,29 @@ server_qc <- function(input, output, session, rv) {
   })
   
   # ==============================================================================
-  # VENN & UPSET
+  # VENN & UPSET (shared draw-to-dev helpers for display + download)
   # ==============================================================================
-  
-  output$venn_plot <- renderPlot({
-    req(rv$all_genes_list)
+
+  draw_qc_venn_to_dev <- function() {
     if (length(rv$all_genes_list) < 2) {
       plot.new()
       text(0.5, 0.5, "Need 2+ datasets for Venn diagram", cex = 1.8, col = "gray40")
-      return()
+      return(invisible())
     }
-    
-    # Use original gene lists (before filtering to common genes)
     sets <- rv$all_genes_list[1:min(5, length(rv$all_genes_list))]
-    
-    # Ensure sets are lists of character vectors and remove duplicates
     sets <- lapply(sets, function(x) {
       if (is.null(x)) return(character(0))
       x <- as.character(x)
-      x <- x[!is.na(x) & x != ""]  # Remove NA and empty strings
-      unique(x)  # Remove duplicates within each set
+      x <- x[!is.na(x) & x != ""]
+      unique(x)
     })
-    
-    # Remove any empty sets
     sets <- sets[sapply(sets, length) > 0]
-    
-    # Ensure all sets have names
-    if (is.null(names(sets)) || any(names(sets) == "")) {
-      names(sets) <- paste0("Dataset_", seq_along(sets))
-    }
-    
+    if (is.null(names(sets)) || any(names(sets) == "")) names(sets) <- paste0("Dataset_", seq_along(sets))
     if (length(sets) < 2) {
       plot.new()
       text(0.5, 0.5, "Need 2+ datasets with genes for Venn diagram", cex = 1.8, col = "gray40")
-      return()
+      return(invisible())
     }
-    
     if (length(sets) == 2) {
       tryCatch({
         # Calculate intersection manually to ensure correct count
@@ -160,6 +147,7 @@ server_qc <- function(input, output, session, rv) {
           category.names = cat_names,
           filename = NULL,
           output = TRUE,
+          disable.logging = TRUE,
           fill = c("#f39c12", "#3498db"),
           alpha = 0.6,
           cex = 0.85,
@@ -205,6 +193,7 @@ server_qc <- function(input, output, session, rv) {
           category.names = cat_names,
           filename = NULL,
           output = TRUE,
+          disable.logging = TRUE,
           fill = c("#f1c40f", "#3498db", "#e74c3c"),
           alpha = 0.6,
           cex = 0.8,
@@ -258,6 +247,7 @@ server_qc <- function(input, output, session, rv) {
           category.names = cat_names,
           filename = NULL,
           output = TRUE,
+          disable.logging = TRUE,
           fill = c("#f1c40f", "#3498db", "#e74c3c", "#2ecc71"),
           alpha = 0.65,
           cex = 0.7,
@@ -305,83 +295,58 @@ server_qc <- function(input, output, session, rv) {
              cex = 1.3, col = "gray40")
       }
     }
+  }
+
+  output$venn_plot <- renderPlot({
+    req(rv$all_genes_list)
+    draw_qc_venn_to_dev()
   })
   
-  output$upset_plot <- renderPlot({
-    req(rv$all_genes_list)
+  draw_qc_upset_to_dev <- function() {
     if (length(rv$all_genes_list) < 2) {
       plot.new()
       text(0.5, 0.5, "Need 2+ datasets for UpSet plot", cex = 1.8, col = "gray40")
-      return()
+      return(invisible())
     }
-    
-    # Use original gene lists (before filtering to common genes)
-    gene_lists <- rv$all_genes_list
-    
-    # Ensure all are character vectors
-    gene_lists <- lapply(gene_lists, function(x) {
+    gene_lists <- lapply(rv$all_genes_list, function(x) {
       if (is.null(x)) return(character(0))
       as.character(x)
     })
-    
-    # Remove any empty lists
     gene_lists <- gene_lists[sapply(gene_lists, length) > 0]
-    
     if (length(gene_lists) < 2) {
       plot.new()
       text(0.5, 0.5, "Need 2+ datasets with genes for UpSet plot", cex = 1.8, col = "gray40")
-      return()
+      return(invisible())
     }
-    
-    # Get all unique genes across all datasets
     all_genes <- unique(unlist(gene_lists))
-    
     if (length(all_genes) == 0) {
       plot.new()
       text(0.5, 0.5, "No genes found in datasets", cex = 1.8, col = "gray40")
-      return()
+      return(invisible())
     }
-    
-    # Create binary matrix: rows = genes, columns = datasets
     upset_matrix <- matrix(0, nrow = length(all_genes), ncol = length(gene_lists))
     rownames(upset_matrix) <- all_genes
     colnames(upset_matrix) <- names(gene_lists)
-    
-    # Fill matrix: 1 if gene is present in dataset, 0 otherwise
     for (i in seq_along(gene_lists)) {
-      genes_in_set <- gene_lists[[i]]
-      # Find which rows (genes) are in this set
-      matching_genes <- intersect(all_genes, genes_in_set)
-      if (length(matching_genes) > 0) {
-        upset_matrix[matching_genes, i] <- 1
-      }
+      matching_genes <- intersect(all_genes, gene_lists[[i]])
+      if (length(matching_genes) > 0) upset_matrix[matching_genes, i] <- 1
     }
-    
-    # Convert to data frame for UpSetR
     upset_df <- as.data.frame(upset_matrix)
-    
-    # Calculate max set size for scaling
     max_set_size <- max(sapply(gene_lists, length))
-    
     tryCatch({
-      upset(upset_df, 
-            sets = colnames(upset_df),
-            keep.order = TRUE, 
-            order.by = "freq",
-            main.bar.color = "#3498db",
-            sets.bar.color = "#e74c3c",
-            matrix.color = "#2ecc71",
-            point.size = 4,
-            line.size = 1.2,
-            text.scale = c(1.8, 1.5, 1.5, 1.3, 1.8, 1.5),
-            mb.ratio = c(0.6, 0.4),
-            set_size.show = TRUE,
-            set_size.scale_max = max_set_size * 1.1
-      )
+      upset(upset_df, sets = colnames(upset_df), keep.order = TRUE, order.by = "freq",
+            main.bar.color = "#3498db", sets.bar.color = "#e74c3c", matrix.color = "#2ecc71",
+            point.size = 4, line.size = 1.2, text.scale = c(1.8, 1.5, 1.5, 1.3, 1.8, 1.5),
+            mb.ratio = c(0.6, 0.4), set_size.show = TRUE, set_size.scale_max = max_set_size * 1.1)
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error creating UpSet plot:", e$message), cex = 1.2, col = "red")
     })
+  }
+
+  output$upset_plot <- renderPlot({
+    req(rv$all_genes_list)
+    draw_qc_upset_to_dev()
   })
   
   # ==============================================================================
@@ -726,6 +691,111 @@ server_qc <- function(input, output, session, rv) {
     content = function(file) {
       req(rv$qc_conn_k)
       ggplot2::ggsave(file, make_qc_conn_plot(), width = 8, height = 6, device = "pdf", bg = "white")
+    }
+  )
+
+  output$dl_qc_venn_png <- downloadHandler(
+    filename = function() "QC_Venn_Diagram.png",
+    content = function(file) {
+      req(rv$all_genes_list)
+      png(file, width = 8, height = 6, res = IMAGE_DPI, units = "in", bg = "white")
+      on.exit(dev.off())
+      draw_qc_venn_to_dev()
+    }
+  )
+  output$dl_qc_venn_pdf <- downloadHandler(
+    filename = function() "QC_Venn_Diagram.pdf",
+    content = function(file) {
+      req(rv$all_genes_list)
+      pdf(file, width = 8, height = 6, bg = "white")
+      on.exit(dev.off())
+      draw_qc_venn_to_dev()
+    }
+  )
+  output$dl_qc_upset_png <- downloadHandler(
+    filename = function() "QC_UpSet_Plot.png",
+    content = function(file) {
+      req(rv$all_genes_list)
+      png(file, width = 10, height = 6, res = IMAGE_DPI, units = "in", bg = "white")
+      on.exit(dev.off())
+      draw_qc_upset_to_dev()
+    }
+  )
+  output$dl_qc_upset_pdf <- downloadHandler(
+    filename = function() "QC_UpSet_Plot.pdf",
+    content = function(file) {
+      req(rv$all_genes_list)
+      pdf(file, width = 10, height = 6, bg = "white")
+      on.exit(dev.off())
+      draw_qc_upset_to_dev()
+    }
+  )
+  output$dl_qc_boxplot_png <- downloadHandler(
+    filename = function() "QC_Boxplot.png",
+    content = function(file) {
+      req(rv$combined_expr_raw)
+      micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
+      rna_n <- if (length(rv$rna_counts_list) > 0) sum(vapply(rv$rna_counts_list, ncol, integer(1))) else 0L
+      platform_per_sample <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
+      platform_labels <- rep(platform_per_sample, each = nrow(rv$combined_expr_raw))
+      df <- data.frame(
+        Expression = as.vector(rv$combined_expr_raw),
+        Sample = rep(colnames(rv$combined_expr_raw), each = nrow(rv$combined_expr_raw)),
+        Platform = platform_labels[1:length(as.vector(rv$combined_expr_raw))]
+      )
+      if (nrow(df) > 500000) { set.seed(123); df <- df[sample(nrow(df), 500000), ] }
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$Sample, y = .data$Expression, fill = .data$Platform)) +
+        ggplot2::geom_boxplot(outlier.size = 0.5) +
+        ggplot2::theme_bw() +
+        ggplot2::labs(title = "Expression Distribution - Raw Data", y = "Expression") +
+        ggplot2::theme(axis.text.x = ggplot2::element_blank(), axis.ticks.x = ggplot2::element_blank(), plot.title = ggplot2::element_text(face = "bold", size = 16))
+      ggplot2::ggsave(file, p, width = 10, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$dl_qc_boxplot_pdf <- downloadHandler(
+    filename = function() "QC_Boxplot.pdf",
+    content = function(file) {
+      req(rv$combined_expr_raw)
+      micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
+      rna_n <- if (length(rv$rna_counts_list) > 0) sum(vapply(rv$rna_counts_list, ncol, integer(1))) else 0L
+      platform_per_sample <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
+      platform_labels <- rep(platform_per_sample, each = nrow(rv$combined_expr_raw))
+      df <- data.frame(
+        Expression = as.vector(rv$combined_expr_raw),
+        Sample = rep(colnames(rv$combined_expr_raw), each = nrow(rv$combined_expr_raw)),
+        Platform = platform_labels[1:length(as.vector(rv$combined_expr_raw))]
+      )
+      if (nrow(df) > 500000) { set.seed(123); df <- df[sample(nrow(df), 500000), ] }
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$Sample, y = .data$Expression, fill = .data$Platform)) +
+        ggplot2::geom_boxplot(outlier.size = 0.5) +
+        ggplot2::theme_bw() +
+        ggplot2::labs(title = "Expression Distribution - Raw Data", y = "Expression") +
+        ggplot2::theme(axis.text.x = ggplot2::element_blank(), axis.ticks.x = ggplot2::element_blank(), plot.title = ggplot2::element_text(face = "bold", size = 16))
+      ggplot2::ggsave(file, p, width = 10, height = 5, device = "pdf", bg = "white")
+    }
+  )
+  output$dl_qc_density_png <- downloadHandler(
+    filename = function() "QC_Density.png",
+    content = function(file) {
+      req(rv$combined_expr_raw)
+      png(file, width = 8, height = 5, res = IMAGE_DPI, units = "in", bg = "white")
+      on.exit(dev.off())
+      d1 <- density(rv$combined_expr_raw[, 1], na.rm = TRUE)
+      plot(d1, main = "Expression Density - Raw Data", xlab = "Expression", col = "#3498db", lwd = 2, ylim = c(0, max(d1$y) * 1.2))
+      colors <- rainbow(min(ncol(rv$combined_expr_raw), 50))
+      for (i in 2:min(ncol(rv$combined_expr_raw), 50)) lines(density(rv$combined_expr_raw[, i], na.rm = TRUE), col = colors[i], lwd = 1)
+    }
+  )
+  output$dl_qc_density_pdf <- downloadHandler(
+    filename = function() "QC_Density.pdf",
+    content = function(file) {
+      req(rv$combined_expr_raw)
+      pdf(file, width = 8, height = 5, bg = "white")
+      on.exit(dev.off())
+      d1 <- density(rv$combined_expr_raw[, 1], na.rm = TRUE)
+      plot(d1, main = "Expression Density - Raw Data", xlab = "Expression", col = "#3498db", lwd = 2, ylim = c(0, max(d1$y) * 1.2))
+      colors <- rainbow(min(ncol(rv$combined_expr_raw), 50))
+      for (i in 2:min(ncol(rv$combined_expr_raw), 50)) lines(density(rv$combined_expr_raw[, i], na.rm = TRUE), col = colors[i], lwd = 1)
     }
   )
 

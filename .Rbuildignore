@@ -7,6 +7,7 @@
 ^build_for_bioc\.ps1$
 ^README\.md$
 ^SUBMISSION\.md$
+^BIOC_SUBMISSION_CHECKLIST\.md$
 ^OmniVerse\.BiocCheck$
 ^OmniVerse\.Rcheck$
 ^OmniVerse_.*\.tar\.gz$
@@ -16,4 +17,8 @@
 ^inst/shinyapp/rna_data
 ^inst/shinyapp/saved_workspaces
 ^inst/shinyapp/.*\.log$
-^vignettes/OmniVerse\.Rmd$
+^vignettes/.*\.docx$
+^vignettes/vignette\.htm$
+^vignettes/vignette_files/
+^vignettes/~\$
+^vignettes/.*\.tmp$

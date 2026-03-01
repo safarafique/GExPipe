@@ -15,6 +15,7 @@ ui_groups <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         tags$p(tags$strong("Purpose:"), " Define phenotype groups (e.g. control vs disease) for differential expression and WGCNA. Samples are assigned to groups using metadata columns from your datasets.", style = "margin-bottom: 8px;"),
         tags$p(tags$strong("Disease-specific analysis:"), " Assign your condition groups to ", tags$strong("Disease"), " and controls to ", tags$strong("Normal"), ". Step 6 (DE) and Step 7 (WGCNA) will use these to find disease-associated genes and modules.", style = "margin-bottom: 8px; color: #2c3e50;"),
+        tags$p(tags$strong("Need both groups for DE:"), " Differential expression (Step 6) compares Normal vs Disease. You must have at least one sample in ", tags$strong("Normal"), " and one in ", tags$strong("Disease"), ". If you enter GSEs from the same sample source (e.g. same study with only one condition), you will not get DEGs until you add a dataset that contains the other condition.", style = "margin-bottom: 8px; color: #555;"),
         tags$p(tags$strong("Workflow:"), " Browse the phenodata table below to understand your metadata, select the phenotype column per dataset, extract unique group labels, categorize each as Normal, Disease, or None, then apply.", style = "margin-bottom: 0;")
       )
     ),

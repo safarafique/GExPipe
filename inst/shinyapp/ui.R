@@ -53,13 +53,6 @@ ui_analysis <- dashboardPage(
       )
     ),
     tags$li(class = "dropdown",
-            actionButton("reset_app", 
-                        tagList(icon("redo"), " Reset App"),
-                        class = "btn-danger",
-                        style = "margin: 10px; background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); 
-                                 border: none; color: white; font-weight: bold; padding: 8px 15px; 
-                                 border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);")),
-    tags$li(class = "dropdown",
             actionButton("start_tour", 
                         tagList(icon("question-circle"), " Guided Tour"),
                         class = "btn-info",
@@ -72,52 +65,52 @@ ui_analysis <- dashboardPage(
     width = 280,
     sidebarMenu(
       id = "sidebar_menu",
-      menuItem("1. Download Data", tabName = "download", 
-               icon = icon("download", class = "fa-lg"), 
+      menuItem("1. Download Data", tabName = "download",
+               icon = icon("download", class = "fa-lg"),
                badgeLabel = "Start", badgeColor = "green"),
-      menuItem("2. QC & Visualization", tabName = "qc", 
+      menuItem("2. QC & Visualization", tabName = "qc",
                icon = icon("chart-bar", class = "fa-lg"),
                badgeLabel = "View", badgeColor = "blue"),
-      menuItem("3. Normalize Data", tabName = "normalize", 
+      menuItem("3. Normalize Data", tabName = "normalize",
                icon = icon("balance-scale", class = "fa-lg"),
                badgeLabel = "Process", badgeColor = "purple"),
-      menuItem("4. Select Groups", tabName = "groups", 
+      menuItem("4. Select Groups", tabName = "groups",
                icon = icon("users", class = "fa-lg"),
                badgeLabel = "Categorize", badgeColor = "orange"),
-      menuItem("5. Batch Correction", tabName = "batch", 
+      menuItem("5. Batch Correction", tabName = "batch",
                icon = icon("filter", class = "fa-lg"),
                badgeLabel = "Correct", badgeColor = "red"),
-      menuItem("6. Differential Expression Analysis", tabName = "results", 
+      menuItem("6. Differential Expression Analysis", tabName = "results",
                icon = icon("dna", class = "fa-lg"),
                badgeLabel = "DE Analysis", badgeColor = "yellow"),
-      menuItem("7. WGCNA Analysis", tabName = "wgcna", 
+      menuItem("7. WGCNA Analysis", tabName = "wgcna",
                icon = icon("project-diagram", class = "fa-lg"),
                badgeLabel = "Network", badgeColor = "purple"),
-      menuItem("8. Common Genes (DEG & WGCNA)", tabName = "common_genes", 
+      menuItem("8. Common Genes (DEG & WGCNA)", tabName = "common_genes",
                icon = icon("venus-double", class = "fa-lg"),
                badgeLabel = "GO/KEGG", badgeColor = "green"),
-      menuItem("9. PPI Interaction", tabName = "ppi", 
+      menuItem("9. PPI Interaction", tabName = "ppi",
                icon = icon("project-diagram", class = "fa-lg"),
                badgeLabel = "Network", badgeColor = "teal"),
-      menuItem("10. Machine Learning Process", tabName = "ml", 
+      menuItem("10. Machine Learning Process", tabName = "ml",
                icon = icon("brain", class = "fa-lg"),
                badgeLabel = "ML", badgeColor = "maroon"),
-      menuItem("11. Validation Setup", tabName = "validation", 
+      menuItem("11. Validation Setup", tabName = "validation",
                icon = icon("shield-alt", class = "fa-lg"),
                badgeLabel = "Validate", badgeColor = "olive"),
-      menuItem("12. ROC Curve Analysis", tabName = "roc", 
+      menuItem("12. ROC Curve Analysis", tabName = "roc",
                icon = icon("chart-line", class = "fa-lg"),
                badgeLabel = "AUC", badgeColor = "green"),
-      menuItem("13. Diagnostic Nomogram", tabName = "nomogram", 
+      menuItem("13. Diagnostic Nomogram", tabName = "nomogram",
                icon = icon("calculator", class = "fa-lg"),
                badgeLabel = "Nomogram", badgeColor = "maroon"),
-      menuItem("14. GSEA Analysis", tabName = "gsea", 
+      menuItem("14. GSEA Analysis", tabName = "gsea",
                icon = icon("project-diagram", class = "fa-lg"),
                badgeLabel = "GSEA", badgeColor = "teal"),
-      menuItem("15. Immune Cell Deconvolution", tabName = "immune", 
+      menuItem("15. Immune Cell Deconvolution", tabName = "immune",
                icon = icon("shield-alt", class = "fa-lg"),
                badgeLabel = "Immune", badgeColor = "purple"),
-      menuItem("16. Results Summary", tabName = "results_summary", 
+      menuItem("16. Results Summary", tabName = "results_summary",
                icon = icon("file-alt", class = "fa-lg"),
                badgeLabel = "PDF", badgeColor = "red")
     ),
@@ -176,6 +169,29 @@ ui_analysis <- dashboardPage(
             setTimeout(function() {
               $('[data-toggle=\"tooltip\"]').tooltip({ html: true, container: 'body' });
             }, 300);
+          });
+        });
+      ")),
+      tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"),
+      tags$script(HTML("
+        $(document).on('click', '#start_tour', function() {
+          var el = document.querySelector('.wrapper') || document.body;
+          if (typeof html2canvas === 'undefined') {
+            alert('Screenshot library loading. Please try again in a moment.');
+            return;
+          }
+          var tourLi = document.getElementById('start_tour') && document.getElementById('start_tour').closest('li');
+          if (tourLi) tourLi.style.visibility = 'hidden';
+          html2canvas(el, { scale: 4, useCors: true, logging: false, scrollX: 0, scrollY: 0 }).then(function(canvas) {
+            if (tourLi) tourLi.style.visibility = '';
+            var name = 'OmniVerse_screenshot_' + new Date().toISOString().slice(0,19).replace(/-/g,'').replace('T','_').replace(/:/g,'') + '.png';
+            var a = document.createElement('a');
+            a.download = name;
+            a.href = canvas.toDataURL('image/png');
+            a.click();
+          }).catch(function(err) {
+            if (tourLi) tourLi.style.visibility = '';
+            alert('Screenshot failed: ' + (err.message || 'unknown'));
           });
         });
       ")),
@@ -615,16 +631,6 @@ ui_analysis <- dashboardPage(
           animation: fadeIn 0.5s ease;
         }
         
-        /* ===== RESET BUTTON STYLING ===== */
-        #reset_app {
-          transition: all 0.3s ease;
-        }
-        
-        #reset_app:hover {
-          transform: scale(1.05);
-          box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4) !important;
-        }
-        
         /* ===== MODAL DIALOG STYLING ===== */
         .modal-content {
           border-radius: 15px;
@@ -1001,11 +1007,6 @@ ui_analysis <- dashboardPage(
         @media (max-width: 768px) {
           .box {
             margin-bottom: 15px;
-          }
-          
-          #reset_app {
-            font-size: 12px;
-            padding: 6px 12px;
           }
           
           .group-category-card {

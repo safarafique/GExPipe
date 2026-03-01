@@ -4,6 +4,49 @@
 
 server_batch <- function(input, output, session, rv) {
 
+  output$batch_single_dataset_ui <- renderUI({
+    if (isTRUE(rv$single_dataset)) {
+      return(
+        tags$div(
+          class = "alert alert-info",
+          style = "margin-top: 10px;",
+          icon("info-circle"),
+          tags$strong(" Single dataset detected: "),
+          "Batch correction will be skipped automatically. You can proceed to Results."
+        )
+      )
+    }
+    NULL
+  })
+
+  # Auto-skip batch correction when there is only one dataset.
+  observe({
+    if (!isTRUE(rv$single_dataset)) return()
+    if (!isTRUE(rv$groups_applied)) return()
+    if (isTRUE(rv$batch_complete)) return()
+
+    base_expr <- NULL
+    if (!is.null(rv$combined_expr) && (is.matrix(rv$combined_expr) || is.data.frame(rv$combined_expr)) && nrow(rv$combined_expr) > 0) {
+      base_expr <- rv$combined_expr
+    } else if (!is.null(rv$combined_expr_raw) && (is.matrix(rv$combined_expr_raw) || is.data.frame(rv$combined_expr_raw)) && nrow(rv$combined_expr_raw) > 0) {
+      base_expr <- rv$combined_expr_raw
+    }
+    req(base_expr)
+
+    rv$expr_filtered <- base_expr
+    rv$batch_corrected <- base_expr
+    rv$batch_complete <- TRUE
+    rv$batch_running <- FALSE
+
+    output$batch_log <- renderText({
+      paste0(
+        "✓ Batch correction skipped (single dataset)\n\n",
+        "Reason: Only 1 dataset was selected, so there is no between-study batch to remove.\n",
+        "Downstream steps will use the current expression matrix.\n"
+      )
+    })
+  })
+
   output$batch_timer <- renderText({
     if (!isTRUE(rv$batch_running) || is.null(rv$batch_start)) return("00:00")
     invalidateLater(1000, session)
@@ -68,31 +111,70 @@ server_batch <- function(input, output, session, rv) {
             color = "purple", fill = TRUE)
   })
   
-  output$gene_variance_plot <- renderPlot({
+  batch_gene_variance_plot <- reactive({
     req(rv$combined_expr, input$variance_percentile)
-    
     gene_vars <- apply(rv$combined_expr, 1, var)
     cutoff <- variance_cutoff()
-    
-    df <- data.frame(
-      Variance = gene_vars,
-      Kept = ifelse(gene_vars > cutoff, "Retained", "Filtered")
-    )
-    
-    ggplot(df, aes(x = log10(Variance), fill = Kept)) +
-      geom_histogram(bins = 50, alpha = 0.7) +
-      geom_vline(xintercept = log10(cutoff), linetype = "dashed", color = "red", size = 1.5) +
-      scale_fill_manual(values = c("Retained" = "#2ecc71", "Filtered" = "#e74c3c")) +
-      theme_bw(base_size = 14) +
-      labs(title = "Gene Variance Distribution",
+    df <- data.frame(Variance = gene_vars, Kept = ifelse(gene_vars > cutoff, "Retained", "Filtered"))
+    ggplot2::ggplot(df, ggplot2::aes(x = log10(Variance), fill = Kept)) +
+      ggplot2::geom_histogram(bins = 50, alpha = 0.7) +
+      ggplot2::geom_vline(xintercept = log10(cutoff), linetype = "dashed", color = "red", linewidth = 1.5) +
+      ggplot2::scale_fill_manual(values = c("Retained" = "#2ecc71", "Filtered" = "#e74c3c")) +
+      ggplot2::theme_bw(base_size = 14) +
+      ggplot2::labs(title = "Gene Variance Distribution",
            subtitle = paste0("Cutoff (", input$variance_percentile, "th percentile): ", round(cutoff, 4)),
-           x = "Log10(Variance)", y = "Count",
-           fill = "Status") +
-      theme(plot.title = element_text(face = "bold"),
-            legend.position = "top")
+           x = "Log10(Variance)", y = "Count", fill = "Status") +
+      ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"), legend.position = "top")
   })
+
+  output$gene_variance_plot <- renderPlot({
+    p <- batch_gene_variance_plot()
+    if (!is.null(p)) print(p)
+  })
+
+  output$download_gene_variance_png <- downloadHandler(
+    filename = function() "Batch_Gene_Variance.png",
+    content = function(file) {
+      p <- batch_gene_variance_plot()
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_gene_variance_pdf <- downloadHandler(
+    filename = function() "Batch_Gene_Variance.pdf",
+    content = function(file) {
+      p <- batch_gene_variance_plot()
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 5, device = "pdf", bg = "white")
+    }
+  )
   
   observeEvent(input$apply_batch, {
+    # If only one dataset is present, skip batch correction and mark complete.
+    if (isTRUE(rv$single_dataset)) {
+      if (!isTRUE(rv$groups_applied)) {
+        showNotification("Step 4 required: apply group labels before proceeding.", type = "error", duration = 6)
+        return()
+      }
+      base_expr <- NULL
+      if (!is.null(rv$combined_expr) && (is.matrix(rv$combined_expr) || is.data.frame(rv$combined_expr)) && nrow(rv$combined_expr) > 0) {
+        base_expr <- rv$combined_expr
+      } else if (!is.null(rv$combined_expr_raw) && (is.matrix(rv$combined_expr_raw) || is.data.frame(rv$combined_expr_raw)) && nrow(rv$combined_expr_raw) > 0) {
+        base_expr <- rv$combined_expr_raw
+      }
+      req(base_expr)
+      rv$expr_filtered <- base_expr
+      rv$batch_corrected <- base_expr
+      rv$batch_complete <- TRUE
+      rv$batch_running <- FALSE
+      output$batch_log <- renderText({
+        paste0(
+          "✓ Batch correction skipped (single dataset)\n\n",
+          "Reason: Only 1 dataset was selected, so there is no between-study batch to remove.\n",
+          "Downstream steps will use the current expression matrix.\n"
+        )
+      })
+      showNotification("Single dataset detected: batch correction skipped.", type = "message", duration = 6)
+      return()
+    }
     if (!isTRUE(rv$groups_applied)) {
       showNotification(
         tags$div(icon("exclamation-triangle"), tags$strong(" Step 4 required:"),
@@ -708,6 +790,288 @@ server_batch <- function(input, output, session, rv) {
     actionButton("go_to_results", "Next: View Results", 
                  icon = icon("arrow-right"), class = "btn-success btn-lg")
   })
+
+  # Batch plot download helpers: re-use same logic as renderPlot, draw to file
+  batch_save_ggplot <- function(p, file, device = "png") {
+    if (is.null(p)) return()
+    if (device == "png") ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    else ggplot2::ggsave(file, plot = p, width = 7, height = 5, device = "pdf", bg = "white")
+  }
+  output$download_pca_before_dataset_png <- downloadHandler(
+    filename = function() "Batch_PCA_Before_Dataset.png",
+    content = function(file) {
+      req(rv$expr_filtered)
+      pca <- prcomp(t(rv$expr_filtered), scale. = TRUE)
+      pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+      theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+      df <- data.frame(theta = theta, r = r, Dataset = rv$unified_metadata$Dataset)
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Dataset)) +
+        ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+        ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        ggplot2::scale_y_continuous(limits = c(0, NA)) +
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(title = "Before Batch Correction - By Dataset", subtitle = "Batch effects visible as dataset separation (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Dataset") +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+      batch_save_ggplot(p, file, "png")
+    }
+  )
+  output$download_pca_before_dataset_pdf <- downloadHandler(
+    filename = function() "Batch_PCA_Before_Dataset.pdf",
+    content = function(file) {
+      req(rv$expr_filtered)
+      pca <- prcomp(t(rv$expr_filtered), scale. = TRUE)
+      pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+      theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+      df <- data.frame(theta = theta, r = r, Dataset = rv$unified_metadata$Dataset)
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Dataset)) +
+        ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+        ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        ggplot2::scale_y_continuous(limits = c(0, NA)) +
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(title = "Before Batch Correction - By Dataset", subtitle = "Batch effects visible as dataset separation (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Dataset") +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+      batch_save_ggplot(p, file, "pdf")
+    }
+  )
+  output$download_pca_after_dataset_png <- downloadHandler(
+    filename = function() "Batch_PCA_After_Dataset.png",
+    content = function(file) {
+      req(rv$batch_corrected)
+      pca <- prcomp(t(rv$batch_corrected), scale. = TRUE)
+      pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+      theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+      df <- data.frame(theta = theta, r = r, Dataset = rv$unified_metadata$Dataset)
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Dataset)) +
+        ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+        ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        ggplot2::scale_y_continuous(limits = c(0, NA)) +
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(title = "After Batch Correction - By Dataset", subtitle = "Batch effects reduced (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Dataset") +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+      batch_save_ggplot(p, file, "png")
+    }
+  )
+  output$download_pca_after_dataset_pdf <- downloadHandler(
+    filename = function() "Batch_PCA_After_Dataset.pdf",
+    content = function(file) {
+      req(rv$batch_corrected)
+      pca <- prcomp(t(rv$batch_corrected), scale. = TRUE)
+      pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+      theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+      df <- data.frame(theta = theta, r = r, Dataset = rv$unified_metadata$Dataset)
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Dataset)) +
+        ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+        ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+        ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+        ggplot2::scale_y_continuous(limits = c(0, NA)) +
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(title = "After Batch Correction - By Dataset", subtitle = "Batch effects reduced (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Dataset") +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+      batch_save_ggplot(p, file, "pdf")
+    }
+  )
+  output$download_pca_before_condition_png <- downloadHandler(
+    filename = function() "Batch_PCA_Before_Condition.png",
+    content = function(file) {
+      p <- tryCatch({
+        req(rv$expr_filtered)
+        pca <- prcomp(t(rv$expr_filtered), scale. = TRUE)
+        pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+        theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+        df <- data.frame(theta = theta, r = r, Condition = rv$unified_metadata$Condition, Dataset = rv$unified_metadata$Dataset)
+        if (all(is.na(df$Condition)) || length(unique(df$Condition[!is.na(df$Condition)])) < 2) {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r)) + ggplot2::geom_point(size = 3.5, alpha = 0.7, color = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "Before Batch Correction - By Condition", subtitle = "Conditions not yet assigned (circular)", x = "Angle (PC1–PC2)", y = "Radius") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), panel.grid.minor = ggplot2::element_blank())
+        } else {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Condition)) + ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+            ggplot2::scale_color_manual(values = c("Normal" = "#3498db", "Disease" = "#e74c3c", "None" = "#95a5a6"), na.value = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "Before Batch Correction - By Condition", subtitle = "Biological signal may be obscured by batch effects (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Condition") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+        }
+      }, error = function(e) NULL)
+      batch_save_ggplot(p, file, "png")
+    }
+  )
+  output$download_pca_before_condition_pdf <- downloadHandler(
+    filename = function() "Batch_PCA_Before_Condition.pdf",
+    content = function(file) {
+      p <- tryCatch({
+        req(rv$expr_filtered)
+        pca <- prcomp(t(rv$expr_filtered), scale. = TRUE)
+        pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+        theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+        df <- data.frame(theta = theta, r = r, Condition = rv$unified_metadata$Condition, Dataset = rv$unified_metadata$Dataset)
+        if (all(is.na(df$Condition)) || length(unique(df$Condition[!is.na(df$Condition)])) < 2) {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r)) + ggplot2::geom_point(size = 3.5, alpha = 0.7, color = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "Before Batch Correction - By Condition", subtitle = "Conditions not yet assigned (circular)", x = "Angle (PC1–PC2)", y = "Radius") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), panel.grid.minor = ggplot2::element_blank())
+        } else {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Condition)) + ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+            ggplot2::scale_color_manual(values = c("Normal" = "#3498db", "Disease" = "#e74c3c", "None" = "#95a5a6"), na.value = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "Before Batch Correction - By Condition", subtitle = "Biological signal may be obscured by batch effects (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Condition") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+        }
+      }, error = function(e) NULL)
+      batch_save_ggplot(p, file, "pdf")
+    }
+  )
+  output$download_pca_after_condition_png <- downloadHandler(
+    filename = function() "Batch_PCA_After_Condition.png",
+    content = function(file) {
+      p <- tryCatch({
+        req(rv$batch_corrected)
+        pca <- prcomp(t(rv$batch_corrected), scale. = TRUE)
+        pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+        theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+        df <- data.frame(theta = theta, r = r, Condition = rv$unified_metadata$Condition, Dataset = rv$unified_metadata$Dataset)
+        if (all(is.na(df$Condition)) || length(unique(df$Condition[!is.na(df$Condition)])) < 2) {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r)) + ggplot2::geom_point(size = 3.5, alpha = 0.7, color = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "After Batch Correction - By Condition", subtitle = "Conditions (circular)", x = "Angle (PC1–PC2)", y = "Radius") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), panel.grid.minor = ggplot2::element_blank())
+        } else {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Condition)) + ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+            ggplot2::scale_color_manual(values = c("Normal" = "#3498db", "Disease" = "#e74c3c", "None" = "#95a5a6"), na.value = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "After Batch Correction - By Condition", subtitle = "Biological signal (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Condition") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+        }
+      }, error = function(e) NULL)
+      batch_save_ggplot(p, file, "png")
+    }
+  )
+  output$download_pca_after_condition_pdf <- downloadHandler(
+    filename = function() "Batch_PCA_After_Condition.pdf",
+    content = function(file) {
+      p <- tryCatch({
+        req(rv$batch_corrected)
+        pca <- prcomp(t(rv$batch_corrected), scale. = TRUE)
+        pc1 <- pca$x[, 1]; pc2 <- pca$x[, 2]
+        theta <- atan2(pc2, pc1); r <- sqrt(pc1^2 + pc2^2); if (max(r) > 0) r <- r / max(r)
+        df <- data.frame(theta = theta, r = r, Condition = rv$unified_metadata$Condition, Dataset = rv$unified_metadata$Dataset)
+        if (all(is.na(df$Condition)) || length(unique(df$Condition[!is.na(df$Condition)])) < 2) {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r)) + ggplot2::geom_point(size = 3.5, alpha = 0.7, color = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "After Batch Correction - By Condition", subtitle = "Conditions (circular)", x = "Angle (PC1–PC2)", y = "Radius") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), panel.grid.minor = ggplot2::element_blank())
+        } else {
+          ggplot2::ggplot(df, ggplot2::aes(x = theta, y = r, color = Condition)) + ggplot2::geom_point(size = 3.5, alpha = 0.7) +
+            ggplot2::scale_color_manual(values = c("Normal" = "#3498db", "Disease" = "#e74c3c", "None" = "#95a5a6"), na.value = "gray60") +
+            ggplot2::coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+            ggplot2::scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi), labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+            ggplot2::scale_y_continuous(limits = c(0, NA)) + ggplot2::theme_bw(base_size = 14) +
+            ggplot2::labs(title = "After Batch Correction - By Condition", subtitle = "Biological signal (circular)", x = "Angle (PC1–PC2)", y = "Radius", color = "Condition") +
+            ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), legend.position = "right", panel.grid.minor = ggplot2::element_blank())
+        }
+      }, error = function(e) NULL)
+      batch_save_ggplot(p, file, "pdf")
+    }
+  )
+
+  # Hclust and PVCA: draw to device (pheatmap / base)
+  batch_hclust_to_file <- function(file, dev_fun, before = TRUE) {
+    expr_mat <- if (before) rv$expr_filtered else rv$batch_corrected
+    if (is.null(expr_mat)) return()
+    n_samples <- min(50, ncol(expr_mat))
+    if (ncol(expr_mat) > n_samples) { set.seed(123); sample_idx <- sample(seq_len(ncol(expr_mat)), n_samples); expr_subset <- expr_mat[, sample_idx]; metadata_subset <- rv$unified_metadata[sample_idx, ] } else { expr_subset <- expr_mat; metadata_subset <- rv$unified_metadata }
+    cor_matrix <- cor(expr_subset, use = "pairwise.complete.obs")
+    dist_matrix <- as.dist(1 - cor_matrix)
+    hclust_result <- hclust(dist_matrix, method = "ward.D2")
+    annotation_col <- data.frame(Dataset = metadata_subset$Dataset, Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", metadata_subset$Condition), row.names = colnames(expr_subset))
+    cor_matrix_ordered <- cor_matrix[hclust_result$order, hclust_result$order]
+    dev_fun(file)
+    tryCatch({
+      pheatmap::pheatmap(cor_matrix_ordered, cluster_rows = FALSE, cluster_cols = FALSE, annotation_col = annotation_col, annotation_row = annotation_col,
+        color = grDevices::colorRampPalette(c("#e74c3c", "white", "#3498db"))(100),
+        main = if (before) "Hierarchical Clustering - Before Batch Correction\n(Samples cluster by Dataset)" else "Hierarchical Clustering - After Batch Correction\n(Samples cluster by Condition)",
+        fontsize = 8, fontsize_row = 7, fontsize_col = 7, show_rownames = FALSE, show_colnames = FALSE)
+    }, error = function(e) { plot.new(); text(0.5, 0.5, paste("Error:", e$message), cex = 1) })
+    dev.off()
+  }
+  output$download_hclust_before_png <- downloadHandler(
+    filename = function() "Batch_Hclust_Before.png",
+    content = function(file) batch_hclust_to_file(file, function(f) png(f, width = 10, height = 8, res = IMAGE_DPI, units = "in", bg = "white"), before = TRUE)
+  )
+  output$download_hclust_before_pdf <- downloadHandler(
+    filename = function() "Batch_Hclust_Before.pdf",
+    content = function(file) batch_hclust_to_file(file, function(f) pdf(f, width = 10, height = 8, bg = "white"), before = TRUE)
+  )
+  output$download_hclust_after_png <- downloadHandler(
+    filename = function() "Batch_Hclust_After.png",
+    content = function(file) batch_hclust_to_file(file, function(f) png(f, width = 10, height = 8, res = IMAGE_DPI, units = "in", bg = "white"), before = FALSE)
+  )
+  output$download_hclust_after_pdf <- downloadHandler(
+    filename = function() "Batch_Hclust_After.pdf",
+    content = function(file) batch_hclust_to_file(file, function(f) pdf(f, width = 10, height = 8, bg = "white"), before = FALSE)
+  )
+
+  # PVCA: rebuild bar plot and ggsave
+  batch_pvca_to_plot <- function(before = TRUE) {
+    expr_mat <- if (before) rv$expr_filtered else rv$batch_corrected
+    if (is.null(expr_mat)) return(NULL)
+    n_samples <- min(100, ncol(expr_mat))
+    if (ncol(expr_mat) > n_samples) { set.seed(123); sample_idx <- sample(seq_len(ncol(expr_mat)), n_samples); expr_subset <- expr_mat[, sample_idx]; metadata_subset <- rv$unified_metadata[sample_idx, ] } else { expr_subset <- expr_mat; metadata_subset <- rv$unified_metadata }
+    pca <- prcomp(t(expr_subset), scale. = TRUE)
+    cum_var <- cumsum(pca$sdev^2 / sum(pca$sdev^2)); n_pcs <- min(10, which(cum_var >= 0.8)[1]); if (is.na(n_pcs)) n_pcs <- min(10, ncol(pca$x))
+    pca_scores <- pca$x[, 1:n_pcs]
+    pvca_results <- data.frame(Factor = character(), Variance = numeric(), stringsAsFactors = FALSE)
+    if (length(unique(metadata_subset$Dataset)) > 1) {
+      dataset_var <- sum(apply(pca_scores, 2, function(pc) { aov_result <- aov(pc ~ metadata_subset$Dataset); sum_sq <- summary(aov_result)[[1]]$`Sum Sq`; sum_sq[1] / sum(sum_sq) })) / n_pcs
+      pvca_results <- rbind(pvca_results, data.frame(Factor = "Dataset", Variance = dataset_var))
+    }
+    if (!all(is.na(metadata_subset$Condition)) && length(unique(metadata_subset$Condition[!is.na(metadata_subset$Condition)])) > 1) {
+      condition_var <- sum(apply(pca_scores, 2, function(pc) { aov_result <- aov(pc ~ metadata_subset$Condition); sum_sq <- summary(aov_result)[[1]]$`Sum Sq`; sum_sq[1] / sum(sum_sq) })) / n_pcs
+      pvca_results <- rbind(pvca_results, data.frame(Factor = "Condition", Variance = condition_var))
+    }
+    total_var <- sum(pvca_results$Variance); residual_var <- max(0, 1 - total_var)
+    pvca_results <- rbind(pvca_results, data.frame(Factor = "Residual", Variance = residual_var))
+    pvca_results$Factor <- factor(pvca_results$Factor, levels = c("Dataset", "Condition", "Residual"))
+    ggplot2::ggplot(pvca_results, ggplot2::aes(x = Factor, y = Variance, fill = Factor)) +
+      ggplot2::geom_bar(stat = "identity", alpha = 0.8) +
+      ggplot2::scale_fill_manual(values = c("Dataset" = "#e74c3c", "Condition" = "#3498db", "Residual" = "#95a5a6")) +
+      ggplot2::theme_bw(base_size = 14) +
+      ggplot2::labs(title = paste0("PVCA - ", if (before) "Before" else "After", " Batch Correction"), subtitle = "Variance explained by Dataset vs Condition", x = "Factor", y = "Proportion of Variance", fill = "Factor") +
+      ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5), plot.subtitle = ggplot2::element_text(size = 11, hjust = 0.5, color = "gray50"), legend.position = "right", panel.grid.major = ggplot2::element_line(color = "gray90"), panel.grid.minor = ggplot2::element_line(color = "gray95")) +
+      ggplot2::ylim(0, 1)
+  }
+  output$download_pvca_before_png <- downloadHandler(
+    filename = function() "Batch_PVCA_Before.png",
+    content = function(file) { p <- batch_pvca_to_plot(before = TRUE); if (!is.null(p)) batch_save_ggplot(p, file, "png") }
+  )
+  output$download_pvca_before_pdf <- downloadHandler(
+    filename = function() "Batch_PVCA_Before.pdf",
+    content = function(file) { p <- batch_pvca_to_plot(before = TRUE); if (!is.null(p)) batch_save_ggplot(p, file, "pdf") }
+  )
+  output$download_pvca_after_png <- downloadHandler(
+    filename = function() "Batch_PVCA_After.png",
+    content = function(file) { p <- batch_pvca_to_plot(before = FALSE); if (!is.null(p)) batch_save_ggplot(p, file, "png") }
+  )
+  output$download_pvca_after_pdf <- downloadHandler(
+    filename = function() "Batch_PVCA_After.pdf",
+    content = function(file) { p <- batch_pvca_to_plot(before = FALSE); if (!is.null(p)) batch_save_ggplot(p, file, "pdf") }
+  )
   
 }
 

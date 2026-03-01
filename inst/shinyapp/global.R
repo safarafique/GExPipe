@@ -183,6 +183,7 @@ platform_to_annot <- list(
   "GPL26132" = NA,   "GPL26134" = NA,   "GPL26226" = NA,   "GPL26291" = NA,   "GPL26303" = NA,   "GPL26363" = NA,   "GPL26619" = NA,   "GPL11154" = NA,   "GPL15433" = NA,   "GPL16512" = NA,   "GPL16791" = NA,   "GPL17553" = NA,
   "GPL18031" = NA,   "GPL18160" = NA,   "GPL18215" = NA,   "GPL18430" = NA,   "GPL18448" = NA,   "GPL18460" = NA,   "GPL19227" = NA,   "GPL19367" = NA,   "GPL19381" = NA,   "GPL20050" = NA,   "GPL20238" = NA,   "GPL20271" = NA,
   "GPL20301" = NA,   "GPL20607" = NA,   "GPL20795" = NA,   "GPL21219" = NA,   "GPL35694" = NA,   "GPL35732" = NA,   "GPL36010" = NA,   "GPL36168" = NA,   "GPL36169" = NA,   "GPL36170" = NA,   "GPL36176" = NA,   "GPL36331" = NA,
+  # (GPL11154=Illumina HiSeq 2000, GPL15433=Illumina HiSeq 1000, GPL16512=Illumina HiSeq 2000 Multi-species, GPL16791=Illumina HiSeq 2500, GPL18448=Illumina HiSeq 2000, GPL18460=Illumina HiSeq 2500, GPL19227=Illumina NextSeq 500, GPL20050=Illumina HiSeq 2500 Dual RNA-Seq, GPL20301=Illumina HiSeq 4000, GPL21219=Illumina HiSeq 3000)
   "GPL36530" = NA,   "GPL28955" = NA,   "GPL29480" = NA,   "GPL30882" = NA,   "GPL32186" = NA,   "GPL35417" = NA,   "GPL35868" = NA,   "GPL28038" = NA,   "GPL28337" = NA,   "GPL29439" = NA,   "GPL29481" = NA,   "GPL29482" = NA,
   "GPL32283" = NA,   "GPL26167" = NA,   "GPL28975" = NA,   "GPL32242" = NA,   "GPL32271" = NA,   "GPL31265" = NA,   "GPL27444" = NA,   "GPL17301" = NA,   "GPL17303" = NA,   "GPL29544" = NA,   "GPL28352" = NA,   "GPL26180" = NA,
   "GPL19124" = NA,   "GPL36273" = NA,   "GPL29455" = NA,   "GPL29714" = NA,   "GPL29811" = NA,   "GPL29861" = NA,   "GPL26694" = NA,   "GPL24950" = NA,   "GPL25879" = NA,   "GPL15520" = NA,   "GPL17658" = NA,   "GPL19969" = NA,
@@ -411,9 +412,191 @@ annot_pkg_to_type <- c(
   "mgu74av2.db" = "Affymetrix MG-U74A v2",
   "hugenefl.db" = "Affymetrix HuGeneFL"
 )
-# Every GPL gets a display type: from annot package if present, else "Other microarray (biomaRt)"
+# Bulk RNA-seq and Microarray GPL -> full platform name (replaces "Other microarray (biomaRt)" / short type in UI lists)
+platform_id_display_name_override <- c(
+  # Microarray (Affymetrix, Illumina, Agilent)
+  "GPL96" = "Affymetrix Human Genome U133 Array",
+  "GPL97" = "Affymetrix Human Genome U133 Plus 2.0 Array (B-set)",
+  "GPL570" = "[HG-U133_Plus_2] Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL571" = "Affymetrix Human Genome U133A 2.0 Array",
+  "GPL887" = "Affymetrix Human Genome U95B",
+  "GPL1053" = "Affymetrix Human Genome U133 Plus 2.0 Array (B-set)",
+  "GPL1073" = "Affymetrix Human Genome U133A Array",
+  "GPL1261" = "Affymetrix Mouse Genome 430 2.0 Array",
+  "GPL1312" = "Affymetrix Mouse Genome U74A Version 2 Array",
+  "GPL1322" = "Affymetrix Human Full Length HuGeneFL Array",
+  "GPL1352" = "Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL1390" = "Affymetrix Human Genome U95A Array",
+  "GPL3921" = "Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL5175" = "Affymetrix Human Exon 1.0 ST Array",
+  "GPL6104" = "Illumina HumanWG-6 v2.0 Expression BeadChip",
+  "GPL6244" = "Affymetrix Human Gene 1.0 ST Array",
+  "GPL6885" = "Illumina MouseRef-8 v2.0 Expression BeadChip",
+  "GPL10558" = "Illumina HumanHT-12 V4.0 expression beadchip",
+  "GPL10739" = "Affymetrix Human Genome U133 Plus 2.0 Array (Custom)",
+  "GPL17586" = "Affymetrix Human Transcriptome Array 2.0",
+  "GPL17930" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL19370" = "Affymetrix Human Gene 2.1 ST Array (v1)",
+  "GPL21509" = "Affymetrix Human Transcriptome Array 2.0",
+  "GPL23126" = "Affymetrix Clariom D Human Array",
+  "GPL23270" = "Affymetrix Clariom S Human Array",
+  "GPL1843" = "Agilent-014850 Whole Human Genome (Custom/GEO Table)",
+  "GPL17303" = "Agilent-028004 SurePrint G3 Human GE (Custom/Agilent)",
+  "GPL13607" = "Agilent-028004 SurePrint G3 Human GE 8x60K Microarray (Feature Number version)",
+  # Microarray (all remaining .db platforms — original full names)
+  "GPL201" = "Affymetrix Human Genome U133 Array",
+  "GPL5188" = "Affymetrix Human Exon 1.0 ST Array",
+  "GPL8300" = "Affymetrix Human Genome U95A Version 2 Array",
+  "GPL8432" = "Illumina HumanHT-12 V2.0 Expression BeadChip",
+  "GPL10904" = "Illumina HumanHT-12 V4.0 Expression BeadChip",
+  "GPL11532" = "Affymetrix Human Gene 1.1 ST Array",
+  "GPL13158" = "Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL13915" = "Affymetrix Human Gene 1.0 ST Array",
+  "GPL14951" = "Affymetrix Human Gene 1.0 ST Array",
+  "GPL15088" = "Affymetrix Human Gene 2.0 ST Array",
+  "GPL15207" = "Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL15314" = "Affymetrix Human Gene 1.1 ST Array",
+  "GPL16043" = "Affymetrix PrimeView Array",
+  "GPL16311" = "Affymetrix Human Gene 2.0 ST Array",
+  "GPL16686" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL17556" = "Affymetrix Human Gene 1.1 ST Array",
+  "GPL17585" = "Affymetrix Human Transcriptome Array 2.0",
+  "GPL17692" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL18990" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL18991" = "Affymetrix Human Genome U133A 2.0 Array",
+  "GPL19251" = "Affymetrix Human Transcriptome Array 2.0",
+  "GPL19859" = "Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL19983" = "Affymetrix Human Genome U133A 2.0 Array",
+  "GPL20265" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL21061" = "Affymetrix Human Gene 2.0 ST Array",
+  "GPL21559" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL21970" = "Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL22286" = "Affymetrix Human Gene 1.1 ST Array",
+  "GPL22995" = "Affymetrix Human Gene 1.0 ST Array",
+  "GPL23159" = "Affymetrix Clariom D Human Array",
+  "GPL23432" = "Affymetrix Human Genome U133 Plus 2.0 Array",
+  "GPL23961" = "Affymetrix Clariom S Human Array",
+  "GPL24299" = "Affymetrix Clariom S Human Array",
+  "GPL24507" = "Affymetrix Clariom S Human Array",
+  "GPL24532" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL24676" = "Illumina HumanHT-12 V3.0 Expression BeadChip",
+  "GPL25249" = "Affymetrix Clariom S Human Array",
+  "GPL25336" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL25381" = "Affymetrix Clariom S Human Array",
+  "GPL26944" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL28718" = "Affymetrix Human Gene 1.0 ST Array",
+  "GPL29829" = "Affymetrix Human Genome U133 Array",
+  "GPL30572" = "Affymetrix Human Gene 2.1 ST Array",
+  "GPL6947" = "Illumina HumanHT-12 V3.0 Expression BeadChip",
+  # Additional microarray / non-RNA-seq platforms (user-provided official names)
+  "GPL13667" = "[HG-U219] Affymetrix Human Genome U219 Array",
+  "GPL14550" = "Agilent-028004 SurePrint G3 Human GE 8x60K Microarray (Probe Name version)",
+  "GPL8227" = "Agilent-019118 Human miRNA Microarray 2.0 G4470B (miRNA ID version)",
+  "GPL8363" = "[HG-U219] Affymetrix Human Genome U219 Array (Probe Set ID version)",
+  "GPL8490" = "Illumina HumanMethylation27 BeadChip",
+  "GPL9081" = "Agilent-016436 Human miRNA Microarray G4470A (miRNA ID version)",
+  "GPL13534" = "Illumina HumanMethylation450 BeadChip",
+  "GPL17077" = "Agilent-039494 SurePrint G3 Human GE v2 8x60K Microarray (Probe Name version)",
+  "GPL20115" = "Agilent-067406 Human CBC lncRNA + mRNA microarray V4.0",
+  "GPL21145" = "Infinium MethylationEPIC",
+  "GPL21185" = "Agilent-072363 SurePrint G3 Human GE v3 8x60K Microarray (Probe Name version)",
+  "GPL25758" = "Agilent-085775 Arraystar Human circRNA Epitranscriptomic microarray",
+  "GPL20204" = "SABiosciences/Qiagen Human Cellular Senescence RT\u00b2 Profiler PCR Array",
+  "GPL6359" = "[HG-U133_Plus_2] Affymetrix Human Genome U133 Plus 2.0 Array (with custom CDF)",
+  "GPL16020" = "[HuGene-2_1-st] Affymetrix Human Gene 2.1 ST Array [transcript (gene) version]",
+  "GPL16956" = "Agilent-026652 Whole Human Genome Microarray 4x44K v2 (Feature Number version)",
+  "GPL6883" = "Illumina HumanRef-8 v3.0 expression beadchip",
+  "GPL4133" = "Agilent-014850 Whole Human Genome Microarray 4x44K G4112F (Feature Number version)",
+  "GPL18451" = "NimbleGen Homo sapiens HG18 expression array [100718_HG18_opt_expr_HX12]",
+  "GPL24072" = "Affymetrix HG-U133 Plus 2.0 (custom BrainArray v21)",
+  "GPL21439" = "Affymetrix HG-U133 Plus 2.0 (custom BrainArray v20)",
+  "GPL22003" = "Affymetrix HG-U133 Plus 2.0 (custom BrainArray v18)",
+  "GPL24875" = "Agilent-028004 SurePrint G3 Human GE 8x60K",
+  "GPL13987" = "Agilent-028004 SurePrint G3 Human GE 8x60K (Probe Name)",
+  "GPL19387" = "Agilent-033501 SurePrint G3 Human CGH 2x400K",
+  "GPL23178" = "Affymetrix Human Custom lncRNA Array [OElncRNAs520855F]",
+  "GPL16847" = "Agilent-039494 SurePrint G3 Human GE v2 8x60K",
+  "GPL17629" = "[HuEx-1_0-st-v2] Affymetrix Human Exon 1.0 ST Array",
+  "GPL17810" = "Agilent-028004 SurePrint G3 Human GE 8x60K (Probe Name)",
+  "GPL23649" = "Agilent-028004 SurePrint G3 Human GE 8x60K (Probe Name)",
+  "GPL6480" = "Agilent-014850 Whole Human Genome Microarray 4x44K",
+  "GPL22516" = "Agilent-072363 SurePrint G3 Human GE v3 8x60K",
+  "GPL22517" = "Agilent-072363 SurePrint G3 Human GE v3 8x60K",
+  "GPL17107" = "Exiqon miRCURY LNA microRNA Array (hsa, mmu, rno)",
+  "GPL16384" = "[miRNA-3] Affymetrix Multispecies miRNA-3 Array",
+  "GPL20791" = "Agilent-062918 Arraystar Human LncRNA microarray V3",
+  "GPL19965" = "nCounter PanCancer Immune Profiling (Nanostring)",
+  # Bulk RNA-seq
+  "GPL10999" = "Illumina Genome Analyzer II (Homo sapiens)",
+  "GPL11118" = "Illumina HiSeq 2000 (Homo sapiens)",
+  "GPL11154" = "Illumina HiSeq 2000 (Mus musculus / Homo sapiens)",
+  "GPL15433" = "Illumina HiSeq 1000 (Homo sapiens)",
+  "GPL15440" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL15456" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL15520" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL15524" = "Illumina HiSeq 2500 (Mus musculus)",
+  "GPL16027" = "Illumina HiSeq 2000 (Mus musculus)",
+  "GPL16287" = "Illumina HiSeq 2000 (Homo sapiens)",
+  "GPL16512" = "Illumina HiSeq 2000 (Multi-species)",
+  "GPL16790" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL16791" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL18402" = "Illumina HiSeq 2000 (Homo sapiens)",
+  "GPL18448" = "Illumina HiSeq 2000 (Homo sapiens)",
+  "GPL18460" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL18461" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL18573" = "Illumina NextSeq 500 (Homo sapiens)",
+  "GPL18578" = "Illumina NextSeq 500 (Homo sapiens)",
+  "GPL18643" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL26525" = "Illumina HiSeq 3000 (Homo sapiens)",
+  "GPL19072" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL18723" = "Illumina HiSeq 2500 (Mus musculus)",
+  "GPL19065" = "Illumina HiSeq 2000 (Homo sapiens)",
+  "GPL19826" = "Illumina NextSeq 500 (Homo sapiens)",
+  "GPL19828" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL23465" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL23578" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL24904" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL24879" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL25024" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL25166" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL25635" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL25672" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL25484" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL24605" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL24606" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL24607" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL26026" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL26747" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL26705" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL26683" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL27487" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL27765" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL29173" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL19124" = "PacBio RS (Homo sapiens)",
+  "GPL19227" = "Illumina NextSeq 500 (Homo sapiens)",
+  "GPL19969" = "Illumina MiSeq (Multi-species)",
+  "GPL20050" = "Illumina HiSeq 2500 (Dual RNA-Seq)",
+  "GPL20051" = "Illumina HiSeq 2000 (Homo sapiens)",
+  "GPL20148" = "Illumina NextSeq 500 (Homo sapiens)",
+  "GPL20149" = "Illumina NextSeq 500 (Homo sapiens)",
+  "GPL20276" = "Illumina NextSeq 500 (Mixed Species)",
+  "GPL20301" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL20311" = "Illumina HiSeq 2500 (Homo sapiens)",
+  "GPL21219" = "Illumina HiSeq 3000 (Mus musculus)",
+  "GPL21272" = "Illumina HiSeq 4000 (Homo sapiens)",
+  "GPL21290" = "Illumina HiSeq 3000 (Homo sapiens)",
+  "GPL24432" = "Illumina NovaSeq 6000 (Homo sapiens)",
+  "GPL24632" = "Illumina HiSeq 3000 (Homo sapiens)",
+  "GPL33023" = "Illumina NovaSeq 6000 (Homo sapiens)",
+  "GPL33758" = "DNBSEQ-G400 (Homo sapiens)",
+  "GPL33762" = "DNBSEQ-G400 (Homo sapiens)",
+  "GPL20828" = "Illumina NextSeq 500 (Danio rerio)"
+)
+# Every GPL gets a display type: from display-name override, else annot package, else "Other microarray (biomaRt)"
 platform_id_to_type <- setNames(
   vapply(names(platform_to_annot), function(gpl) {
+    if (gpl %in% names(platform_id_display_name_override))
+      return(platform_id_display_name_override[[gpl]])
     pkg <- platform_to_annot[[gpl]]
     if (is.na(pkg) || !nzchar(pkg)) return("Other microarray (biomaRt)")
     type <- if (pkg %in% names(annot_pkg_to_type)) annot_pkg_to_type[[pkg]] else NULL
@@ -424,10 +607,14 @@ platform_id_to_type <- setNames(
 )
 
 # Two main categories: Microarray | RNA-seq. Subtypes within each for ordered listing.
-# GPLs used as sequencing platforms in GEO (RNA-seq); add/remove as needed. Others = Microarray.
+# GPLs used as sequencing platforms in GEO (bulk RNA-seq); add/remove as needed. Others = Microarray.
 platform_ids_rnaseq <- c(
-  "GPL11154", "GPL16791", "GPL18573", "GPL20301", "GPL21219",
-  "GPL15433", "GPL20795", "GPL26921", "GPL26922", "GPL27991", "GPL28867"
+  "GPL10999", "GPL11118", "GPL11154", "GPL15433", "GPL15440", "GPL15456", "GPL15520", "GPL15524",
+  "GPL16027", "GPL16287", "GPL16512", "GPL16790", "GPL16791", "GPL18402", "GPL18448", "GPL18460",
+  "GPL18461", "GPL18573", "GPL18578", "GPL18643", "GPL18723", "GPL19065", "GPL19124", "GPL19227",
+  "GPL19969", "GPL20050", "GPL20051", "GPL20148", "GPL20149", "GPL20276", "GPL20301", "GPL20311",
+  "GPL20795", "GPL20822", "GPL20828", "GPL21219", "GPL21272", "GPL21290", "GPL24432", "GPL24632",
+  "GPL26921", "GPL26922", "GPL27991", "GPL28867", "GPL33023", "GPL33758", "GPL33762", "GPL26525"
 )
 # Map display type -> subtype (for grouping). Order of subtype names defines sequence.
 type_to_subtype_microarray <- c(
@@ -454,27 +641,90 @@ type_to_subtype_microarray <- c(
   "Illumina HumanHT-12 v4" = "Illumina",
   "Illumina Mouse v2" = "Illumina",
   "Microarray (annot)" = "Other microarray",
-  "Other microarray (biomaRt)" = "Other microarray"
+  "Other microarray (biomaRt)" = "Other microarray",
+  # Full platform names (from platform_id_display_name_override)
+  "Affymetrix Human Genome U133 Array" = "Affymetrix HG-U133",
+  "Affymetrix Human Genome U133 Plus 2.0 Array (B-set)" = "Affymetrix HG-U133",
+  "Affymetrix Human Genome U133 Plus 2.0 Array" = "Affymetrix HG-U133",
+  "Affymetrix Human Genome U133 Plus 2.0 Array (Custom)" = "Affymetrix HG-U133",
+  "Affymetrix Human Genome U133A Array" = "Affymetrix HG-U133",
+  "Affymetrix Human Genome U133A 2.0 Array" = "Affymetrix HG-U133",
+  "Affymetrix Human Genome U95A Array" = "Affymetrix Other",
+  "Affymetrix Human Genome U95B" = "Affymetrix Other",
+  "Affymetrix Mouse Genome 430 2.0 Array" = "Affymetrix Other",
+  "Affymetrix Mouse Genome U74A Version 2 Array" = "Affymetrix Other",
+  "Affymetrix Human Full Length HuGeneFL Array" = "Affymetrix Other",
+  "Affymetrix Human Exon 1.0 ST Array" = "Affymetrix HuEx",
+  "Affymetrix Human Gene 1.0 ST Array" = "Affymetrix HuGene",
+  "Affymetrix Human Gene 2.1 ST Array" = "Affymetrix HuGene",
+  "Affymetrix Human Gene 2.1 ST Array (v1)" = "Affymetrix HuGene",
+  "Affymetrix Human Transcriptome Array 2.0" = "Affymetrix HTA",
+  "Affymetrix Clariom D Human Array" = "Affymetrix Other",
+  "Affymetrix Clariom S Human Array" = "Affymetrix Other",
+  "Illumina HumanWG-6 v2.0 Expression BeadChip" = "Illumina",
+  "Illumina HumanHT-12 V4.0 Expression BeadChip" = "Illumina",
+  "Illumina MouseRef-8 v2.0 Expression BeadChip" = "Illumina",
+  "Illumina HumanHT-12 V2.0 Expression BeadChip" = "Illumina",
+  "Illumina HumanHT-12 V3.0 Expression BeadChip" = "Illumina",
+  "Affymetrix Human Gene 1.1 ST Array" = "Affymetrix HuGene",
+  "Affymetrix Human Gene 2.0 ST Array" = "Affymetrix HuGene",
+  "Affymetrix PrimeView Array" = "Affymetrix Other",
+  "Affymetrix Human Genome U95A Version 2 Array" = "Affymetrix Other",
+  "Agilent-014850 Whole Human Genome (Custom/GEO Table)" = "Other microarray",
+  "Agilent-028004 SurePrint G3 Human GE (Custom/Agilent)" = "Other microarray",
+  "Agilent-028004 SurePrint G3 Human GE 8x60K Microarray (Feature Number version)" = "Other microarray",
+  "[HG-U219] Affymetrix Human Genome U219 Array" = "Affymetrix Other",
+  "[HG-U219] Affymetrix Human Genome U219 Array (Probe Set ID version)" = "Affymetrix Other",
+  "Agilent-028004 SurePrint G3 Human GE 8x60K Microarray (Probe Name version)" = "Other microarray",
+  "Agilent-019118 Human miRNA Microarray 2.0 G4470B (miRNA ID version)" = "Other microarray",
+  "Agilent-016436 Human miRNA Microarray G4470A (miRNA ID version)" = "Other microarray",
+  "Agilent-072363 SurePrint G3 Human GE v3 8x60K Microarray (Probe Name version)" = "Other microarray",
+  "Agilent-067406 Human CBC lncRNA + mRNA microarray V4.0" = "Other microarray",
+  "Illumina HumanMethylation27 BeadChip" = "Other microarray",
+  "Illumina HumanMethylation450 BeadChip" = "Other microarray",
+  "Illumina HumanHT-12 V4.0 expression beadchip" = "Illumina",
+  "Agilent-039494 SurePrint G3 Human GE v2 8x60K Microarray (Probe Name version)" = "Other microarray",
+  "Agilent-085775 Arraystar Human circRNA Epitranscriptomic microarray" = "Other microarray",
+  "Infinium MethylationEPIC" = "Other microarray",
+  "[HG-U133_Plus_2] Affymetrix Human Genome U133 Plus 2.0 Array" = "Affymetrix HG-U133",
+  "[HG-U133_Plus_2] Affymetrix Human Genome U133 Plus 2.0 Array (with custom CDF)" = "Affymetrix HG-U133",
+  "[HuGene-2_1-st] Affymetrix Human Gene 2.1 ST Array [transcript (gene) version]" = "Affymetrix HuGene",
+  "Agilent-026652 Whole Human Genome Microarray 4x44K v2 (Feature Number version)" = "Other microarray",
+  "Illumina HumanRef-8 v3.0 expression beadchip" = "Illumina",
+  "Agilent-014850 Whole Human Genome Microarray 4x44K G4112F (Feature Number version)" = "Other microarray",
+  "NimbleGen Homo sapiens HG18 expression array [100718_HG18_opt_expr_HX12]" = "Other microarray",
+  "SABiosciences/Qiagen Human Cellular Senescence RT\u00b2 Profiler PCR Array" = "Other microarray"
 )
 microarray_subtype_order <- c(
   "Affymetrix HG-U133", "Affymetrix HuGene", "Affymetrix HTA", "Affymetrix HuEx",
   "Affymetrix Other", "Illumina", "Other microarray"
 )
 rnaseq_subtype_order <- c("Illumina HiSeq/NovaSeq", "Other RNA-seq")
+other_subtype_order <- c("Other technologies")
 
-# GPL -> category: "Microarray" or "RNA-seq"
+# Explicit technology groups: Microarray, RNA-seq (bulk), and Other (miRNA, methylation, circRNA, etc.)
+platform_ids_other <- c("GPL8227", "GPL9081", "GPL13534", "GPL25758", "GPL8490", "GPL21145", "GPL20204")
+
+# GPL -> category: "Microarray", "RNA-seq", or "Other"
 platform_id_category <- setNames(
-  ifelse(names(platform_to_annot) %in% platform_ids_rnaseq, "RNA-seq", "Microarray"),
+  ifelse(
+    names(platform_to_annot) %in% platform_ids_rnaseq, "RNA-seq",
+    ifelse(names(platform_to_annot) %in% platform_ids_other, "Other", "Microarray")
+  ),
   names(platform_to_annot)
 )
+
 # GPL -> subtype (within category)
 platform_id_subtype <- setNames(
   vapply(names(platform_to_annot), function(gpl) {
     type <- platform_id_to_type[[gpl]]
     cat <- platform_id_category[[gpl]]
     if (cat == "RNA-seq") {
-      if (gpl %in% c("GPL11154", "GPL16791", "GPL18573", "GPL20301", "GPL21219", "GPL24676")) return("Illumina HiSeq/NovaSeq")
+      if (grepl("Illumina|DNBSEQ", type, ignore.case = TRUE)) return("Illumina HiSeq/NovaSeq")
       return("Other RNA-seq")
+    }
+    if (cat == "Other") {
+      return("Other technologies")
     }
     sub <- if (type %in% names(type_to_subtype_microarray)) type_to_subtype_microarray[[type]] else NULL
     if (is.null(sub) || is.na(sub)) return("Other microarray")
@@ -485,20 +735,24 @@ platform_id_subtype <- setNames(
 
 # Nested list: category -> subtype -> vector of GPL ids (for display/export in sequence)
 platform_ids_by_category_subtype <- local({
-  out <- list(Microarray = list(), RNA_seq = list())
+  out <- list(Microarray = list(), RNA_seq = list(), Other = list())
   for (sub in microarray_subtype_order) {
     out$Microarray[[sub]] <- names(platform_to_annot)[platform_id_category == "Microarray" & platform_id_subtype == sub]
   }
   for (sub in rnaseq_subtype_order) {
     out$RNA_seq[[sub]] <- names(platform_to_annot)[platform_id_category == "RNA-seq" & platform_id_subtype == sub]
   }
+  for (sub in other_subtype_order) {
+    out$Other[[sub]] <- names(platform_to_annot)[platform_id_category == "Other" & platform_id_subtype == sub]
+  }
   out
 })
 
-# Ordered vector of all platform IDs: Microarray (by subtype order) then RNA-seq (by subtype order),
+# Ordered vector of all platform IDs: Microarray (by subtype order) then RNA-seq, then Other
 platform_id_sequence <- c(
   unlist(platform_ids_by_category_subtype$Microarray, use.names = FALSE),
-  unlist(platform_ids_by_category_subtype$RNA_seq, use.names = FALSE)
+  unlist(platform_ids_by_category_subtype$RNA_seq, use.names = FALSE),
+  unlist(platform_ids_by_category_subtype$Other, use.names = FALSE)
 )
 # Reorder platform_to_annot so names follow category/subtype sequence (existing GPLs not in sequence stay at end)
 platform_to_annot <- c(
