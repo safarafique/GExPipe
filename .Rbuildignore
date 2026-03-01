@@ -15,7 +15,9 @@
 ^OmniVerse/
 ^inst/shinyapp/micro_data
 ^inst/shinyapp/rna_data
+^inst/shinyapp/ext_val_rna
 ^inst/shinyapp/saved_workspaces
+^inst/shinyapp/csv_exports
 ^inst/shinyapp/.*\.log$
 ^vignettes/.*\.docx$
 ^vignettes/vignette\.htm$
