@@ -6,27 +6,10 @@ ui_download <- tabItem(
     tabName = "download",
     h2(icon("download"), " Step 1: Select Platform & Download Data"),
 
-    # ----- Disease-specific analysis: quick guide -----
-    fluidRow(
-      tags$div(
-        class = "disease-guide-box",
-        style = "padding: 20px 24px; margin-bottom: 22px; border-radius: 12px; border: 2px solid #667eea; background: linear-gradient(135deg, #e8f0ff 0%, #f0e6ff 50%, #ffe8f0 100%); box-shadow: 0 6px 20px rgba(102,126,234,0.2);",
-        tags$h4(icon("heartbeat"), " Finding disease-specific results — quick guide", style = "color: #2c3e50; margin-bottom: 12px; font-weight: bold;"),
-        tags$p("You can ", tags$strong("choose any threshold"), " that fits your study. Key places:", style = "margin-bottom: 10px; color: #34495e;"),
-        tags$ul(
-          style = "margin: 0 0 10px 20px; color: #2c3e50; line-height: 1.8;",
-          tags$li(tags$strong("Step 1 (here):"), " Optionally enter your ", tags$strong("Disease / Condition"), " name (e.g. Breast cancer). It is used in reports and for Normal vs Disease grouping."),
-          tags$li(tags$strong("Step 4: Select Groups"), " — Assign samples to ", tags$em("Normal"), " and ", tags$em("Disease"), " so DE and WGCNA compare the right groups."),
-          tags$li(tags$strong("Step 6: DE Parameters"), " — Set ", tags$strong("LogFC cutoff"), " and ", tags$strong("Adj. P-value"), " (e.g. 0.5 and 0.05). Genes passing both are your disease-specific DEGs."),
-          tags$li(tags$strong("Step 7: WGCNA"), " — Use ", tags$strong("GS P-value"), ", ", tags$strong("MM correlation"), ", and ", tags$strong("significant module"), " thresholds to define disease-related modules and genes.")
-        ),
-        tags$p(tags$small(icon("lightbulb"), " Tip: Hover over ", tags$span(icon("question-circle"), style = "color: #667eea;"), " next to parameters for detailed help. All thresholds are flexible — pick what fits your question."), style = "margin: 0; color: #555; font-size: 13px;")
-      )
-    ),
     fluidRow(
       box(
-        title = tags$span(icon("heartbeat"), " Analysis Context"),
-        width = 12, status = "success", solidHeader = TRUE,
+        title = tags$span(icon("heartbeat"), " Analysis Context (optional)"),
+        width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$p("Specify the disease or condition you are analyzing. This helps keep your analysis organized and can be used in reports and filenames.", style = "margin-bottom: 12px;"),
         textInput("disease_name", "Disease / Condition (optional):",
                   placeholder = "e.g. Myocardial infarction, Breast cancer, COVID-19",
@@ -36,17 +19,17 @@ ui_download <- tabItem(
     fluidRow(
       box(
         title = tags$span(icon("info-circle"), " About this step"),
-        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$p(tags$strong("Purpose:"), " Download expression data from NCBI GEO for RNA-seq and/or microarray. Data are mapped to gene symbols and merged to a common gene set for downstream analysis.", style = "margin-bottom: 8px;"),
         tags$p(tags$strong("Methods:"), " RNA-seq uses NCBI-provided raw counts with TMM normalization; microarray uses GEO Series Matrix with platform-specific annotation. Common genes (intersection across datasets) are retained.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("Storage:"), " Downloaded files are stored in ", tags$code("micro_data"), " (microarray/CEL) and ", tags$code("rna_data"), " (bulk RNA-seq). These folders are cleared at the start of each new run and when you click Reset, so only the current run's data is kept—no accumulation across multiple uses.", style = "margin-bottom: 8px;"),
+        tags$p(tags$strong("Storage:"), " Downloaded files are stored in ", tags$code("micro_data"), " (microarray/CEL) and ", tags$code("rna_data"), " (bulk RNA-seq). These folders are cleared at the start of each new run, so only the current run's data is kept—no accumulation across multiple uses.", style = "margin-bottom: 8px;"),
         tags$p(tags$strong("Output:"), " Combined expression matrix (genes × samples), sample metadata, and gene overlap statistics for QC.", style = "margin-bottom: 0;")
       )
     ),
     fluidRow(
       box(
         title = tags$span(icon("folder-open"), " Optional: Resume from saved data"),
-        width = 12, status = "warning", solidHeader = TRUE,
+        width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$p("Load a previously saved workspace (from the app folder) to continue where you left off, or skip and start a new analysis below.", style = "margin-bottom: 10px;"),
         fluidRow(
           column(12, tags$div(style = "margin-bottom: 12px;",
@@ -79,6 +62,18 @@ ui_download <- tabItem(
                          selected = "rnaseq", inline = TRUE)
           ),
           column(6,
+            radioButtons(
+              "dataset_mode",
+              "Datasets:",
+              choices = c(
+                "Single dataset (1 GSE) — skip batch correction" = "single",
+                "Multiple datasets (comma-separated) — batch correction recommended" = "multi"
+              ),
+              selected = "multi",
+              inline = TRUE
+            )
+          ),
+          column(12,
             radioButtons("de_method",
               tags$span("DE Method:",
               tags$i(class = "fa fa-question-circle param-help",
@@ -114,14 +109,16 @@ ui_download <- tabItem(
         box(title = tags$span(icon("dna"), " RNA-seq Datasets"), 
             width = 6, status = "info", solidHeader = TRUE,
             textAreaInput("rnaseq_gses", "GSE IDs (comma separated):",
-                          value = "GSE50760, GSE104836", rows = 3))
+                          value = "GSE184050, GSE153315", placeholder = "e.g. GSE184050, GSE153315",
+                          rows = 3))
       ),
       conditionalPanel(
         condition = "input.analysis_type == 'microarray' || input.analysis_type == 'merged'",
         box(title = tags$span(icon("microchip"), " Microarray Datasets"), 
             width = 6, status = "warning", solidHeader = TRUE,
             textAreaInput("microarray_gses", "GSE IDs (comma separated):",
-                          value = "", rows = 3))
+                          value = "GSE21321, GSE163980", placeholder = "e.g. GSE21321, GSE163980",
+                          rows = 3))
       )
     ),
     
@@ -137,9 +134,7 @@ ui_download <- tabItem(
         ),
         tags$p(
           icon("info-circle"),
-          " To clear all data and start over, use the ",
-          tags$strong("Reset App"),
-          " button in the header above.",
+          " Save your workspace (sidebar) to resume your analysis later.",
           style = "margin-top: 12px; margin-bottom: 0; color: #6c757d; font-size: 13px;"
         )
       )
@@ -164,9 +159,9 @@ ui_download <- tabItem(
     ),
     fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,
-          tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
+          tags$div(class = "next-btn", style = "text-align: center; padding: 12px 0;",
                    actionButton("next_page_download", "Next: QC & Visualization",
                                 icon = icon("arrow-right"), class = "btn-success btn-lg",
-                                style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+                                style = "font-size: 16px; padding: 10px 24px; border-radius: 25px;")))
     )
   )

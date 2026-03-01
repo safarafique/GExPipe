@@ -53,6 +53,29 @@ box(
     ),
     
     fluidRow(
+      uiOutput("de_pipeline_verification")
+    ),
+    fluidRow(
+      box(
+        title = tags$span(icon("clipboard-check"), " How to check your results are valid"),
+        width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        tags$p(tags$strong("Volcano & DE results (this step):"), style = "margin-bottom: 6px;"),
+        tags$ul(
+          style = "margin: 0 0 12px 0; padding-left: 20px;",
+          tags$li("Confirm groups in ", tags$strong("Step 3 (Define Groups)"), " — Disease vs Normal (or your contrast) are correctly assigned. Wrong labels will flip or invalidate DEGs."),
+          tags$li("Check the ", tags$strong("Pipeline verification"), " box above: it shows which DE method and batch correction were used. The volcano uses the actual statistics from that model."),
+          tags$li("Sample size: ensure you have enough samples per group (e.g. ≥ 3 per group for DESeq2). Small n can give unstable estimates."),
+          tags$li("Optional: compare top DEGs with published results for the same disease or GSE to spot-check.")
+        ),
+        tags$p(tags$strong("ML / prediction (Steps 10–12):"), style = "margin-bottom: 6px;"),
+        tags$ul(
+          style = "margin: 0; padding-left: 20px;",
+          tags$li(tags$strong("Step 12 (ROC):"), " AUC ≥ 0.8 suggests good discrimination. Use ", tags$strong("Step 11 (Validation)"), " to load an external dataset — ROC and Nomogram then show training vs external AUC; similar values suggest the model generalizes."),
+          tags$li(tags$strong("Step 12 (Nomogram):"), " Training vs validation AUC (70/30 split) — if validation AUC is much lower than training, the model may be overfitting. External validation (Step 11) is the strongest check.")
+        )
+      )
+    ),
+    fluidRow(
       box(title = tags$span(icon("mountain"), " Volcano Plot"),
           width = 8, status = "danger", solidHeader = TRUE,
           plotOutput("volcano_plot", height = "550px"),
@@ -74,9 +97,22 @@ box(
     
     fluidRow(
       box(
+        title = tags$span(icon("file-csv"), " Download data to verify your pipeline"),
+        width = 12, status = "info", solidHeader = TRUE,
+        tags$p("Export expression before/after batch correction and the DE (volcano) table to check results in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
+        column(4,
+          downloadButton("download_expr_before_batch", tagList(icon("download"), " Before batch (expression CSV)"), class = "btn-warning btn-block")),
+        column(4,
+          downloadButton("download_expr_after_batch", tagList(icon("download"), " After batch (expression CSV)"), class = "btn-success btn-block")),
+        column(4,
+          downloadButton("download_de_results", tagList(icon("download"), " DE results / volcano table (CSV)"), class = "btn-primary btn-block"))
+      )
+    ),
+    fluidRow(
+      box(
         title = tags$span(icon("download"), " Download Results"), 
         width = 12, status = "warning", solidHeader = TRUE,
-        column(4, downloadButton("download_de_results", tagList(icon("download"), " DE Results"), class = "btn-success btn-block")),
+        column(4, downloadButton("download_de_results_alt", tagList(icon("download"), " DE Results"), class = "btn-success btn-block")),
         column(4, downloadButton("download_sig_genes", tagList(icon("download"), " Significant Genes"), class = "btn-success btn-block")),
         column(4, downloadButton("download_workspace", tagList(icon("download"), " Workspace"), class = "btn-success btn-block"))
       )

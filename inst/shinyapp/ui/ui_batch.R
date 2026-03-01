@@ -5,11 +5,17 @@
 ui_batch <- tabItem(
     tabName = "batch",
     h2(icon("filter"), " Step 5: Gene Filtering & Batch Correction"),
+
+    # When only one dataset is selected, batch correction is skipped automatically.
+    uiOutput("batch_single_dataset_ui"),
     
     fluidRow(
       box(title = tags$span(icon("chart-bar"), " Gene Variance Distribution"), 
           width = 12, status = "warning", solidHeader = TRUE,
-          plotOutput("gene_variance_plot", height = "300px"))
+          plotOutput("gene_variance_plot", height = "300px"),
+          tags$div(style = "margin-top: 6px;",
+            downloadButton("download_gene_variance_png", tagList(icon("download"), " PNG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
+            downloadButton("download_gene_variance_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm"))
     ),
     
     fluidRow(
@@ -145,12 +151,14 @@ ui_batch <- tabItem(
       box(
         title = tags$span(icon("exclamation-triangle"), " Before Batch Correction - By Dataset"), 
         width = 6, status = "warning", solidHeader = TRUE,
-        plotOutput("pca_before_dataset", height = "400px")
+        plotOutput("pca_before_dataset", height = "400px"),
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_before_dataset_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_dataset_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
       ),
       box(
         title = tags$span(icon("check-circle"), " After Batch Correction - By Dataset"), 
         width = 6, status = "success", solidHeader = TRUE,
-        plotOutput("pca_after_dataset", height = "400px")
+        plotOutput("pca_after_dataset", height = "400px"),
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_after_dataset_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_dataset_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
       )
     ),
     
@@ -158,12 +166,14 @@ ui_batch <- tabItem(
       box(
         title = tags$span(icon("exclamation-triangle"), " Before Batch Correction - By Condition"), 
         width = 6, status = "warning", solidHeader = TRUE,
-        plotOutput("pca_before_condition", height = "400px")
+        plotOutput("pca_before_condition", height = "400px"),
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_before_condition_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_condition_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
       ),
       box(
         title = tags$span(icon("check-circle"), " After Batch Correction - By Condition"), 
         width = 6, status = "success", solidHeader = TRUE,
-        plotOutput("pca_after_condition", height = "400px")
+        plotOutput("pca_after_condition", height = "400px"),
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_after_condition_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_condition_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
       )
     ),
     
@@ -179,7 +189,8 @@ ui_batch <- tabItem(
             " The dendrogram branches separate different datasets.",
             style = "color: #495057; font-size: 12px; margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 5px;"
           ),
-          plotOutput("hclust_before", height = "500px")
+          plotOutput("hclust_before", height = "500px"),
+          tags$div(style = "margin-top: 6px;", downloadButton("download_hclust_before_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_hclust_before_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
         )
       )
     ),
@@ -196,7 +207,8 @@ ui_batch <- tabItem(
             " The dendrogram branches separate biological conditions, not datasets.",
             style = "color: #495057; font-size: 12px; margin-bottom: 10px; padding: 8px; background: #d4edda; border-radius: 5px;"
           ),
-          plotOutput("hclust_after", height = "500px")
+          plotOutput("hclust_after", height = "500px"),
+          tags$div(style = "margin-top: 6px;", downloadButton("download_hclust_after_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_hclust_after_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
         )
       )
     ),
@@ -215,10 +227,12 @@ ui_batch <- tabItem(
           ),
           fluidRow(
             column(6,
-              plotOutput("pvca_before", height = "350px")
+              plotOutput("pvca_before", height = "350px"),
+              tags$div(style = "margin-top: 6px;", downloadButton("download_pvca_before_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_before_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-info"))
             ),
             column(6,
-              plotOutput("pvca_after", height = "350px")
+              plotOutput("pvca_after", height = "350px"),
+              tags$div(style = "margin-top: 6px;", downloadButton("download_pvca_after_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_after_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-info"))
             )
           )
         )
@@ -261,6 +275,6 @@ ui_batch <- tabItem(
           tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
                    actionButton("next_page_batch", "Next: Differential Expression",
                                 icon = icon("arrow-right"), class = "btn-success btn-lg",
-                                style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+                                style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"))))
     ),
   )

@@ -277,22 +277,14 @@ server_nomogram <- function(input, output, session, rv) {
 
     train_data$Predicted_Prob <- predict(nomogram_model, newdata = train_data, type = "fitted")
 
-    # For validation data, set datadist appropriately
-    if (mode == "external") {
-      old_dd2 <- getOption("datadist")
-      dd2 <- rms::datadist(validation_data[, available_genes, drop = FALSE])
-      options(datadist = dd2)
-      validation_data$Predicted_Prob <- tryCatch(
-        predict(nomogram_model, newdata = validation_data, type = "fitted"),
-        error = function(e) {
-          glm_model <- glm(formula_obj, data = train_data, family = binomial())
-          predict(glm_model, newdata = validation_data, type = "response")
-        }
-      )
-      options(datadist = old_dd2)
-    } else {
-      validation_data$Predicted_Prob <- predict(nomogram_model, newdata = validation_data, type = "fitted")
-    }
+    # Validation predictions: use same (training) datadist so the model is applied consistently to new data
+    validation_data$Predicted_Prob <- tryCatch(
+      predict(nomogram_model, newdata = validation_data, type = "fitted"),
+      error = function(e) {
+        glm_model <- glm(formula_obj, data = train_data, family = binomial())
+        predict(glm_model, newdata = validation_data, type = "response")
+      }
+    )
 
     train_roc <- pROC::roc(train_data$Outcome, train_data$Predicted_Prob, quiet = TRUE)
     optimal_threshold <- as.numeric(pROC::coords(train_roc, "best", ret = "threshold", best.method = "youden"))

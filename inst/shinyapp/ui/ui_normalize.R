@@ -62,6 +62,25 @@ ui_normalize <- tabItem(
             tags$li(tags$b("Combined:"), " Global quantile")
           ),
           hr(),
+          tags$p(tags$strong("Normalization mode:"), style = "margin-bottom: 8px;"),
+          radioButtons(
+            "normalize_mode",
+            label = NULL,
+            choices = c(
+              "Auto (recommended) — use default methods" = "auto",
+              "Manual — choose methods below" = "manual"
+            ),
+            selected = "auto",
+            inline = TRUE
+          ),
+          tags$div(
+            id = "norm_auto_note",
+            class = "alert alert-info",
+            style = "margin: 10px 0 15px 0;",
+            icon("info-circle"),
+            tags$strong("Auto mode: "),
+            "Microarray = Quantile; RNA-seq = TMM + log2-CPM. Switch to Manual to change methods."
+          ),
           tags$p(tags$strong("Normalization method choices:"), style = "margin-bottom: 10px;"),
           fluidRow(
             column(6,
@@ -140,7 +159,10 @@ ui_normalize <- tabItem(
       box(
         title = tags$span(icon("chart-bar"), " Expression Distribution by Dataset"), 
         width = 12, status = "info", solidHeader = TRUE,
-        plotOutput("normalization_plot", height = "400px")
+        plotOutput("normalization_plot", height = "400px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_plot_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       )
     ),
     
@@ -148,12 +170,18 @@ ui_normalize <- tabItem(
       box(
         title = tags$span(icon("wave-square"), " Overall Expression Distribution"), 
         width = 6, status = "success", solidHeader = TRUE,
-        plotOutput("normalization_density", height = "350px")
+        plotOutput("normalization_density", height = "350px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_density_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_density_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("chart-line"), " Quantile-Quantile (Q-Q) Plot"), 
         width = 6, status = "warning", solidHeader = TRUE,
-        plotOutput("normalization_qq", height = "350px")
+        plotOutput("normalization_qq", height = "350px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_qq_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_qq_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       )
     ),
     
@@ -161,12 +189,18 @@ ui_normalize <- tabItem(
       box(
         title = tags$span(icon("chart-bar"), " Median & Range Alignment"), 
         width = 6, status = "info", solidHeader = TRUE,
-        plotOutput("normalization_median_range", height = "400px")
+        plotOutput("normalization_median_range", height = "400px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_median_range_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_median_range_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("wave-square"), " Distribution Overlap"), 
         width = 6, status = "primary", solidHeader = TRUE,
-        plotOutput("normalization_distribution_overlap", height = "400px")
+        plotOutput("normalization_distribution_overlap", height = "400px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_dist_overlap_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_dist_overlap_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       )
     ),
     
@@ -174,12 +208,18 @@ ui_normalize <- tabItem(
       box(
         title = tags$span(icon("chart-area"), " Intensity Bias - MA Plot"), 
         width = 6, status = "warning", solidHeader = TRUE,
-        plotOutput("normalization_ma_plot", height = "400px")
+        plotOutput("normalization_ma_plot", height = "400px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_ma_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_ma_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("dot-circle"), " Variance Stability - Mean-Variance Plot"), 
         width = 6, status = "success", solidHeader = TRUE,
-        plotOutput("normalization_mean_variance", height = "400px")
+        plotOutput("normalization_mean_variance", height = "400px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_mv_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_mv_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       )
     ),
     
@@ -187,12 +227,18 @@ ui_normalize <- tabItem(
       box(
         title = tags$span(icon("th"), " Sample Correlation - Before Normalization"), 
         width = 6, status = "danger", solidHeader = TRUE,
-        plotOutput("normalization_corr_before", height = "400px")
+        plotOutput("normalization_corr_before", height = "400px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_corr_before_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_corr_before_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("th"), " Sample Correlation - After Normalization"), 
         width = 6, status = "success", solidHeader = TRUE,
-        plotOutput("normalization_corr_after", height = "400px")
+        plotOutput("normalization_corr_after", height = "400px"),
+        tags$div(style = "margin-top: 6px;",
+          downloadButton("dl_norm_corr_after_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
+          downloadButton("dl_norm_corr_after_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
       )
     ),
     
@@ -206,7 +252,9 @@ ui_normalize <- tabItem(
             style = "margin-bottom: 20px;",
             tags$h4(icon("table"), " Gene Count Statistics", 
                    style = "color: #2c3e50; margin-bottom: 15px;"),
-            tableOutput("normalization_summary_table")
+            tableOutput("normalization_summary_table"),
+            tags$div(style = "margin-top: 10px;",
+              downloadButton("download_normalization_summary_csv", tagList(icon("download"), " Summary table (CSV)"), class = "btn-info btn-sm"))
           ),
           tags$hr(),
           tags$div(

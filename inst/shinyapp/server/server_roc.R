@@ -73,20 +73,23 @@ server_roc <- function(input, output, session, rv) {
       auc_val <- if (!is.null(roc_obj)) as.numeric(pROC::auc(roc_obj)) else NA_real_
       list(Gene = g, AUC = auc_val, roc = roc_obj)
     })
-    df <- data.frame(
+    df_all <- data.frame(
       Gene = vapply(res, function(x) x$Gene, character(1)),
       AUC = vapply(res, function(x) x$AUC, numeric(1)),
       stringsAsFactors = FALSE
     )
-    df <- df[!is.na(df$AUC), , drop = FALSE]
-    df <- df[order(-df$AUC), , drop = FALSE]
+    df_all <- df_all[!is.na(df_all$AUC), , drop = FALSE]
+    df_all <- df_all[order(-df_all$AUC), , drop = FALSE]
+    if (nrow(df_all) == 0) return(NULL)
     curves_all <- setNames(lapply(res, function(x) x$roc), vapply(res, function(x) x$Gene, character(1)))
-    removed <- df[df$AUC < AUC_MIN, , drop = FALSE]
-    df <- df[df$AUC >= AUC_MIN, , drop = FALSE]
+    removed <- df_all[df_all$AUC < AUC_MIN, , drop = FALSE]
+    df <- df_all[df_all$AUC >= AUC_MIN, , drop = FALSE]
     curves <- curves_all[names(curves_all) %in% df$Gene]
     list(
       df = df,
+      df_all = df_all,
       curves = curves,
+      curves_all = curves_all,
       n_removed = nrow(removed),
       removed_genes = if (nrow(removed) > 0) removed$Gene else character(0)
     )
@@ -125,8 +128,10 @@ server_roc <- function(input, output, session, rv) {
 
   roc_auc_plot_data <- reactive({
     roc <- roc_results()
-    if (is.null(roc) || nrow(roc$df) == 0) return(NULL)
-    df <- roc$df
+    if (is.null(roc)) return(NULL)
+    # Prefer all AUC values (for visualization), fall back to filtered if needed
+    df <- if (!is.null(roc$df_all) && nrow(roc$df_all) > 0) roc$df_all else roc$df
+    if (is.null(df) || nrow(df) == 0) return(NULL)
     df$AUC <- round(df$AUC, 3)
     top_n <- min(15, nrow(df))
     df <- df[seq_len(top_n), , drop = FALSE]
@@ -300,65 +305,124 @@ server_roc <- function(input, output, session, rv) {
            col = cols[seq_along(cols)], lwd = c(2.5, 2), lty = c(1, 2), bty = "n", cex = 0.9)
   }, height = 360)
 
-  output$roc_combined_panel_table <- DT::renderDataTable({
+  roc_combined_panel_table_df <- reactive({
     res <- roc_combined_panel()
     roc <- roc_results()
     if (is.null(res) || is.null(roc) || nrow(roc$df) == 0) return(NULL)
-
     df_single <- head(roc$df[order(-roc$df$AUC), c("Gene", "AUC"), drop = FALSE], 10)
     names(df_single) <- c("Feature", "AUC")
     df_single$Type <- "Single-gene"
-
     df_combined <- data.frame(
       Feature = paste0("Combined panel (", length(res$genes), " genes)"),
       AUC = res$auc,
       Type = "Multi-gene",
       stringsAsFactors = FALSE
     )
-
     df_out <- rbind(df_combined, df_single)
     df_out$AUC <- round(df_out$AUC, 4)
-    df_out <- df_out[, c("Feature", "Type", "AUC")]
+    df_out[, c("Feature", "Type", "AUC")]
+  })
 
+  output$roc_combined_panel_table <- DT::renderDataTable({
+    df_out <- roc_combined_panel_table_df()
+    if (is.null(df_out)) return(NULL)
     DT::datatable(df_out, options = list(pageLength = 11, scrollX = TRUE), rownames = FALSE)
   })
+
+  output$download_roc_combined_panel_csv <- downloadHandler(
+    filename = function() "ROC_Combined_Panel_Table.csv",
+    content = function(file) {
+      df_out <- roc_combined_panel_table_df()
+      if (is.null(df_out)) return()
+      write.csv(df_out, file, row.names = FALSE)
+      write.csv(df_out, file.path(CSV_EXPORT_DIR(), "ROC_Combined_Panel_Table.csv"), row.names = FALSE)
+    }
+  )
+
+  output$download_roc_combined_panel_plot_jpg <- downloadHandler(
+    filename = function() "ROC_Combined_Panel.jpg",
+    content = function(file) {
+      res <- roc_combined_panel()
+      if (is.null(res)) return()
+      jpeg(file, width = 7, height = 5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
+      roc_combined_panel_plot_to_dev()
+      dev.off()
+    }
+  )
+  output$download_roc_combined_panel_plot_pdf <- downloadHandler(
+    filename = function() "ROC_Combined_Panel.pdf",
+    content = function(file) {
+      res <- roc_combined_panel()
+      if (is.null(res)) return()
+      pdf(file, width = 7, height = 5, bg = "#FAFAFA")
+      roc_combined_panel_plot_to_dev()
+      dev.off()
+    }
+  )
+
+  roc_combined_panel_plot_to_dev <- function() {
+    res <- roc_combined_panel()
+    if (is.null(res)) return(invisible(NULL))
+    combined_roc <- res$roc
+    best_roc <- res$best_roc
+    cols <- c("Combined panel" = "#E74C3C", "Best single gene" = "#3498DB")
+    op <- par(mar = c(4, 4, 3, 2), bg = "#FAFAFA")
+    on.exit(par(op), add = TRUE)
+    pROC::plot.roc(combined_roc, col = cols["Combined panel"], lwd = 2.5,
+                   main = "Multi-variable ROC (Combined Biomarker Panel)", legacy.axes = TRUE)
+    if (!is.null(best_roc)) pROC::lines.roc(best_roc, col = cols["Best single gene"], lwd = 2, lty = 2)
+    abline(0, 1, lty = 2, col = "grey60")
+    legend("bottomright",
+           legend = c(
+             paste0("Combined panel (AUC=", round(res$auc, 3), ")"),
+             if (!is.null(best_roc)) paste0("Best single gene: ", res$best_gene, " (AUC=", round(res$best_auc, 3), ")") else NULL
+           ),
+           col = cols[seq_along(cols)], lwd = c(2.5, 2), lty = c(1, 2), bty = "n", cex = 0.9)
+  }
 
   output$roc_curves_plot <- renderPlot({
     roc <- roc_results()
     if (is.null(roc) || nrow(roc$df) == 0) {
+      par(mar = c(2, 2, 2, 2), bg = "#FAFAFA")
       plot.new()
-      text(0.5, 0.5, "No biomarkers with AUC >= 0.8 (or no common genes). Run ML first; only genes with AUC >= 0.8 are shown.", cex = 0.95, col = "gray40")
-      return()
+      text(0.5, 0.5, "No biomarkers with AUC >= 0.8 (or no common genes).\nRun Step 10 (ML) first; only genes with AUC >= 0.8 are shown here.", cex = 1, col = "gray40")
+      return(invisible(NULL))
     }
     curves <- roc$curves
     curves <- curves[!sapply(curves, is.null)]
     if (length(curves) == 0) {
+      par(mar = c(2, 2, 2, 2), bg = "#FAFAFA")
       plot.new()
-      text(0.5, 0.5, "No valid ROC curves.", cex = 1, col = "gray40")
-      return()
+      text(0.5, 0.5, "No valid ROC curves available.", cex = 1, col = "gray40")
+      return(invisible(NULL))
     }
     n_plot <- min(10, length(curves))
-    top_genes <- roc$df$Gene[seq_len(n_plot)]
-    curves_plot <- curves[top_genes]
+    top_genes <- as.character(roc$df$Gene[seq_len(n_plot)])
+    curves_plot <- curves[intersect(top_genes, names(curves))]
     curves_plot <- curves_plot[!sapply(curves_plot, is.null)]
-    if (length(curves_plot) == 0) return()
-    gene_cols <- roc_gene_colors()
-    cols <- unname(gene_cols[names(curves_plot)])
-    # Fallback palette if some colors are NA
-    if (any(!nzchar(cols) | is.na(cols))) {
-      base_cols <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA",
-                     "#00ACC1", "#7B1FA2", "#C62828", "#2E7D32", "#EF6C00")
-      cols <- rep(base_cols, length.out = length(curves_plot))
+    if (length(curves_plot) == 0) {
+      par(mar = c(2, 2, 2, 2), bg = "#FAFAFA")
+      plot.new()
+      text(0.5, 0.5, "No plottable ROC curves for selected genes.", cex = 1, col = "gray40")
+      return(invisible(NULL))
     }
+    base_cols <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA",
+                   "#00ACC1", "#7B1FA2", "#C62828", "#2E7D32", "#EF6C00")
+    cols <- rep(base_cols, length.out = length(curves_plot))
     op <- par(mar = c(4, 4, 3, 2), bg = "#FAFAFA")
     on.exit(par(op), add = TRUE)
-    pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2)
-    for (i in seq_along(curves_plot)[-1]) {
-      pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
-    }
-    auc_vals <- vapply(curves_plot, function(r) as.numeric(pROC::auc(r)), numeric(1))
-    legend("bottomright", legend = paste0(names(curves_plot), " (AUC=", round(auc_vals, 3), ")"),
-           col = cols[seq_along(curves_plot)], lwd = 2, cex = 0.85, bty = "n")
+    tryCatch({
+      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2)
+      for (i in seq_along(curves_plot)[-1]) {
+        pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
+      }
+      auc_vals <- vapply(curves_plot, function(r) as.numeric(pROC::auc(r)), numeric(1))
+      legend("bottomright", legend = paste0(names(curves_plot), " (AUC=", round(auc_vals, 3), ")"),
+             col = cols[seq_along(curves_plot)], lwd = 2, cex = 0.85, bty = "n")
+    }, error = function(e) {
+      plot.new()
+      text(0.5, 0.5, paste0("Could not draw ROC curves: ", conditionMessage(e)), cex = 0.9, col = "gray40")
+    })
   }, width = 600, height = 500, res = 96)
 
   roc_curves_plot_data <- reactive({
@@ -545,6 +609,35 @@ server_roc <- function(input, output, session, rv) {
          n_genes_total = length(common_genes))
   })
 
+  # Training vs Validation AUC comparison at top (clear side-by-side when validation exists)
+  output$roc_auc_comparison_top_ui <- renderUI({
+    ext <- roc_external_results()
+    if (is.null(ext) || nrow(ext$df) == 0) return(NULL)
+    fluidRow(
+      box(
+        title = tags$span(icon("balance-scale"), " AUC: Training vs Validation — Clear Comparison"),
+        width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+        tags$p(
+          icon("info-circle"),
+          " Per-gene AUC on training data vs independent validation data. Similar values suggest the biomarker generalizes.",
+          style = "margin-bottom: 12px; color: #2c3e50; font-size: 13px;"
+        ),
+        fluidRow(
+          column(6,
+                 tags$p(tags$strong(icon("table"), " Gene | AUC Training | AUC Validation | Delta"), style = "margin-bottom: 6px;"),
+                 DT::dataTableOutput("roc_ext_auc_comparison_table"),
+                 tags$div(style = "margin-top: 8px;",
+                   downloadButton("download_roc_ext_auc", tagList(icon("download"), " Comparison (CSV)"), class = "btn-success btn-sm"))),
+          column(6,
+                 tags$p(tags$strong(icon("chart-bar"), " Bar chart: Training vs Validation"), style = "margin-bottom: 6px;"),
+                 plotOutput("roc_comparison_auc_plot", height = "380px"),
+                 tags$div(style = "margin-top: 8px;",
+                   downloadButton("download_roc_comparison_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                   downloadButton("download_roc_comparison_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))))
+      )
+    )
+  })
+
   # Dynamic UI for validation ROC panels (shown prominently when validation data exists)
   output$roc_external_validation_panels_ui <- renderUI({
     ext <- roc_external_results()
@@ -563,7 +656,7 @@ server_roc <- function(input, output, session, rv) {
                                       style = "margin-left: 8px; font-size: 11px;")),
           width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
 
-          # Info banner
+          # Info banner (AUC comparison table & bar chart are in the top box)
           tags$div(
             class = "alert alert-success", style = "margin-bottom: 15px;",
             icon("star", style = "color: #f39c12; margin-right: 4px;"),
@@ -572,28 +665,10 @@ server_roc <- function(input, output, session, rv) {
                    nrow(rv$external_validation_expr), " samples: ",
                    n_disease, " Disease / ", n_normal, " Normal) for the same ",
                    ext$n_genes_matched, "/", ext$n_genes_total,
-                   " ML common genes. This gives an unbiased view of biomarker diagnostic performance.")
+                   " ML common genes. See the box above for Training vs Validation AUC comparison.")
           ),
 
-          # Row 1: AUC Comparison Table + Comparison Bar Chart
-          fluidRow(
-            column(6,
-              tags$p(tags$strong(icon("table"), " AUC: Training vs Validation"), style = "margin-bottom: 6px;"),
-              DT::dataTableOutput("roc_ext_auc_comparison_table"),
-              tags$div(style = "margin-top: 8px;",
-                downloadButton("download_roc_ext_auc", tagList(icon("download"), " Comparison (CSV)"),
-                  class = "btn-success btn-sm"))
-            ),
-            column(6,
-              tags$p(tags$strong(icon("chart-bar"), " AUC Comparison (Training vs Validation)"), style = "margin-bottom: 6px;"),
-              plotOutput("roc_comparison_auc_plot", height = "380px"),
-              tags$div(style = "margin-top: 8px;",
-                downloadButton("download_roc_comparison_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-                downloadButton("download_roc_comparison_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))
-            )
-          ),
-
-          # Row 2: Validation ROC Curves (gene expression boxplots are shown side-by-side with training above)
+          # Validation ROC Curves
           fluidRow(
             column(12,
               tags$p(tags$strong(icon("chart-area"), " Validation ROC Curves"), style = "margin-bottom: 6px; margin-top: 20px;"),

@@ -283,16 +283,48 @@ server_immune <- function(input, output, session, rv) {
     }
   )
 
-  output$immune_heatmap <- renderPlot({
-    req(rv$immune_matrix, rv$immune_cell_cols)
+  immune_cor_matrix <- reactive({
+    if (is.null(rv$immune_matrix) || is.null(rv$immune_cell_cols)) return(NULL)
     M <- rv$immune_matrix[, rv$immune_cell_cols, drop = FALSE]
-    M <- as.data.frame(sapply(M, function(x) as.numeric(as.character(x))))
-    rownames(M) <- rv$immune_matrix$SampleID
-    cr <- cor(M, method = "spearman", use = "pairwise.complete.obs")
+    if (ncol(M) < 2 || nrow(M) < 3) return(NULL)
+    M_num <- as.data.frame(lapply(M, function(x) as.numeric(as.character(x))))
+    rownames(M_num) <- rv$immune_matrix$SampleID
+    if (!all(is.finite(as.matrix(M_num)))) {
+      M_num[!is.finite(as.matrix(M_num))] <- NA_real_
+    }
+    cr <- tryCatch(
+      cor(M_num, method = "spearman", use = "pairwise.complete.obs"),
+      error = function(e) NULL
+    )
+    if (is.null(cr)) return(NULL)
     if (any(is.na(cr))) cr[is.na(cr)] <- 0
+    cr
+  })
+
+  output$immune_heatmap <- renderPlot({
+    cr <- immune_cor_matrix()
+    if (is.null(cr) || ncol(cr) == 0 || nrow(cr) == 0) {
+      par(mar = c(2, 2, 2, 2), bg = "#FAFAFA")
+      plot.new()
+      text(0.5, 0.5, "Run immune deconvolution (Step 13) first.\nThen the correlation heatmap between cell types will appear here.", cex = 1, col = "gray40")
+      return(invisible(NULL))
+    }
     heatmap_colors <- colorRampPalette(c("#2166AC", "white", "#B2182B"))(100)
-    pheatmap::pheatmap(cr, color = heatmap_colors, clustering_distance_rows = "euclidean", clustering_distance_cols = "euclidean",
-      main = "Correlation between immune cells", fontsize = 8, border_color = NA)
+    tryCatch({
+      pheatmap::pheatmap(
+        cr,
+        color = heatmap_colors,
+        clustering_distance_rows = "euclidean",
+        clustering_distance_cols = "euclidean",
+        main = "Correlation between immune cells",
+        fontsize = 8,
+        border_color = NA
+      )
+    }, error = function(e) {
+      par(mar = c(2, 2, 2, 2), bg = "#FAFAFA")
+      plot.new()
+      text(0.5, 0.5, paste("Error drawing heatmap:", conditionMessage(e)), cex = 0.9, col = "red")
+    })
   }, width = 600, height = 500, res = 96)
 
   output$download_immune_heatmap_jpg <- downloadHandler(
@@ -406,7 +438,21 @@ server_immune <- function(input, output, session, rv) {
       if (is.null(res) || nrow(res$cor_matrix) == 0) return()
       heatmap_colors <- colorRampPalette(c("#2166AC", "white", "#B2182B"))(100)
       jpeg(file, width = 9.33, height = 6.67, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
-      pheatmap::pheatmap(res$cor_matrix, color = heatmap_colors, main = "Gene–immune cell correlation (Spearman)", fontsize = 10, border_color = NA)
+      tryCatch(
+        {
+          pheatmap::pheatmap(
+            res$cor_matrix,
+            color = heatmap_colors,
+            main = "Gene–immune cell correlation (Spearman)",
+            fontsize = 10,
+            border_color = NA
+          )
+        },
+        error = function(e) {
+          plot.new()
+          text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red")
+        }
+      )
       dev.off()
     }
   )
@@ -417,7 +463,21 @@ server_immune <- function(input, output, session, rv) {
       if (is.null(res) || nrow(res$cor_matrix) == 0) return()
       heatmap_colors <- colorRampPalette(c("#2166AC", "white", "#B2182B"))(100)
       pdf(file, width = 9.33, height = 6.67, bg = "white")
-      pheatmap::pheatmap(res$cor_matrix, color = heatmap_colors, main = "Gene–immune cell correlation (Spearman)", fontsize = 10, border_color = NA)
+      tryCatch(
+        {
+          pheatmap::pheatmap(
+            res$cor_matrix,
+            color = heatmap_colors,
+            main = "Gene–immune cell correlation (Spearman)",
+            fontsize = 10,
+            border_color = NA
+          )
+        },
+        error = function(e) {
+          plot.new()
+          text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red")
+        }
+      )
       dev.off()
     }
   )

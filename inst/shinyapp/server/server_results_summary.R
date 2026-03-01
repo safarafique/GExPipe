@@ -6,8 +6,8 @@
 
 server_results_summary <- function(input, output, session, rv) {
 
-  # ----- Narrative writeup (one paragraph, generalized from rv) -----
-  output$results_summary_narrative <- renderUI({
+  # Build narrative paragraph from rv (used by UI and PDF download; do not call output$ from downloadHandler)
+  narrative_paragraph <- function() {
     expr <- rv$batch_corrected
     if (is.null(expr)) expr <- rv$combined_expr
     n_genes_expr <- if (!is.null(expr)) nrow(expr) else 0L
@@ -49,7 +49,12 @@ server_results_summary <- function(input, output, session, rv) {
     s9 <- sprintf("GSEA was performed for %s target gene(s). ", format(n_gsea, big.mark = ","))
     s10 <- if (n_immune_samp > 0) sprintf("Immune cell deconvolution (%s) estimated proportions for %s cell types across %s samples. ", immune_meth, n_cells, format(n_immune_samp, big.mark = ",")) else "Immune deconvolution was not run. "
 
-    para <- paste0(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10)
+    paste0(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10)
+  }
+
+  # ----- Narrative writeup (one paragraph, generalized from rv) -----
+  output$results_summary_narrative <- renderUI({
+    para <- narrative_paragraph()
     tags$div(
       style = "font-size: 14px; line-height: 1.7; color: #333; text-align: justify; padding: 12px 0;",
       tags$p(para)
@@ -245,9 +250,15 @@ server_results_summary <- function(input, output, session, rv) {
     colors <- rv$moduleColors
     if (is.null(mods) || length(mods) == 0)
       return(tags$p(style = "color: #7f8c8d;", "Run WGCNA and identify significant modules to see list here."))
-    if (is.data.frame(mods)) df <- mods else {
-      t <- table(colors)[names(mods)]
-      df <- data.frame(Module = names(mods), N_genes = as.integer(t), stringsAsFactors = FALSE)
+    if (is.data.frame(mods)) {
+      df <- mods
+      if (!"N_genes" %in% names(df) && "Size" %in% names(df))
+        df$N_genes <- as.integer(df$Size)
+    } else {
+      color_from_me <- sub("^ME", "", names(mods))
+      t <- table(colors)
+      n_genes <- as.integer(t[match(color_from_me, names(t))])
+      df <- data.frame(Module = names(mods), N_genes = n_genes, stringsAsFactors = FALSE)
     }
     tags$div(
       tags$p(tags$strong("Significant modules (with color):")),
@@ -257,9 +268,10 @@ server_results_summary <- function(input, output, session, rv) {
         tags$tbody(
           lapply(seq_len(min(20, nrow(df))), function(i) {
             r <- df[i, ]
-            mod_name <- if ("Module" %in% names(r)) r$Module else names(mods)[i]
-            n_g <- if ("N_genes" %in% names(r)) r$N_genes else NA
-            tags$tr(tags$td(mod_name), tags$td(format(n_g, big.mark = ",")))
+            mod_name <- if ("Module" %in% names(r)) as.character(r$Module) else names(mods)[i]
+            n_g <- if ("N_genes" %in% names(r)) r$N_genes else if ("Size" %in% names(r)) r$Size else NA_integer_
+            n_str <- if (is.na(n_g)) "—" else format(as.integer(n_g), big.mark = ",")
+            tags$tr(tags$td(mod_name), tags$td(n_str))
           })
         )
       ),
@@ -427,15 +439,19 @@ server_results_summary <- function(input, output, session, rv) {
     )
   })
 
-  output$results_summary_ml_venn <- renderImage({
-    if (is.null(rv$ml_venn_sets) || length(rv$ml_venn_sets) < 2) return(list(src = "", alt = "No Venn"))
+  # Venn/UpSet drawn in-memory only; no file saved until user clicks Download (ML tab)
+  output$results_summary_ml_venn <- renderPlot({
+    if (is.null(rv$ml_venn_sets) || length(rv$ml_venn_sets) < 2) {
+      plot.new()
+      text(0.5, 0.5, "Run ML (Step 10) with 2+ methods to see Venn/UpSet here.", cex = 1, col = "gray40")
+      return(invisible())
+    }
     sets <- rv$ml_venn_sets
     n_sets <- length(sets)
-    outfile <- tempfile(fileext = ".png")
     ml_venn_fill <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#009688", "#795548", "#607D8B")
     if (n_sets > 5) {
       all_genes <- unique(unlist(sets, use.names = FALSE))
-      if (length(all_genes) == 0) return(list(src = "", alt = "No Venn"))
+      if (length(all_genes) == 0) { plot.new(); text(0.5, 0.5, "No genes", cex = 1, col = "gray40"); return(invisible()) }
       upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
       rownames(upset_matrix) <- all_genes
       colnames(upset_matrix) <- names(sets)
@@ -445,7 +461,6 @@ server_results_summary <- function(input, output, session, rv) {
       }
       upset_df <- as.data.frame(upset_matrix)
       max_set_size <- max(sapply(sets, length))
-      png(outfile, width = 10 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI)
       tryCatch({
         UpSetR::upset(upset_df, sets = colnames(upset_df), keep.order = TRUE, order.by = "freq",
                       main.bar.color = "#3498db", sets.bar.color = ml_venn_fill[seq_len(n_sets)],
@@ -453,20 +468,16 @@ server_results_summary <- function(input, output, session, rv) {
                       text.scale = c(1.3, 1.1, 1.1, 1, 1.3, 1.1), mb.ratio = c(0.6, 0.4),
                       set_size.show = TRUE, set_size.scale_max = max(1, max_set_size * 1.1))
       }, error = function(e) { plot.new(); text(0.5, 0.5, "UpSet error", cex = 1, col = "red") })
-      dev.off()
     } else {
       fill_colors <- ml_venn_fill[seq_len(n_sets)]
       cat_names <- names(sets)
       if (is.null(cat_names)) cat_names <- c("LASSO", "Elastic Net", "Ridge", "Random Forest", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost+SHAP")[seq_len(n_sets)]
-      png(outfile, width = 8 * IMAGE_DPI, height = 8 * IMAGE_DPI, res = IMAGE_DPI)
       grid::grid.newpage()
       vp <- VennDiagram::venn.diagram(x = sets, category.names = cat_names, filename = NULL, output = TRUE,
-                                      fill = fill_colors, alpha = 0.65, cex = 1, main = "ML methods Venn", main.cex = 1.2)
+                                      disable.logging = TRUE, fill = fill_colors, alpha = 0.65, cex = 1, main = "ML methods Venn", main.cex = 1.2)
       grid::grid.draw(vp)
-      dev.off()
     }
-    list(src = outfile, contentType = "image/png", alt = if (n_sets > 5) "UpSet" else "Venn", width = "100%", height = "260px")
-  }, deleteFile = TRUE)
+  }, height = 260)
 
   # ----- 9. GSEA -----
   output$results_summary_gsea <- renderUI({
@@ -516,16 +527,50 @@ server_results_summary <- function(input, output, session, rv) {
     M <- rv$immune_matrix
     cols <- rv$immune_cell_cols
     if (is.null(cols) && !is.null(M)) cols <- setdiff(colnames(M), "SampleID")
-    if (is.null(M) || nrow(M) == 0 || length(cols) == 0) {
-      plot.new(); text(0.5, 0.5, "No immune deconvolution results", cex = 1.2); return(invisible(NULL))
+    if (is.null(M) || nrow(M) == 0 || length(cols) < 2) {
+      plot.new()
+      text(0.5, 0.5, "No immune cell correlation heatmap (run Step 13).", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
     }
-    mat <- as.matrix(M[, cols, drop = FALSE])
-    rownames(mat) <- if (!is.null(M$SampleID)) M$SampleID else seq_len(nrow(M))
-    tryCatch({
-      heatmap_colors <- colorRampPalette(c("#2166AC", "white", "#B2182B"))(100)
-      pheatmap::pheatmap(mat, color = heatmap_colors, clustering_distance_rows = "euclidean", clustering_distance_cols = "euclidean",
-                         main = "Immune cell proportions", fontsize_row = 8, fontsize_col = 9, border_color = NA)
-    }, error = function(e) { plot.new(); text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red") })
+    mat_raw <- M[, cols, drop = FALSE]
+    # Convert to numeric and clean infinities/NA
+    mat_num <- as.data.frame(lapply(mat_raw, function(x) as.numeric(as.character(x))))
+    rownames(mat_num) <- if (!is.null(M$SampleID)) M$SampleID else seq_len(nrow(M))
+    if (!all(is.finite(as.matrix(mat_num)))) {
+      m <- as.matrix(mat_num)
+      m[!is.finite(m)] <- NA_real_
+      mat_num <- as.data.frame(m)
+    }
+    # Correlation between immune cell types (same as Immune tab)
+    cr <- tryCatch(
+      cor(mat_num, method = "spearman", use = "pairwise.complete.obs"),
+      error = function(e) NULL
+    )
+    if (is.null(cr) || nrow(cr) == 0 || ncol(cr) == 0) {
+      plot.new()
+      text(0.5, 0.5, "Not enough immune data to compute correlations.", cex = 1, col = "gray40")
+      return(invisible(NULL))
+    }
+    if (any(is.na(cr))) cr[is.na(cr)] <- 0
+    heatmap_colors <- colorRampPalette(c("#2166AC", "white", "#B2182B"))(100)
+    tryCatch(
+      {
+        pheatmap::pheatmap(
+          cr,
+          color = heatmap_colors,
+          clustering_distance_rows = "euclidean",
+          clustering_distance_cols = "euclidean",
+          main = "Immune Cell Correlation Heatmap",
+          fontsize_row = 7,
+          fontsize_col = 8,
+          border_color = NA
+        )
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red")
+      }
+    )
   }, height = 260)
 
   # ----- Download all results as PDF -----
@@ -535,27 +580,35 @@ server_results_summary <- function(input, output, session, rv) {
       tryCatch({
         pdf(file, width = 11, height = 8.5, onefile = TRUE)
 
-        # Helper: safe plot
+        # Helper: safe plot — reset to full page so no overlap between sections
         safe_plot <- function(expr) {
-          tryCatch(expr, error = function(e) { plot.new(); text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red") })
+          tryCatch({
+            par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1, oma = c(0, 0, 0, 0), bg = "white")
+            expr
+          }, error = function(e) {
+            par(mfrow = c(1, 1), mar = c(5, 4, 4, 2) + 0.1)
+            plot.new()
+            text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red")
+          })
         }
 
         # --- Title page ---
-        par(mar = c(2, 2, 2, 2))
+        par(mfrow = c(1, 1), mar = c(2, 2, 2, 2))
         plot.new()
         text(0.5, 0.85, "Pipeline Results Summary", cex = 2, font = 2)
         text(0.5, 0.75, format(Sys.time(), "%Y-%m-%d %H:%M"), cex = 1.2)
 
-        # Narrative
+        # Narrative (use helper; do not read output$ from downloadHandler)
+        par(mfrow = c(1, 1), mar = c(3, 3, 3, 3))
         plot.new()
         text(0.5, 0.95, "Narrative summary", cex = 1.4, font = 2)
-        txt <- htmltools::htmlEscape(paste(capture.output(print(output$results_summary_narrative())), collapse = " "))
-        # keep short chunk
+        txt <- narrative_paragraph()
         txt_wrap <- strwrap(txt, width = 110)
         y_pos <- seq(0.8, 0.1, length.out = min(length(txt_wrap), 15))
         for (i in seq_along(y_pos)) text(0.05, y_pos[i], txt_wrap[i], pos = 4, cex = 0.8)
 
         # --- Methods (auto-generated) ---
+        par(mfrow = c(1, 1), mar = c(3, 3, 3, 3))
         plot.new()
         text(0.5, 0.95, "Methods (auto-generated)", cex = 1.4, font = 2)
         de_method_label <- switch(
@@ -732,7 +785,7 @@ server_results_summary <- function(input, output, session, rv) {
               fill_colors <- ml_venn_fill[seq_len(n_sets)]; cat_names <- names(sets)
               if (is.null(cat_names)) cat_names <- c("LASSO", "Elastic", "Ridge", "RF", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost")[seq_len(n_sets)]
               vp <- VennDiagram::venn.diagram(x = sets, category.names = cat_names, filename = NULL, output = TRUE,
-                                              fill = fill_colors, alpha = 0.65, cex = 1, main = "ML methods Venn", main.cex = 1.2)
+                                              disable.logging = TRUE, fill = fill_colors, alpha = 0.65, cex = 1, main = "ML methods Venn", main.cex = 1.2)
               grid::grid.newpage(); grid::grid.draw(vp)
             }
           }
@@ -792,7 +845,7 @@ server_results_summary <- function(input, output, session, rv) {
         # ---------- Immune heatmap ----------
         safe_plot({
           M <- rv$immune_matrix; cols <- rv$immune_cell_cols; if (is.null(cols) && !is.null(M)) cols <- setdiff(colnames(M), "SampleID")
-          if (is.null(M) || nrow(M) == 0 || length(cols) == 0) { plot.new(); text(0.5, 0.5, "No immune results") } else {
+          if (is.null(M) || nrow(M) == 0 || length(cols) == 0) { plot.new(); text(0.5, 0.5, "No immune results", cex = 1.2) } else {
             mat <- as.matrix(M[, cols, drop = FALSE]); rownames(mat) <- if (!is.null(M$SampleID)) M$SampleID else seq_len(nrow(M))
             heatmap_colors <- colorRampPalette(c("#2166AC", "white", "#B2182B"))(100)
             pheatmap::pheatmap(mat, color = heatmap_colors, clustering_distance_rows = "euclidean", clustering_distance_cols = "euclidean",
@@ -802,6 +855,7 @@ server_results_summary <- function(input, output, session, rv) {
 
         # ---------- Session info ----------
         safe_plot({
+          par(mar = c(2, 2, 2, 2))
           plot.new()
           text(0.5, 0.95, "Session info (reproducibility)", cex = 1.4, font = 2)
           si <- capture.output(sessionInfo())

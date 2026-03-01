@@ -263,7 +263,7 @@ server <- function(input, output, session) {
         type = "warning", duration = 6)
     }
   })
-  
+
   # ==============================================================================
   # PIPELINE PROGRESS TRACKER (dynamic, reactive, clickable)
   # ==============================================================================
@@ -457,8 +457,21 @@ server <- function(input, output, session) {
   observeEvent(input$next_page_normalize,{ updateTabItems(session, "sidebar_menu", "groups") })
   observeEvent(input$go_to_groups,       { updateTabItems(session, "sidebar_menu", "groups") })
   observeEvent(input$go_to_groups_from_norm, { updateTabItems(session, "sidebar_menu", "groups") })
-  observeEvent(input$next_page_groups,   { updateTabItems(session, "sidebar_menu", "batch") })
-  observeEvent(input$next_to_batch_btn,  { updateTabItems(session, "sidebar_menu", "batch") })
+  observeEvent(input$next_page_groups, {
+    # If only one dataset is used, skip batch correction step
+    if (isTRUE(rv$single_dataset)) {
+      updateTabItems(session, "sidebar_menu", "results")
+    } else {
+      updateTabItems(session, "sidebar_menu", "batch")
+    }
+  })
+  observeEvent(input$next_to_batch_btn, {
+    if (isTRUE(rv$single_dataset)) {
+      updateTabItems(session, "sidebar_menu", "results")
+    } else {
+      updateTabItems(session, "sidebar_menu", "batch")
+    }
+  })
   observeEvent(input$go_to_results,      { updateTabItems(session, "sidebar_menu", "results") })
   observeEvent(input$next_page_batch,    { updateTabItems(session, "sidebar_menu", "results") })
   observeEvent(input$next_page_results,  { updateTabItems(session, "sidebar_menu", "wgcna") })
@@ -682,6 +695,11 @@ server <- function(input, output, session) {
     for (nm in setdiff(names(state), "saved_step")) {
       tryCatch({ rv[[nm]] <- state[[nm]] }, error = function(e) NULL)
     }
+    # Derive dataset count/single-dataset flag (used to skip batch correction when applicable)
+    if (!is.null(rv$all_genes_list) && is.list(rv$all_genes_list)) {
+      rv$dataset_count <- length(rv$all_genes_list)
+      rv$single_dataset <- isTRUE(rv$dataset_count == 1)
+    }
     if (!is.null(rv$combined_expr) && (is.matrix(rv$combined_expr) || is.data.frame(rv$combined_expr)) && nrow(rv$combined_expr) > 0) {
       rv$download_complete <- TRUE
     }
@@ -846,296 +864,9 @@ server <- function(input, output, session) {
     }
   }, ignoreInit = TRUE)
   
-  # Start guided tour when user clicks the header button
+  # Header "Guided Tour / Screenshot" button: screenshot is handled by JavaScript in ui.R (full-page capture); no server-side tour start
   observeEvent(input$start_tour, {
-    if (!is.null(guide)) {
-      safe_run({
-        guide$init()$start()
-      }, step_name = "Guided tour", session = session)
-    } else {
-      showNotification("Guided tour is not available (cicerone package not installed).", type = "warning", duration = 6)
-    }
-  })
-  
-  # ==============================================================================
-  # RESET FUNCTIONALITY
-  # ==============================================================================
-  
-  show_reset_modal <- function() {
-    showModal(modalDialog(
-      title = tags$span(icon("exclamation-triangle"), " Reset & start new analysis"),
-      tags$div(
-        style = "font-size: 16px;",
-        tags$p(tags$strong("Clear all previous data and analysis?"), 
-               style = "color: #e74c3c; margin-bottom: 10px;"),
-        tags$p("All downloaded files and in-memory results will be deleted. The app stays open so you can start a new analysis from Step 1."),
-        tags$p(tags$em("Save your workspace first (sidebar or Results tab) if you want to keep the current analysis."), style = "color: #7f8c8d; margin-bottom: 10px;"),
-        tags$p("This will:"),
-        tags$ul(
-          tags$li("Delete downloaded files (micro_data, rna_data, ext_val_rna folders)"),
-          tags$li("Clear all in-app data: datasets, normalization, groups, batch, DE, WGCNA, PPI, ML, ROC, GSEA, Immune, etc."),
-          tags$li("Reset inputs to defaults and return you to Step 1 (Download)")
-        ),
-        tags$p(tags$strong("The app remains open. This action cannot be undone."), 
-               style = "color: #c0392b; margin-top: 12px; font-weight: bold;")
-      ),
-      footer = tagList(
-        modalButton("Cancel"),
-        actionButton("confirm_reset", "Yes, clear all & start new", 
-                    class = "btn-danger",
-                    style = "background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); 
-                             border: none; color: white; font-weight: bold;")
-      ),
-      easyClose = FALSE,
-      size = "m"
-    ))
-  }
-  
-  observeEvent(input$reset_app, { show_reset_modal() })
-  
-  observeEvent(input$confirm_reset, {
-    # Remove modal
-    removeModal()
-    
-    # Show progress notification
-    showNotification(
-      tags$div(
-        icon("spinner", class = "fa-spin"),
-        tags$strong("Clearing all data and deleting previous files...")
-      ),
-      type = "default",
-      duration = 2
-    )
-    
-    # Delete all previous downloaded/cached files (app stays open)
-    data_dirs <- c(
-      file.path(getwd(), "micro_data"),
-      file.path(getwd(), "rna_data"),
-      file.path(getwd(), "ext_val_rna")
-    )
-    for (d in data_dirs) {
-      tryCatch({
-        if (dir.exists(d)) {
-          unlink(d, recursive = TRUE, force = TRUE)
-        }
-      }, error = function(e) NULL)
-    }
-
-    # Reset PPI module state (app_ppi is created in server_ppi.R, same environment)
-    tryCatch({
-      if (exists("app_ppi")) {
-        app_ppi$applied_mode <- NULL
-        app_ppi$applied_top_n <- NULL
-        app_ppi$applied_manual_genes <- NULL
-      }
-    }, error = function(e) NULL)
-    
-    # Reset all reactive values (removes previous analysis; nothing is saved unless user already saved workspace)
-    rv$disease_name <- ""
-    rv$micro_expr_list <- list()
-    rv$micro_eset_list <- list()
-    rv$micro_metadata_list <- list()
-    rv$micro_cel_paths <- list()
-    rv$platform_per_gse <- list()
-    rv$rna_counts_list <- list()
-    rv$rna_metadata_list <- list()
-    rv$all_genes_list <- list()
-    rv$common_genes <- NULL
-    rv$combined_expr_raw <- NULL
-    rv$combined_expr <- NULL
-    rv$combined_expr_before_global_norm <- NULL
-    rv$all_expr_norm_list <- list()
-    rv$normalization_stats <- list()
-    rv$normalization_summary_table <- NULL
-    rv$normalization_caption <- NULL
-    rv$unified_metadata <- NULL
-    rv$expr_filtered <- NULL
-    rv$qc_pca_scores <- NULL
-    rv$qc_pca_distances <- NULL
-    rv$qc_pca_threshold <- NULL
-    rv$qc_pca_outliers <- character(0)
-    rv$qc_pca_var_explained <- NULL
-    rv$qc_conn_k <- NULL
-    rv$qc_conn_threshold <- NULL
-    rv$qc_conn_outliers <- character(0)
-    rv$qc_all_outliers <- character(0)
-    rv$qc_outlier_detection_complete <- FALSE
-    rv$qc_excluded_samples <- character(0)
-    rv$batch_corrected <- NULL
-    rv$de_results <- NULL
-    rv$sig_genes <- NULL
-    rv$de_method <- "limma"
-    rv$raw_counts_for_deseq2 <- NULL
-    rv$raw_counts_metadata <- NULL
-    rv$download_complete <- FALSE
-    rv$normalization_complete <- FALSE
-    rv$groups_applied <- FALSE
-    rv$batch_complete <- FALSE
-    rv$wgcna_prepared <- FALSE
-    rv$wgcna_complete <- FALSE
-    rv$datExpr <- NULL
-    rv$wgcna_top_variable_genes <- NULL
-    rv$wgcna_gene_variance_table <- NULL
-    rv$wgcna_sample_info <- NULL
-    rv$wgcna_sample_tree <- NULL
-    rv$soft_threshold <- NULL
-    rv$soft_threshold_powers <- NULL
-    rv$moduleColors <- NULL
-    rv$dynamicColors <- NULL
-    rv$MEs <- NULL
-    rv$geneTree <- NULL
-    rv$trait_data <- NULL
-    rv$moduleTraitCor <- NULL
-    rv$moduleTraitPvalue <- NULL
-    rv$gene_metrics <- NULL
-    rv$geneModuleMembership <- NULL
-    rv$MMPvalue <- NULL
-    rv$wgcna_log_messages <- character(0)
-    rv$wgcna_datExpr_before_exclude <- NULL
-    rv$wgcna_sample_info_before_exclude <- NULL
-    rv$wgcna_excluded_samples <- character(0)
-    rv$wgcna_suggested_outliers <- character(0)
-    rv$ME_correlation <- NULL
-    rv$ME_tree <- NULL
-    rv$significant_modules <- NULL
-    rv$common_genes_de_wgcna <- NULL
-    rv$common_genes_df <- NULL
-    rv$common_genes_deg_n <- 0L
-    rv$common_genes_wgcna_n <- 0L
-    rv$go_bp <- NULL
-    rv$go_mf <- NULL
-    rv$go_cc <- NULL
-    rv$kegg_enrichment <- NULL
-    rv$ppi_graph <- NULL
-    rv$ppi_hub_scores <- NULL
-    rv$ppi_consensus_hubs <- NULL
-    rv$ppi_hub_rankings <- NULL
-    rv$ppi_interactive_genes <- NULL
-    rv$ppi_non_interactive_genes <- NULL
-    rv$ppi_gene_status_table <- NULL
-    rv$ppi_complete <- FALSE
-    rv$ppi_centrality_filtered_genes <- NULL
-    rv$ppi_centrality_weights <- NULL
-    rv$ppi_centrality_table <- NULL
-    rv$extracted_data_ml <- NULL
-    rv$ml_lasso_df <- NULL
-    rv$ml_rf_importance <- NULL
-    rv$ml_svm_ranking <- NULL
-    rv$ml_common_genes <- NULL
-    rv$ml_venn_sets <- NULL
-    rv$ml_x <- NULL
-    rv$ml_y <- NULL
-    rv$ml_complete <- FALSE
-    rv$ml_lasso_genes <- NULL
-    rv$ml_elastic_df <- NULL
-    rv$ml_elastic_top_genes <- NULL
-    rv$ml_ridge_df <- NULL
-    rv$ml_ridge_top_genes <- NULL
-    rv$ml_rf_top_genes <- NULL
-    rv$ml_svm_top_genes <- NULL
-    rv$ml_boruta_df <- NULL
-    rv$ml_boruta_top_genes <- NULL
-    rv$ml_splsda_df <- NULL
-    rv$ml_splsda_top_genes <- NULL
-    rv$ml_xgboost_df <- NULL
-    rv$ml_xgboost_top_genes <- NULL
-    rv$ml_methods_run <- NULL
-    rv$nomogram_complete <- FALSE
-    rv$nomogram_model <- NULL
-    rv$nomogram_train_data <- NULL
-    rv$nomogram_validation_data <- NULL
-    rv$nomogram_available_genes <- NULL
-    rv$nomogram_optimal_threshold <- NULL
-    rv$nomogram_train_metrics <- NULL
-    rv$nomogram_val_metrics <- NULL
-    rv$nomogram_train_roc <- NULL
-    rv$nomogram_val_roc <- NULL
-    rv$nomogram_model_diagnostics <- NULL
-    rv$nomogram_performance_comparison <- NULL
-    rv$nomogram_cal_train <- NULL
-    rv$nomogram_cal_validation <- NULL
-    rv$nomogram_dca_train <- NULL
-    rv$nomogram_dca_val <- NULL
-    rv$nomogram_ci_train <- NULL
-    rv$nomogram_ci_val <- NULL
-    # Validation mode
-    rv$validation_mode <- "external"
-    # External validation
-    rv$external_validation_expr <- NULL
-    rv$external_validation_outcome <- NULL
-    rv$external_validation_group_col <- NULL
-    rv$external_validation_n_disease <- NULL
-    rv$external_validation_n_normal <- NULL
-    rv$external_validation_gene_names <- NULL
-    rv$external_validation_raw_expr <- NULL
-    rv$external_validation_metadata <- NULL
-    rv$ext_val_log <- NULL
-    rv$ext_val_raw_expr <- NULL
-    rv$ext_val_metadata <- NULL
-    rv$ext_val_downloaded <- NULL
-    rv$ext_val_de_results <- NULL
-    rv$ext_val_sig_genes <- NULL
-    rv$nom_ext_val_raw_expr <- NULL
-    rv$nom_ext_val_metadata <- NULL
-    rv$nom_ext_val_downloaded <- NULL
-    rv$nomogram_ext_val_data <- NULL
-    rv$nomogram_ext_val_metrics <- NULL
-    rv$nomogram_ext_val_roc <- NULL
-    rv$nomogram_ext_cal <- NULL
-    rv$nomogram_ext_dca <- NULL
-    rv$nomogram_ext_ci <- NULL
-    rv$gsea_result <- NULL
-    rv$gsea_target_genes <- NULL
-    rv$gsea_results_by_gene <- NULL
-    rv$gsea_collection_lookup <- NULL
-    rv$gsea_collections_used <- NULL
-    rv$gsea_complete <- FALSE
-    rv$immune_raw <- NULL
-    rv$immune_matrix <- NULL
-    rv$immune_data <- NULL
-    rv$immune_long <- NULL
-    rv$immune_method <- NULL
-    rv$immune_cell_cols <- NULL
-    rv$immune_complete <- FALSE
-
-    # Reset timers
-    rv$download_start <- NULL
-    rv$download_running <- FALSE
-    rv$download_complete_at <- NULL
-    rv$auto_save_after_download_done <- FALSE
-    rv$normalize_start <- NULL
-    rv$normalize_running <- FALSE
-    rv$batch_start <- NULL
-    rv$batch_running <- FALSE
-    rv$de_start <- NULL
-    rv$de_running <- FALSE
-    rv$wgcna_start <- NULL
-    rv$wgcna_running <- FALSE
-    
-    # Reset UI inputs so user can start a new analysis from defaults
-    updateRadioButtons(session, "analysis_type", selected = "rnaseq")
-    updateRadioButtons(session, "de_method", selected = "limma")
-    updateTextInput(session, "disease_name", value = "")
-    updateTextAreaInput(session, "rnaseq_gses", value = "GSE50760, GSE104836")
-    updateTextAreaInput(session, "microarray_gses", value = "")
-    updateNumericInput(session, "logfc_cutoff", value = 0.5)
-    updateNumericInput(session, "padj_cutoff", value = 0.05)
-    updateNumericInput(session, "top_genes", value = 50)
-    tryCatch(shinyjs::reset("upload_workspace_file"), error = function(e) NULL)
-    
-    # Navigate to Step 1 (Download) so user starts from the beginning
-    updateTabItems(session, "sidebar_menu", "download")
-    
-    # Success: previous files deleted, state cleared; app remains open for new analysis
-    Sys.sleep(0.5)
-    showNotification(
-      tags$div(
-        icon("check-circle"),
-        tags$strong("Reset complete. App remains open."),
-        tags$p("All previous files and data have been deleted. Enter new GSE IDs in Step 1 and click Start Processing to run from the start.", style = "margin-top: 5px;")
-      ),
-      type = "success",
-      duration = 6
-    )
+    # Button used for screenshot only; tour disabled to avoid double action
+    invisible(NULL)
   })
 }

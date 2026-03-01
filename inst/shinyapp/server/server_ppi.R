@@ -345,6 +345,70 @@ server_ppi <- function(input, output, session, rv) {
     igraph::layout_with_fr(g_sub, niter = 3500, start.temp = sqrt(n))
   }
 
+  draw_ppi_traditional <- function(g_sub, cm, main_title) {
+    layout_fr <- ppi_safe_layout(g_sub, "fr")
+    if (is.null(layout_fr) || nrow(layout_fr) != igraph::vcount(g_sub)) return(invisible(NULL))
+    op <- par(mar = c(1.5, 1.5, 2.5, 1.5), bg = "#FAFAFA", cex.main = 1.1, col.main = "#37474F", xpd = NA)
+    on.exit(par(op), add = TRUE)
+    igraph::plot.igraph(g_sub, layout = layout_fr, vertex.color = cm$colors, vertex.size = cm$sizes,
+                        vertex.label = igraph::V(g_sub)$SYMBOL, vertex.label.cex = ppi_label_cex, vertex.label.dist = ppi_label_dist,
+                        vertex.label.color = "#263238", vertex.label.family = "sans", vertex.frame.color = ppi_frame_col, vertex.frame.width = 0.8,
+                        edge.color = ppi_edge_col, edge.width = 0.65, main = main_title)
+    legend("bottomright", legend = cm$legend_show$legend, pch = 21, pt.bg = cm$legend_show$col, pt.cex = 2, bty = "n", text.col = "#37474F")
+  }
+  draw_ppi_circular <- function(g_sub, cm, main_title) {
+    degree_order <- order(igraph::V(g_sub)$degree, decreasing = TRUE)
+    layout_circle <- igraph::layout_in_circle(g_sub, order = degree_order)
+    op <- par(mar = c(1.5, 1.5, 2.5, 1.5), bg = "#FAFAFA", cex.main = 1.1, col.main = "#37474F", xpd = NA)
+    on.exit(par(op), add = TRUE)
+    igraph::plot.igraph(g_sub, layout = layout_circle, vertex.color = cm$colors, vertex.size = cm$sizes,
+                        vertex.label = igraph::V(g_sub)$SYMBOL, vertex.label.cex = ppi_label_cex, vertex.label.dist = ppi_label_dist,
+                        vertex.label.color = "#263238", vertex.label.family = "sans", vertex.frame.color = ppi_frame_col, vertex.frame.width = 0.8,
+                        edge.color = ppi_edge_col, edge.width = 0.65, main = main_title)
+    legend("bottomright", legend = cm$legend_show$legend, pch = 21, pt.bg = cm$legend_show$col, pt.cex = 2, bty = "n", text.col = "#37474F")
+  }
+  make_ppi_ggraph_plot <- function(g_sub, main_title) {
+    if (is.null(g_sub) || igraph::vcount(g_sub) == 0) return(NULL)
+    tg <- tidygraph::as_tbl_graph(g_sub)
+    tg <- tg %>% tidygraph::activate(nodes) %>% dplyr::mutate(hub_status = ifelse(is_hub, "Hub", "Other"))
+    set.seed(123)
+    ggraph::ggraph(tg, layout = "fr", niter = 3500) +
+      ggraph::geom_edge_link(alpha = 0.4, color = "#FF9800", width = 0.55) +
+      ggraph::geom_node_point(aes(size = degree, color = hub_status), alpha = 0.92, stroke = 0.8) +
+      ggraph::geom_node_text(aes(label = SYMBOL), repel = TRUE, size = 3, fontface = "bold", color = "#263238", box.padding = 0.7, point.padding = 0.45, max.overlaps = 25) +
+      ggplot2::scale_color_manual(values = c("Hub" = ppi_col_hub, "Other" = ppi_col_other)) +
+      ggplot2::scale_size_continuous(range = c(5, 14)) +
+      ggplot2::labs(title = main_title, subtitle = paste0(igraph::vcount(g_sub), " nodes, ", igraph::ecount(g_sub), " edges"), color = "Type", size = "Degree") +
+      ggraph::theme_graph(base_family = "sans", background = "#FAFAFA") +
+      ggplot2::theme(legend.position = "right", plot.title = ggplot2::element_text(face = "bold", size = 13, color = "#37474F"),
+                    plot.subtitle = ggplot2::element_text(size = 9, color = "#546E7A"), plot.margin = ggplot2::margin(4, 4, 4, 4, "pt"))
+  }
+  draw_ppi_kamada <- function(g_sub, cm, main_title) {
+    layout_kk <- ppi_safe_layout(g_sub, "kk")
+    if (is.null(layout_kk) || nrow(layout_kk) != igraph::vcount(g_sub)) return(invisible(NULL))
+    op <- par(mar = c(1.5, 1.5, 2.5, 1.5), bg = "#FAFAFA", cex.main = 1.1, col.main = "#37474F", xpd = NA)
+    on.exit(par(op), add = TRUE)
+    igraph::plot.igraph(g_sub, layout = layout_kk, vertex.color = cm$colors, vertex.size = cm$sizes,
+                        vertex.label = igraph::V(g_sub)$SYMBOL, vertex.label.cex = ppi_label_cex, vertex.label.dist = ppi_label_dist,
+                        vertex.label.color = "#263238", vertex.label.family = "sans", vertex.frame.color = ppi_frame_col, vertex.frame.width = 0.8,
+                        edge.color = ppi_edge_col, edge.width = 0.65, main = main_title)
+    legend("bottomright", legend = cm$legend_show$legend, pch = 21, pt.bg = cm$legend_show$col, pt.cex = 2, bty = "n", text.col = "#37474F")
+  }
+  draw_ppi_hub_or_other <- function(g, main, node_col) {
+    if (is.null(g) || igraph::vcount(g) == 0) return(invisible(NULL))
+    deg <- igraph::V(g)$degree
+    if (length(deg) == 0 || all(is.na(deg))) deg <- rep(1, igraph::vcount(g))
+    node_sizes <- scales::rescale(deg, to = c(6, 18))
+    layout_fr <- ppi_safe_layout(g, "fr")
+    if (is.null(layout_fr) || nrow(layout_fr) != igraph::vcount(g)) return(invisible(NULL))
+    op <- par(mar = c(1.5, 1.5, 2.5, 1.5), bg = "#FAFAFA", cex.main = 1.1, col.main = "#37474F", xpd = NA)
+    on.exit(par(op), add = TRUE)
+    igraph::plot.igraph(g, layout = layout_fr, vertex.color = node_col, vertex.size = node_sizes,
+                        vertex.label = igraph::V(g)$SYMBOL, vertex.label.cex = ppi_label_cex, vertex.label.dist = ppi_label_dist,
+                        vertex.label.color = "#263238", vertex.label.family = "sans", vertex.frame.color = ppi_frame_col, vertex.frame.width = 0.8,
+                        edge.color = ppi_edge_col, edge.width = 0.65, main = main)
+  }
+
   output$ppi_plot_traditional <- renderPlot(
     {
       tryCatch({
@@ -548,6 +612,131 @@ server_ppi <- function(input, output, session, rv) {
     width = 560, height = 520, res = 96
   )
 
+  output$download_ppi_traditional_png <- downloadHandler(
+    filename = function() "PPI_Network_FruchtermanReingold.png",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("1. Fruchterman–Reingold", sel$mode, sel$n_val)
+      png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
+      draw_ppi_traditional(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_traditional_pdf <- downloadHandler(
+    filename = function() "PPI_Network_FruchtermanReingold.pdf",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("1. Fruchterman–Reingold", sel$mode, sel$n_val)
+      pdf(file, width = 7, height = 6.5, bg = "#FAFAFA")
+      draw_ppi_traditional(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_circular_png <- downloadHandler(
+    filename = function() "PPI_Network_Circular.png",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("2. Circular by Degree", sel$mode, sel$n_val)
+      png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
+      draw_ppi_circular(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_circular_pdf <- downloadHandler(
+    filename = function() "PPI_Network_Circular.pdf",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("2. Circular by Degree", sel$mode, sel$n_val)
+      pdf(file, width = 7, height = 6.5, bg = "#FAFAFA")
+      draw_ppi_circular(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_ggraph_png <- downloadHandler(
+    filename = function() "PPI_Network_ggraph.png",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("3. ggraph", sel$mode, sel$n_val)
+      p <- make_ppi_ggraph_plot(g_sub, main_title)
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 6.5, dpi = IMAGE_DPI, units = "in", bg = "#FAFAFA", device = "png")
+    }
+  )
+  output$download_ppi_ggraph_pdf <- downloadHandler(
+    filename = function() "PPI_Network_ggraph.pdf",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("3. ggraph", sel$mode, sel$n_val)
+      p <- make_ppi_ggraph_plot(g_sub, main_title)
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 6.5, device = "pdf", bg = "#FAFAFA")
+    }
+  )
+  output$download_ppi_kamada_png <- downloadHandler(
+    filename = function() "PPI_Network_KamadaKawai.png",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
+      png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
+      draw_ppi_kamada(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_kamada_pdf <- downloadHandler(
+    filename = function() "PPI_Network_KamadaKawai.pdf",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
+      pdf(file, width = 7, height = 6.5, bg = "#FAFAFA")
+      draw_ppi_kamada(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_hub_or_other_png <- downloadHandler(
+    filename = function() "PPI_Network_HubOrOther.png",
+    content = function(file) {
+      mode <- app_ppi$applied_mode
+      if (mode == "hub") { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
+      } else if (mode == "topn") { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
+      } else return()
+      if (is.null(g) || igraph::vcount(g) == 0) return()
+      png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
+      draw_ppi_hub_or_other(g, main, node_col)
+      dev.off()
+    }
+  )
+  output$download_ppi_hub_or_other_pdf <- downloadHandler(
+    filename = function() "PPI_Network_HubOrOther.pdf",
+    content = function(file) {
+      mode <- app_ppi$applied_mode
+      if (mode == "hub") { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
+      } else if (mode == "topn") { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
+      } else return()
+      if (is.null(g) || igraph::vcount(g) == 0) return()
+      pdf(file, width = 7, height = 6.5, bg = "#FAFAFA")
+      draw_ppi_hub_or_other(g, main, node_col)
+      dev.off()
+    }
+  )
+
   output$ppi_hub_table <- DT::renderDataTable({
     req(rv$ppi_hub_scores)
     df <- rv$ppi_hub_scores
@@ -733,24 +922,6 @@ server_ppi <- function(input, output, session, rv) {
     df <- rv$ppi_hub_scores
     mode <- input$ppi_centrality_mode
     if (is.null(mode)) mode <- "filter"
-    if (mode == "hub") {
-      hubs <- rv$ppi_consensus_hubs
-      if (is.null(hubs) || length(hubs) == 0) {
-        showNotification("No consensus hub genes. Run PPI and ensure hub analysis completed.", type = "warning", duration = 5)
-        return()
-      }
-      inter <- rv$ppi_interactive_genes
-      if (!is.null(inter) && length(inter) > 0) hubs <- intersect(hubs, inter)
-      rv$ppi_centrality_filtered_genes <- hubs
-      rv$ppi_centrality_weights <- NULL
-      tab <- df[df$SYMBOL %in% hubs, ]
-      tab <- tab[order(-tab$Degree), ]
-      tab$Rank <- seq_len(nrow(tab))
-      tab$Weight <- NA
-      rv$ppi_centrality_table <- tab
-      showNotification(paste("Hub genes only (", length(hubs), " genes) selected for ML. Click 'Extract Data for ML' to use them."), type = "message", duration = 4)
-      return()
-    }
     n_top <- max(5, min(100, as.integer(input$ppi_centrality_top_n)))
     metric <- input$ppi_centrality_metric
     if (is.null(metric)) metric <- "Degree"
@@ -795,7 +966,7 @@ server_ppi <- function(input, output, session, rv) {
     if (is.null(rv$ppi_centrality_table)) return(NULL)
     n <- nrow(rv$ppi_centrality_table)
     mode_txt <- if (!is.null(rv$ppi_centrality_filtered_genes) && length(rv$ppi_centrality_filtered_genes) > 0)
-      paste0("Selected for ML: ", length(rv$ppi_centrality_filtered_genes), " genes (filter or hub).") else "Weights computed (no gene filter)."
+      paste0("Selected for ML: ", length(rv$ppi_centrality_filtered_genes), " genes (filter).") else "Weights computed (no gene filter)."
     tags$div(
       class = "alert alert-success",
       icon("check-circle"),
