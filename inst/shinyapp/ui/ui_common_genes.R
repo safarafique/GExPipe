@@ -149,7 +149,7 @@ ui_common_genes <- tabItem(
         tags$h5(icon("table"), " Pathway list table (expand to view)", style = "margin-bottom: 8px; color: #5a6268; font-weight: 600;"),
         box(
           title = tags$span(icon("list"), " Pathway list – same pathways as chord diagram"),
-          width = 12, status = "default", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
           tags$p("Open this box to view or download the pathway–gene table.", style = "margin-bottom: 10px; color: #6c757d; font-size: 12px;"),
           DT::dataTableOutput("kegg_pathway_list_table"),
           tags$div(style = "margin-top: 10px;",
