@@ -109,7 +109,7 @@ ui_download <- tabItem(
         box(title = tags$span(icon("dna"), " RNA-seq Datasets"), 
             width = 6, status = "info", solidHeader = TRUE,
             textAreaInput("rnaseq_gses", "GSE IDs (comma separated):",
-                          value = "GSE184050, GSE153315", placeholder = "e.g. GSE184050, GSE153315",
+                          value = "GSE50760, GSE104836", placeholder = "e.g. GSE50760, GSE104836",
                           rows = 3))
       ),
       conditionalPanel(
@@ -117,7 +117,7 @@ ui_download <- tabItem(
         box(title = tags$span(icon("microchip"), " Microarray Datasets"), 
             width = 6, status = "warning", solidHeader = TRUE,
             textAreaInput("microarray_gses", "GSE IDs (comma separated):",
-                          value = "GSE21321, GSE163980", placeholder = "e.g. GSE21321, GSE163980",
+                          value = "GSE89076, GSE44076", placeholder = "e.g. GSE89076, GSE44076",
                           rows = 3))
       )
     ),
