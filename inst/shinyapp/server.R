@@ -12,7 +12,20 @@
 # ==============================================================================
 
 server <- function(input, output, session) {
-  
+
+  # Notify once if some packages failed to load (app still runs with reduced functionality)
+  missing_pkgs <- getOption("omniVerse.missingPkgs", character(0))
+  if (length(missing_pkgs) > 0L) {
+    tryCatch({
+      shiny::showNotification(
+        paste0("Some packages could not be loaded: ", paste(head(missing_pkgs, 5), collapse = ", "),
+               if (length(missing_pkgs) > 5) paste0(" and ", length(missing_pkgs) - 5, " more") else "", ". ",
+               "Install with: BiocManager::install(\"OmniVerse\") for full functionality."),
+        type = "warning", duration = 12, session = session
+      )
+    }, error = function(e) NULL)
+  }
+
   # Guided tour (Cicerone) ------------------------------------------------------
   guide <- tryCatch({
     if (requireNamespace("cicerone", quietly = TRUE)) {

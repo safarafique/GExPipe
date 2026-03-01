@@ -10,42 +10,53 @@ options(timeout = 600)
 # ==============================================================================
 cat("Loading packages (R ", R.version.string, ")...\n")
 
-# Load Imports (required). Do not install at runtime; dependencies must be declared in DESCRIPTION.
+# Core UI packages (required for app to open) - stop if any fail
+core_pkgs <- c("shiny", "shinydashboard", "shinyjs", "DT")
+for (p in core_pkgs) {
+  if (!requireNamespace(p, quietly = TRUE)) {
+    stop("OmniVerse requires package '", p, "'. Install with: install.packages(\"", p, "\")")
+  }
+}
 suppressPackageStartupMessages({
   library(shiny); library(shinydashboard); library(shinyjs); library(DT)
-  library(Biobase); library(GEOquery); library(limma); library(AnnotationDbi); library(org.Hs.eg.db)
-  library(dplyr); library(data.table); library(edgeR); library(sva)
-  library(ggplot2); library(gridExtra); library(RColorBrewer); library(pheatmap); library(ggrepel)
-  library(VennDiagram); library(UpSetR); library(WGCNA); library(parallel)
-  library(clusterProfiler); library(enrichplot); library(circlize); library(STRINGdb); library(DESeq2)
-  library(igraph); library(ggraph); library(tidygraph); library(tidyr)
-  library(randomForest); library(caret); library(e1071); library(glmnet); library(pROC); library(kernlab)
-  library(tibble); library(msigdbr); library(ggpubr); library(reshape2); library(corrplot)
-  library(R.utils); library(dynamicTreeCut); library(scales)
 })
-# Optional Suggests (loaded only if present)
-if (requireNamespace("Boruta", quietly = TRUE)) suppressPackageStartupMessages(library(Boruta))
-if (requireNamespace("mixOmics", quietly = TRUE)) suppressPackageStartupMessages(library(mixOmics))
-if (requireNamespace("xgboost", quietly = TRUE)) suppressPackageStartupMessages(library(xgboost))
-if (requireNamespace("SHAPforxgboost", quietly = TRUE)) suppressPackageStartupMessages(library(SHAPforxgboost))
-if (requireNamespace("immunedeconv", quietly = TRUE)) suppressPackageStartupMessages(library(immunedeconv))
-if (requireNamespace("rms", quietly = TRUE)) suppressPackageStartupMessages(library(rms))
-if (requireNamespace("rmda", quietly = TRUE)) suppressPackageStartupMessages(library(rmda))
-if (requireNamespace("cicerone", quietly = TRUE)) suppressPackageStartupMessages(library(cicerone))
-if (requireNamespace("biomaRt", quietly = TRUE)) suppressPackageStartupMessages(library(biomaRt))
 
-# If any required package failed to load, warn with Bioconductor-friendly message
-required_loaded <- c("shiny", "shinydashboard", "shinyjs", "DT", "Biobase", "GEOquery", "limma",
-  "AnnotationDbi", "org.Hs.eg.db", "dplyr", "data.table", "edgeR", "sva", "ggplot2", "gridExtra",
-  "RColorBrewer", "pheatmap", "ggrepel", "VennDiagram", "UpSetR", "WGCNA", "clusterProfiler",
-  "enrichplot", "circlize", "STRINGdb", "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
-  "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab", "tibble", "msigdbr", "ggpubr",
-  "reshape2", "corrplot", "R.utils", "dynamicTreeCut", "scales")
-missing <- required_loaded[!sapply(required_loaded, function(p) isNamespaceLoaded(p) || requireNamespace(p, quietly = TRUE))]
-if (length(missing) > 0L) {
-  warning("OmniVerse: required packages missing (", paste(missing, collapse = ", "), "). ",
-          "Install with: BiocManager::install(\"OmniVerse\") then restart the app.")
+# All other Imports: load one-by-one so one failure does not stop the app
+imports_ordered <- c(
+  "Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
+  "dplyr", "data.table", "edgeR", "sva", "ggplot2", "gridExtra", "RColorBrewer", "pheatmap", "ggrepel",
+  "VennDiagram", "UpSetR", "WGCNA", "parallel", "clusterProfiler", "enrichplot", "circlize", "STRINGdb", "DESeq2",
+  "igraph", "ggraph", "tidygraph", "tidyr", "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
+  "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils", "dynamicTreeCut", "scales"
+)
+omniVerse_missing_pkgs <- character(0)
+for (p in imports_ordered) {
+  if (isNamespaceLoaded(p)) next
+  ok <- tryCatch(
+    suppressPackageStartupMessages(library(p, character.only = TRUE, quietly = TRUE)),
+    error = function(e) FALSE
+  )
+  if (identical(ok, FALSE) || !isNamespaceLoaded(p)) {
+    omniVerse_missing_pkgs <- c(omniVerse_missing_pkgs, p)
+  }
 }
+if (length(omniVerse_missing_pkgs) > 0L) {
+  warning("OmniVerse: some packages could not be loaded (", paste(omniVerse_missing_pkgs, collapse = ", "), "). ",
+          "Install with: BiocManager::install(c(\"", omniVerse_missing_pkgs[1], "\", ...)) or BiocManager::install(\"OmniVerse\"). ",
+          "App will start but some steps may not work until these are installed.")
+  options(omniVerse.missingPkgs = omniVerse_missing_pkgs)
+}
+
+# Optional Suggests (loaded only if present)
+if (requireNamespace("Boruta", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(Boruta)), error = function(e) NULL)
+if (requireNamespace("mixOmics", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(mixOmics)), error = function(e) NULL)
+if (requireNamespace("xgboost", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(xgboost)), error = function(e) NULL)
+if (requireNamespace("SHAPforxgboost", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(SHAPforxgboost)), error = function(e) NULL)
+if (requireNamespace("immunedeconv", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(immunedeconv)), error = function(e) NULL)
+if (requireNamespace("rms", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(rms)), error = function(e) NULL)
+if (requireNamespace("rmda", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(rmda)), error = function(e) NULL)
+if (requireNamespace("cicerone", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(cicerone)), error = function(e) NULL)
+if (requireNamespace("biomaRt", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(biomaRt)), error = function(e) NULL)
 
 # Allow large workspace .rds uploads (default Shiny limit is 5 MB)
 options(shiny.maxRequestSize = 500 * 1024^2)  # 500 MB
@@ -55,8 +66,11 @@ options(timeout = 3600)  # 1 hour so large GEO/supplementary files can finish
 
 # WGCNA-friendly options (match standalone script)
 options(stringsAsFactors = FALSE)
-if (exists("enableWGCNAThreads", mode = "function", where = asNamespace("WGCNA"))) {
-  tryCatch(WGCNA::enableWGCNAThreads(nThreads = parallel::detectCores() - 1L), error = function(e) NULL)
+if (isNamespaceLoaded("WGCNA")) {
+  tryCatch({
+    if (exists("enableWGCNAThreads", mode = "function", where = asNamespace("WGCNA")))
+      WGCNA::enableWGCNAThreads(nThreads = max(1L, parallel::detectCores() - 1L))
+  }, error = function(e) NULL)
 }
 
 cat("✓ All packages loaded\n")

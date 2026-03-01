@@ -17,8 +17,12 @@
 runOmniVerse <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
   app_dir <- system.file("shinyapp", package = "OmniVerse")
   if (!nzchar(app_dir) || !dir.exists(app_dir)) {
-    stop("OmniVerse app directory not found. Reinstall the package.")
+    stop("OmniVerse app directory not found. Reinstall the package with: remotes::install_github(\"safarafique/Shiny_app-OmniVerse-\", dependencies = TRUE)")
   }
+  port <- as.integer(port)
+  if (port == 0) port <- 3838
+  url <- sprintf("http://%s:%s", if (host == "0.0.0.0") "127.0.0.1" else host, port)
+  message("OmniVerse: open in browser: ", url, " (if it does not open automatically, paste this URL)")
   options(shiny.launch.browser = launch.browser)
   shiny::runApp(app_dir, host = host, port = port)
 }
