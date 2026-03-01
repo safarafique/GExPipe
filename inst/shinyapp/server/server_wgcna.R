@@ -258,9 +258,9 @@ server_wgcna <- function(input, output, session, rv) {
     tags$div(
       class = "alert alert-info",
       style = "margin-bottom: 0;",
-      tags$strong(icon("list"), " Genes used in WGCNA: ", n, " genes"),
-      " (top variable genes you selected, after min-samples filter). Selection is by ",
-      tags$strong("variance"), " (higher = more variable).",
+      tags$strong(icon("list"), " Genes used in WGCNA: ", n, " genes."),
+      " These are the top variable genes (by variance across samples) that passed the minimum-sample filter. ",
+      "Higher variance means the gene’s expression varies more across samples.",
       tags$br(),
       tags$div(
         style = "margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;",
@@ -460,20 +460,18 @@ server_wgcna <- function(input, output, session, rv) {
     }
   })
 
-  output$wgcna_sample_tree <- renderPlot({
+  draw_wgcna_sample_tree <- function() {
     req(rv$wgcna_sample_tree, rv$datExpr)
     ht <- rv$wgcna_sample_tree
     n_samp <- nrow(rv$datExpr)
     n_genes <- ncol(rv$datExpr)
     d <- as.dendrogram(ht)
-    # Style branches
     set_edge_par <- function(node) {
       if (is.leaf(node)) return(node)
       attr(node, "edgePar") <- list(col = "#2980b9", lwd = 1.4)
       node
     }
     d <- dendrapply(d, set_edge_par)
-    # Small leaf labels so sample IDs fit (scale by number of samples to limit overlap)
     leaf_cex <- max(0.25, min(0.55, 28 / n_samp))
     set_leaf_par <- function(node) {
       if (!is.leaf(node)) return(node)
@@ -481,7 +479,6 @@ server_wgcna <- function(input, output, session, rv) {
       node
     }
     d <- dendrapply(d, set_leaf_par)
-    # Extra bottom margin for sample ID labels
     op <- par(mar = c(6, 4.5, 5, 1.5), bg = "white", fg = "#2c3e50", xpd = NA,
               plt = c(0.14, 0.98, 0.22, 0.88))
     on.exit(par(op), add = TRUE)
@@ -492,6 +489,10 @@ server_wgcna <- function(input, output, session, rv) {
     y_ticks <- pretty(c(0, h_max), n = 5)
     axis(2, at = y_ticks, col = "#5d6d7e", col.axis = "#2c3e50", cex.axis = 0.9, las = 1)
     box(col = "gray85", lwd = 1)
+  }
+
+  output$wgcna_sample_tree <- renderPlot({
+    draw_wgcna_sample_tree()
   }, width = 960, height = 420, res = 96)
   
   # ---------- STEP 2: SOFT THRESHOLD ----------
@@ -584,7 +585,7 @@ server_wgcna <- function(input, output, session, rv) {
     })
   })
   
-  output$soft_threshold_plot <- renderPlot({
+  draw_soft_threshold_plot <- function() {
     req(rv$soft_threshold)
     sft <- rv$soft_threshold
     if (!is.null(rv$soft_threshold_powers)) {
@@ -594,7 +595,6 @@ server_wgcna <- function(input, output, session, rv) {
     }
     op <- par(mfrow = c(1, 2), bg = "white", fg = "#2c3e50", col.main = "#1a252f", font.main = 2, col.axis = "#34495e", col.lab = "#34495e")
     on.exit(par(op), add = TRUE)
-    # Scale independence plot
     x1 <- sft$fitIndices[, 1]
     y1 <- -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2]
     plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "Scale Free Topology Model Fit, signed R²",
@@ -603,13 +603,16 @@ server_wgcna <- function(input, output, session, rv) {
     text(x1, y1, labels = powers, cex = 0.85, col = "#1a252f", pos = 4, offset = 0.3)
     abline(h = 0.8, col = "#e74c3c", lty = 2, lwd = 1.5)
     box(col = "gray85", lwd = 1)
-    # Mean connectivity plot
     y2 <- sft$fitIndices[, 5]
     plot(x1, y2, xlab = "Soft Threshold (power)", ylab = "Mean Connectivity",
          type = "n", main = "Mean connectivity", col.main = "#1a252f")
     points(x1, y2, pch = 19, col = "#27ae60", cex = 1.2)
     text(x1, y2, labels = powers, cex = 0.85, col = "#1a252f", pos = 4, offset = 0.3)
     box(col = "gray85", lwd = 1)
+  }
+
+  output$soft_threshold_plot <- renderPlot({
+    draw_soft_threshold_plot()
   })
   
   output$soft_threshold_result <- renderUI({
@@ -828,12 +831,11 @@ server_wgcna <- function(input, output, session, rv) {
     }
   })
   
-  output$wgcna_dendrogram <- renderPlot({
+  draw_wgcna_dendrogram <- function() {
     req(rv$geneTree, rv$moduleColors)
-    
     if (!requireNamespace("WGCNA", quietly = TRUE)) {
       par(bg = "white"); plot.new(); text(0.5, 0.5, "WGCNA package required", cex = 1.2)
-      return()
+      return(invisible(NULL))
     }
     op <- par(bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
@@ -843,6 +845,10 @@ server_wgcna <- function(input, output, session, rv) {
                                main = "Gene Dendrogram and Module Colors",
                                dendroLabels = FALSE, hang = 0.03,
                                addGuide = TRUE, guideHang = 0.05)
+  }
+
+  output$wgcna_dendrogram <- renderPlot({
+    draw_wgcna_dendrogram()
   })
   
   # ---------- STEP 4: MODULE-TRAIT & GS/MM ----------
@@ -1071,6 +1077,57 @@ server_wgcna <- function(input, output, session, rv) {
       wgcna_module_trait_to_file(file, function(f) pdf(f, width = 6, height = 8, bg = "white"))
     }
   )
+
+  output$download_wgcna_sample_tree_png <- downloadHandler(
+    filename = function() "wgcna_sample_tree.png",
+    content = function(file) {
+      png(file, width = 7 * IMAGE_DPI, height = 4.4 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      draw_wgcna_sample_tree()
+      dev.off()
+    }
+  )
+  output$download_wgcna_sample_tree_pdf <- downloadHandler(
+    filename = function() "wgcna_sample_tree.pdf",
+    content = function(file) {
+      pdf(file, width = 7, height = 4.4, bg = "white")
+      draw_wgcna_sample_tree()
+      dev.off()
+    }
+  )
+
+  output$download_soft_threshold_png <- downloadHandler(
+    filename = function() "wgcna_soft_threshold.png",
+    content = function(file) {
+      png(file, width = 10 * IMAGE_DPI, height = 5 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      draw_soft_threshold_plot()
+      dev.off()
+    }
+  )
+  output$download_soft_threshold_pdf <- downloadHandler(
+    filename = function() "wgcna_soft_threshold.pdf",
+    content = function(file) {
+      pdf(file, width = 10, height = 5, bg = "white")
+      draw_soft_threshold_plot()
+      dev.off()
+    }
+  )
+
+  output$download_wgcna_dendrogram_png <- downloadHandler(
+    filename = function() "wgcna_dendrogram.png",
+    content = function(file) {
+      png(file, width = 12 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      draw_wgcna_dendrogram()
+      dev.off()
+    }
+  )
+  output$download_wgcna_dendrogram_pdf <- downloadHandler(
+    filename = function() "wgcna_dendrogram.pdf",
+    content = function(file) {
+      pdf(file, width = 12, height = 6, bg = "white")
+      draw_wgcna_dendrogram()
+      dev.off()
+    }
+  )
   
   # ========== STEP 5: ME RELATIONSHIPS ==========
   observeEvent(input$calculate_me_relationships, {
@@ -1149,28 +1206,7 @@ server_wgcna <- function(input, output, session, rv) {
   })
   
   output$me_scatter_plot <- renderPlot({
-    req(rv$MEs, ncol(rv$MEs) >= 2)
-    
-    df <- data.frame(
-      ME1 = rv$MEs[, 1],
-      ME2 = rv$MEs[, 2]
-    )
-    
-    ggplot(df, aes(x = ME1, y = ME2)) +
-      geom_point(color = "#3498db", alpha = 0.7, size = 3) +
-      theme_bw(base_size = 14) +
-      labs(
-        title = "Module Eigengene Scatter Plot",
-        x = names(rv$MEs)[1],
-        y = names(rv$MEs)[2]
-      ) +
-      theme(
-        plot.background = element_rect(fill = "white", color = NA),
-        panel.background = element_rect(fill = "white"),
-        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-        panel.grid.major = element_line(color = "gray92"),
-        panel.grid.minor = element_line(color = "gray97")
-      )
+    make_me_scatter_plot()
   })
   
   output$eigengene_distance_heatmap <- renderPlot({
@@ -1194,6 +1230,144 @@ server_wgcna <- function(input, output, session, rv) {
       fontsize = 10
     )
   })
+
+  output$download_me_correlation_heatmap_png <- downloadHandler(
+    filename = function() "wgcna_me_correlation_heatmap.png",
+    content = function(file) {
+      req(rv$ME_correlation)
+      png(file, width = 8 * IMAGE_DPI, height = 7 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      par(bg = "white")
+      WGCNA::labeledHeatmap(
+        Matrix = rv$ME_correlation,
+        xLabels = names(rv$MEs),
+        yLabels = names(rv$MEs),
+        ySymbols = names(rv$MEs),
+        colorLabels = FALSE,
+        colors = WGCNA::blueWhiteRed(50),
+        textMatrix = round(rv$ME_correlation, 2),
+        main = "Module Eigengene Correlation"
+      )
+      dev.off()
+    }
+  )
+  output$download_me_correlation_heatmap_pdf <- downloadHandler(
+    filename = function() "wgcna_me_correlation_heatmap.pdf",
+    content = function(file) {
+      pdf(file, width = 8, height = 7, bg = "white")
+      WGCNA::labeledHeatmap(
+        Matrix = rv$ME_correlation,
+        xLabels = names(rv$MEs),
+        yLabels = names(rv$MEs),
+        ySymbols = names(rv$MEs),
+        colorLabels = FALSE,
+        colors = WGCNA::blueWhiteRed(50),
+        textMatrix = round(rv$ME_correlation, 2),
+        main = "Module Eigengene Correlation"
+      )
+      dev.off()
+    }
+  )
+
+  draw_me_dendrogram <- function() {
+    req(rv$ME_tree)
+    ht <- rv$ME_tree
+    d <- as.dendrogram(ht)
+    set_edge_par <- function(node) {
+      if (is.leaf(node)) return(node)
+      attr(node, "edgePar") <- list(col = "#8e44ad", lwd = 1.4)
+      node
+    }
+    d <- dendrapply(d, set_edge_par)
+    op <- par(mar = c(4, 4, 4, 2), bg = "white", fg = "#2c3e50")
+    on.exit(par(op), add = TRUE)
+    plot(d, main = "Module Eigengene Dendrogram", xlab = "", ylab = "Height", leaflab = "perpendicular", cex = 0.8, col.main = "#1a252f")
+    axis(2, col = "#5d6d7e", col.axis = "#2c3e50", cex.axis = 0.9, las = 1)
+    box(col = "gray85", lwd = 1)
+  }
+  output$download_me_dendrogram_png <- downloadHandler(
+    filename = function() "wgcna_me_dendrogram.png",
+    content = function(file) {
+      png(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      draw_me_dendrogram()
+      dev.off()
+    }
+  )
+  output$download_me_dendrogram_pdf <- downloadHandler(
+    filename = function() "wgcna_me_dendrogram.pdf",
+    content = function(file) {
+      pdf(file, width = 8, height = 6, bg = "white")
+      draw_me_dendrogram()
+      dev.off()
+    }
+  )
+
+  make_me_scatter_plot <- function() {
+    req(rv$MEs, ncol(rv$MEs) >= 2)
+    df <- data.frame(
+      ME1 = rv$MEs[, 1],
+      ME2 = rv$MEs[, 2]
+    )
+    ggplot(df, aes(x = ME1, y = ME2)) +
+      geom_point(color = "#3498db", alpha = 0.7, size = 3) +
+      theme_bw(base_size = 14) +
+      labs(
+        title = "Module Eigengene Scatter Plot",
+        x = names(rv$MEs)[1],
+        y = names(rv$MEs)[2]
+      ) +
+      theme(
+        plot.background = element_rect(fill = "white", color = NA),
+        panel.background = element_rect(fill = "white"),
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        panel.grid.major = element_line(color = "gray92"),
+        panel.grid.minor = element_line(color = "gray97")
+      )
+  }
+  output$download_me_scatter_png <- downloadHandler(
+    filename = function() "wgcna_me_scatter.png",
+    content = function(file) {
+      p <- make_me_scatter_plot()
+      ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_me_scatter_pdf <- downloadHandler(
+    filename = function() "wgcna_me_scatter.pdf",
+    content = function(file) {
+      p <- make_me_scatter_plot()
+      ggplot2::ggsave(file, plot = p, width = 7, height = 5, device = "pdf", bg = "white")
+    }
+  )
+
+  make_eigengene_distance_heatmap <- function() {
+    req(rv$ME_correlation)
+    if (!requireNamespace("pheatmap", quietly = TRUE)) return(NULL)
+    dist_matrix <- as.matrix(as.dist(1 - rv$ME_correlation))
+    pheatmap::pheatmap(
+      dist_matrix,
+      color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
+      main = "Eigengene Distance Heatmap",
+      cluster_rows = TRUE,
+      cluster_cols = TRUE,
+      border_color = "gray90",
+      fontsize = 10
+    )
+  }
+  output$download_eigengene_distance_png <- downloadHandler(
+    filename = function() "wgcna_eigengene_distance_heatmap.png",
+    content = function(file) {
+      png(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      make_eigengene_distance_heatmap()
+      dev.off()
+    }
+  )
+  output$download_eigengene_distance_pdf <- downloadHandler(
+    filename = function() "wgcna_eigengene_distance_heatmap.pdf",
+    content = function(file) {
+      pdf(file, width = 8, height = 6, bg = "white")
+      make_eigengene_distance_heatmap()
+      dev.off()
+    }
+  )
   
   # ========== STEP 6: SIGNIFICANT MODULE ANALYSIS ==========
   observeEvent(input$identify_significant_modules, {
@@ -1274,20 +1448,17 @@ server_wgcna <- function(input, output, session, rv) {
     )
   })
   
-  output$module_significance_barplot <- renderPlot({
+  make_module_significance_barplot <- function() {
     req(rv$significant_modules)
-    
     sig_mods <- rv$significant_modules
-    sig_mods$Module <- factor(sig_mods$Module, 
+    sig_mods$Module <- factor(sig_mods$Module,
                              levels = sig_mods$Module[order(abs(sig_mods$Correlation), decreasing = TRUE)])
-    # Original module color (strip): positive = upper side, negative = lower side
     sig_mods$orig_color <- sapply(as.character(sig_mods$Module), function(m) {
       x <- sub("^ME", "", m)
       if (x %in% colors()) x else "gray50"
     })
     y_range <- max(sig_mods$Correlation, na.rm = TRUE) - min(sig_mods$Correlation, na.rm = TRUE)
     strip_height <- if (y_range > 0) 0.02 * y_range else 0.02
-    # Bar segments: green (positive) or red (negative)
     bar_df <- data.frame(
       Module = sig_mods$Module,
       ymin = 0,
@@ -1295,7 +1466,6 @@ server_wgcna <- function(input, output, session, rv) {
       fill_val = ifelse(sig_mods$Correlation > 0, "#2ecc71", "#e74c3c"),
       stringsAsFactors = FALSE
     )
-    # Strip segments: original module color on upper (positive) or lower (negative) side
     strip_df <- data.frame(
       Module = sig_mods$Module,
       ymin = ifelse(sig_mods$Correlation > 0, sig_mods$Correlation, sig_mods$Correlation - strip_height),
@@ -1323,14 +1493,31 @@ server_wgcna <- function(input, output, session, rv) {
         panel.grid.major = element_line(color = "gray92"),
         panel.grid.minor = element_line(color = "gray97")
       )
+  }
+
+  output$module_significance_barplot <- renderPlot({
+    make_module_significance_barplot()
   })
-  
-  output$module_size_correlation_plot <- renderPlot({
+
+  output$download_module_significance_barplot_png <- downloadHandler(
+    filename = function() "wgcna_module_significance_barplot.png",
+    content = function(file) {
+      p <- make_module_significance_barplot()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_module_significance_barplot_pdf <- downloadHandler(
+    filename = function() "wgcna_module_significance_barplot.pdf",
+    content = function(file) {
+      p <- make_module_significance_barplot()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 5, device = "pdf", bg = "white")
+    }
+  )
+
+  make_module_size_correlation_plot <- function() {
     req(rv$significant_modules)
-    
     sig_mods <- rv$significant_modules
     sig_mods$Direction <- ifelse(sig_mods$Correlation > 0, "Positive", "Negative")
-    
     ggplot(sig_mods, aes(x = Size, y = abs(Correlation), color = Direction)) +
       geom_point(size = 4, alpha = 0.7) +
       scale_color_manual(values = c("Positive" = "#2ecc71", "Negative" = "#e74c3c"), name = "Direction") +
@@ -1347,7 +1534,26 @@ server_wgcna <- function(input, output, session, rv) {
         panel.grid.major = element_line(color = "gray92"),
         panel.grid.minor = element_line(color = "gray97")
       )
+  }
+
+  output$module_size_correlation_plot <- renderPlot({
+    make_module_size_correlation_plot()
   })
+
+  output$download_module_size_correlation_png <- downloadHandler(
+    filename = function() "wgcna_module_size_correlation.png",
+    content = function(file) {
+      p <- make_module_size_correlation_plot()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_module_size_correlation_pdf <- downloadHandler(
+    filename = function() "wgcna_module_size_correlation.pdf",
+    content = function(file) {
+      p <- make_module_size_correlation_plot()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 5, device = "pdf", bg = "white")
+    }
+  )
   
   output$significant_modules_table <- DT::renderDataTable({
     req(rv$significant_modules)
@@ -1404,38 +1610,163 @@ server_wgcna <- function(input, output, session, rv) {
     )
   })
   
-  # GS vs MM scatter for selected module (e.g. when a significant module is selected)
+  output$wgcna_gs_mm_trait_ui <- renderUI({
+    if (is.null(rv$trait_data) || ncol(rv$trait_data) < 1) return(NULL)
+    trait_choices <- colnames(rv$trait_data)
+    selectInput("wgcna_gs_mm_trait",
+                label = tags$strong("Trait for Gene Significance (GS vs MM):"),
+                choices = trait_choices,
+                selected = trait_choices[1],
+                width = "100%")
+  })
+
+  wgcna_gs_mm_trait_selected <- reactive({
+    if (is.null(rv$trait_data) || ncol(rv$trait_data) < 1) return(NULL)
+    tr <- input$wgcna_gs_mm_trait
+    if (is.null(tr) || !tr %in% colnames(rv$trait_data)) return(colnames(rv$trait_data)[1])
+    tr
+  })
+
+  make_gs_mm_plot <- function(module_color, trait_col, gene_metrics_df, datExpr, trait_data,
+                              gs_pval = 0.05, mm_cor = 0.5) {
+    module_genes <- gene_metrics_df[gene_metrics_df$Module == module_color, ]
+    if (nrow(module_genes) == 0) return(NULL)
+    module_genes <- as.data.frame(module_genes)
+    vec <- trait_data[[trait_col]]
+    gs_trait <- as.numeric(cor(datExpr, vec, use = "pairwise.complete.obs"))
+    names(gs_trait) <- colnames(datExpr)
+    module_genes$GS_trait <- gs_trait[match(module_genes$Gene, colnames(datExpr))]
+    n_samp <- nrow(datExpr)
+    pval_trait <- if (requireNamespace("WGCNA", quietly = TRUE))
+      WGCNA::corPvalueStudent(abs(module_genes$GS_trait), n_samp) else rep(1, nrow(module_genes))
+    module_genes$Significant <- (pval_trait < gs_pval & abs(module_genes$MM) >= mm_cor)
+    ggplot2::ggplot(module_genes, ggplot2::aes(x = MM, y = GS_trait)) +
+      ggplot2::geom_point(ggplot2::aes(color = Significant), alpha = 0.7, size = 2.5) +
+      ggplot2::scale_color_manual(values = c("TRUE" = "darkred", "FALSE" = "grey70"), name = "GS/MM significant") +
+      ggplot2::labs(
+        title = paste0("GS vs MM — ", module_color, " (trait: ", trait_col, ")"),
+        x = "Module Membership (MM)", y = "Gene Significance (GS)"
+      ) +
+      ggplot2::theme_minimal(base_size = 12) +
+      ggplot2::theme(
+        legend.position = "top",
+        plot.title = ggplot2::element_text(hjust = 0.5, size = 13),
+        axis.title = ggplot2::element_text(size = 12),
+        plot.margin = ggplot2::margin(t = 10, r = 10, b = 28, l = 10, unit = "pt")
+      )
+  }
+
   output$gs_mm_plot <- renderPlot({
-    req(input$select_module, rv$gene_metrics)
+    req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
+    trait_col <- wgcna_gs_mm_trait_selected()
+    if (is.null(trait_col)) return(invisible(NULL))
     gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
     mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
-    module_genes <- rv$gene_metrics[rv$gene_metrics$Module == input$select_module, ]
-    if (nrow(module_genes) == 0) {
+    p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
+    if (is.null(p)) {
       plot.new()
       title(main = paste("No genes in module", input$select_module))
       return(invisible(NULL))
     }
-    module_genes <- as.data.frame(module_genes)
-    module_genes$Significant <- (module_genes$GS.pvalue < gs_pval & abs(module_genes$MM) >= mm_cor)
-    mod_color <- input$select_module
-    if (!requireNamespace("ggplot2", quietly = TRUE)) {
-      plot(module_genes$MM, module_genes$GS,
-           xlab = "Module Membership (MM)", ylab = "Gene Significance (GS)",
-           main = paste("GS vs MM — Module:", mod_color),
-           col = if (mod_color == "grey") "grey50" else mod_color, pch = 19)
-      return(invisible(NULL))
-    }
-    p <- ggplot2::ggplot(module_genes, ggplot2::aes(x = MM, y = GS)) +
-      ggplot2::geom_point(ggplot2::aes(color = Significant), alpha = 0.7, size = 2) +
-      ggplot2::scale_color_manual(values = c("TRUE" = "darkred", "FALSE" = "grey70"), name = "GS/MM significant") +
-      ggplot2::labs(
-        title = paste0("Gene Significance vs Module Membership — Module: ", mod_color),
-        x = "Module Membership (MM)", y = "Gene Significance (GS)"
-      ) +
-      ggplot2::theme_minimal(base_size = 12) +
-      ggplot2::theme(legend.position = "top", plot.title = ggplot2::element_text(hjust = 0.5))
     print(p)
+  }, height = 420, res = 96)
+
+  output$download_gs_mm_plot_png <- downloadHandler(
+    filename = function() paste0("wgcna_gs_vs_mm_", input$select_module, ".png"),
+    content = function(file) {
+      req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
+      trait_col <- wgcna_gs_mm_trait_selected()
+      if (is.null(trait_col)) return()
+      gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
+      mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
+      p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_gs_mm_plot_pdf <- downloadHandler(
+    filename = function() paste0("wgcna_gs_vs_mm_", input$select_module, ".pdf"),
+    content = function(file) {
+      req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
+      trait_col <- wgcna_gs_mm_trait_selected()
+      if (is.null(trait_col)) return()
+      gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
+      mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
+      p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 5, device = "pdf", bg = "white")
+    }
+  )
+
+  output$wgcna_gs_mm_all_download_ui <- renderUI({
+    if (is.null(rv$gene_metrics) || is.null(rv$trait_data) || is.null(rv$datExpr)) return(NULL)
+    tags$div(
+      style = "margin-top: 10px;",
+      tags$p(tags$strong("GS vs MM for all signed modules (one plot per module):"), style = "margin-bottom: 8px;"),
+      tags$div(
+        downloadButton("download_gs_mm_all_modules_pdf", tagList(icon("download"), " Download all as PDF"), class = "btn-info btn-sm", style = "margin-right: 8px;"),
+        downloadButton("download_gs_mm_all_modules_zip", tagList(icon("download"), " Download as ZIP (PNG per module)"), class = "btn-info btn-sm")
+      )
+    )
   })
+
+  observeEvent(input$generate_gs_mm_all_modules, {
+    if (is.null(rv$gene_metrics) || is.null(rv$trait_data)) {
+      showNotification("Run Step 4 (Calculate Correlations & GS/MM) first.", type = "warning", duration = 5)
+      return()
+    }
+    showNotification("Use the download buttons below to get GS vs MM for each module (PDF or ZIP of PNGs).", type = "message", duration = 5)
+  })
+
+  output$download_gs_mm_all_modules_pdf <- downloadHandler(
+    filename = function() {
+      tr <- wgcna_gs_mm_trait_selected()
+      paste0("wgcna_gs_vs_mm_all_modules_", if (length(tr)) gsub("[^A-Za-z0-9]", "_", tr) else "trait", ".pdf")
+    },
+    content = function(file) {
+      req(rv$gene_metrics, rv$trait_data, rv$datExpr)
+      trait_col <- wgcna_gs_mm_trait_selected()
+      if (is.null(trait_col)) return()
+      gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
+      mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
+      modules <- sort(unique(rv$gene_metrics$Module))
+      modules <- modules[modules != "grey"]
+      if (length(modules) == 0) modules <- unique(rv$gene_metrics$Module)
+      grDevices::pdf(file, width = 7, height = 5, bg = "white")
+      on.exit(dev.off(), add = TRUE)
+      for (mod in modules) {
+        p <- make_gs_mm_plot(mod, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
+        if (!is.null(p)) print(p)
+      }
+    }
+  )
+
+  output$download_gs_mm_all_modules_zip <- downloadHandler(
+    filename = function() {
+      tr <- wgcna_gs_mm_trait_selected()
+      paste0("wgcna_gs_vs_mm_all_modules_", if (length(tr)) gsub("[^A-Za-z0-9]", "_", tr) else "trait", ".zip")
+    },
+    content = function(file) {
+      req(rv$gene_metrics, rv$trait_data, rv$datExpr)
+      trait_col <- wgcna_gs_mm_trait_selected()
+      if (is.null(trait_col)) return()
+      gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
+      mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
+      modules <- sort(unique(rv$gene_metrics$Module))
+      modules <- modules[modules != "grey"]
+      if (length(modules) == 0) modules <- unique(rv$gene_metrics$Module)
+      export_dir <- CSV_EXPORT_DIR()
+      tmp_dir <- file.path(export_dir, paste0("gs_mm_", format(Sys.time(), "%Y%m%d_%H%M%S")))
+      dir.create(tmp_dir, showWarnings = FALSE, recursive = TRUE)
+      on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
+      for (mod in modules) {
+        p <- make_gs_mm_plot(mod, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
+        if (!is.null(p)) {
+          fpath <- file.path(tmp_dir, paste0("GS_vs_MM_", mod, ".png"))
+          ggplot2::ggsave(fpath, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+        }
+      }
+      zip(file, list.files(tmp_dir, full.names = TRUE), flags = "-j")
+    }
+  )
   
   output$module_genes_table <- DT::renderDataTable({
     req(input$select_module, rv$gene_metrics)

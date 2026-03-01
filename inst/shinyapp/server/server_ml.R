@@ -587,13 +587,13 @@ server_ml <- function(input, output, session, rv) {
           column(6, box(title = "RF: Training / Test / OOB Error", width = NULL, status = "success", solidHeader = TRUE,
                        plotOutput("ml_plot_rf_error", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_rf_error_png", "Download PNG (300 DPI)", class = "btn-success btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_rf_error_pdf", "Download PDF", class = "btn-success btn-xs")))),
+                                downloadButton("dl_ml_rf_error_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_rf_error_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs")))),
           column(6, box(title = "RF: Top 10 importance (MeanDecreaseAccuracy)", width = NULL, status = "success", solidHeader = TRUE,
                        plotOutput("ml_plot_rf_importance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_rf_imp_png", "Download PNG (300 DPI)", class = "btn-success btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_rf_imp_pdf", "Download PDF", class = "btn-success btn-xs"))))
+                                downloadButton("dl_ml_rf_imp_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_rf_imp_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs"))))
         )
       ))
     }
@@ -604,13 +604,13 @@ server_ml <- function(input, output, session, rv) {
           column(6, box(title = "LASSO: Coefficient path", width = NULL, status = "danger", solidHeader = TRUE,
                        plotOutput("ml_plot_lasso_path", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_lasso_path_png", "Download PNG (300 DPI)", class = "btn-danger btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_lasso_path_pdf", "Download PDF", class = "btn-danger btn-xs")))),
+                                downloadButton("dl_ml_lasso_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_lasso_path_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs")))),
           column(6, box(title = "LASSO: Binomial deviance vs lambda", width = NULL, status = "danger", solidHeader = TRUE,
                        plotOutput("ml_plot_lasso_deviance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_lasso_dev_png", "Download PNG (300 DPI)", class = "btn-danger btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_lasso_dev_pdf", "Download PDF", class = "btn-danger btn-xs"))))
+                                downloadButton("dl_ml_lasso_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_lasso_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs"))))
         )
       ))
     }
@@ -621,13 +621,13 @@ server_ml <- function(input, output, session, rv) {
           column(6, box(title = "Elastic Net: Coefficient path", width = NULL, status = "info", solidHeader = TRUE,
                        plotOutput("ml_plot_elastic_path", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_elastic_path_png", "Download PNG (300 DPI)", class = "btn-info btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_elastic_path_pdf", "Download PDF", class = "btn-info btn-xs")))),
+                                downloadButton("dl_ml_elastic_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_elastic_path_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs")))),
           column(6, box(title = "Elastic Net: Binomial deviance vs lambda", width = NULL, status = "info", solidHeader = TRUE,
                        plotOutput("ml_plot_elastic_deviance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_elastic_dev_png", "Download PNG (300 DPI)", class = "btn-info btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_elastic_dev_pdf", "Download PDF", class = "btn-info btn-xs"))))
+                                downloadButton("dl_ml_elastic_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_elastic_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs"))))
         )
       ))
     }
@@ -638,13 +638,13 @@ server_ml <- function(input, output, session, rv) {
           column(6, box(title = "Ridge: Coefficient path", width = NULL, status = "primary", solidHeader = TRUE,
                        plotOutput("ml_plot_ridge_path", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_ridge_path_png", "Download PNG (300 DPI)", class = "btn-primary btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_ridge_path_pdf", "Download PDF", class = "btn-primary btn-xs")))),
+                                downloadButton("dl_ml_ridge_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_ridge_path_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs")))),
           column(6, box(title = "Ridge: Binomial deviance vs lambda", width = NULL, status = "primary", solidHeader = TRUE,
                        plotOutput("ml_plot_ridge_deviance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_ridge_dev_png", "Download PNG (300 DPI)", class = "btn-primary btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_ridge_dev_pdf", "Download PDF", class = "btn-primary btn-xs"))))
+                                downloadButton("dl_ml_ridge_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_ridge_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs"))))
         )
       ))
     }
@@ -893,6 +893,7 @@ server_ml <- function(input, output, session, rv) {
       category.names = cat_names,
       filename = NULL,
       output = TRUE,
+      disable.logging = TRUE,
       imagetype = "png",
       height = 2200,
       width = 2200,
@@ -971,6 +972,7 @@ server_ml <- function(input, output, session, rv) {
         category.names = cat_names,
         filename = NULL,
         output = TRUE,
+        disable.logging = TRUE,
         imagetype = "png",
         height = 8 * IMAGE_DPI,
         width = 8 * IMAGE_DPI,
@@ -1052,6 +1054,7 @@ server_ml <- function(input, output, session, rv) {
         category.names = cat_names,
         filename = NULL,
         output = TRUE,
+        disable.logging = TRUE,
         imagetype = "png",
         height = 8,
         width = 8,

@@ -56,6 +56,23 @@ server_results <- function(input, output, session, rv) {
       return()
     }
 
+    # DE requires both Normal and Disease; otherwise there is no contrast (e.g. same sample source = one condition only)
+    cond_counts <- table(rv$unified_metadata$Condition)
+    n_normal <- if ("Normal" %in% names(cond_counts)) cond_counts[["Normal"]] else 0L
+    n_disease <- if ("Disease" %in% names(cond_counts)) cond_counts[["Disease"]] else 0L
+    if (n_normal == 0L || n_disease == 0L) {
+      showNotification(
+        tags$div(
+          icon("exclamation-triangle"), tags$strong(" Need both Normal and Disease samples for DE."),
+          tags$br(),
+          "You have ", n_normal, " Normal and ", n_disease, " Disease. Differential expression compares these two groups.",
+          " If you entered GSEs from the same sample source (e.g. same study or only one condition), add a dataset that contains the other group, or in Step 3 assign some samples to Normal and some to Disease."
+        ),
+        type = "error", duration = 12)
+      rv$de_running <- FALSE
+      return()
+    }
+
     method <- rv$de_method
     if (is.null(method)) method <- "limma"
     
@@ -429,6 +446,50 @@ server_results <- function(input, output, session, rv) {
             color = "blue", fill = TRUE)
   })
   
+  # Pipeline verification: confirm DESeq2 + ComBat_ref and that volcano = real DE results
+  output$de_pipeline_verification <- renderUI({
+    req(rv$de_results)
+    method <- if (is.null(rv$de_method)) "limma" else rv$de_method
+    batch_lab <- list(
+      "limma" = "limma removeBatchEffect",
+      "combat" = "ComBat (empirical Bayes)",
+      "combat_ref" = "ComBat with reference batch",
+      "quantile_limma" = "Quantile + limma",
+      "hybrid" = "Hybrid (quantile + ComBat)",
+      "sva" = "SVA + ComBat"
+    )
+    batch_method <- if (is.null(input$batch_method)) "combat_ref" else input$batch_method
+    batch_label <- if (batch_method %in% names(batch_lab)) batch_lab[[batch_method]] else batch_method
+    batch_done <- isTRUE(rv$batch_complete) && !is.null(rv$batch_corrected)
+    n_batches <- length(unique(if (is.null(rv$unified_metadata$Dataset)) "1" else rv$unified_metadata$Dataset))
+    batch_in_model <- n_batches > 1 && method %in% c("deseq2", "edger", "limma_voom")
+    tags$div(
+      class = "alert alert-info",
+      style = "margin: 0 15px 16px 15px; padding: 16px 20px; border-radius: 12px; border-left: 5px solid #3498db; background: linear-gradient(90deg, #e8f4f8 0%, #f8fafc 100%);",
+      tags$p(
+        style = "margin: 0 0 10px 0; font-weight: 700; font-size: 15px; color: #1e293b;",
+        icon("check-circle", style = "color: #10b981; margin-right: 8px;"),
+        "Pipeline verification — Volcano shows real DE results"
+      ),
+      tags$p(
+        style = "margin: 0 0 6px 0; font-size: 13px; color: #334155; line-height: 1.6;",
+        tags$strong("DE method:"), " ", if (method == "deseq2") "DESeq2" else if (method == "edger") "edgeR" else if (method == "limma_voom") "limma-voom" else "limma",
+        if (batch_in_model) " — batch (Dataset) included in the statistical model, so the volcano reflects differential expression after adjusting for batch." else "."
+      ),
+      tags$p(
+        style = "margin: 0 0 6px 0; font-size: 13px; color: #334155; line-height: 1.6;",
+        tags$strong("Batch correction (Step 5):"), " ",
+        if (batch_done) paste0(batch_label, " — applied to the expression matrix used for heatmaps, WGCNA, and downstream steps.")
+        else "Not applied (single dataset or Step 5 skipped)."
+      ),
+      tags$p(
+        style = "margin: 0; font-size: 12px; color: #64748b;",
+        "All prior steps (Download → Normalize → Groups → Batch correction) were completed before DE. The volcano plot uses the actual test statistics (log2FC and adjusted p-value) from the selected DE method. ",
+        "Use the ", tags$strong("How to check your results are valid"), " box below to verify groups and ML prediction performance."
+      )
+    )
+  })
+
   output$volcano_plot <- renderPlot({
     req(rv$de_results)
     tryCatch({
@@ -459,6 +520,12 @@ server_results <- function(input, output, session, rv) {
       n_up <- sum(volcano_data$Significance == "Up-regulated", na.rm = TRUE)
       n_down <- sum(volcano_data$Significance == "Down-regulated", na.rm = TRUE)
       n_sig <- n_up + n_down
+      method <- if (is.null(rv$de_method)) "limma" else rv$de_method
+      method_label <- switch(method, deseq2 = "DESeq2", edger = "edgeR", limma_voom = "limma-voom", "limma")
+      n_batches <- length(unique(if (is.null(rv$unified_metadata$Dataset)) "1" else rv$unified_metadata$Dataset))
+      batch_note <- if (n_batches > 1 && method %in% c("deseq2", "edger", "limma_voom")) " | batch in model" else ""
+      sub_line1 <- paste0(method_label, batch_note, " \u2014 DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")")
+      sub_line2 <- paste0("LogFC \u00b1", input$logfc_cutoff, ", Adj.P \u2264 ", input$padj_cutoff)
 
       p <- ggplot(volcano_data, aes(x = logFC, y = neg_log10_padj, color = Significance)) +
         geom_point(alpha = 0.6, size = 2) +
@@ -469,7 +536,7 @@ server_results <- function(input, output, session, rv) {
         theme_bw(base_size = 14) +
         labs(
           title = "Volcano Plot: Disease vs Normal",
-          subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ") | LogFC \u00b1", input$logfc_cutoff, ", P-value ", input$padj_cutoff),
+          subtitle = paste0(sub_line1, "\n", sub_line2),
           x = "Log2 Fold Change",
           y = "-Log10 Adjusted P-value"
         ) +
@@ -777,10 +844,49 @@ server_results <- function(input, output, session, rv) {
   # ==============================================================================
   # DOWNLOADS
   # ==============================================================================
-  
+
+  # Expression BEFORE batch correction (genes x samples) — for pipeline validation
+  output$download_expr_before_batch <- downloadHandler(
+    filename = function() paste0("Expression_before_batch_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$expr_filtered)
+      M <- as.data.frame(rv$expr_filtered, stringsAsFactors = FALSE)
+      M <- cbind(Gene = rownames(M), M)
+      rownames(M) <- NULL
+      fn <- paste0("Expression_before_batch_", Sys.Date(), ".csv")
+      write.csv(M, file, row.names = FALSE)
+      write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+
+  # Expression AFTER batch correction (genes x samples) — for pipeline validation
+  output$download_expr_after_batch <- downloadHandler(
+    filename = function() paste0("Expression_after_batch_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$batch_corrected)
+      M <- as.data.frame(rv$batch_corrected, stringsAsFactors = FALSE)
+      M <- cbind(Gene = rownames(M), M)
+      rownames(M) <- NULL
+      fn <- paste0("Expression_after_batch_", Sys.Date(), ".csv")
+      write.csv(M, file, row.names = FALSE)
+      write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+
   output$download_de_results <- downloadHandler(
     filename = function() paste0("DE_Results_", Sys.Date(), ".csv"),
     content = function(file) {
+      fn <- paste0("DE_Results_", Sys.Date(), ".csv")
+      write.csv(rv$de_results, file, row.names = FALSE)
+      write.csv(rv$de_results, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+
+  # Same content as download_de_results, for the second "Download Results" box
+  output$download_de_results_alt <- downloadHandler(
+    filename = function() paste0("DE_Results_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$de_results)
       fn <- paste0("DE_Results_", Sys.Date(), ".csv")
       write.csv(rv$de_results, file, row.names = FALSE)
       write.csv(rv$de_results, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)

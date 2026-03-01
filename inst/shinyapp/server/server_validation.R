@@ -286,6 +286,8 @@ server_validation <- function(input, output, session, rv) {
       tags$h4(icon("table"), " Step B: Browse Phenodata & Select Group Column", style = "color: #2980b9; margin-bottom: 10px;"),
       tags$p("Examine the phenodata below. Choose the column that contains your group labels (e.g. Normal vs Disease).", style = "font-size: 13px; margin-bottom: 8px;"),
       DT::dataTableOutput("ext_val_phenodata_table"),
+      tags$div(style = "margin-top: 8px;",
+        downloadButton("download_ext_val_phenodata_csv", tagList(icon("download"), " Phenodata (CSV)"), class = "btn-info btn-sm")),
       tags$div(style = "margin-top: 12px;",
         fluidRow(
           column(6,
@@ -763,7 +765,9 @@ server_validation <- function(input, output, session, rv) {
         tags$div(
           style = "margin-top: 12px;",
           tags$p(tags$strong("ML genes also significant in validation DE:"), style = "font-size: 13px; margin-bottom: 6px;"),
-          DT::dataTableOutput("val_overlap_de_table")
+          DT::dataTableOutput("val_overlap_de_table"),
+          tags$div(style = "margin-top: 8px;",
+            downloadButton("download_val_overlap_de_csv", tagList(icon("download"), " Overlap table (CSV)"), class = "btn-success btn-sm"))
         )
       } else {
         tags$p(tags$em("No ML test genes are significantly DE in the validation dataset."),
@@ -836,6 +840,28 @@ server_validation <- function(input, output, session, rv) {
       req(rv$ext_val_de_results)
       write.csv(rv$ext_val_de_results, file, row.names = FALSE)
       write.csv(rv$ext_val_de_results, file.path(CSV_EXPORT_DIR(), "Validation_DE_Results.csv"), row.names = FALSE)
+    }
+  )
+
+  output$download_ext_val_phenodata_csv <- downloadHandler(
+    filename = function() "External_Validation_Phenodata.csv",
+    content = function(file) {
+      req(rv$ext_val_metadata)
+      write.csv(rv$ext_val_metadata, file, row.names = TRUE)
+      write.csv(rv$ext_val_metadata, file.path(CSV_EXPORT_DIR(), "External_Validation_Phenodata.csv"), row.names = TRUE)
+    }
+  )
+
+  output$download_val_overlap_de_csv <- downloadHandler(
+    filename = function() "Validation_Overlap_ML_DE.csv",
+    content = function(file) {
+      req(rv$ext_val_sig_genes, rv$ml_common_genes)
+      sig <- rv$ext_val_sig_genes
+      ml_genes <- rv$ml_common_genes
+      overlap <- sig[sig$Gene %in% ml_genes, c("Gene", "logFC", "adj.P.Val", "Significance"), drop = FALSE]
+      if (nrow(overlap) == 0) overlap <- data.frame(Gene = character(), logFC = numeric(), adj.P.Val = numeric(), Significance = character())
+      write.csv(overlap, file, row.names = FALSE)
+      write.csv(overlap, file.path(CSV_EXPORT_DIR(), "Validation_Overlap_ML_DE.csv"), row.names = FALSE)
     }
   )
 

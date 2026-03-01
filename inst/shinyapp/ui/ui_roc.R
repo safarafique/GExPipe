@@ -22,6 +22,9 @@ ui_roc <- tabItem(
   # ---- Validation mode indicator ----
   uiOutput("roc_validation_mode_ui"),
 
+  # ---- Training vs Validation AUC comparison (shown first when validation data exists) ----
+  uiOutput("roc_auc_comparison_top_ui"),
+
   fluidRow(
     box(
       title = tags$span(icon("list"), " AUC Summary -- Training Data"),
@@ -84,7 +87,11 @@ ui_roc <- tabItem(
         ),
         column(6,
           tags$p(tags$strong("AUC comparison: single vs combined"), style = "margin-bottom: 6px;"),
-          DT::dataTableOutput("roc_combined_panel_table")
+          DT::dataTableOutput("roc_combined_panel_table"),
+          tags$div(style = "margin-top: 6px;",
+            downloadButton("download_roc_combined_panel_csv", tagList(icon("download"), " Table (CSV)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_roc_combined_panel_plot_jpg", tagList(icon("download"), " Plot JPG"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
+            downloadButton("download_roc_combined_panel_plot_pdf", tagList(icon("download"), " Plot PDF"), class = "btn-primary btn-sm"))
         )
       )
     )

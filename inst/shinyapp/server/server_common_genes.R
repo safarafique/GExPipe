@@ -141,20 +141,12 @@ server_common_genes <- function(input, output, session, rv) {
              "BP: ", n_bp, " terms | MF: ", n_mf, " terms | CC: ", n_cc, " terms")
   })
   
-  plot_go_dot <- function(go_obj, title) {
-    if (is.null(go_obj) || !inherits(go_obj, "enrichResult")) {
-      plot.new()
-      text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2)
-      return(invisible(NULL))
-    }
+  make_go_dot_plot <- function(go_obj, title) {
+    if (is.null(go_obj) || !inherits(go_obj, "enrichResult")) return(NULL)
     df <- as.data.frame(go_obj)
-    if (nrow(df) == 0) {
-      plot.new()
-      text(0.5, 0.5, paste("No significant terms for", title), cex = 1.2)
-      return(invisible(NULL))
-    }
+    if (nrow(df) == 0) return(NULL)
     n_show <- min(20, nrow(df))
-    p <- enrichplot::dotplot(go_obj, showCategory = n_show, x = "GeneRatio", color = "p.adjust", size = "Count") +
+    enrichplot::dotplot(go_obj, showCategory = n_show, x = "GeneRatio", color = "p.adjust", size = "Count") +
       ggplot2::scale_color_continuous(low = "#E64B35", high = "#4DBBD5", name = "p.adjust") +
       ggplot2::theme_minimal(base_size = 12) +
       ggplot2::theme(
@@ -163,35 +155,70 @@ server_common_genes <- function(input, output, session, rv) {
         legend.position = "right"
       ) +
       ggplot2::ggtitle(title)
-    print(p)
   }
-  
+
   output$go_bp_plot <- renderPlot({
     tryCatch({
-      plot_go_dot(rv$go_bp, "GO Biological Process")
+      p <- make_go_dot_plot(rv$go_bp, "GO Biological Process")
+      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
     })
   })
-  
+
   output$go_mf_plot <- renderPlot({
     tryCatch({
-      plot_go_dot(rv$go_mf, "GO Molecular Function")
+      p <- make_go_dot_plot(rv$go_mf, "GO Molecular Function")
+      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
     })
   })
-  
+
   output$go_cc_plot <- renderPlot({
     tryCatch({
-      plot_go_dot(rv$go_cc, "GO Cellular Component")
+      p <- make_go_dot_plot(rv$go_cc, "GO Cellular Component")
+      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
     })
   })
+
+  go_plot_to_file <- function(go_obj, title, file, device = "png") {
+    p <- make_go_dot_plot(go_obj, title)
+    if (is.null(p)) return()
+    if (device == "png")
+      ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    else
+      ggplot2::ggsave(file, plot = p, width = 9, height = 6, device = "pdf", bg = "white")
+  }
+  output$download_go_bp_png <- downloadHandler(
+    filename = function() "GO_Enrichment_Biological_Process.png",
+    content = function(file) { go_plot_to_file(rv$go_bp, "GO Biological Process", file, "png") }
+  )
+  output$download_go_bp_pdf <- downloadHandler(
+    filename = function() "GO_Enrichment_Biological_Process.pdf",
+    content = function(file) { go_plot_to_file(rv$go_bp, "GO Biological Process", file, "pdf") }
+  )
+  output$download_go_mf_png <- downloadHandler(
+    filename = function() "GO_Enrichment_Molecular_Function.png",
+    content = function(file) { go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "png") }
+  )
+  output$download_go_mf_pdf <- downloadHandler(
+    filename = function() "GO_Enrichment_Molecular_Function.pdf",
+    content = function(file) { go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "pdf") }
+  )
+  output$download_go_cc_png <- downloadHandler(
+    filename = function() "GO_Enrichment_Cellular_Component.png",
+    content = function(file) { go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "png") }
+  )
+  output$download_go_cc_pdf <- downloadHandler(
+    filename = function() "GO_Enrichment_Cellular_Component.pdf",
+    content = function(file) { go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "pdf") }
+  )
   
   output$download_go_results <- downloadHandler(
     filename = function() "GO_Enrichment_Common_Genes.csv",
@@ -287,35 +314,37 @@ server_common_genes <- function(input, output, session, rv) {
     lengths(strsplit(as.character(geneID), sep, fixed = TRUE))
   }
 
-  # KEGG bar plot - manual ggplot from result dataframe
+  make_kegg_barplot <- function() {
+    df <- kegg_result_df(rv$kegg_enrichment)
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    n_show <- min(20, nrow(df))
+    o <- order(as.numeric(df$p.adjust))
+    df <- df[o, ][seq_len(n_show), , drop = FALSE]
+    if (!"Count" %in% names(df) && "geneID" %in% names(df))
+      df$Count <- kegg_geneid_count(df$geneID)
+    if (!"Count" %in% names(df)) df$Count <- 1L
+    df$Description <- factor(df$Description, levels = rev(unique(as.character(df$Description))))
+    ggplot2::ggplot(df, ggplot2::aes(x = Description, y = Count, fill = p.adjust)) +
+      ggplot2::geom_col() +
+      ggplot2::coord_flip() +
+      ggplot2::scale_fill_continuous(low = "#E64B35", high = "#4DBBD5", name = "p.adjust") +
+      ggplot2::theme_minimal(base_size = 12) +
+      ggplot2::theme(
+        axis.text.y = ggplot2::element_text(size = 10),
+        plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5),
+        legend.position = "right"
+      ) +
+      ggplot2::labs(title = "KEGG Pathway Enrichment (Bar)", x = NULL, y = "Gene count")
+  }
+
   output$kegg_barplot <- renderPlot(
     {
       tryCatch({
-        df <- kegg_result_df(rv$kegg_enrichment)
-        if (is.null(df) || nrow(df) == 0) {
+        p <- make_kegg_barplot()
+        if (!is.null(p)) print(p) else {
           plot.new()
           text(0.5, 0.5, if (is.null(rv$kegg_enrichment)) "Run KEGG enrichment first" else "No significant KEGG pathways", cex = 1.2)
-          return(invisible(NULL))
         }
-        n_show <- min(20, nrow(df))
-        o <- order(as.numeric(df$p.adjust))
-        df <- df[o, ][seq_len(n_show), , drop = FALSE]
-        if (!"Count" %in% names(df) && "geneID" %in% names(df))
-          df$Count <- kegg_geneid_count(df$geneID)
-        if (!"Count" %in% names(df)) df$Count <- 1L
-        df$Description <- factor(df$Description, levels = rev(unique(as.character(df$Description))))
-        p <- ggplot2::ggplot(df, ggplot2::aes(x = Description, y = Count, fill = p.adjust)) +
-          ggplot2::geom_col() +
-          ggplot2::coord_flip() +
-          ggplot2::scale_fill_continuous(low = "#E64B35", high = "#4DBBD5", name = "p.adjust") +
-          ggplot2::theme_minimal(base_size = 12) +
-          ggplot2::theme(
-            axis.text.y = ggplot2::element_text(size = 10),
-            plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5),
-            legend.position = "right"
-          ) +
-          ggplot2::labs(title = "KEGG Pathway Enrichment (Bar)", x = NULL, y = "Gene count")
-        print(p)
       }, error = function(e) {
         plot.new()
         text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red")
@@ -325,6 +354,21 @@ server_common_genes <- function(input, output, session, rv) {
     height = 500,
     res = 96,
     alt = "KEGG bar plot"
+  )
+
+  output$download_kegg_barplot_png <- downloadHandler(
+    filename = function() "KEGG_Enrichment_Barplot.png",
+    content = function(file) {
+      p <- make_kegg_barplot()
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_kegg_barplot_pdf <- downloadHandler(
+    filename = function() "KEGG_Enrichment_Barplot.pdf",
+    content = function(file) {
+      p <- make_kegg_barplot()
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 6, device = "pdf", bg = "white")
+    }
   )
 
   # KEGG chord diagram: pathways (right) <-> genes (left), colored by pathway
@@ -358,6 +402,21 @@ server_common_genes <- function(input, output, session, rv) {
       pathway_info = pathway_info
     )
   }
+
+  output$download_kegg_pathway_list_csv <- downloadHandler(
+    filename = function() "KEGG_Pathway_List_Chord.csv",
+    content = function(file) {
+      dat <- kegg_chord_data()
+      if (is.null(dat) || !"pathway_info" %in% names(dat) || nrow(dat$pathway_info) == 0) {
+        write.csv(data.frame(Pathway_ID = character(), Description = character(), p.adjust = numeric()), file, row.names = FALSE)
+        return()
+      }
+      df <- dat$pathway_info
+      names(df) <- c("Pathway_ID", "Description", "p.adjust")
+      write.csv(df, file, row.names = FALSE)
+      write.csv(df, file.path(CSV_EXPORT_DIR(), "KEGG_Pathway_List_Chord.csv"), row.names = FALSE)
+    }
+  )
 
   # Pathway list table (same pathways as chord) for UI
   output$kegg_pathway_list_table <- DT::renderDataTable({

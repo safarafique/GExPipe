@@ -4,6 +4,32 @@
 
 server_normalize <- function(input, output, session, rv) {
 
+  # Store last ggplot for each normalization plot (for download)
+  norm_plots <- reactiveValues(
+    plot = NULL, density = NULL, qq = NULL, median_range = NULL,
+    distribution_overlap = NULL, ma_plot = NULL, mean_variance = NULL,
+    corr_before = NULL, corr_after = NULL
+  )
+
+  # Auto vs manual normalization mode:
+  # - auto: force recommended defaults and disable method selectors
+  # - manual: allow user to choose alternatives
+  observe({
+    mode <- if (is.null(input$normalize_mode) || !nzchar(input$normalize_mode)) "auto" else input$normalize_mode
+    if (!requireNamespace("shinyjs", quietly = TRUE)) return()
+    if (identical(mode, "auto")) {
+      tryCatch(updateRadioButtons(session, "micro_norm_method", selected = "quantile"), error = function(e) NULL)
+      tryCatch(updateRadioButtons(session, "rnaseq_norm_method", selected = "TMM"), error = function(e) NULL)
+      tryCatch(shinyjs::disable("micro_norm_method"), error = function(e) NULL)
+      tryCatch(shinyjs::disable("rnaseq_norm_method"), error = function(e) NULL)
+      tryCatch(shinyjs::show("norm_auto_note"), error = function(e) NULL)
+    } else {
+      tryCatch(shinyjs::enable("micro_norm_method"), error = function(e) NULL)
+      tryCatch(shinyjs::enable("rnaseq_norm_method"), error = function(e) NULL)
+      tryCatch(shinyjs::hide("norm_auto_note"), error = function(e) NULL)
+    }
+  })
+
   output$normalization_timer <- renderText({
     if (!isTRUE(rv$normalize_running) || is.null(rv$normalize_start)) return("00:00")
     invalidateLater(1000, session)
@@ -48,8 +74,14 @@ server_normalize <- function(input, output, session, rv) {
       normalization_stats <- list()
 
       # Normalization method choices (defaults if not set)
-      micro_norm_method <- if (!is.null(input$micro_norm_method)) input$micro_norm_method else "quantile"
-      rnaseq_norm_method <- if (!is.null(input$rnaseq_norm_method)) input$rnaseq_norm_method else "TMM"
+      mode <- if (is.null(input$normalize_mode) || !nzchar(input$normalize_mode)) "auto" else input$normalize_mode
+      if (identical(mode, "auto")) {
+        micro_norm_method <- "quantile"
+        rnaseq_norm_method <- "TMM"
+      } else {
+        micro_norm_method <- if (!is.null(input$micro_norm_method)) input$micro_norm_method else "quantile"
+        rnaseq_norm_method <- if (!is.null(input$rnaseq_norm_method)) input$rnaseq_norm_method else "TMM"
+      }
 
       # Normalize microarray
       if (length(rv$micro_expr_list) > 0) {
@@ -519,7 +551,7 @@ server_normalize <- function(input, output, session, rv) {
           strip.background = element_rect(fill = "#3498db", color = "white"),
           strip.text = element_text(color = "white", face = "bold")
         )
-      
+      norm_plots$plot <- p
       print(p)
       
     }, error = function(e) {
@@ -554,7 +586,7 @@ server_normalize <- function(input, output, session, rv) {
             plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
             legend.position = "top"
           )
-        
+        norm_plots$plot <- p
         print(p)
       }, error = function(e2) {
         plot.new()
@@ -647,7 +679,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.major = element_line(color = "gray90"),
           panel.grid.minor = element_line(color = "gray95")
         )
-      
+      norm_plots$density <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -707,7 +739,7 @@ server_normalize <- function(input, output, session, rv) {
           axis.text.y = element_text(size = 7),
           legend.position = "right"
         )
-      
+      norm_plots$corr_before <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -760,7 +792,7 @@ server_normalize <- function(input, output, session, rv) {
           axis.text.y = element_text(size = 7),
           legend.position = "right"
         )
-      
+      norm_plots$corr_after <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -821,7 +853,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.major = element_line(color = "gray90"),
           panel.grid.minor = element_line(color = "gray95")
         )
-      
+      norm_plots$qq <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -878,7 +910,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.major = element_line(color = "gray90"),
           panel.grid.minor = element_line(color = "gray95")
         )
-      
+      norm_plots$median_range <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -971,7 +1003,7 @@ server_normalize <- function(input, output, session, rv) {
           strip.background = element_rect(fill = "#3498db", color = "white"),
           strip.text = element_text(color = "white", face = "bold")
         )
-      
+      norm_plots$distribution_overlap <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -1074,7 +1106,7 @@ server_normalize <- function(input, output, session, rv) {
             panel.grid.minor = element_line(color = "gray95")
           )
       }
-      
+      norm_plots$ma_plot <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -1146,7 +1178,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.major = element_line(color = "gray90"),
           panel.grid.minor = element_line(color = "gray95")
         )
-      
+      norm_plots$mean_variance <- p
       print(p)
     }, error = function(e) {
       plot.new()
@@ -1154,6 +1186,40 @@ server_normalize <- function(input, output, session, rv) {
     })
   })
   
+  # Download handlers for each normalization plot (PNG/PDF)
+  norm_save <- function(p, file, device = "png") {
+    if (is.null(p)) return()
+    if (device == "png") ggplot2::ggsave(file, plot = p, width = 9, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    else ggplot2::ggsave(file, plot = p, width = 9, height = 5, device = "pdf", bg = "white")
+  }
+  output$dl_norm_plot_png <- downloadHandler(filename = function() "Normalization_Distribution.png", content = function(file) { req(norm_plots$plot); norm_save(norm_plots$plot, file, "png") })
+  output$dl_norm_plot_pdf <- downloadHandler(filename = function() "Normalization_Distribution.pdf", content = function(file) { req(norm_plots$plot); norm_save(norm_plots$plot, file, "pdf") })
+  output$dl_norm_density_png <- downloadHandler(filename = function() "Normalization_Density.png", content = function(file) { req(norm_plots$density); norm_save(norm_plots$density, file, "png") })
+  output$dl_norm_density_pdf <- downloadHandler(filename = function() "Normalization_Density.pdf", content = function(file) { req(norm_plots$density); norm_save(norm_plots$density, file, "pdf") })
+  output$dl_norm_qq_png <- downloadHandler(filename = function() "Normalization_QQ.png", content = function(file) { req(norm_plots$qq); norm_save(norm_plots$qq, file, "png") })
+  output$dl_norm_qq_pdf <- downloadHandler(filename = function() "Normalization_QQ.pdf", content = function(file) { req(norm_plots$qq); norm_save(norm_plots$qq, file, "pdf") })
+  output$dl_norm_median_range_png <- downloadHandler(filename = function() "Normalization_Median_Range.png", content = function(file) { req(norm_plots$median_range); norm_save(norm_plots$median_range, file, "png") })
+  output$dl_norm_median_range_pdf <- downloadHandler(filename = function() "Normalization_Median_Range.pdf", content = function(file) { req(norm_plots$median_range); norm_save(norm_plots$median_range, file, "pdf") })
+  output$dl_norm_dist_overlap_png <- downloadHandler(filename = function() "Normalization_Distribution_Overlap.png", content = function(file) { req(norm_plots$distribution_overlap); norm_save(norm_plots$distribution_overlap, file, "png") })
+  output$dl_norm_dist_overlap_pdf <- downloadHandler(filename = function() "Normalization_Distribution_Overlap.pdf", content = function(file) { req(norm_plots$distribution_overlap); norm_save(norm_plots$distribution_overlap, file, "pdf") })
+  output$dl_norm_ma_png <- downloadHandler(filename = function() "Normalization_MA_Plot.png", content = function(file) { req(norm_plots$ma_plot); norm_save(norm_plots$ma_plot, file, "png") })
+  output$dl_norm_ma_pdf <- downloadHandler(filename = function() "Normalization_MA_Plot.pdf", content = function(file) { req(norm_plots$ma_plot); norm_save(norm_plots$ma_plot, file, "pdf") })
+  output$dl_norm_mv_png <- downloadHandler(filename = function() "Normalization_Mean_Variance.png", content = function(file) { req(norm_plots$mean_variance); norm_save(norm_plots$mean_variance, file, "png") })
+  output$dl_norm_mv_pdf <- downloadHandler(filename = function() "Normalization_Mean_Variance.pdf", content = function(file) { req(norm_plots$mean_variance); norm_save(norm_plots$mean_variance, file, "pdf") })
+  output$dl_norm_corr_before_png <- downloadHandler(filename = function() "Normalization_Corr_Before.png", content = function(file) { req(norm_plots$corr_before); norm_save(norm_plots$corr_before, file, "png") })
+  output$dl_norm_corr_before_pdf <- downloadHandler(filename = function() "Normalization_Corr_Before.pdf", content = function(file) { req(norm_plots$corr_before); norm_save(norm_plots$corr_before, file, "pdf") })
+  output$dl_norm_corr_after_png <- downloadHandler(filename = function() "Normalization_Corr_After.png", content = function(file) { req(norm_plots$corr_after); norm_save(norm_plots$corr_after, file, "png") })
+  output$dl_norm_corr_after_pdf <- downloadHandler(filename = function() "Normalization_Corr_After.pdf", content = function(file) { req(norm_plots$corr_after); norm_save(norm_plots$corr_after, file, "pdf") })
+
+  output$download_normalization_summary_csv <- downloadHandler(
+    filename = function() "Normalization_Summary_Table.csv",
+    content = function(file) {
+      req(rv$normalization_summary_table)
+      write.csv(rv$normalization_summary_table, file, row.names = FALSE)
+      write.csv(rv$normalization_summary_table, file.path(CSV_EXPORT_DIR(), "Normalization_Summary_Table.csv"), row.names = FALSE)
+    }
+  )
+
   # Render summary table
   output$normalization_summary_table <- renderTable({
     req(rv$normalization_summary_table)

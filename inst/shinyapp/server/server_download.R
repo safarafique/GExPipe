@@ -77,16 +77,29 @@ server_download <- function(input, output, session, rv) {
         # Parse GSE IDs (pipeline: micro_gse_ids, rna_gse_ids)
         rnaseq_ids <- c()
         micro_ids <- c()
-      if (input$analysis_type %in% c("rnaseq", "merged")) {
-        rnaseq_text <- gsub("\\s+", ",", input$rnaseq_gses)
-        rnaseq_ids <- trimws(unlist(strsplit(rnaseq_text, ",")))
-        rnaseq_ids <- rnaseq_ids[nzchar(rnaseq_ids)]
-      }
-      if (input$analysis_type %in% c("microarray", "merged")) {
-        micro_text <- gsub("\\s+", ",", input$microarray_gses)
-        micro_ids <- trimws(unlist(strsplit(micro_text, ",")))
-        micro_ids <- micro_ids[nzchar(micro_ids)]
-      }
+        if (input$analysis_type %in% c("rnaseq", "merged")) {
+          rnaseq_text <- gsub("\\s+", ",", input$rnaseq_gses)
+          rnaseq_ids <- trimws(unlist(strsplit(rnaseq_text, ",")))
+          rnaseq_ids <- rnaseq_ids[nzchar(rnaseq_ids)]
+        }
+        if (input$analysis_type %in% c("microarray", "merged")) {
+          micro_text <- gsub("\\s+", ",", input$microarray_gses)
+          micro_ids <- trimws(unlist(strsplit(micro_text, ",")))
+          micro_ids <- micro_ids[nzchar(micro_ids)]
+        }
+
+        # Single-dataset mode: keep only the first ID (skip batch correction later)
+        rv$dataset_mode <- if (is.null(input$dataset_mode) || !nzchar(input$dataset_mode)) "multi" else input$dataset_mode
+        if (identical(rv$dataset_mode, "single")) {
+          if (length(rnaseq_ids) > 1) {
+            showNotification("Single dataset mode: using only the first RNA-seq GSE ID.", type = "warning", duration = 6)
+            rnaseq_ids <- rnaseq_ids[1]
+          }
+          if (length(micro_ids) > 1) {
+            showNotification("Single dataset mode: using only the first microarray GSE ID.", type = "warning", duration = 6)
+            micro_ids <- micro_ids[1]
+          }
+        }
 
       log_text <- paste0("Starting download...\n")
       disease <- trimws(if (is.null(input$disease_name)) "" else input$disease_name)
@@ -94,6 +107,7 @@ server_download <- function(input, output, session, rv) {
         log_text <- paste0(log_text, "Disease/Condition: ", disease, "\n")
         rv$disease_name <- disease
       }
+      log_text <- paste0(log_text, "Mode: ", if (identical(rv$dataset_mode, "single")) "Single dataset" else "Multiple datasets", "\n")
       log_text <- paste0(log_text, "RNA-seq: ", length(rnaseq_ids), " | Microarray: ", length(micro_ids), "\n\n")
 
       if (length(rnaseq_ids) == 0 && length(micro_ids) == 0) {
@@ -109,7 +123,7 @@ server_download <- function(input, output, session, rv) {
       # --------------------------------------------------------------------------
       # MANAGE STORED FILES: clear download dirs at start of each run so multiple
       # runs don't accumulate old GSE data. Only current run's bulk/microarray
-      # files are kept; Reset also deletes these dirs.
+      # files are kept.
       # --------------------------------------------------------------------------
       if (length(micro_ids) > 0) {
         micro_dir <- file.path(getwd(), "micro_data")
@@ -474,6 +488,10 @@ server_download <- function(input, output, session, rv) {
       for (gse in names(rv$rna_counts_list)) {
         rv$all_genes_list[[gse]] <- rownames(rv$rna_counts_list[[gse]])
       }
+
+      # Dataset count for downstream steps (e.g. skip batch correction when only 1 dataset)
+      rv$dataset_count <- length(rv$all_genes_list)
+      rv$single_dataset <- isTRUE(rv$dataset_count == 1)
 
       # --------------------------------------------------------------------------
       # NORMALIZE TO GENE SYMBOLS so overlap is by symbol (probe/Entrez/Ensembl -> symbol)

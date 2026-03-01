@@ -89,18 +89,29 @@ ui_ppi <- tabItem(
       fluidRow(
         column(6,
                tags$h5(icon("circle-nodes"), " 1. Fruchterman–Reingold (force-directed)", style = "margin-top: 8px; margin-bottom: 6px; color: #1976D2; font-size: 13px;"),
-               plotOutput("ppi_plot_traditional", height = "520px", width = "100%")),
+               plotOutput("ppi_plot_traditional", height = "520px", width = "100%"),
+               tags$div(style = "margin-top: 6px;",
+                 downloadButton("download_ppi_traditional_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_traditional_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
         column(6,
                tags$h5(icon("circle"), " 2. Circular layout (by degree)", style = "margin-top: 8px; margin-bottom: 6px; color: #388E3C; font-size: 13px;"),
-               plotOutput("ppi_plot_circular", height = "520px", width = "100%"))
-      ),
+               plotOutput("ppi_plot_circular", height = "520px", width = "100%"),
+               tags$div(style = "margin-top: 6px;",
+                 downloadButton("download_ppi_circular_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_circular_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
       fluidRow(
         column(6,
                tags$h5(icon("project-diagram"), " 3. ggraph (modern edges + nodes)", style = "margin-top: 8px; margin-bottom: 6px; color: #7B1FA2; font-size: 13px;"),
-               plotOutput("ppi_plot_ggraph", height = "520px", width = "100%")),
+               plotOutput("ppi_plot_ggraph", height = "520px", width = "100%"),
+               tags$div(style = "margin-top: 6px;",
+                 downloadButton("download_ppi_ggraph_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_ggraph_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
         column(6,
                tags$h5(icon("project-diagram"), " 4. Kamada–Kawai (stress-minimization)", style = "margin-top: 8px; margin-bottom: 6px; color: #E65100; font-size: 13px;"),
-               plotOutput("ppi_plot_kamada", height = "520px", width = "100%"))
+               plotOutput("ppi_plot_kamada", height = "520px", width = "100%"),
+               tags$div(style = "margin-top: 6px;",
+                 downloadButton("download_ppi_kamada_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_kamada_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
       )
     )
   ),
@@ -111,7 +122,10 @@ ui_ppi <- tabItem(
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       tags$p("One network: shows hub genes only or other genes only (top N connected, non-hub) depending on your selection above (Hub genes only / Top N by degree). Single color; no Hub/Other legend.", style = "margin-bottom: 10px; font-size: 12px; color: #555;"),
       uiOutput("ppi_hub_or_other_title_ui"),
-      plotOutput("ppi_plot_hub_or_other", height = "520px", width = "100%")
+      plotOutput("ppi_plot_hub_or_other", height = "520px", width = "100%"),
+      tags$div(style = "margin-top: 6px;",
+        downloadButton("download_ppi_hub_or_other_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
+        downloadButton("download_ppi_hub_or_other_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))
     )
   ),
 
@@ -170,7 +184,7 @@ ui_ppi <- tabItem(
         column(3,
                radioButtons("ppi_centrality_mode",
                             "Mode (this choice is used for Extract Data for ML):",
-                            choices = c("Filter top N by metric" = "filter", "Use hub genes only" = "hub", "Compute centrality weights only" = "weight"),
+                            choices = c("Filter top N by metric" = "filter", "Compute centrality weights only" = "weight"),
                             selected = "filter")),
         column(2,
                numericInput("ppi_centrality_top_n", "Top N genes (for filter)", value = 20, min = 5, max = 100, step = 1)),
@@ -202,7 +216,7 @@ ui_ppi <- tabItem(
       tags$div(
         class = "alert alert-info",
         "Extract expression data (samples × genes) for ML from WGCNA datExpr. ",
-        "If you applied '5. Network Centrality-Weighted ML' above (Filter top N or Hub genes only), that chosen set is used; otherwise the gene set from the network graphs section is used. This matrix is used on the next tab for LASSO, Random Forest, SVM-RFE, etc."
+        "If you applied '5. Network Centrality-Weighted ML' above (Filter top N or weights), that chosen set is used; otherwise the gene set from the network graphs section is used. This matrix is used on the next tab for LASSO, Random Forest, SVM-RFE, etc."
       ),
       tags$div(style = "margin-bottom: 15px;",
                actionButton("extract_ml_data",
@@ -221,5 +235,6 @@ ui_ppi <- tabItem(
                              tagList(icon("arrow-right"), " Next: Machine Learning Process"),
                              class = "btn-success btn-lg",
                              style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+  )
   )
 )

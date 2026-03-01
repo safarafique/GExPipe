@@ -23,7 +23,7 @@ ui_results_summary <- tabItem(
   fluidRow(
     column(12, align = "center", style = "margin-bottom: 25px;",
            downloadButton("download_all_results_pdf",
-                          tagList(icon("file-pdf"), " Download all results (PDF)"),
+                          tagList(icon("download"), " Download all results (PDF)"),
                           class = "btn-danger btn-lg",
                           style = "font-size: 18px; padding: 14px 40px; border-radius: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);"))
   ),
@@ -185,7 +185,7 @@ ui_results_summary <- tabItem(
         width = NULL, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         tags$p("Overlap of gene lists across selected ML methods. Common genes used for ROC and GSEA.", style = "margin-bottom: 8px; font-size: 12px; color: #555;"),
         uiOutput("results_summary_ml"),
-        imageOutput("results_summary_ml_venn", height = RESULTS_PLOT_HEIGHT)
+        plotOutput("results_summary_ml_venn", height = RESULTS_PLOT_HEIGHT)
       )
     ),
     column(6,
