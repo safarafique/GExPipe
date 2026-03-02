@@ -21,6 +21,26 @@ suppressPackageStartupMessages({
   library(shiny); library(shinydashboard); library(shinyjs); library(DT)
 })
 
+# Auto-install Bioconductor packages (e.g. DESeq2) if missing, so new users can run the app
+bioc_imports <- c(
+  "Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
+  "edgeR", "clusterProfiler", "enrichplot", "STRINGdb", "DESeq2", "sva"
+)
+bioc_missing <- bioc_imports[!sapply(bioc_imports, function(p) requireNamespace(p, quietly = TRUE))]
+if (length(bioc_missing) > 0L) {
+  cat("Installing missing Bioconductor packages (e.g. DESeq2): ", paste(bioc_missing, collapse = ", "), "\n")
+  if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager", repos = "https://cloud.r-project.org")
+    library(BiocManager)
+  }
+  tryCatch({
+    BiocManager::install(bioc_missing, update = FALSE, ask = FALSE)
+  }, error = function(e) {
+    warning("Auto-install of Bioconductor packages failed: ", conditionMessage(e),
+            ". Install manually with: BiocManager::install(c(\"", bioc_missing[1], "\", ...))")
+  })
+}
+
 # All other Imports: load one-by-one so one failure does not stop the app
 imports_ordered <- c(
   "Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
@@ -53,7 +73,15 @@ if (requireNamespace("mixOmics", quietly = TRUE)) tryCatch(suppressPackageStartu
 if (requireNamespace("xgboost", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(xgboost)), error = function(e) NULL)
 if (requireNamespace("SHAPforxgboost", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(SHAPforxgboost)), error = function(e) NULL)
 if (requireNamespace("immunedeconv", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(immunedeconv)), error = function(e) NULL)
-if (requireNamespace("rms", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(rms)), error = function(e) NULL)
+# rms (nomogram) requires Hmisc >= 5.2.4; ensure it before loading rms
+if (requireNamespace("rms", quietly = TRUE)) {
+  need_hmisc <- !requireNamespace("Hmisc", quietly = TRUE) ||
+    (packageVersion("Hmisc") < "5.2.4")
+  if (need_hmisc) {
+    tryCatch(install.packages("Hmisc", repos = "https://cloud.r-project.org"), error = function(e) NULL)
+  }
+  tryCatch(suppressPackageStartupMessages(library(rms)), error = function(e) NULL)
+}
 if (requireNamespace("rmda", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(rmda)), error = function(e) NULL)
 if (requireNamespace("cicerone", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(cicerone)), error = function(e) NULL)
 if (requireNamespace("biomaRt", quietly = TRUE)) tryCatch(suppressPackageStartupMessages(library(biomaRt)), error = function(e) NULL)
