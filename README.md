@@ -4,16 +4,33 @@ Shiny application for bulk RNA-seq and microarray analysis (GEO). Workflow: down
 
 ## Installation
 
-**From source (e.g. after cloning or unpacking):**
+**From GitHub (recommended until on Bioconductor):**  
+OmniVerse depends on **Bioconductor** packages (DESeq2, GEOquery, limma, etc.). Install them first, then install OmniVerse:
+
 ```r
-install.packages(".", repos = NULL, type = "source")
+# 1. Install BiocManager and Bioconductor dependencies
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install(c(
+  "DESeq2", "GEOquery", "limma", "edgeR", "Biobase", "AnnotationDbi",
+  "org.Hs.eg.db", "clusterProfiler", "enrichplot", "STRINGdb", "sva"
+), update = FALSE, ask = FALSE)
+
+# 2. Install OmniVerse from GitHub
+remotes::install_github("safarafique/Shiny_app-OmniVerse-", dependencies = TRUE)
 ```
+
+If you see "dependency 'X' is not available", run step 1 again (BiocManager will install from Bioconductor). Do **not** use `install.packages("DESeq2")` — DESeq2 is on Bioconductor.
 
 **From Bioconductor (when accepted):**
 ```r
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
 BiocManager::install("OmniVerse")
+```
+
+**From local source (e.g. after cloning):**
+```r
+# Install Bioconductor dependencies first (see above), then:
+install.packages(".", repos = NULL, type = "source")
 ```
 
 ## Run
@@ -24,6 +41,24 @@ runOmniVerse()
 ```
 
 Install OmniVerse (e.g. `BiocManager::install("OmniVerse")`) so all dependencies are installed; the app does not install packages at runtime.
+
+## Running in Google Colab (or other cloud notebooks)
+
+In **RStudio**, the app can open in your browser. In **Google Colab** (or any headless/cloud R session) there is no local browser, and the app runs on a remote machine, so you must **expose the app and open the URL Colab gives you**.
+
+1. **Install dependencies and OmniVerse** (see Installation above). In Colab you may need to install R and Bioconductor first (e.g. use an R Colab notebook or `rpy2` with R kernel).
+
+2. **Start the app with Colab-friendly options** (no browser launch, listen on all interfaces):
+   ```r
+   library(OmniVerse)
+   runOmniVerse(launch.browser = FALSE, host = "0.0.0.0", port = 3838)
+   ```
+
+3. **Get the URL to open the app:**
+   - **Colab with port forwarding:** In the Colab UI, use “Port forwarding” or “Preview” for port **3838** (or the port you used). Colab will show a URL like `https://xxxx-3838.proxy.runtime.googleusercontent.com` — open that in your browser.
+   - **Manual tunnel (e.g. ngrok):** If Colab doesn’t show a link, in a separate terminal run a tunnel to port 3838 (e.g. `ngrok http 3838`) and open the HTTPS URL ngrok prints.
+
+4. **Why it “doesn’t work” in Colab:** The app process often runs fine, but (a) there is no local browser to open, and (b) the app is bound to `127.0.0.1` by default, so it’s not reachable from outside. Using `launch.browser = FALSE` and `host = "0.0.0.0"` fixes (b); then you must use Colab’s port forwarding or a tunnel to get a URL (step 3).
 
 ## Package versions (tested with)
 

@@ -162,7 +162,7 @@ server_download <- function(input, output, session, rv) {
 
           micro_data <- tryCatch({
             suppressMessages(invisible(capture.output(
-              md <- getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
+              md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
               file = nullfile()
             )))
             md
@@ -182,11 +182,11 @@ server_download <- function(input, output, session, rv) {
 
           # When GSE has multiple platforms, use first that matches platform_to_annot (global.R)
           if (is.list(micro_data) && length(micro_data) >= 1) {
-            platforms <- vapply(micro_data, function(x) annotation(x), character(1))
+            platforms <- vapply(micro_data, function(x) Biobase::annotation(x), character(1))
             idx <- which(platforms %in% known_platforms)[1]
             if (!is.na(idx)) {
               micro_eset <- micro_data[[idx]]
-              platform_id <- annotation(micro_eset)
+              platform_id <- Biobase::annotation(micro_eset)
               plat_type <- if (!is.null(platform_id_to_type) && platform_id %in% names(platform_id_to_type)) platform_id_to_type[[platform_id]] else "supported"
               log_text <- paste0(log_text, "Platform ", platform_id, " - ", plat_type, ". ")
             } else {
@@ -200,7 +200,7 @@ server_download <- function(input, output, session, rv) {
             }
           } else {
             micro_eset <- micro_data
-            platform_id <- annotation(micro_eset)
+            platform_id <- Biobase::annotation(micro_eset)
             if (!(platform_id %in% known_platforms)) {
               missing_platform_gses <- c(missing_platform_gses, gse_id)
               reason <- paste0("platform ID missing (", platform_id, " not in app list)")
@@ -211,8 +211,8 @@ server_download <- function(input, output, session, rv) {
             plat_type <- if (!is.null(platform_id_to_type) && platform_id %in% names(platform_id_to_type)) platform_id_to_type[[platform_id]] else "supported"
             log_text <- paste0(log_text, "Platform ", platform_id, " - ", plat_type, ". ")
           }
-          micro_expr <- exprs(micro_eset)
-          pdata <- pData(micro_eset)
+          micro_expr <- Biobase::exprs(micro_eset)
+          pdata <- Biobase::pData(micro_eset)
 
           rv$micro_expr_list[[gse_id]] <- micro_expr
           rv$micro_metadata_list[[gse_id]] <- pdata
@@ -224,7 +224,7 @@ server_download <- function(input, output, session, rv) {
           # Optional: try to fetch CEL files from GEO supplementary for RMA normalization
           tryCatch({
             suppressMessages(invisible(capture.output(
-              getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE),
+              GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE),
               file = nullfile()
             )))
             supp_dir <- file.path(micro_dir, gse_id)
@@ -281,7 +281,7 @@ server_download <- function(input, output, session, rv) {
           if (is.null(count_file)) {
             tryCatch({
               suppressMessages(invisible(capture.output(
-                getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE),
+                GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE),
                 file = nullfile()
               )))
               files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
@@ -388,13 +388,13 @@ server_download <- function(input, output, session, rv) {
           # General GSE phenodata extraction: getGEO + pData so all GSE phenodata columns appear
           rna_metadata <- tryCatch({
             suppressMessages(invisible(capture.output(
-              gse_list <- getGEO(gse_id, GSEMatrix = TRUE),
+              gse_list <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE),
               file = nullfile()
             )))
             # If multiple platforms, select the first one
             gse <- if (inherits(gse_list, "list") && length(gse_list) > 1) gse_list[[1]] else if (inherits(gse_list, "list")) gse_list[[1]] else gse_list
             # Extract phenotype/sample metadata (all columns from GSE)
-            pheno <- pData(gse)
+            pheno <- Biobase::pData(gse)
             if (is.null(pheno) || nrow(pheno) == 0) stop("empty pData")
             pheno
           }, error = function(e) {
@@ -458,7 +458,7 @@ server_download <- function(input, output, session, rv) {
           if (is.null(micro_eset)) {
             micro_data <- tryCatch({
               suppressMessages(invisible(capture.output(
-                md <- getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
+                md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
                 file = nullfile()
               )))
               md
@@ -466,7 +466,7 @@ server_download <- function(input, output, session, rv) {
             micro_eset <- if (!is.null(micro_data) && is.list(micro_data)) micro_data[[1]] else micro_data
           }
           if (is.null(micro_eset)) next
-          fdata <- fData(micro_eset)
+          fdata <- Biobase::fData(micro_eset)
           gene_symbols <- suppressMessages(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id))
           rownames(micro_expr) <- gene_symbols
           valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
@@ -533,6 +533,28 @@ server_download <- function(input, output, session, rv) {
             rv$rna_counts_list[[gse]] <- cnt
             rv$all_genes_list[[gse]] <- rownames(cnt)
             log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(cnt), " gene symbols\n")
+          }
+        }
+      }
+
+      # Force Entrez -> symbol for RNA-seq datasets still with numeric row IDs (e.g. org.Hs.eg.db failed; biomaRt fallback)
+      for (gse in names(rv$rna_counts_list)) {
+        rn <- rownames(rv$rna_counts_list[[gse]])
+        sample_rn <- head(rn[!is.na(rn) & nzchar(trimws(rn))], min(300, length(rn)))
+        if (length(sample_rn) > 0 && mean(grepl("^[0-9]+$", sample_rn), na.rm = TRUE) > 0.7) {
+          log_text <- paste0(log_text, "  ", gse, ": row IDs still Entrez-like -> trying biomaRt Entrez->symbol...\n")
+          sym <- entrez_to_symbol_biomart(rn)
+          if (!is.null(sym)) {
+            valid <- !is.na(sym) & trimws(sym) != ""
+            if (sum(valid) > 0) {
+              cnt <- rv$rna_counts_list[[gse]]
+              rownames(cnt) <- sym
+              cnt <- cnt[valid, , drop = FALSE]
+              if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+              rv$rna_counts_list[[gse]] <- cnt
+              rv$all_genes_list[[gse]] <- rownames(cnt)
+              log_text <- paste0(log_text, "  ", gse, ": biomaRt converted to ", nrow(cnt), " gene symbols\n")
+            }
           }
         }
       }
@@ -610,23 +632,22 @@ server_download <- function(input, output, session, rv) {
               sample_rn <- head(rn[!is.na(rn) & nzchar(trimws(rn))], 5)
               log_text <- paste0(log_text, "  ", gse, " (", length(rn), " rows): ", paste(sQuote(sample_rn), collapse = ", "), "\n")
             }
-            log_text <- paste0(log_text, "\n--- biomaRt / Probe conversion fallback ---\n")
-            log_text <- paste0(log_text, "If you see probe IDs (e.g. 2824546_st, 200000_s_at) instead of symbols (e.g. BRCA1):\n")
-            log_text <- paste0(log_text, "  1. Check internet connection (biomaRt needs Ensembl access)\n")
-            log_text <- paste0(log_text, "  2. GEO GPL annotation is used as fallback when biomaRt is offline\n")
-            log_text <- paste0(log_text, "  3. Use datasets with built-in gene symbols for testing, e.g. GSE62646\n")
-            log_text <- paste0(log_text, "  4. Install biomaRt if missing: BiocManager::install(\"biomaRt\")\n")
+            log_text <- paste0(log_text, "\n--- Gene ID conversion (probe / Entrez -> symbols) ---\n")
+            log_text <- paste0(log_text, "If you see probe IDs (2824546_st, 200000_s_at) or numeric IDs (Entrez) instead of symbols (e.g. BRCA1):\n")
+            log_text <- paste0(log_text, "  1. Check internet (biomaRt needs Ensembl); install biomaRt: BiocManager::install(\"biomaRt\")\n")
+            log_text <- paste0(log_text, "  2. RNA-seq with Entrez row IDs is converted via org.Hs.eg.db then biomaRt fallback\n")
+            log_text <- paste0(log_text, "  3. Microarray: GEO GPL annotation is used when biomaRt is offline\n")
+            log_text <- paste0(log_text, "  4. For testing merged RNA+microarray, use GSEs that map to symbols (e.g. GSE62646)\n")
             showNotification(
               tags$div(
                 icon("exclamation-triangle"),
-                tags$strong("0 common genes — probe conversion may have failed"),
-                tags$p("Suggestions:", style = "margin-top: 8px; font-size: 12px;"),
+                tags$strong("0 common genes — ID conversion may have failed"),
+                tags$p("Ensure both datasets use gene symbols. RNA-seq Entrez IDs are converted via org.Hs.eg.db and biomaRt.", style = "margin-top: 8px; font-size: 12px;"),
                 tags$ul(
                   style = "margin: 4px 0 0 0; padding-left: 18px; font-size: 12px; color: #333;",
-                  tags$li("Check internet connection (biomaRt needs Ensembl)"),
-                  tags$li("GEO GPL annotation is used as fallback when offline"),
-                  tags$li("Use datasets with gene symbols for testing, e.g. GSE62646"),
-                  tags$li("Install biomaRt: BiocManager::install(\"biomaRt\")")
+                  tags$li("Install biomaRt for Entrez→symbol fallback: BiocManager::install(\"biomaRt\")"),
+                  tags$li("Check internet (biomaRt needs Ensembl access)"),
+                  tags$li("See download log for sample row IDs per dataset")
                 ),
                 tags$p("See download log for details.", style = "margin-top: 6px; font-size: 11px; opacity: 0.9;")
               ),

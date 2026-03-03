@@ -886,7 +886,7 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
   if (is.null(gpl_id) || !nzchar(gpl_id)) return(NULL)
   probe_ids <- as.character(probe_ids)
   gpl <- tryCatch({
-    suppressMessages(getGEO(gpl_id, destdir = getwd()))
+    suppressMessages(GEOquery::getGEO(gpl_id, destdir = getwd()))
   }, error = function(e) NULL)
   if (is.null(gpl)) return(NULL)
   tab <- tryCatch({
@@ -1007,14 +1007,14 @@ get_platform_for_gse <- function(gse_id) {
     return(NULL)
   }
   gse <- tryCatch(
-    getGEO(GEO = gse_id, GSEMatrix = TRUE, getGPL = TRUE, destdir = getwd()),
+    GEOquery::getGEO(GEO = gse_id, GSEMatrix = TRUE, getGPL = TRUE, destdir = getwd()),
     error = function(e) { message("getGEO failed: ", e$message); return(NULL) }
   )
   if (is.null(gse)) return(NULL)
   if (inherits(gse, "list")) {
-    platforms <- vapply(gse, function(x) annotation(x), character(1))
+    platforms <- vapply(gse, function(x) Biobase::annotation(x), character(1))
   } else {
-    platforms <- annotation(gse)
+    platforms <- Biobase::annotation(gse)
   }
   known <- names(platform_to_annot)
   for (pl in platforms) {
@@ -1029,12 +1029,12 @@ run_gse_annotation_and_download <- function(gse_id, dest_dir = getwd(), save_ann
   gse_id <- trimws(toupper(gse_id))
   if (!dir.exists(dest_dir)) dir.create(dest_dir, recursive = TRUE)
   gse <- tryCatch(
-    getGEO(GEO = gse_id, GSEMatrix = TRUE, getGPL = TRUE, destdir = dest_dir),
+    GEOquery::getGEO(GEO = gse_id, GSEMatrix = TRUE, getGPL = TRUE, destdir = dest_dir),
     error = function(e) { message("getGEO failed: ", e$message); return(invisible(NULL)) }
   )
   if (is.null(gse)) return(invisible(NULL))
   if (inherits(gse, "list")) {
-    platforms <- vapply(gse, function(x) annotation(x), character(1))
+    platforms <- vapply(gse, function(x) Biobase::annotation(x), character(1))
     known <- names(platform_to_annot)
     idx <- which(platforms %in% known)[1]
     if (is.na(idx)) {
@@ -1047,7 +1047,7 @@ run_gse_annotation_and_download <- function(gse_id, dest_dir = getwd(), save_ann
   } else {
     micro_eset <- gse
   }
-  platform_id <- annotation(micro_eset)
+  platform_id <- Biobase::annotation(micro_eset)
   micro_expr <- Biobase::exprs(micro_eset)
   fdata <- Biobase::fData(micro_eset)
   gene_symbols <- map_microarray_ids(micro_expr, fdata, micro_eset, gse_id = gse_id)
@@ -1089,7 +1089,7 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset, gse_id = NULL) {
     gene_symbols[gene_symbols == "" | is.na(gene_symbols)] <- NA
     return(gene_symbols)
   }
-  platform_id <- annotation(micro_eset)
+  platform_id <- Biobase::annotation(micro_eset)
   annot_pkg <- platform_to_annot[[platform_id]]
   if (!is.null(annot_pkg) && !is.na(annot_pkg) && requireNamespace(annot_pkg, quietly = TRUE)) {
     suppressPackageStartupMessages(library(annot_pkg, character.only = TRUE))
@@ -1159,6 +1159,37 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset, gse_id = NULL) {
   return(probe_ids)
 }
 
+# Entrez ID -> gene symbol via biomaRt (fallback when org.Hs.eg.db fails or is offline)
+# Returns character vector same length as ids; NA where unmapped. Batches to avoid server limits.
+entrez_to_symbol_biomart <- function(ids) {
+  if (!requireNamespace("biomaRt", quietly = TRUE)) return(NULL)
+  if (is.null(ids) || length(ids) == 0) return(NULL)
+  ids <- as.character(ids)
+  ids_clean <- gsub("\\.0+$", "", ids)  # strip trailing .0 from numeric-as-character
+  keep <- !is.na(ids_clean) & nzchar(trimws(ids_clean)) & grepl("^[0-9]+$", ids_clean)
+  if (sum(keep) == 0) return(NULL)
+  unique_entrez <- unique(ids_clean[keep])
+  mart <- tryCatch(biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl"), error = function(e) NULL)
+  if (is.null(mart)) return(NULL)
+  out <- rep(NA_character_, length(ids))
+  batch_size <- 5000L
+  for (start in seq(1L, length(unique_entrez), by = batch_size)) {
+    chunk <- unique_entrez[start:min(start + batch_size - 1L, length(unique_entrez))]
+    res <- tryCatch({
+      biomaRt::getBM(attributes = c("entrezgene_id", "hgnc_symbol"),
+                     filters = "entrezgene_id", values = as.integer(chunk), mart = mart)
+    }, error = function(e) NULL)
+    if (is.null(res) || nrow(res) == 0) next
+    res <- res[!is.na(res$hgnc_symbol) & nzchar(trimws(res$hgnc_symbol)), , drop = FALSE]
+    if (nrow(res) == 0) next
+    res$entrezgene_id <- as.character(res$entrezgene_id)
+    idx <- match(ids_clean, res$entrezgene_id)
+    mapped <- res$hgnc_symbol[idx]
+    out[!is.na(mapped)] <- as.character(mapped[!is.na(mapped)])
+  }
+  if (sum(!is.na(out)) > length(ids) * 0.1) out else NULL
+}
+
 # Convert any gene ID (probe, Entrez, Ensembl, or symbol) to gene symbol for overlap
 # Used so all datasets end up with symbols and common-gene intersection is meaningful
 # gpl_id: optional platform ID (e.g. GPL6244) so biomaRt uses the right probe attribute for _st/_at IDs
@@ -1178,16 +1209,19 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
   # Try ENSEMBL
   if (any(grepl("^ENSG", sample_ids))) {
     clean <- gsub("\\..*", "", ids)
-    sym <- tryCatch(suppressMessages(mapIds(org.Hs.eg.db, keys = clean, column = "SYMBOL", keytype = "ENSEMBL", multiVals = "first")), error = function(e) NULL)
+    sym <- tryCatch(suppressMessages(AnnotationDbi::mapIds(org.Hs.eg.db, keys = clean, column = "SYMBOL", keytype = "ENSEMBL", multiVals = "first")), error = function(e) NULL)
     if (!is.null(sym) && length(sym) == length(ids) && sum(!is.na(sym)) > length(ids) * 0.1) return(as.character(sym))
   }
-  # Try ENTREZID (numeric)
+  # Try ENTREZID (numeric): coerce to character and strip trailing .0 so keys match DB
   if (mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) > 0.3) {
-    sym <- tryCatch(suppressMessages(mapIds(org.Hs.eg.db, keys = ids, column = "SYMBOL", keytype = "ENTREZID", multiVals = "first")), error = function(e) NULL)
+    keys_entrez <- gsub("\\.0+$", "", ids)
+    sym <- tryCatch(suppressMessages(AnnotationDbi::mapIds(org.Hs.eg.db, keys = keys_entrez, column = "SYMBOL", keytype = "ENTREZID", multiVals = "first")), error = function(e) NULL)
     if (!is.null(sym) && sum(!is.na(sym)) > length(ids) * 0.1) { out <- as.character(sym); return(out) }
+    bm_sym <- entrez_to_symbol_biomart(ids)
+    if (!is.null(bm_sym) && sum(!is.na(bm_sym)) > length(ids) * 0.1) return(bm_sym)
   }
   # Try ALIAS (probe IDs etc.)
-  sym <- tryCatch(suppressMessages(mapIds(org.Hs.eg.db, keys = ids, column = "SYMBOL", keytype = "ALIAS", multiVals = "first")), error = function(e) NULL)
+  sym <- tryCatch(suppressMessages(AnnotationDbi::mapIds(org.Hs.eg.db, keys = ids, column = "SYMBOL", keytype = "ALIAS", multiVals = "first")), error = function(e) NULL)
   if (!is.null(sym) && sum(!is.na(sym)) > length(ids) * 0.1) return(as.character(sym))
   # Affymetrix probe IDs (e.g. 2824546_st): try HuGene .db, GEO GPL table, then biomaRt
   if (mean(grepl("_at$|_st$|_x_at$", sample_ids), na.rm = TRUE) > 0.2) {
@@ -1210,8 +1244,8 @@ convert_rnaseq_ids <- function(gene_ids, gse_id = NULL) {
   if (is_likely_symbol && !any(grepl("^[0-9]{5,}", sample_ids))) {
     test_symbols <- head(sample_ids, 10)
     verified <- tryCatch({
-      mapped <- mapIds(org.Hs.eg.db, keys = test_symbols, column = "SYMBOL",
-                      keytype = "SYMBOL", multiVals = "first")
+      mapped <- AnnotationDbi::mapIds(org.Hs.eg.db, keys = test_symbols, column = "SYMBOL",
+                                      keytype = "SYMBOL", multiVals = "first")
       sum(!is.na(mapped)) / length(test_symbols) > 0.5
     }, error = function(e) FALSE)
     if (verified) return(gene_ids)
@@ -1219,20 +1253,25 @@ convert_rnaseq_ids <- function(gene_ids, gse_id = NULL) {
   if (any(grepl("^ENSG", sample_ids))) {
     clean_keys <- gsub("\\..*", "", gene_ids)
     gene_symbols <- tryCatch({
-      mapIds(org.Hs.eg.db, keys = clean_keys, column = "SYMBOL",
-             keytype = "ENSEMBL", multiVals = "first")
+      AnnotationDbi::mapIds(org.Hs.eg.db, keys = clean_keys, column = "SYMBOL",
+                             keytype = "ENSEMBL", multiVals = "first")
     }, error = function(e) NULL)
     if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(gene_ids) * 0.1) {
       return(as.character(gene_symbols))
     }
   }
   if (mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) > 0.7) {
+    keys_entrez <- gsub("\\.0+$", "", as.character(gene_ids))
     gene_symbols <- tryCatch({
-      mapIds(org.Hs.eg.db, keys = as.character(gene_ids), column = "SYMBOL",
-             keytype = "ENTREZID", multiVals = "first")
+      AnnotationDbi::mapIds(org.Hs.eg.db, keys = keys_entrez, column = "SYMBOL",
+                            keytype = "ENTREZID", multiVals = "first")
     }, error = function(e) NULL)
     if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(gene_ids) * 0.1) {
       return(as.character(gene_symbols))
+    }
+    bm_sym <- entrez_to_symbol_biomart(gene_ids)
+    if (!is.null(bm_sym) && sum(!is.na(bm_sym)) > length(gene_ids) * 0.1) {
+      return(bm_sym)
     }
   }
   return(gene_ids)
@@ -1324,7 +1363,7 @@ normalize_microarray <- function(expr_matrix, dataset_name = NULL, method = "qua
     log2_applied <- TRUE
   }
 
-  expr_norm <- normalizeBetweenArrays(expr_matrix, method = "quantile")
+  expr_norm <- limma::normalizeBetweenArrays(expr_matrix, method = "quantile")
 
   # Store normalization info as attribute
   attr(expr_norm, "normalization_info") <- list(
@@ -1396,12 +1435,12 @@ normalize_rnaseq <- function(count_matrix, dataset_name = NULL, method = "TMM") 
   genes_after_filtering <- nrow(count_matrix)
   genes_removed <- initial_genes - genes_after_filtering
 
-  dge <- DGEList(counts = count_matrix)
+  dge <- edgeR::DGEList(counts = count_matrix)
   if (method == "TMM") {
-    dge <- calcNormFactors(dge, method = "TMM")
+    dge <- edgeR::calcNormFactors(dge, method = "TMM")
   }
   # log2(CPM+1): same call; when norm.factors are 1 (no TMM), this is simple log2(CPM+1)
-  logcpm_matrix <- cpm(dge, log = TRUE, prior.count = 1)
+  logcpm_matrix <- edgeR::cpm(dge, log = TRUE, prior.count = 1)
 
   # Store normalization info as attribute
   attr(logcpm_matrix, "normalization_info") <- list(

@@ -221,29 +221,40 @@ server_batch <- function(input, output, session, rv) {
       
       # Apply method
       if (input$batch_method == "limma") {
-        rv$batch_corrected <- removeBatchEffect(rv$expr_filtered,
-                                                 batch = rv$unified_metadata$Dataset,
-                                                 design = design)
+        rv$batch_corrected <- limma::removeBatchEffect(
+          rv$expr_filtered,
+          batch = rv$unified_metadata$Dataset,
+          design = design
+        )
       } else if (input$batch_method == "combat") {
-        rv$batch_corrected <- ComBat(rv$expr_filtered,
-                                      batch = rv$unified_metadata$Dataset,
-                                      mod = NULL, par.prior = TRUE, prior.plots = FALSE)
+        rv$batch_corrected <- sva::ComBat(
+          rv$expr_filtered,
+          batch = rv$unified_metadata$Dataset,
+          mod = NULL, par.prior = TRUE, prior.plots = FALSE
+        )
       } else if (input$batch_method == "quantile_limma") {
-        expr_q <- normalizeBetweenArrays(rv$expr_filtered, method = "quantile")
-        rv$batch_corrected <- removeBatchEffect(expr_q,
-                                                 batch = rv$unified_metadata$Dataset,
-                                                 design = design)
+        expr_q <- limma::normalizeBetweenArrays(rv$expr_filtered, method = "quantile")
+        rv$batch_corrected <- limma::removeBatchEffect(
+          expr_q,
+          batch = rv$unified_metadata$Dataset,
+          design = design
+        )
       } else if (input$batch_method == "hybrid") {
-        expr_q <- normalizeBetweenArrays(rv$expr_filtered, method = "quantile")
-        rv$batch_corrected <- ComBat(expr_q, batch = rv$unified_metadata$Dataset,
-                                      mod = NULL, par.prior = TRUE, prior.plots = FALSE)
+        expr_q <- limma::normalizeBetweenArrays(rv$expr_filtered, method = "quantile")
+        rv$batch_corrected <- sva::ComBat(
+          expr_q,
+          batch = rv$unified_metadata$Dataset,
+          mod = NULL, par.prior = TRUE, prior.plots = FALSE
+        )
       } else if (input$batch_method == "combat_ref") {
         sizes <- table(rv$unified_metadata$Dataset)
         ref <- names(sizes)[which.max(sizes)]
-        rv$batch_corrected <- ComBat(rv$expr_filtered,
-                                      batch = rv$unified_metadata$Dataset,
-                                      mod = NULL, par.prior = TRUE, prior.plots = FALSE,
-                                      ref.batch = ref)
+        rv$batch_corrected <- sva::ComBat(
+          rv$expr_filtered,
+          batch = rv$unified_metadata$Dataset,
+          mod = NULL, par.prior = TRUE, prior.plots = FALSE,
+          ref.batch = ref
+        )
       } else if (input$batch_method == "sva") {
         # Surrogate variable analysis: estimate hidden confounders, then ComBat with mod = design + SVs
         mod <- model.matrix(~ Condition, data = rv$unified_metadata)
@@ -257,18 +268,24 @@ server_batch <- function(input, output, session, rv) {
           )
           if (!is.null(svobj) && ncol(svobj$sv) > 0) {
             mod_sv <- cbind(mod, svobj$sv)
-            rv$batch_corrected <- ComBat(rv$expr_filtered,
-                                         batch = rv$unified_metadata$Dataset,
-                                         mod = mod_sv, par.prior = TRUE, prior.plots = FALSE)
+            rv$batch_corrected <- sva::ComBat(
+              rv$expr_filtered,
+              batch = rv$unified_metadata$Dataset,
+              mod = mod_sv, par.prior = TRUE, prior.plots = FALSE
+            )
           } else {
-            rv$batch_corrected <- ComBat(rv$expr_filtered,
-                                         batch = rv$unified_metadata$Dataset,
-                                         mod = mod, par.prior = TRUE, prior.plots = FALSE)
+            rv$batch_corrected <- sva::ComBat(
+              rv$expr_filtered,
+              batch = rv$unified_metadata$Dataset,
+              mod = mod, par.prior = TRUE, prior.plots = FALSE
+            )
           }
         } else {
-          rv$batch_corrected <- ComBat(rv$expr_filtered,
-                                       batch = rv$unified_metadata$Dataset,
-                                       mod = mod, par.prior = TRUE, prior.plots = FALSE)
+          rv$batch_corrected <- sva::ComBat(
+            rv$expr_filtered,
+            batch = rv$unified_metadata$Dataset,
+            mod = mod, par.prior = TRUE, prior.plots = FALSE
+          )
         }
       }
       

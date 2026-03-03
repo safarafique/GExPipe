@@ -199,7 +199,7 @@ server_normalize <- function(input, output, session, rv) {
       rv$combined_expr_before_global_norm <- combined_before_global
 
       # Apply global quantile normalization
-      rv$combined_expr <- normalizeBetweenArrays(combined_before_global, method = "quantile")
+      rv$combined_expr <- limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
 
       # ====================================================================
       # SAVE RAW COUNTS FOR DESeq2 (before global quantile normalization)
@@ -412,7 +412,7 @@ server_normalize <- function(input, output, session, rv) {
       # Combine and apply global quantile normalization
       combined_before_global <- do.call(cbind, all_expr_norm)
       rv$combined_expr_before_global_norm <- combined_before_global
-      rv$combined_expr <- normalizeBetweenArrays(combined_before_global, method = "quantile")
+      rv$combined_expr <- limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
       rv$all_expr_norm_list <- all_expr_norm
       
       # Create metadata

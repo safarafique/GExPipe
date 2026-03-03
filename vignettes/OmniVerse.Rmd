@@ -55,9 +55,15 @@ The app guides you through:
 11. **Machine learning** – Feature selection, ROC, nomogram, validation.
 12. **Immune** – Optional immune cell deconvolution.
 
-For full details and screenshots, see the package documentation and the application’s in-app help.
+# More information
+
+- **R help:** In R, run `?runOmniVerse` for the function help and references.
+- **In the app:** Each step has an **"About this step"** or info box (click the header to expand) with purpose, methods, and tips. Use the **Guided Tour** button in the app header to highlight the main workflow; you can use it to capture a full-page screenshot for your own documentation.
+- **Session info:** The section below shows the R session and package versions used when this vignette was built. Use it to reproduce the environment or report issues.
 
 # Session information
+
+This chunk runs when the vignette is built and records the R version and loaded packages.
 
 ```{r session}
 sessionInfo()

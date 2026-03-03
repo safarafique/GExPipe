@@ -5,14 +5,16 @@
 #' WGCNA, pathway enrichment, PPI, machine learning, and more).
 #'
 #' @param launch.browser If TRUE, open the app in the default browser (default).
+#'   Set to FALSE in Google Colab or headless servers (no local browser).
 #' @param port The TCP port to listen on (0 = random available port).
-#' @param host The host to bind (e.g. "0.0.0.0" for external access).
+#' @param host The host to bind. Use "0.0.0.0" in Google Colab so port forwarding works.
 #' @return Invisible. Runs the Shiny app.
 #' @export
 #' @examples
 #' if (interactive()) {
 #'   runOmniVerse()
 #'   runOmniVerse(launch.browser = TRUE, port = 3838)
+#'   # In Google Colab: runOmniVerse(launch.browser = FALSE, host = "0.0.0.0", port = 3838)
 #' }
 runOmniVerse <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
   app_dir <- system.file("shinyapp", package = "OmniVerse")

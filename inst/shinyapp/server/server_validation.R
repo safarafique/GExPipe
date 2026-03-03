@@ -150,7 +150,7 @@ server_validation <- function(input, output, session, rv) {
           count_file <- tryCatch(download_ncbi_raw_counts(gse_id, gse_dir), error = function(e) NULL)
           if (is.null(count_file)) {
             tryCatch({
-              suppressMessages(invisible(capture.output(getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE), file = nullfile())))
+              suppressMessages(invisible(capture.output(GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE), file = nullfile())))
               files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
               tar_files <- files[grepl("\\.tar$", files, ignore.case = TRUE)]
               for (tf in tar_files) tryCatch(untar(tf, exdir = gse_dir, tar = "internal"), error = function(e) NULL)
@@ -181,8 +181,8 @@ server_validation <- function(input, output, session, rv) {
           if (any(duplicated(rownames(count_matrix)))) count_matrix <- limma::avereps(count_matrix, ID = rownames(count_matrix))
           all_expr_list[[gse_id]] <- count_matrix
           rna_meta <- tryCatch({
-            suppressMessages(invisible(capture.output(gl <- getGEO(gse_id, GSEMatrix = TRUE), file = nullfile())))
-            pData(if (is.list(gl)) gl[[1]] else gl)
+            suppressMessages(invisible(capture.output(gl <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE), file = nullfile())))
+            Biobase::pData(if (is.list(gl)) gl[[1]] else gl)
           }, error = function(e) { sm <- fetch_geo_series_matrix_metadata(gse_id); if (!is.null(sm)) sm else data.frame(title = colnames(count_matrix), row.names = colnames(count_matrix)) })
           all_metadata_list[[gse_id]] <- rna_meta
           ext_log <- paste0(ext_log, "OK (", nrow(count_matrix), "g x ", ncol(count_matrix), "s)\n")
@@ -194,24 +194,24 @@ server_validation <- function(input, output, session, rv) {
           incProgress(0.2 / max(1, length(gse_ids)), detail = paste0(gse_id, " (Microarray)"))
           ext_log <- paste0(ext_log, gse_id, " (Microarray)... ")
           micro_data <- tryCatch({
-            suppressMessages(invisible(capture.output(md <- getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE), file = nullfile()))); md
+            suppressMessages(invisible(capture.output(md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE), file = nullfile()))); md
           }, error = function(e) NULL)
           if (is.null(micro_data)) { ext_log <- paste0(ext_log, "FAILED\n"); next }
           known_platforms <- names(platform_to_annot); micro_eset <- NULL
           if (is.list(micro_data) && length(micro_data) >= 1) {
-            plats <- vapply(micro_data, function(x) annotation(x), character(1))
+            plats <- vapply(micro_data, function(x) Biobase::annotation(x), character(1))
             idx <- which(plats %in% known_platforms)[1]
             if (!is.na(idx)) micro_eset <- micro_data[[idx]]
-          } else { if (annotation(micro_data) %in% known_platforms) micro_eset <- micro_data }
+          } else { if (Biobase::annotation(micro_data) %in% known_platforms) micro_eset <- micro_data }
           if (is.null(micro_eset)) { ext_log <- paste0(ext_log, "SKIPPED (platform)\n"); next }
-          micro_expr <- exprs(micro_eset); fdata <- fData(micro_eset)
+          micro_expr <- Biobase::exprs(micro_eset); fdata <- Biobase::fData(micro_eset)
           gene_symbols <- suppressMessages(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id))
           rownames(micro_expr) <- gene_symbols
           vld <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
           micro_expr <- micro_expr[vld, , drop = FALSE]
           if (any(duplicated(rownames(micro_expr)))) micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
           all_expr_list[[gse_id]] <- micro_expr
-          all_metadata_list[[gse_id]] <- pData(micro_eset)
+          all_metadata_list[[gse_id]] <- Biobase::pData(micro_eset)
           ext_log <- paste0(ext_log, "OK (", nrow(micro_expr), "g x ", ncol(micro_expr), "s)\n")
         }
 
