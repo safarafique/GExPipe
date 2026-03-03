@@ -15,6 +15,7 @@ biocViews: Software, GeneExpression, RNASeq, Microarray, DifferentialExpression,
     Pathways, Network, Visualization
 URL: https://bioconductor.org/packages/OmniVerse
 BugReports: https://support.bioconductor.org/tag/OmniVerse
+Additional_repositories: https://bioconductor.org/packages/3.22/bioc
 Imports:
     AnnotationDbi (>= 1.72.0),
     Biobase (>= 2.70.0),

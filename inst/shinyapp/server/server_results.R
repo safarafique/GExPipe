@@ -385,25 +385,56 @@ server_results <- function(input, output, session, rv) {
         
       } else {
         # ==================================================================
-        # LIMMA PATHWAY (current default)
+        # LIMMA PATHWAY (microarray, or merged RNA+microarray; batch-aware when multiple datasets)
         # ==================================================================
         withProgress(message = 'limma DE analysis...', value = 0, {
           
-          rv$unified_metadata$Condition <- factor(rv$unified_metadata$Condition,
-                                                   levels = c("Normal", "Disease"))
+          if (is.null(rv$batch_corrected) || is.null(rv$unified_metadata)) {
+            showNotification(
+              tags$div(icon("exclamation-triangle"), tags$strong(" Missing data."),
+                       " Run Steps 1–5 (Download, Groups, QC, Normalize, Batch) first."),
+              type = "error", duration = 8)
+            rv$de_running <- FALSE
+            return()
+          }
           
-          design <- model.matrix(~ 0 + Condition, data = rv$unified_metadata)
-          colnames(design) <- levels(rv$unified_metadata$Condition)
+          meta <- rv$unified_metadata
+          meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
+          rv$unified_metadata <- meta
           
-          contrast <- makeContrasts(Disease - Normal, levels = design)
+          # Align samples: batch_corrected and metadata must match
+          common_samp <- intersect(colnames(rv$batch_corrected), rownames(meta))
+          if (length(common_samp) < 2) {
+            showNotification(
+              tags$div(icon("exclamation-triangle"), tags$strong(" Too few samples."),
+                       " Need at least 2 samples with groups assigned."),
+              type = "error", duration = 8)
+            rv$de_running <- FALSE
+            return()
+          }
+          rv$batch_corrected <- rv$batch_corrected[, common_samp, drop = FALSE]
+          meta <- meta[common_samp, , drop = FALSE]
+          
+          # Design: include Dataset (batch) when multiple datasets (merged or multi-GSE)
+          n_batches <- length(unique(meta$Dataset))
+          if (n_batches > 1) {
+            meta$Dataset <- factor(meta$Dataset)
+            design <- model.matrix(~ Dataset + Condition, data = meta)
+            coef_condition <- ncol(design)  # last column is ConditionDisease
+            fit <- limma::lmFit(rv$batch_corrected, design)
+            fit2 <- limma::eBayes(fit)
+            de_results <- limma::topTable(fit2, coef = coef_condition, number = Inf, adjust.method = "BH")
+          } else {
+            design <- model.matrix(~ 0 + Condition, data = meta)
+            colnames(design) <- levels(meta$Condition)
+            contrast <- limma::makeContrasts(Disease - Normal, levels = design)
+            fit <- limma::lmFit(rv$batch_corrected, design)
+            fit2 <- limma::contrasts.fit(fit, contrast)
+            fit2 <- limma::eBayes(fit2)
+            de_results <- limma::topTable(fit2, number = Inf, adjust.method = "BH")
+          }
           
           incProgress(0.5)
-          
-          fit <- lmFit(rv$batch_corrected, design)
-          fit2 <- contrasts.fit(fit, contrast)
-          fit2 <- eBayes(fit2)
-          
-          de_results <- topTable(fit2, number = Inf, adjust.method = "BH")
           de_results$Gene <- rownames(de_results)
           de_results <- de_results[, c("Gene", "logFC", "AveExpr", "P.Value", "adj.P.Val")]
           
