@@ -7,6 +7,18 @@
 
 server_immune <- function(input, output, session, rv) {
 
+  output$immune_process_summary_ui <- renderUI({
+    if (is.null(rv$immune_matrix) || nrow(rv$immune_matrix) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run immune deconvolution to see process summary."))
+    }
+    n_samp <- nrow(rv$immune_matrix)
+    n_cells <- length(setdiff(colnames(rv$immune_matrix), "SampleID"))
+    meth <- if (is.null(rv$immune_method)) "" else rv$immune_method
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 15 complete."), " Immune deconvolution (", meth, "): ", n_cells, " cell types \u00d7 ", n_samp, " samples. Boxplot, heatmap, and lollipop above."))
+  })
+
   output$immune_placeholder_ui <- renderUI({
     expr <- rv$batch_corrected
     if (!is.null(expr) && (is.matrix(expr) || is.data.frame(expr)) && nrow(expr) > 0) return(NULL)

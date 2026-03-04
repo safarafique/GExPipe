@@ -1,8 +1,7 @@
 # ==============================================================================
-# UI_WELCOME.R - Landing / Welcome Page
+# UI_WELCOME.R - Landing / Welcome Page (GExPipe - Gene Expression Pipeline)
 # ==============================================================================
-# Shown when the app first loads. User clicks "Go to Analysis" to proceed.
-# Enhanced with 3D pipeline visualization, animations, and attention-grabbing design.
+# Shown when the app first loads. User clicks "Start Analyzing" to proceed.
 # ==============================================================================
 
 ui_welcome <- fluidPage(
@@ -41,6 +40,7 @@ ui_welcome <- fluidPage(
       .badge-pop:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.25); }
       .pipeline-item { padding: 6px 0; border-left: 3px solid transparent; padding-left: 14px; margin: 4px 0; transition: all 0.25s ease; }
       .pipeline-item:hover { border-left-color: #8b5cf6; padding-left: 18px; }
+      .watermark-welcome { position: fixed; bottom: 24px; right: 28px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255,255,255,0.12); pointer-events: none; z-index: 0; font-family: 'Outfit', sans-serif; }
     "))
   ),
   style = "min-height: 100vh; background: linear-gradient(135deg, #0e0a1f 0%, #1e1b4b 18%, #312e81 35%, #1e3a5f 52%, #4c1d95 70%, #0f172a 100%); 
@@ -55,6 +55,7 @@ ui_welcome <- fluidPage(
     .bg-mesh { position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 32px 32px; pointer-events: none; }
   ")),
   tags$div(class = "bg-glow"), tags$div(class = "bg-glow-2"), tags$div(class = "bg-mesh"),
+  tags$div(class = "watermark-welcome", "GExPipe · Gene Expression Pipeline"),
   tags$div(
     style = "max-width: 980px; width: 100%; position: relative; z-index: 1;",
     # Hero: Logo + Stats Badges + 3D Pipeline
@@ -62,19 +63,19 @@ ui_welcome <- fluidPage(
       style = "text-align: center; margin-bottom: 48px;",
       tags$h1(
         class = "hero-animate welcome-hero-logo",
-        style = "font-size: 64px; font-weight: 800; margin-bottom: 14px; letter-spacing: -1px; line-height: 1.1;",
-        icon("dna", style = "margin-right: 18px; color: #a78bfa; filter: drop-shadow(0 0 16px rgba(167,139,250,0.9)); vertical-align: middle;"),
-        tags$span(class = "hero-title-gradient", "OmniVerse")
+        style = "font-size: 58px; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.5px; line-height: 1.15;",
+        icon("dna", style = "margin-right: 16px; color: #a78bfa; filter: drop-shadow(0 0 16px rgba(167,139,250,0.9)); vertical-align: middle;"),
+        tags$span(class = "hero-title-gradient", "GExPipe")
       ),
       tags$p(
         class = "hero-animate",
-        style = "color: rgba(255,255,255,0.98); font-size: 22px; font-weight: 600; letter-spacing: 0.4px; margin-bottom: 10px; text-shadow: 0 2px 20px rgba(0,0,0,0.3);",
-        "Your One-Stop RNA-seq & Microarray Analysis Pipeline"
+        style = "color: rgba(255,255,255,0.98); font-size: 20px; font-weight: 600; letter-spacing: 0.3px; margin-bottom: 6px; text-shadow: 0 2px 20px rgba(0,0,0,0.3);",
+        "Gene Expression Pipeline"
       ),
       tags$p(
         class = "hero-animate",
-        style = "color: rgba(255,255,255,0.8); font-size: 16px; font-weight: 500; letter-spacing: 0.6px; margin-bottom: 28px;",
-        "From GEO download to publication-ready reports — all in one place"
+        style = "color: rgba(255,255,255,0.85); font-size: 16px; font-weight: 500; letter-spacing: 0.4px; margin-bottom: 28px;",
+        "One workflow: GEO → QC → DE → WGCNA → PPI → ML → reports. No coding required."
       ),
       # Stats badges
       tags$div(
@@ -135,17 +136,17 @@ ui_welcome <- fluidPage(
                 box-shadow: 0 32px 88px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.5), inset 0 1px 0 rgba(255,255,255,0.8);
                 margin-bottom: 36px; animation: fadeInUp 0.9s ease 1.2s forwards; opacity: 0;",
       tags$p(
-        style = "color: #334155; font-size: 17px; line-height: 1.85; margin-bottom: 32px; text-align: left; font-weight: 500;
-                 letter-spacing: 0.2px;",
-        "OmniVerse guides you through a complete analysis workflow: from GEO download and QC,
-         through normalization and differential expression, to WGCNA, pathway enrichment, PPI networks,
-         machine learning, and publication-ready reports."
+        style = "color: #334155; font-size: 16px; line-height: 1.9; margin-bottom: 28px; text-align: left; font-weight: 500;
+                 letter-spacing: 0.15px;",
+        "GExPipe walks you through a complete gene expression analysis: download data from GEO, run quality checks,
+         normalize and correct for batch effects, find differentially expressed genes, build co-expression networks (WGCNA),
+         enrich pathways, analyze protein interactions (PPI), run machine learning, and export publication-ready figures and reports."
       ),
       tags$h3(
-        style = "color: #1e293b; font-size: 21px; font-weight: 700; margin: 30px 0 16px 0; text-align: left;
-                 border-bottom: 3px solid #8b5cf6; padding-bottom: 10px; display: inline-block; letter-spacing: -0.3px;",
+        style = "color: #1e293b; font-size: 20px; font-weight: 700; margin: 26px 0 14px 0; text-align: left;
+                 border-bottom: 3px solid #8b5cf6; padding-bottom: 8px; display: inline-block; letter-spacing: -0.2px;",
         icon("sitemap", style = "margin-right: 10px; color: #8b5cf6;"),
-        "Pipeline Overview"
+        "What you can do"
       ),
       tags$div(
         style = "text-align: left; margin: 0 0 28px 0; font-size: 14px; line-height: 1.95; color: #475569;",
@@ -158,10 +159,10 @@ ui_welcome <- fluidPage(
         tags$div(class = "pipeline-item", tags$strong("11–16. Validation, ROC, Nomogram, GSEA, Immune, Summary"), " — Validation and report")
       ),
       tags$h3(
-        style = "color: #1e293b; font-size: 21px; font-weight: 700; margin: 30px 0 16px 0; text-align: left;
-                 border-bottom: 3px solid #8b5cf6; padding-bottom: 10px; display: inline-block; letter-spacing: -0.3px;",
+        style = "color: #1e293b; font-size: 20px; font-weight: 700; margin: 26px 0 14px 0; text-align: left;
+                 border-bottom: 3px solid #8b5cf6; padding-bottom: 8px; display: inline-block; letter-spacing: -0.2px;",
         icon("star", style = "margin-right: 10px; color: #f59e0b;"),
-        "Why OmniVerse?"
+        "Why GExPipe?"
       ),
       tags$ul(
         style = "text-align: left; padding-left: 26px; margin: 0 0 38px 0; color: #475569; font-size: 14px; line-height: 2.1;
@@ -182,8 +183,12 @@ ui_welcome <- fluidPage(
                 icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
                 "Optional workspace save/load to resume analyses")
       ),
+      tags$p(
+        style = "color: #64748b; font-size: 14px; font-weight: 600; margin-bottom: 8px; text-align: center;",
+        "Ready? Click below to open the pipeline."
+      ),
       tags$div(
-        style = "text-align: center; margin-top: 28px; padding-top: 8px;",
+        style = "text-align: center; margin-top: 16px; padding-top: 4px;",
         actionButton(
           "go_to_analysis",
           tagList(icon("rocket", style = "margin-right: 12px; font-size: 18px;"), " Start Analyzing"),
@@ -194,7 +199,7 @@ ui_welcome <- fluidPage(
         ),
         tags$p(
           style = "color: #94a3b8; font-size: 12px; margin-top: 14px; font-weight: 500;",
-          "Professional RNA-seq & Microarray Analysis"
+          "GExPipe — Gene Expression Pipeline"
         )
       )
     )

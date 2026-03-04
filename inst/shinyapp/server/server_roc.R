@@ -41,6 +41,16 @@ server_roc <- function(input, output, session, rv) {
     }
   })
 
+  output$roc_process_summary_ui <- renderUI({
+    if (is.null(rv$ml_common_genes) || length(rv$ml_common_genes) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Complete ML (Step 10) to see ROC process summary."))
+    }
+    n_genes <- length(rv$ml_common_genes)
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 12 summary."), " ROC/AUC for ", n_genes, " ML common genes. Training AUC table and bar plot above; validation AUC when external data is loaded."))
+  })
+
   output$roc_placeholder_ui <- renderUI({
     if (!is.null(rv$ml_common_genes) && length(rv$ml_common_genes) > 0) return(NULL)
     tags$div(

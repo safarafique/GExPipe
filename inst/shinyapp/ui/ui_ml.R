@@ -233,7 +233,12 @@ ui_ml <- tabItem(
       )
     )
   ),
-
+  fluidRow(
+    box(
+      title = tags$span(icon("file-alt"), " Process Summary"),
+      width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+      uiOutput("ml_process_summary_ui"))
+  ),
   fluidRow(
     box(width = 12, status = "primary", solidHeader = FALSE,
         tags$div(style = "text-align: center; padding: 20px 0;",

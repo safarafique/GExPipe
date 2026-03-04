@@ -1,5 +1,5 @@
-# OmniVerse: package versions (minimums in DESCRIPTION; tested with R 4.5.2)
-# Install: BiocManager::install("OmniVerse")
+# GExPipe: package versions (minimums in DESCRIPTION; tested with R 4.5.2)
+# Install: BiocManager::install("GExPipe")
 # See inst/PACKAGE_VERSIONS.md for details.
 # Imports (required)
 package	version

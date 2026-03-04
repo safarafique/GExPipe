@@ -8,6 +8,18 @@
 
 server_gsea <- function(input, output, session, rv) {
 
+  output$gsea_process_summary_ui <- renderUI({
+    n_gene <- length(rv$gsea_results_by_gene)
+    has_result <- !is.null(rv$gsea_result) && inherits(rv$gsea_result, "enrichResult") && nrow(rv$gsea_result@result) > 0
+    if (n_gene == 0 && !has_result) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run GSEA to see process summary."))
+    }
+    msg <- if (n_gene > 0) paste0("GSEA run for ", n_gene, " target gene(s).") else "GSEA complete (pathway enrichment)."
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 14 complete."), " ", msg, " Enrichment plots and pathway lists above."))
+  })
+
   output$gsea_placeholder_ui <- renderUI({
     expr <- rv$batch_corrected
     if (!is.null(expr) && (is.matrix(expr) || is.data.frame(expr)) && nrow(expr) > 0) return(NULL)

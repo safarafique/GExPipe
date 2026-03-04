@@ -1,8 +1,8 @@
-# Package versions for OmniVerse (R 4.5.2)
+# Package versions for GExPipe (R 4.5.2)
 
 ## Tested and specified for R >= 4.5.0 (best with R 4.5.2)
 
-The `DESCRIPTION` file uses **minimum version** constraints (e.g. `shiny (>= 1.13.0)`) so that installs via `BiocManager::install("OmniVerse")` pull versions known to work with **R 4.5.2** and Bioconductor 3.22. The table below lists the versions used when setting those minimums; newer compatible versions from CRAN/Bioconductor should work.
+The `DESCRIPTION` file uses **minimum version** constraints (e.g. `shiny (>= 1.13.0)`) so that installs via `BiocManager::install("GExPipe")` pull versions known to work with **R 4.5.2** and Bioconductor 3.22. The table below lists the versions used when setting those minimums; newer compatible versions from CRAN/Bioconductor should work.
 
 | Package         | Version (≥ in DESCRIPTION) |
 |-----------------|-----------------------------|
@@ -72,4 +72,4 @@ The `DESCRIPTION` file uses **minimum version** constraints (e.g. `shiny (>= 1.1
 Install Suggests only if you use those features (e.g. knitr/rmarkdown for vignettes, BiocCheck for submission).
 
 - **Plain list:** `inst/pkg_versions.txt` has the same info in tab-separated form.
-- **Record your session:** After loading OmniVerse from source, run `source(system.file("script_save_pkg_versions.R", package = "OmniVerse"))` to overwrite `inst/pkg_versions.txt` with your current package versions.
+- **Record your session:** Use `scripts/generate_session_info.R` in the source tree to generate session/version info; the installed package ships a static `inst/pkg_versions.txt` and `inst/PACKAGE_VERSIONS.md`.

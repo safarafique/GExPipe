@@ -49,6 +49,21 @@ server_download <- function(input, output, session, rv) {
     sprintf("%02d:%02d", elapsed %/% 60, elapsed %% 60)
   })
 
+  output$download_process_summary_ui <- renderUI({
+    expr <- rv$combined_expr_raw
+    if (is.null(expr) || nrow(expr) == 0 || ncol(expr) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run download to see process summary (datasets, samples, genes)."))
+    }
+    n_genes <- nrow(expr)
+    n_samples <- ncol(expr)
+    n_rna <- length(rv$rna_counts_list)
+    n_micro <- length(rv$micro_expr_list)
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 1 complete."), " Combined matrix: ", format(n_genes, big.mark = ","), " genes \u00d7 ", format(n_samples, big.mark = ","), " samples."),
+      tags$p("RNA-seq datasets: ", n_rna, ". Microarray datasets: ", n_micro, ". Common genes (intersection) retained. See log below for details."))
+  })
+
   observeEvent(input$start_processing, {
     shinyjs::disable("start_processing")
     shinyjs::html("start_processing",

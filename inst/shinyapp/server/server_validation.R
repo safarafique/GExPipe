@@ -14,6 +14,22 @@ server_validation <- function(input, output, session, rv) {
   })
 
   # ---- Mode description panel ----
+  output$validation_process_summary_ui <- renderUI({
+    mode <- input$validation_mode
+    if (is.null(mode)) mode <- "external"
+    if (mode == "external" && (is.null(rv$external_validation_expr) || nrow(rv$external_validation_expr) == 0)) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Complete validation setup (download GSE, select groups, run DE) to see process summary."))
+    }
+    if (mode == "internal") {
+      return(tags$p(style = "font-size: 14px; color: #333; margin: 0;", tags$strong("Step 11 (Internal)."), " 70/30 split will be used for nomogram. Proceed to ROC/Nomogram."))
+    }
+    n_samp <- ncol(rv$external_validation_expr)
+    n_genes <- nrow(rv$external_validation_expr)
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 11 complete (External)."), " Validation data: ", format(n_genes, big.mark = ","), " genes \u00d7 ", n_samp, " samples. DE and ROC/Nomogram use this cohort."))
+  })
+
   output$validation_mode_info_ui <- renderUI({
     mode <- input$validation_mode
     if (is.null(mode)) mode <- "external"

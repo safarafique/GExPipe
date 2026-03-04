@@ -909,6 +909,17 @@ server_wgcna <- function(input, output, session, rv) {
           for (g in unique_groups) {
             trait_data[[as.character(g)]] <- ifelse(sample_info[[cond_col]] == g, 1, 0)
           }
+          # Add "Disease vs Normal" (or "A vs B") so both show on one line when selected
+          if (length(unique_groups) == 2L) {
+            ug <- as.character(unique_groups)
+            if ("Normal" %in% ug && "Disease" %in% ug) {
+              both_label <- "Disease vs Normal"
+              trait_data[[both_label]] <- trait_data[["Disease"]]
+            } else {
+              both_label <- paste(ug, collapse = " vs ")
+              trait_data[[both_label]] <- trait_data[[ug[1]]]
+            }
+          }
         }
         rv$trait_data <- trait_data
         
@@ -1432,6 +1443,17 @@ server_wgcna <- function(input, output, session, rv) {
     })
   })
   
+  output$wgcna_process_summary_ui <- renderUI({
+    if (is.null(rv$significant_modules) || nrow(rv$significant_modules) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Complete WGCNA (soft threshold, blockwise modules, module-trait, identify significant modules) to see process summary."))
+    }
+    n_mods <- nrow(rv$significant_modules)
+    n_genes <- if (!is.null(rv$gene_metrics)) nrow(rv$gene_metrics) else 0
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 7 complete."), " Significant modules: ", n_mods, ". Gene metrics: ", format(n_genes, big.mark = ","), " genes. Use these for Common Genes (Step 8)."))
+  })
+
   output$significant_modules_summary_ui <- renderUI({
     req(rv$significant_modules)
     
@@ -1600,12 +1622,11 @@ server_wgcna <- function(input, output, session, rv) {
     }
     
     tags$div(
-      class = "alert alert-info",
-      style = "margin-top: 25px; padding: 10px;",
-      tags$p(tags$strong("Module: ", input$select_module)),
-      tags$p("Total genes: ", n_total),
+      style = "margin-top: 25px; padding: 12px 14px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; font-size: 13px; color: #212529;",
+      tags$p(tags$strong("Module:"), " ", input$select_module, style = "margin: 0 0 4px 0;"),
+      tags$p("Total genes:", " ", format(n_total, big.mark = ","), style = "margin: 0;"),
       if (input$filter_sig_genes == "sig_only") {
-        tags$p("Significant genes: ", n_sig)
+        tags$p("Significant genes:", " ", format(n_sig, big.mark = ","), style = "margin: 4px 0 0 0;")
       }
     )
   })
@@ -1613,11 +1634,22 @@ server_wgcna <- function(input, output, session, rv) {
   output$wgcna_gs_mm_trait_ui <- renderUI({
     if (is.null(rv$trait_data) || ncol(rv$trait_data) < 1) return(NULL)
     trait_choices <- colnames(rv$trait_data)
-    selectInput("wgcna_gs_mm_trait",
-                label = tags$strong("Trait for Gene Significance (GS vs MM):"),
-                choices = trait_choices,
-                selected = trait_choices[1],
-                width = "100%")
+    # Prefer combined "Disease vs Normal" (or "A vs B") as default so both show on one line
+    default <- trait_choices[1]
+    combined_idx <- grep(" vs ", trait_choices, fixed = TRUE)
+    if (length(combined_idx) > 0L) default <- trait_choices[combined_idx[1]]
+    tagList(
+      tags$p(
+        style = "margin: 0 0 8px 0; font-size: 13px; color: #495057;",
+        tags$strong("Traits: "),
+        tags$span(paste(trait_choices, collapse = "  |  "))
+      ),
+      selectInput("wgcna_gs_mm_trait",
+                  label = tags$strong("Trait for gene significance (GS vs MM):"),
+                  choices = trait_choices,
+                  selected = default,
+                  width = "100%")
+    )
   })
 
   wgcna_gs_mm_trait_selected <- reactive({
@@ -1640,20 +1672,37 @@ server_wgcna <- function(input, output, session, rv) {
     pval_trait <- if (requireNamespace("WGCNA", quietly = TRUE))
       WGCNA::corPvalueStudent(abs(module_genes$GS_trait), n_samp) else rep(1, nrow(module_genes))
     module_genes$Significant <- (pval_trait < gs_pval & abs(module_genes$MM) >= mm_cor)
-    ggplot2::ggplot(module_genes, ggplot2::aes(x = MM, y = GS_trait)) +
-      ggplot2::geom_point(ggplot2::aes(color = Significant), alpha = 0.7, size = 2.5) +
-      ggplot2::scale_color_manual(values = c("TRUE" = "darkred", "FALSE" = "grey70"), name = "GS/MM significant") +
-      ggplot2::labs(
-        title = paste0("GS vs MM — ", module_color, " (trait: ", trait_col, ")"),
-        x = "Module Membership (MM)", y = "Gene Significance (GS)"
+    # Publication-ready: colorblind-friendly palette, classic theme, clear axes
+    col_sig <- "#D55E00"   # orange (colorblind-safe)
+    col_nonsig <- "#999999"
+    p <- ggplot2::ggplot(module_genes, ggplot2::aes(x = MM, y = GS_trait)) +
+      ggplot2::geom_hline(yintercept = 0, linewidth = 0.35, colour = "grey40", linetype = "solid") +
+      ggplot2::geom_vline(xintercept = c(-mm_cor, mm_cor), linewidth = 0.35, colour = "grey50", linetype = "dashed") +
+      ggplot2::geom_point(ggplot2::aes(color = Significant), alpha = 0.8, size = 3, stroke = 0) +
+      ggplot2::scale_color_manual(
+        values = c("TRUE" = col_sig, "FALSE" = col_nonsig),
+        name = "GS/MM significant",
+        labels = c("FALSE" = "No", "TRUE" = "Yes")
       ) +
-      ggplot2::theme_minimal(base_size = 12) +
+      ggplot2::labs(
+        title = paste0("Gene significance vs. module membership — ", module_color, " (trait: ", trait_col, ")"),
+        x = "Module membership (MM)",
+        y = "Gene significance (GS)"
+      ) +
+      ggplot2::theme_classic(base_size = 14) +
       ggplot2::theme(
+        plot.title = ggplot2::element_text(hjust = 0.5, size = 14, face = "bold", margin = ggplot2::margin(b = 10)),
+        axis.title = ggplot2::element_text(size = 13, colour = "black"),
+        axis.text = ggplot2::element_text(size = 11, colour = "black"),
+        axis.line = ggplot2::element_line(linewidth = 0.5, colour = "black"),
         legend.position = "top",
-        plot.title = ggplot2::element_text(hjust = 0.5, size = 13),
-        axis.title = ggplot2::element_text(size = 12),
-        plot.margin = ggplot2::margin(t = 10, r = 10, b = 28, l = 10, unit = "pt")
+        legend.title = ggplot2::element_text(size = 12, face = "plain"),
+        legend.text = ggplot2::element_text(size = 11),
+        legend.key.size = ggplot2::unit(0.5, "cm"),
+        plot.margin = ggplot2::margin(t = 14, r = 14, b = 14, l = 18, unit = "pt"),
+        panel.background = ggplot2::element_rect(fill = "white", colour = NA)
       )
+    p
   }
 
   output$gs_mm_plot <- renderPlot({

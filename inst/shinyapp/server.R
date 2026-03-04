@@ -20,7 +20,7 @@ server <- function(input, output, session) {
       shiny::showNotification(
         paste0("Some packages could not be loaded: ", paste(head(missing_pkgs, 5), collapse = ", "),
                if (length(missing_pkgs) > 5) paste0(" and ", length(missing_pkgs) - 5, " more") else "", ". ",
-               "Install with: BiocManager::install(\"OmniVerse\") for full functionality."),
+               "Install with: BiocManager::install(\"GExPipe\") for full functionality."),
         type = "warning", duration = 12, session = session
       )
     }, error = function(e) NULL)
@@ -877,9 +877,65 @@ server <- function(input, output, session) {
     }
   }, ignoreInit = TRUE)
   
-  # Header "Guided Tour / Screenshot" button: screenshot is handled by JavaScript in ui.R (full-page capture); no server-side tour start
+  # Header "Guided Tour" button: show User Guideline modal (no screenshot)
   observeEvent(input$start_tour, {
-    # Button used for screenshot only; tour disabled to avoid double action
-    invisible(NULL)
+    showModal(modalDialog(
+      title = tags$span(icon("book-open"), " GExPipe User Guideline"),
+      size = "l",
+      easyClose = TRUE,
+      footer = modalButton("Close"),
+      tags$div(
+        style = "max-height: 75vh; overflow-y: auto; padding-right: 8px;",
+        # ---- About ----
+        tags$h4(icon("info-circle"), " About GExPipe", style = "color: #1e293b; margin-top: 0; border-bottom: 2px solid #667eea; padding-bottom: 6px;"),
+        tags$p(
+          "GExPipe (Gene Expression Pipeline) is a Shiny app for end-to-end analysis of bulk RNA-seq and microarray data. ",
+          "You can download data from GEO, run quality control, normalize, correct for batch effects, perform differential expression (limma, DESeq2, edgeR), ",
+          "build co-expression networks (WGCNA), enrich pathways (GO/KEGG), analyze protein–protein interactions (PPI), run machine learning, and export validation, ROC, nomogram, GSEA, and immune deconvolution results — all without writing code."
+        ),
+        tags$h4(icon("list-check"), " Features at a glance", style = "color: #1e293b; margin-top: 22px; border-bottom: 2px solid #667eea; padding-bottom: 6px;"),
+        tags$ul(
+          style = "padding-left: 22px; line-height: 1.85; color: #334155;",
+          tags$li(tags$strong("Step 1 – Download:"), " GEO access (GSE IDs), RNA-seq / Microarray / Merged; gene symbol mapping."),
+          tags$li(tags$strong("Step 2 – QC & Visualization:"), " Gene overlap, PCA, sample connectivity."),
+          tags$li(tags$strong("Steps 3–5 – Normalize, Groups, Batch:"), " Normalization, group assignment (Normal/Disease), batch correction (ComBat, etc.)."),
+          tags$li(tags$strong("Step 6 – Differential Expression:"), " limma, DESeq2, edgeR; volcano plot, heatmaps, DEG tables."),
+          tags$li(tags$strong("Steps 7–8 – WGCNA & Common Genes:"), " Co-expression modules, module–trait links, GO/KEGG enrichment on DEG ∩ WGCNA genes."),
+          tags$li(tags$strong("Step 9 – PPI:"), " STRINGdb-based protein interaction network, hub genes, network plots."),
+          tags$li(tags$strong("Step 10 – Machine Learning:"), " LASSO, Random Forest, SVM-RFE, Boruta, sPLS-DA, XGBoost; Venn of selected genes."),
+          tags$li(tags$strong("Steps 11–16 – Validation, ROC, Nomogram, GSEA, Immune, Summary:"), " Model validation, ROC curves, nomogram, GSEA, immune deconvolution, PDF-ready summary.")
+        ),
+        tags$h4(icon("route"), " Recommended workflow", style = "color: #1e293b; margin-top: 22px; border-bottom: 2px solid #667eea; padding-bottom: 6px;"),
+        tags$p("Follow the sidebar steps in order. Each step depends on the previous one.", style = "margin-bottom: 10px; color: #475569;"),
+        tags$ol(
+          style = "padding-left: 22px; line-height: 1.9; color: #334155;",
+          tags$li("Download your dataset(s) (Step 1) and run QC (Step 2)."),
+          tags$li("Normalize (Step 3), assign Normal/Disease groups (Step 4), then run batch correction (Step 5)."),
+          tags$li("Run differential expression (Step 6); use the DE method that matches your data (limma for microarray, DESeq2/edgeR for RNA-seq counts)."),
+          tags$li("Run WGCNA (Step 7), then compute common genes between DEGs and WGCNA (Step 8) and run GO/KEGG enrichment."),
+          tags$li("Build the PPI network (Step 9), then run ML (Step 10) on the selected genes."),
+          tags$li("Validate (Step 11), plot ROC (Step 12), build nomogram (Step 13), run GSEA (Step 14), optional immune deconvolution (Step 15), and generate the results summary (Step 16).")
+        ),
+        tags$h4(icon("lightbulb"), " Quick example", style = "color: #1e293b; margin-top: 22px; border-bottom: 2px solid #667eea; padding-bottom: 6px;"),
+        tags$p("Example: analyze a public RNA-seq study from GEO.", style = "margin-bottom: 8px; color: #475569;"),
+        tags$ul(
+          style = "padding-left: 22px; line-height: 1.8; color: #334155;",
+          tags$li("Step 1: Enter a GSE ID (e.g. GSE123456), select \"RNA-seq\", click \"Download\". Wait for processing."),
+          tags$li("Step 2: Check QC plots (PCA, sample clustering)."),
+          tags$li("Step 4: In \"Select Groups\", assign each sample to \"Normal\" or \"Disease\" using the metadata column that contains group labels."),
+          tags$li("Step 5: Run batch correction (e.g. ComBat with reference batch if you have multiple datasets)."),
+          tags$li("Step 6: Run DE (choose DESeq2 or edgeR for RNA-seq). Inspect volcano plot and DEG table."),
+          tags$li("Step 7: Prepare WGCNA data, pick soft threshold, build modules. Step 8: Compute common genes and run GO/KEGG."),
+          tags$li("Step 9: Run PPI on common genes. Step 10: Extract data for ML, run your chosen methods, use the gene list for ROC/Nomogram/GSEA.")
+        ),
+        tags$h4(icon("envelope"), " Contact", style = "color: #1e293b; margin-top: 22px; border-bottom: 2px solid #667eea; padding-bottom: 6px;"),
+        tags$p("If you have questions, need help, or want to report issues, please contact:", style = "margin-bottom: 4px; color: #475569;"),
+        tags$p(
+          tags$a(href = "mailto:safa.res.sbb@pu.edu.pk", "safa.res.sbb@pu.edu.pk", style = "font-weight: bold; color: #6366f1;"),
+          style = "margin-bottom: 0;"
+        )
+      )
+    ))
   })
 }
+

@@ -1,10 +1,10 @@
 # ==============================================================================
-# APP.R - OmniVerse launcher (R 4.5.2; no additional setup required)
+# APP.R - GExPipe (Gene Expression Pipeline) launcher
 # ==============================================================================
 # Run: source("app.R") or Run App in RStudio. Dependencies auto-install on first run.
 # ==============================================================================
 
-cat("\n  OmniVerse — Bulk RNA-seq | Microarray | Merged\n  Loading...\n\n")
+cat("\n  GExPipe — Gene Expression Pipeline\n  Loading...\n\n")
 
 # Check for required files
 required_files <- c("global.R", "ui.R", "server.R")
@@ -18,7 +18,7 @@ if (length(missing_files) > 0) {
 err_global <- tryCatch(source("global.R"), error = function(e) e)
 if (inherits(err_global, "error")) {
   stop("Failed to load global.R: ", conditionMessage(err_global),
-       "\nInstall missing packages with: BiocManager::install(\"OmniVerse\") or install.packages(\"remotes\"); remotes::install_github(\"safarafique/Shiny_app-OmniVerse-\", dependencies = TRUE)")
+       "\nInstall missing packages with: BiocManager::install(\"GExPipe\") when available, or install the package from source.")
 }
 
 err_ui <- tryCatch(source("ui.R"), error = function(e) e)

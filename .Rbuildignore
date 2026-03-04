@@ -8,11 +8,11 @@
 ^README\.md$
 ^SUBMISSION\.md$
 ^BIOC_SUBMISSION_CHECKLIST\.md$
-^OmniVerse\.BiocCheck$
-^OmniVerse\.Rcheck$
-^OmniVerse_.*\.tar\.gz$
+^GExPipe\.BiocCheck$
+^GExPipe\.Rcheck$
+^GExPipe_.*\.tar\.gz$
 ^app$
-^OmniVerse/
+^GExPipe/
 ^inst/shinyapp/micro_data
 ^inst/shinyapp/rna_data
 ^inst/shinyapp/ext_val_rna
@@ -21,6 +21,10 @@
 ^inst/shinyapp/.*\.log$
 ^vignettes/.*\.docx$
 ^vignettes/vignette\.htm$
+^vignettes/vignette\.Rmd$
 ^vignettes/vignette_files/
+^PACKAGE_REVIEW\.md$
+^session_info\.txt$
+^scripts/
 ^vignettes/~\$
 ^vignettes/.*\.tmp$

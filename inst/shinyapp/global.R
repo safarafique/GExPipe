@@ -6,7 +6,7 @@
 options(timeout = 600)
 
 # ==============================================================================
-# LOAD PACKAGES (Bioconductor-compliant: no runtime install; use BiocManager::install("OmniVerse"))
+# LOAD PACKAGES (Bioconductor-compliant: no runtime install; use BiocManager::install("GExPipe"))
 # ==============================================================================
 cat("Loading packages (R ", R.version.string, ")...\n")
 
@@ -14,7 +14,7 @@ cat("Loading packages (R ", R.version.string, ")...\n")
 core_pkgs <- c("shiny", "shinydashboard", "shinyjs", "DT")
 for (p in core_pkgs) {
   if (!requireNamespace(p, quietly = TRUE)) {
-    stop("OmniVerse requires package '", p, "'. Install with: install.packages(\"", p, "\")")
+    stop("GExPipe requires package '", p, "'. Install with: install.packages(\"", p, "\")")
   }
 }
 suppressPackageStartupMessages({
@@ -61,8 +61,8 @@ for (p in imports_ordered) {
   }
 }
 if (length(omniVerse_missing_pkgs) > 0L) {
-  warning("OmniVerse: some packages could not be loaded (", paste(omniVerse_missing_pkgs, collapse = ", "), "). ",
-          "Install with: BiocManager::install(c(\"", omniVerse_missing_pkgs[1], "\", ...)) or BiocManager::install(\"OmniVerse\"). ",
+  warning("GExPipe: some packages could not be loaded (", paste(omniVerse_missing_pkgs, collapse = ", "), "). ",
+          "Install with: BiocManager::install(c(\"", omniVerse_missing_pkgs[1], "\", ...)) or BiocManager::install(\"GExPipe\"). ",
           "App will start but some steps may not work until these are installed.")
   options(omniVerse.missingPkgs = omniVerse_missing_pkgs)
 }
@@ -1314,7 +1314,7 @@ read_count_matrix <- function(file_path) {
       read_with_suppress(file_path),
       error = function(e) {
         if (!requireNamespace("R.utils", quietly = TRUE)) {
-          stop("Cannot read .gz file: R.utils is required. Install OmniVerse with BiocManager::install(\"OmniVerse\").")
+          stop("Cannot read .gz file: R.utils is required. Install with: install.packages(\"R.utils\").")
         }
         R.utils::gunzip(file_path, remove = FALSE, overwrite = TRUE)
         tmp <- gsub("\\.gz$", "", file_path, ignore.case = TRUE)
@@ -1455,3 +1455,4 @@ normalize_rnaseq <- function(count_matrix, dataset_name = NULL, method = "TMM") 
 }
 
 cat("✓ Helper functions loaded\n")
+

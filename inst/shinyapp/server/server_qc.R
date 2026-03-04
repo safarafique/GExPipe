@@ -498,6 +498,19 @@ server_qc <- function(input, output, session, rv) {
     })
   })
 
+  output$qc_process_summary_ui <- renderUI({
+    if (is.null(rv$combined_expr_raw) || ncol(rv$combined_expr_raw) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Complete Step 1 (Download) and view QC plots to see process summary."))
+    }
+    n_samp <- ncol(rv$combined_expr_raw)
+    n_genes <- nrow(rv$combined_expr_raw)
+    n_out <- length(rv$qc_all_outliers)
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 2 summary."), " ", format(n_genes, big.mark = ","), " genes, ", format(n_samp, big.mark = ","), " samples. Venn/UpSet show gene overlap; QC plots show expression distribution."),
+      if (isTRUE(rv$qc_outlier_detection_complete)) tags$p("Outlier detection: ", n_out, " sample(s) flagged (PCA and/or connectivity).") else NULL)
+  })
+
   # ---- Summary badges ----
   output$qc_outlier_summary_ui <- renderUI({
     if (!isTRUE(rv$qc_outlier_detection_complete)) return(NULL)

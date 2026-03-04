@@ -269,7 +269,25 @@ ui_batch <- tabItem(
         )
       )
     ),
-    
+    fluidRow(
+      box(
+        title = tags$span(icon("file-csv"), " Download expression data (batch step)"),
+        width = 12, status = "warning", solidHeader = TRUE,
+        tags$p("Export expression before and after batch correction to verify the pipeline in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
+        fluidRow(
+          column(6,
+            downloadButton("download_expr_before_batch", tagList(icon("download"), " Before batch (expression CSV)"), class = "btn-warning btn-block")),
+          column(6,
+            downloadButton("download_expr_after_batch", tagList(icon("download"), " After batch (expression CSV)"), class = "btn-success btn-block"))
+        )
+      )
+    ),
+    fluidRow(
+      box(
+        title = tags$span(icon("file-alt"), " Process Summary"),
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        uiOutput("batch_process_summary_ui"))
+    ),
     fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,
           tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
