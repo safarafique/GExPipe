@@ -558,35 +558,35 @@ server_results <- function(input, output, session, rv) {
       sub_line1 <- paste0(method_label, batch_note, " \u2014 DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")")
       sub_line2 <- paste0("LogFC \u00b1", input$logfc_cutoff, ", Adj.P \u2264 ", input$padj_cutoff)
 
-      p <- ggplot(volcano_data, aes(x = logFC, y = neg_log10_padj, color = Significance)) +
-        geom_point(alpha = 0.6, size = 2) +
-        scale_color_manual(
+      p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
+        ggplot2::geom_point(alpha = 0.6, size = 2) +
+        ggplot2::scale_color_manual(
           values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"),
           name = "Significance"
         ) +
-        theme_bw(base_size = 14) +
-        labs(
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(
           title = "Volcano Plot: Disease vs Normal",
           subtitle = paste0(sub_line1, "\n", sub_line2),
           x = "Log2 Fold Change",
           y = "-Log10 Adjusted P-value"
         ) +
-        geom_hline(yintercept = -log10(input$padj_cutoff), linetype = "dashed", color = "gray40", alpha = 0.7) +
-        geom_vline(xintercept = c(-input$logfc_cutoff, input$logfc_cutoff), linetype = "dashed", color = "gray40", alpha = 0.7) +
-        geom_text_repel(
-          aes(label = Label),
+        ggplot2::geom_hline(yintercept = -log10(input$padj_cutoff), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggplot2::geom_vline(xintercept = c(-input$logfc_cutoff, input$logfc_cutoff), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggrepel::geom_text_repel(
+          ggplot2::aes(label = Label),
           size = 3,
           max.overlaps = 20,
           box.padding = 0.5,
           segment.color = "gray50"
         ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 16),
-          plot.subtitle = element_text(size = 12),
+        ggplot2::theme(
+          plot.title = ggplot2::element_text(face = "bold", size = 16),
+          plot.subtitle = ggplot2::element_text(size = 12),
           legend.position = "right"
         ) +
-        scale_x_continuous(breaks = pretty(volcano_data$logFC, n = 8)) +
-        scale_y_continuous(breaks = pretty(volcano_data$neg_log10_padj, n = 8))
+        ggplot2::scale_x_continuous(breaks = pretty(volcano_data$logFC, n = 8)) +
+        ggplot2::scale_y_continuous(breaks = pretty(volcano_data$neg_log10_padj, n = 8))
       print(p)
     }, error = function(e) {
       plot.new()
@@ -695,16 +695,16 @@ server_results <- function(input, output, session, rv) {
       n_sig <- n_up + n_down
       logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
       padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
-      p <- ggplot(volcano_data, aes(x = logFC, y = neg_log10_padj, color = Significance)) +
-        geom_point(alpha = 0.6, size = 2) +
-        scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
-        theme_bw(base_size = 14) +
-        labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
-        geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
-        geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
-        geom_text_repel(aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
-        theme(plot.title = element_text(face = "bold", size = 16), plot.subtitle = element_text(size = 12), legend.position = "right")
-      ggsave(file, plot = p, device = "png", width = 10, height = 7, dpi = 150, bg = "white")
+      p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
+        ggplot2::geom_point(alpha = 0.6, size = 2) +
+        ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggrepel::geom_text_repel(ggplot2::aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 16), plot.subtitle = ggplot2::element_text(size = 12), legend.position = "right")
+      ggplot2::ggsave(file, plot = p, device = "png", width = 10, height = 7, dpi = 150, bg = "white")
     }
   )
 
@@ -735,16 +735,16 @@ server_results <- function(input, output, session, rv) {
       n_sig <- n_up + n_down
       logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
       padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
-      p <- ggplot(volcano_data, aes(x = logFC, y = neg_log10_padj, color = Significance)) +
-        geom_point(alpha = 0.6, size = 2) +
-        scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
-        theme_bw(base_size = 14) +
-        labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
-        geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
-        geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
-        geom_text_repel(aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
-        theme(plot.title = element_text(face = "bold", size = 16), plot.subtitle = element_text(size = 12), legend.position = "right")
-      ggsave(file, plot = p, device = "pdf", width = 10, height = 7, bg = "white")
+      p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
+        ggplot2::geom_point(alpha = 0.6, size = 2) +
+        ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggrepel::geom_text_repel(ggplot2::aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 16), plot.subtitle = ggplot2::element_text(size = 12), legend.position = "right")
+      ggplot2::ggsave(file, plot = p, device = "pdf", width = 10, height = 7, bg = "white")
     }
   )
 
