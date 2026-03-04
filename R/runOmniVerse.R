@@ -12,11 +12,11 @@
 #' @export
 #' @examples
 #' if (interactive()) {
-#'   runOmniVerse()
-#'   runOmniVerse(launch.browser = TRUE, port = 3838)
-#'   # In Google Colab: runOmniVerse(launch.browser = FALSE, host = "0.0.0.0", port = 3838)
+#'   runGExPipe()
+#'   runGExPipe(launch.browser = TRUE, port = 3838)
+#'   # In Google Colab: runGExPipe(launch.browser = FALSE, host = "0.0.0.0", port = 3838)
 #' }
-runOmniVerse <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
+runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
   app_dir <- system.file("shinyapp", package = "GExPipe")
   if (!nzchar(app_dir) || !dir.exists(app_dir)) {
     stop("GExPipe app directory not found. Reinstall the package from source or with BiocManager::install(\"GExPipe\") when available.")
