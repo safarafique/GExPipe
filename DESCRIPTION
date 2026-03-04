@@ -17,7 +17,7 @@ Encoding: UTF-8
 Depends: R (>= 4.5.2)
 biocViews: Software, GeneExpression, RNASeq, Microarray, DifferentialExpression,
     Pathways, Network, Visualization
-URL: https://bioconductor.org/packages/GExPipe
+URL: https://bioconductor.org/packages/GExPipe, https://github.com/safarafique/GExPipe-
 BugReports: https://support.bioconductor.org/tag/GExPipe
 Additional_repositories: https://bioconductor.org/packages/3.22/bioc
 Imports:
