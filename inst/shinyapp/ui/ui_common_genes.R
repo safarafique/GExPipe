@@ -32,6 +32,12 @@ ui_common_genes <- tabItem(
         uiOutput("common_genes_placeholder_ui"),
         uiOutput("common_genes_summary_ui"),
         tags$hr(),
+        tags$h5(icon("circle-notch"), " Venn diagram: DEG \u2229 WGCNA", style = "margin-top: 10px; margin-bottom: 8px; font-weight: 600;"),
+        plotOutput("common_genes_venn_plot", height = "420px"),
+        tags$div(style = "margin-top: 8px; margin-bottom: 15px;",
+          downloadButton("download_common_genes_venn_png", tagList(icon("download"), " Venn diagram (PNG)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_common_genes_venn_pdf", tagList(icon("download"), " Venn diagram (PDF)"), class = "btn-success btn-sm")),
+        tags$hr(),
         DT::dataTableOutput("common_genes_table"),
         tags$div(
           style = "margin-top: 15px;",
@@ -178,6 +184,12 @@ ui_common_genes <- tabItem(
     )
   ),
 
+  fluidRow(
+    box(
+      title = tags$span(icon("file-alt"), " Process Summary"),
+      width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+      uiOutput("common_genes_process_summary_ui"))
+  ),
   # ========== GO TO NEXT STEP: two paths (PPI then ML, or direct to ML) ==========
   fluidRow(
     box(

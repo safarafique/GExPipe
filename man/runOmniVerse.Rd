@@ -2,7 +2,7 @@
 % Please edit documentation in R/runOmniVerse.R
 \name{runOmniVerse}
 \alias{runOmniVerse}
-\title{Run the OmniVerse Shiny application}
+\title{Run the GExPipe Shiny application}
 \usage{
 runOmniVerse(
   launch.browser = TRUE,
@@ -21,7 +21,7 @@ runOmniVerse(
 Invisible. Runs the Shiny app.
 }
 \description{
-Launches the OmniVerse Shiny app for multi-omics RNA analysis (bulk RNA-seq,
+Launches the GExPipe Shiny app for multi-omics RNA analysis (bulk RNA-seq,
 microarray, GEO download, QC, normalization, differential expression,
 WGCNA, pathway enrichment, PPI, machine learning, and more).
 }

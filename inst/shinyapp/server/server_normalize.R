@@ -1220,6 +1220,18 @@ server_normalize <- function(input, output, session, rv) {
     }
   )
 
+  output$normalize_process_summary_ui <- renderUI({
+    if (is.null(rv$normalization_summary_table) || nrow(rv$normalization_summary_table) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run normalization to see process summary."))
+    }
+    st <- rv$normalization_summary_table
+    n_genes <- if ("Final_Common_Genes" %in% names(st)) max(st$Final_Common_Genes, na.rm = TRUE) else NA
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 3 complete."), " Normalization applied per dataset; see table and log below for gene counts (initial, after filtering, final common)."),
+      tags$p("Final common genes: ", format(n_genes, big.mark = ","), "."))
+  })
+
   # Render summary table
   output$normalization_summary_table <- renderTable({
     req(rv$normalization_summary_table)

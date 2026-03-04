@@ -97,15 +97,10 @@ box(
     
     fluidRow(
       box(
-        title = tags$span(icon("file-csv"), " Download data to verify your pipeline"),
+        title = tags$span(icon("file-csv"), " Download DE results"),
         width = 12, status = "info", solidHeader = TRUE,
-        tags$p("Export expression before/after batch correction and the DE (volcano) table to check results in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
-        column(4,
-          downloadButton("download_expr_before_batch", tagList(icon("download"), " Before batch (expression CSV)"), class = "btn-warning btn-block")),
-        column(4,
-          downloadButton("download_expr_after_batch", tagList(icon("download"), " After batch (expression CSV)"), class = "btn-success btn-block")),
-        column(4,
-          downloadButton("download_de_results", tagList(icon("download"), " DE results / volcano table (CSV)"), class = "btn-primary btn-block"))
+        tags$p("Export the differential expression (volcano) table to check results in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
+        downloadButton("download_de_results", tagList(icon("download"), " DE results / volcano table (CSV)"), class = "btn-primary btn-lg")
       )
     ),
     fluidRow(
@@ -166,6 +161,12 @@ box(
       )
     ),
 
+    fluidRow(
+      box(
+        title = tags$span(icon("file-alt"), " Process Summary"),
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        uiOutput("results_process_summary_ui"))
+    ),
     fluidRow(
       box(
         width = 12, status = "primary", solidHeader = FALSE,

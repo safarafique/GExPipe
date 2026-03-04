@@ -946,7 +946,19 @@ server_groups <- function(input, output, session, rv) {
   # ==============================================================================
   # GROUP SUMMARY
   # ==============================================================================
-  
+
+  output$groups_process_summary_ui <- renderUI({
+    if (is.null(rv$groups_applied) || !rv$groups_applied) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Apply group categorization to see process summary."))
+    }
+    counts <- table(rv$unified_metadata$Condition)
+    n_samp <- sum(counts)
+    n_genes <- if (!is.null(rv$combined_expr)) nrow(rv$combined_expr) else 0
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 4 complete."), " Groups applied: ", paste(names(counts), counts, sep = " = ", collapse = "; "), ". Total ", n_samp, " samples, ", format(n_genes, big.mark = ","), " genes."))
+  })
+
   output$group_summary_ui <- renderUI({
     if (is.null(rv$groups_applied) || !rv$groups_applied) {
       return(tags$div(

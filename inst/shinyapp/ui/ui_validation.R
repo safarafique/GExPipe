@@ -64,6 +64,12 @@ ui_validation <- tabItem(
   # ---- DE Results (conditional) ----
   uiOutput("val_de_panel_ui"),
 
+  fluidRow(
+    box(
+      title = tags$span(icon("file-alt"), " Process Summary"),
+      width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+      uiOutput("validation_process_summary_ui"))
+  ),
   # ---- Navigation ----
   fluidRow(
     box(width = 12, status = "primary", solidHeader = FALSE,

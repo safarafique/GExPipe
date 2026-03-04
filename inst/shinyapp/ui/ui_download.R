@@ -5,6 +5,9 @@
 ui_download <- tabItem(
     tabName = "download",
     h2(icon("download"), " Step 1: Select Platform & Download Data"),
+    tags$style(HTML(
+      "#rnaseq_gses, #microarray_gses { background-color: #f8f9fa; color: #212529; }"
+    )),
 
     fluidRow(
       box(
@@ -30,18 +33,13 @@ ui_download <- tabItem(
       box(
         title = tags$span(icon("folder-open"), " Optional: Resume from saved data"),
         width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-        tags$p("Load a previously saved workspace (from the app folder) to continue where you left off, or skip and start a new analysis below.", style = "margin-bottom: 10px;"),
+        tags$p("Upload a saved workspace (.rds) to continue where you left off, or skip and start a new analysis below.", style = "margin-bottom: 10px;"),
         fluidRow(
           column(12, tags$div(style = "margin-bottom: 12px;",
             actionButton("skip_load_btn", tagList(icon("arrow-down"), " Continue without loading — start new analysis below"), class = "btn-success btn-sm")))
         ),
         fluidRow(
-          column(6, tags$p(tags$strong("Load from folder:"), style = "margin-bottom: 4px;"), uiOutput("load_from_folder_ui")),
-          column(4, tags$div(style = "margin-top: 25px;",
-                   actionButton("load_from_folder_btn", tagList(icon("folder-open"), " Load from folder"), class = "btn-info btn-block")))
-        ),
-        fluidRow(
-          column(6, tags$p(tags$strong("Or upload a .rds file:"), style = "margin-bottom: 4px;"),
+          column(6, tags$p(tags$strong("Upload a .rds file:"), style = "margin-bottom: 4px;"),
             fileInput("upload_workspace_file", NULL, accept = c(".rds"), buttonLabel = "Choose file", placeholder = "No file chosen")),
           column(4, tags$div(style = "margin-top: 25px;",
                    actionButton("load_uploaded_btn", tagList(icon("upload"), " Load uploaded file"), class = "btn-info btn-block")))
@@ -109,16 +107,20 @@ ui_download <- tabItem(
         box(title = tags$span(icon("dna"), " RNA-seq Datasets"), 
             width = 6, status = "info", solidHeader = TRUE,
             textAreaInput("rnaseq_gses", "GSE IDs (comma separated):",
-                          value = "GSE50760, GSE104836", placeholder = "e.g. GSE50760, GSE104836",
-                          rows = 3))
+                          value = "", placeholder = "e.g. GSE50760, GSE104836",
+                          rows = 3),
+            tags$p(style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
+              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."))
       ),
       conditionalPanel(
         condition = "input.analysis_type == 'microarray' || input.analysis_type == 'merged'",
         box(title = tags$span(icon("microchip"), " Microarray Datasets"), 
             width = 6, status = "warning", solidHeader = TRUE,
             textAreaInput("microarray_gses", "GSE IDs (comma separated):",
-                          value = "GSE89076, GSE44076", placeholder = "e.g. GSE89076, GSE44076",
-                          rows = 3))
+                          value = "", placeholder = "e.g. GSE89076, GSE44076",
+                          rows = 3),
+            tags$p(style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
+              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."))
       )
     ),
     
@@ -143,8 +145,10 @@ ui_download <- tabItem(
     fluidRow(
       box(
         width = 12,
-        title = tags$span(icon("file-alt"), " Processing Summary"), 
+        title = tags$span(icon("file-alt"), " Process Summary"), 
         status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        uiOutput("download_process_summary_ui"),
+        tags$hr(style = "margin: 12px 0;"),
         tags$div(
           id = "download_summary_panel",
           verbatimTextOutput("download_log"),

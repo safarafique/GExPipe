@@ -53,6 +53,50 @@ server_batch <- function(input, output, session, rv) {
     elapsed <- as.integer(difftime(Sys.time(), rv$batch_start, units = "secs"))
     sprintf("%02d:%02d", elapsed %/% 60, elapsed %% 60)
   })
+
+  output$batch_process_summary_ui <- renderUI({
+    if (!isTRUE(rv$batch_complete) && !isTRUE(rv$single_dataset)) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run batch correction (or skip if single dataset) to see process summary."))
+    }
+    expr <- rv$batch_corrected
+    if (is.null(expr)) expr <- rv$combined_expr
+    n_genes <- if (!is.null(expr)) nrow(expr) else 0
+    n_samp <- if (!is.null(expr)) ncol(expr) else 0
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 5 complete."), if (isTRUE(rv$single_dataset)) " Single dataset: batch correction skipped." else " Batch correction applied. Before/after PCA and variance explained are shown above."),
+      tags$p(format(n_genes, big.mark = ","), " genes \u00d7 ", format(n_samp, big.mark = ","), " samples ready for DE."))
+  })
+
+  # Expression BEFORE batch correction (genes x samples) — in batch step
+  output$download_expr_before_batch <- downloadHandler(
+    filename = function() paste0("Expression_before_batch_", Sys.Date(), ".csv"),
+    content = function(file) {
+      expr <- rv$expr_filtered
+      if (is.null(expr)) expr <- rv$combined_expr
+      req(expr)
+      M <- as.data.frame(expr, stringsAsFactors = FALSE)
+      M <- cbind(Gene = rownames(M), M)
+      rownames(M) <- NULL
+      fn <- paste0("Expression_before_batch_", Sys.Date(), ".csv")
+      write.csv(M, file, row.names = FALSE)
+      write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+
+  # Expression AFTER batch correction (genes x samples) — in batch step
+  output$download_expr_after_batch <- downloadHandler(
+    filename = function() paste0("Expression_after_batch_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$batch_corrected)
+      M <- as.data.frame(rv$batch_corrected, stringsAsFactors = FALSE)
+      M <- cbind(Gene = rownames(M), M)
+      rownames(M) <- NULL
+      fn <- paste0("Expression_after_batch_", Sys.Date(), ".csv")
+      write.csv(M, file, row.names = FALSE)
+      write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
   
   # Info boxes
   output$genes_before_filter <- renderInfoBox({

@@ -43,6 +43,8 @@ server_common_genes <- function(input, output, session, rv) {
     rv$common_genes_df <- data.frame(Gene = common, stringsAsFactors = FALSE)
     rv$common_genes_deg_n <- length(deg_genes)
     rv$common_genes_wgcna_n <- length(wgcna_genes)
+    rv$common_genes_deg_list <- deg_genes
+    rv$common_genes_wgcna_list <- wgcna_genes
 
     if (length(common) == 0) {
       showNotification("Computation done: no overlap between DEGs and WGCNA significant module genes. Try relaxing DE or module-trait cutoffs.", type = "warning", duration = 8)
@@ -77,6 +79,134 @@ server_common_genes <- function(input, output, session, rv) {
       "Overlap: ", pct_deg, "% of DEGs, ", pct_wgcna, "% of WGCNA genes."
     )
   })
+
+  output$common_genes_process_summary_ui <- renderUI({
+    if (is.null(rv$common_genes_de_wgcna) || length(rv$common_genes_de_wgcna) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Compute common genes (DEG \u2229 WGCNA) to see process summary."))
+    }
+    n_common <- length(rv$common_genes_de_wgcna)
+    n_deg <- rv$common_genes_deg_n
+    n_wgcna <- rv$common_genes_wgcna_n
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 8 complete."), " Common genes: ", n_common, " (DEG: ", n_deg, ", WGCNA sig. modules: ", n_wgcna, "). Venn above; GO/KEGG and PPI use this set."))
+  })
+
+  # Venn diagram: DEG vs WGCNA (common genes overlap)
+  output$common_genes_venn_plot <- renderPlot({
+    req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
+    deg_set <- rv$common_genes_deg_list
+    wgcna_set <- rv$common_genes_wgcna_list
+    if (length(deg_set) == 0 && length(wgcna_set) == 0) {
+      plot.new()
+      text(0.5, 0.5, "No DEG or WGCNA genes to show.", cex = 1.2)
+      return(invisible(NULL))
+    }
+    grid::grid.newpage()
+    vp <- VennDiagram::venn.diagram(
+      x = list(DEG = deg_set, WGCNA = wgcna_set),
+      category.names = c("DEG", "WGCNA"),
+      filename = NULL,
+      output = TRUE,
+      disable.logging = TRUE,
+      imagetype = "png",
+      height = 2200,
+      width = 2200,
+      resolution = 200,
+      compression = "lzw",
+      lwd = 2.5,
+      lty = "blank",
+      fill = c("#E41A1C", "#377EB8"),
+      alpha = 0.65,
+      cex = 1.4,
+      fontface = "bold",
+      cat.cex = 1.3,
+      cat.fontface = "bold",
+      cat.col = c("#E41A1C", "#377EB8"),
+      margin = 0.08,
+      main = "Common Genes (DEG \u2229 WGCNA)",
+      main.cex = 1.4,
+      main.fontface = "bold"
+    )
+    grid::grid.draw(vp)
+  }, height = 420)
+
+  output$download_common_genes_venn_png <- downloadHandler(
+    filename = function() "common_genes_venn_DEG_WGCNA.png",
+    content = function(file) {
+      req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
+      deg_set <- rv$common_genes_deg_list
+      wgcna_set <- rv$common_genes_wgcna_list
+      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
+      png(file, width = 8 * 150, height = 8 * 150, res = 150, bg = "white")
+      grid::grid.newpage()
+      vp <- VennDiagram::venn.diagram(
+        x = list(DEG = deg_set, WGCNA = wgcna_set),
+        category.names = c("DEG", "WGCNA"),
+        filename = NULL,
+        output = TRUE,
+        disable.logging = TRUE,
+        imagetype = "png",
+        height = 8 * 150,
+        width = 8 * 150,
+        resolution = 150,
+        compression = "lzw",
+        lwd = 2.5,
+        lty = "blank",
+        fill = c("#E41A1C", "#377EB8"),
+        alpha = 0.65,
+        cex = 1.4,
+        fontface = "bold",
+        cat.cex = 1.3,
+        cat.fontface = "bold",
+        cat.col = c("#E41A1C", "#377EB8"),
+        margin = 0.08,
+        main = "Common Genes (DEG \u2229 WGCNA)",
+        main.cex = 1.4,
+        main.fontface = "bold"
+      )
+      grid::grid.draw(vp)
+      dev.off()
+    }
+  )
+
+  output$download_common_genes_venn_pdf <- downloadHandler(
+    filename = function() "common_genes_venn_DEG_WGCNA.pdf",
+    content = function(file) {
+      req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
+      deg_set <- rv$common_genes_deg_list
+      wgcna_set <- rv$common_genes_wgcna_list
+      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
+      pdf(file, width = 8, height = 8, bg = "white")
+      grid::grid.newpage()
+      vp <- VennDiagram::venn.diagram(
+        x = list(DEG = deg_set, WGCNA = wgcna_set),
+        category.names = c("DEG", "WGCNA"),
+        filename = NULL,
+        output = TRUE,
+        disable.logging = TRUE,
+        imagetype = "png",
+        height = 2200,
+        width = 2200,
+        resolution = 200,
+        lwd = 2.5,
+        lty = "blank",
+        fill = c("#E41A1C", "#377EB8"),
+        alpha = 0.65,
+        cex = 1.4,
+        fontface = "bold",
+        cat.cex = 1.3,
+        cat.fontface = "bold",
+        cat.col = c("#E41A1C", "#377EB8"),
+        margin = 0.08,
+        main = "Common Genes (DEG \u2229 WGCNA)",
+        main.cex = 1.4,
+        main.fontface = "bold"
+      )
+      grid::grid.draw(vp)
+      dev.off()
+    }
+  )
   
   output$common_genes_table <- DT::renderDataTable({
     req(rv$common_genes_df)

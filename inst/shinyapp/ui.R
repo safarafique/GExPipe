@@ -37,11 +37,11 @@ ui_analysis <- dashboardPage(
   dashboardHeader(
     title = tags$span(
       icon("dna", class = "fa-spin", style = "margin-right: 10px;"),
-      tags$strong("OmniVerse", style = "font-size: 24px; color: #fff;")
+      tags$strong("GExPipe", style = "font-size: 24px; color: #fff;")
     ),
     titleWidth = 300,
     tags$li(class = "dropdown",
-            tags$a(href = "#", icon("flask"), "OmniVerse",
+            tags$a(href = "#", icon("flask"), "GExPipe",
                    style = "color: #fff; font-weight: bold; padding: 15px;")),
     tags$li(
       class = "dropdown",
@@ -54,7 +54,7 @@ ui_analysis <- dashboardPage(
     ),
     tags$li(class = "dropdown",
             actionButton("start_tour", 
-                        tagList(icon("question-circle"), " Guided Tour"),
+                        tagList(icon("book-open"), " User Guideline"),
                         class = "btn-info",
                         style = "margin: 10px; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); 
                                  border: none; color: white; font-weight: bold; padding: 8px 15px; 
@@ -130,14 +130,20 @@ ui_analysis <- dashboardPage(
     ),
     tags$div(
       style = "padding: 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: auto;",
-      tags$h4(icon("info-circle"), " Analysis Pipeline", style = "color: white; font-weight: bold;"),
-      tags$p("Professional RNA-seq & Microarray Analysis", 
+      tags$h4(icon("info-circle"), " GExPipe", style = "color: white; font-weight: bold;"),
+      tags$p("Gene Expression Pipeline", 
              style = "font-size: 12px; margin-top: 10px; opacity: 0.9;")
     )
   ),
   
   dashboardBody(
     useShinyjs(),
+    tags$div(
+      class = "gexpipe-watermark",
+      style = "position: fixed; bottom: 12px; right: 18px; font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+               color: rgba(102, 126, 234, 0.18); pointer-events: none; z-index: 0;",
+      "GExPipe"
+    ),
     if (requireNamespace("cicerone", quietly = TRUE)) cicerone::use_cicerone(),
     tags$div(id = "download-toast", icon("download"), " Downloading..."),
     tags$script(HTML("
@@ -169,29 +175,6 @@ ui_analysis <- dashboardPage(
             setTimeout(function() {
               $('[data-toggle=\"tooltip\"]').tooltip({ html: true, container: 'body' });
             }, 300);
-          });
-        });
-      ")),
-      tags$script(src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"),
-      tags$script(HTML("
-        $(document).on('click', '#start_tour', function() {
-          var el = document.querySelector('.wrapper') || document.body;
-          if (typeof html2canvas === 'undefined') {
-            alert('Screenshot library loading. Please try again in a moment.');
-            return;
-          }
-          var tourLi = document.getElementById('start_tour') && document.getElementById('start_tour').closest('li');
-          if (tourLi) tourLi.style.visibility = 'hidden';
-          html2canvas(el, { scale: 4, useCors: true, logging: false, scrollX: 0, scrollY: 0 }).then(function(canvas) {
-            if (tourLi) tourLi.style.visibility = '';
-            var name = 'OmniVerse_screenshot_' + new Date().toISOString().slice(0,19).replace(/-/g,'').replace('T','_').replace(/:/g,'') + '.png';
-            var a = document.createElement('a');
-            a.download = name;
-            a.href = canvas.toDataURL('image/png');
-            a.click();
-          }).catch(function(err) {
-            if (tourLi) tourLi.style.visibility = '';
-            alert('Screenshot failed: ' + (err.message || 'unknown'));
           });
         });
       ")),

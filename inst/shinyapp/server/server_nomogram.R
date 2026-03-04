@@ -52,6 +52,17 @@ server_nomogram <- function(input, output, session, rv) {
     }
   })
 
+  output$nomogram_process_summary_ui <- renderUI({
+    if (!isTRUE(rv$nomogram_complete)) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run diagnostic nomogram to see process summary."))
+    }
+    train_auc <- if (!is.null(rv$nomogram_train_metrics) && "AUC" %in% names(rv$nomogram_train_metrics)) round(rv$nomogram_train_metrics$AUC, 3) else NA
+    val_auc <- if (!is.null(rv$nomogram_val_metrics) && "AUC" %in% names(rv$nomogram_val_metrics)) round(rv$nomogram_val_metrics$AUC, 3) else NA
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 13 complete."), " Nomogram built. Training AUC: ", train_auc, "; Validation AUC: ", val_auc, ". Calibration and DCA plots above."))
+  })
+
   output$nomogram_placeholder_ui <- renderUI({
     if (!is.null(rv$batch_corrected) && (is.matrix(rv$batch_corrected) || is.data.frame(rv$batch_corrected)) && nrow(rv$batch_corrected) > 0) return(NULL)
     tags$div(

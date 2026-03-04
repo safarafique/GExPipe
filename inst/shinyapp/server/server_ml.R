@@ -26,6 +26,17 @@ server_ml <- function(input, output, session, rv) {
     )
   })
 
+  output$ml_process_summary_ui <- renderUI({
+    if (!isTRUE(rv$ml_complete)) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Extract data for ML and run ML analysis to see process summary."))
+    }
+    n_genes <- length(rv$ml_common_genes)
+    methods_run <- rv$ml_methods_run
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 10 complete."), " Common genes across selected methods: ", n_genes, ". Methods run: ", paste(methods_run, collapse = ", "), "."))
+  })
+
   # SVM-RFE helper (recursive feature elimination)
   svmRFE <- function(X, y, k_fold = 5) {
     X <- as.matrix(X)

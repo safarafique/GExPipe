@@ -104,7 +104,12 @@ ui_groups <- tabItem(
           width = 12, status = "info", solidHeader = TRUE,
           uiOutput("group_summary_ui"))
     ),
-    
+    fluidRow(
+      box(
+        title = tags$span(icon("file-alt"), " Process Summary"),
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        uiOutput("groups_process_summary_ui"))
+    ),
     fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,
           tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",

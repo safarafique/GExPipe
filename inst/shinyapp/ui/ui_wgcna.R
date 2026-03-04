@@ -485,25 +485,25 @@ ui_wgcna <- tabItem(
       )
     ),
     
-    # ========== MODULE GENES TABLE ==========
+    # ========== MODULE GENES TABLE (publication-ready GS vs MM) ==========
     fluidRow(
       box(
-        title = tags$span(icon("table"), " Module Gene Lists & Significant Genes"), 
-        width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        title = tags$span(icon("table"), " Module Gene Lists & Significant Genes"),
+        width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$div(
           style = "padding: 15px 0;",
           fluidRow(
             column(4,
               selectInput("select_module",
-                         label = tags$strong("Select Module to view genes:"),
+                         label = tags$strong("Select module to view genes:"),
                          choices = NULL,
                          width = "100%")
             ),
             column(4,
               selectInput("filter_sig_genes",
-                         label = tags$strong("Filter by Significance:"),
-                         choices = c("All Genes" = "all",
-                                   "Significant Genes Only (GS/MM)" = "sig_only"),
+                         label = tags$strong("Filter by significance:"),
+                         choices = c("All genes" = "all",
+                                   "Significant only (GS/MM)" = "sig_only"),
                          selected = "all",
                          width = "100%")
             ),
@@ -524,13 +524,21 @@ ui_wgcna <- tabItem(
               )
             )
           ),
-          tags$hr(),
-          tags$h5(icon("chart-scatter"), " Gene Significance vs Module Membership (selected module)",
-                 style = "color: #2c3e50; margin-bottom: 15px;"),
-          plotOutput("gs_mm_plot", height = "420px"),
-          tags$div(style = "margin-top: 8px;",
-            downloadButton("download_gs_mm_plot_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_gs_mm_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
+          tags$hr(style = "border-color: #ecf0f1; margin: 20px 0;"),
+          tags$div(
+            style = "background: #fafbfc; border: 1px solid #e8ecef; border-radius: 6px; padding: 16px 20px; margin-bottom: 12px;",
+            tags$p(
+              tags$strong("Gene significance vs. module membership"),
+              " — scatter plot for the selected module and trait. Dashed vertical lines: MM threshold; orange points: GS/MM significant. Export at 300 DPI for publication.",
+              style = "margin: 0; font-size: 13px; color: #495057; line-height: 1.5;"
+            )
+          ),
+          plotOutput("gs_mm_plot", height = "460px"),
+          tags$div(
+            style = "margin-top: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;",
+            downloadButton("download_gs_mm_plot_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-sm"),
+            downloadButton("download_gs_mm_plot_pdf", tagList(icon("download"), " PDF (vector)"), class = "btn-success btn-sm"),
+            tags$span(style = "font-size: 12px; color: #6c757d; margin-left: 4px;", "Suitable for figures.")
           ),
           tags$hr(),
           uiOutput("wgcna_gs_mm_all_download_ui"),
@@ -581,6 +589,12 @@ ui_wgcna <- tabItem(
           textOutput("wgcna_timer", inline = TRUE)
         )
       )
+    ),
+    fluidRow(
+      box(
+        title = tags$span(icon("file-alt"), " Process Summary"),
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        uiOutput("wgcna_process_summary_ui"))
     ),
     fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,

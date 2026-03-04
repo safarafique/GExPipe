@@ -35,6 +35,20 @@ server_ppi <- function(input, output, session, rv) {
     )
   })
 
+  output$ppi_process_summary_ui <- renderUI({
+    if (is.null(rv$ppi_complete) || !rv$ppi_complete) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run PPI analysis to see process summary."))
+    }
+    g <- rv$ppi_graph
+    n_nodes <- igraph::vcount(g)
+    n_edges <- igraph::ecount(g)
+    n_int <- length(rv$ppi_interactive_genes)
+    n_hub <- if (is.data.frame(rv$ppi_consensus_hubs)) nrow(rv$ppi_consensus_hubs) else length(rv$ppi_consensus_hubs)
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 9 complete."), " PPI network: ", n_nodes, " nodes, ", n_edges, " edges. Interactive genes: ", n_int, ". Consensus hubs: ", n_hub, "."))
+  })
+
   observeEvent(input$run_ppi, {
     req(rv$common_genes_de_wgcna)
     if (length(rv$common_genes_de_wgcna) == 0) {

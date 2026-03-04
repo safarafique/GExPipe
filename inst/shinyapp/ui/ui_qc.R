@@ -100,6 +100,12 @@ ui_qc <- tabItem(
     ),
     
     fluidRow(
+      box(
+        title = tags$span(icon("file-alt"), " Process Summary"),
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        uiOutput("qc_process_summary_ui"))
+    ),
+    fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,
           tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
                    uiOutput("qc_next_button")))

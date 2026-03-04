@@ -5,6 +5,19 @@
 server_results <- function(input, output, session, rv) {
 
   # ---------- METHOD BANNER (shows active DE method on Step 6) ----------
+  output$results_process_summary_ui <- renderUI({
+    if (is.null(rv$sig_genes) || nrow(rv$sig_genes) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run DE analysis to see process summary."))
+    }
+    n_sig <- nrow(rv$sig_genes)
+    n_up <- if (!is.null(rv$de_results)) sum(rv$de_results$Significance == "Up-regulated", na.rm = TRUE) else NA
+    n_down <- if (!is.null(rv$de_results)) sum(rv$de_results$Significance == "Down-regulated", na.rm = TRUE) else NA
+    tags$div(
+      style = "font-size: 14px; line-height: 1.6; color: #333;",
+      tags$p(tags$strong("Step 6 complete."), " Significant DEGs: ", format(n_sig, big.mark = ","), "."),
+      if (!is.na(n_up)) tags$p("Up-regulated: ", n_up, "; Down-regulated: ", n_down, ". Volcano plot and heatmap above.") else NULL)
+  })
+
   output$de_method_banner <- renderUI({
     method <- rv$de_method
     if (is.null(method) || method == "limma") {
@@ -873,36 +886,8 @@ server_results <- function(input, output, session, rv) {
   })
   
   # ==============================================================================
-  # DOWNLOADS
+  # DOWNLOADS (DE step: DE results only; batch expression downloads are in server_batch.R)
   # ==============================================================================
-
-  # Expression BEFORE batch correction (genes x samples) — for pipeline validation
-  output$download_expr_before_batch <- downloadHandler(
-    filename = function() paste0("Expression_before_batch_", Sys.Date(), ".csv"),
-    content = function(file) {
-      req(rv$expr_filtered)
-      M <- as.data.frame(rv$expr_filtered, stringsAsFactors = FALSE)
-      M <- cbind(Gene = rownames(M), M)
-      rownames(M) <- NULL
-      fn <- paste0("Expression_before_batch_", Sys.Date(), ".csv")
-      write.csv(M, file, row.names = FALSE)
-      write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
-    }
-  )
-
-  # Expression AFTER batch correction (genes x samples) — for pipeline validation
-  output$download_expr_after_batch <- downloadHandler(
-    filename = function() paste0("Expression_after_batch_", Sys.Date(), ".csv"),
-    content = function(file) {
-      req(rv$batch_corrected)
-      M <- as.data.frame(rv$batch_corrected, stringsAsFactors = FALSE)
-      M <- cbind(Gene = rownames(M), M)
-      rownames(M) <- NULL
-      fn <- paste0("Expression_after_batch_", Sys.Date(), ".csv")
-      write.csv(M, file, row.names = FALSE)
-      write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
-    }
-  )
 
   output$download_de_results <- downloadHandler(
     filename = function() paste0("DE_Results_", Sys.Date(), ".csv"),

@@ -118,7 +118,12 @@ ui_immune <- tabItem(
       plotOutput("immune_lollipop_plot", height = "680px")
     )
   ),
-
+  fluidRow(
+    box(
+      title = tags$span(icon("file-alt"), " Process Summary"),
+      width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+      uiOutput("immune_process_summary_ui"))
+  ),
   fluidRow(
     box(width = 12, status = "primary", solidHeader = FALSE,
         tags$div(style = "text-align: center; padding: 20px 0;",

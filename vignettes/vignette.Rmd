@@ -1,1979 +1,838 @@
-<div class="WordSection1" markdown="1">
+**GExPipe: Gene Expression Pipeline Shiny Application**
 
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Author:
-Safa Rafique, Dr. <span class="SpellE">Nameem</span> Mahmood, Dr. Farooq
-<span class="SpellE">sabir</span></span>
+**Author:** Safa Rafique\
+**Maintainer:** Safa Rafique\
+**Emails:** safa.sandhu@gmail.com; safa.res.sbb@pu.edu.pk
 
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Package:
-"<span class="SpellE">OmniVerse</span>: Integrated Bulk
-RNA-<span class="SpellE">seq</span> and Microarray Analysis"</span>
+**1. Overview**
 
-<span class="GramE"><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">date</span></span><span lang="EN"
-style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">: 2026-2-20</span>
+**GExPipe -- Gene Expression Pipeline** is an interactive Shiny-based
+platform for comprehensive bulk gene expression analysis. It enables
+users to perform end-to-end transcriptomic workflows starting from
+public GEO datasets to validated biomarkers and publication-ready
+figures.
 
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">License:</span>
+The application integrates major Bioconductor packages into a unified,
+reproducible, and GUI-driven workflow.
 
-**<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-spacerun:yes"> </span>Package
-Overview</span>**
+**Core Objectives**
 
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
+GExPipe allows users to:
 
- 
+-   Download and harmonize GEO datasets
 
-<span class="SpellE"><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">OmniVerse</span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"> is a comprehensive
-Shiny</span>
+-   Perform quality control and exploratory analysis
 
-<span class="GramE"><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">application</span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"> package for
-analyzing bulk RNA-<span class="SpellE">seq</span> and microarray data
-from GEO datasets. It provides an integrated workflow supporting single
-or multi-dataset merging, normalization, batch correction, differential
-expression (<span class="SpellE">limma</span>/DESeq2), WGCNA
-co-expression analysis, pathway enrichment (GO/KEGG), PPI networks
-(<span class="SpellE">STRINGdb</span>), machine learning classification,
-ROC validation, nomogram modeling, GSEA, and immune
-deconvolution.</span>
+-   Normalize and correct batch effects
 
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Key
-features include:</span>
+-   Conduct differential expression analysis
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">-<span style="font:7.0pt &quot;Times New Roman&quot;">         
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">GEO query and download with
-automatic</span>
+-   Construct WGCNA co-expression networks
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:Symbol;mso-fareast-font-family:
-Symbol;mso-bidi-font-family:Symbol"><span style="mso-list:Ignore">·<span style="font:7.0pt &quot;Times New Roman&quot;">        
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">platform annotation (200+ GPLs mapped to
-.<span class="SpellE">db</span> or
-<span class="SpellE">biomaRt</span>)</span>
+-   Identify consensus disease genes
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">-<span style="font:7.0pt &quot;Times New Roman&quot;">         
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Gene symbol harmonization across
-platforms</span>
+-   Perform GO/KEGG enrichment analysis
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:Symbol;mso-fareast-font-family:
-Symbol;mso-bidi-font-family:Symbol"><span style="mso-list:Ignore">·<span style="font:7.0pt &quot;Times New Roman&quot;">        
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">for multi-study integration</span>
+-   Build protein--protein interaction (PPI) networks
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">-<span style="font:7.0pt &quot;Times New Roman&quot;">         
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Publication-ready plots (PCA,
-volcano,</span>
+-   Identify hub genes
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:Symbol;mso-fareast-font-family:
-Symbol;mso-bidi-font-family:Symbol"><span style="mso-list:Ignore">·<span style="font:7.0pt &quot;Times New Roman&quot;">        
-</span></span></span><span class="SpellE"><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">heatmaps</span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">, module-trait
-relationships) exported as PNG/PDF at 300 DPI</span>
+-   Apply machine learning for biomarker selection
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">-<span style="font:7.0pt &quot;Times New Roman&quot;">         
-</span></span></span><span class="SpellE"><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">ReactiveValues</span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">-based reactive
-programming</span>
+-   Validate models using ROC and external datasets
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:Symbol;mso-fareast-font-family:
-Symbol;mso-bidi-font-family:Symbol"><span style="mso-list:Ignore">·<span style="font:7.0pt &quot;Times New Roman&quot;">        
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">for efficient large-dataset handling (up to
-500 MB uploads)</span>
+-   Build diagnostic nomograms
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">-<span style="font:7.0pt &quot;Times New Roman&quot;">         
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Bioconductor-compliant dependencies
-loaded</span>
+-   Run GSEA pathway analysis
 
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:Symbol;mso-fareast-font-family:
-Symbol;mso-bidi-font-family:Symbol"><span style="mso-list:Ignore">·<span style="font:7.0pt &quot;Times New Roman&quot;">        
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">via
-\`<span class="SpellE">BiocManager</span>::install("<span class="SpellE">OmniVerse</span>")\`</span>
+-   Perform immune cell deconvolution
 
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
+-   Export publication-ready outputs
 
- 
+**2. Introduction**
 
-**<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-spacerun:yes"> </span>Introduction</span>**
+Bulk transcriptomics (RNA-seq and microarrays) remains foundational for
+biomarker discovery, especially in diseases like chronic myeloid
+leukemia where multi-omics integration reveals
 
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Bulk
-<span class="SpellE">transcriptomics</span>
-(RNA-<span class="SpellE">seq</span> and microarrays) remains
-foundational for biomarker discovery, especially in diseases like
-chronic myeloid leukemia where multi-omics integration reveals</span>
-
-<span class="GramE"><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">robust</span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"> signatures.
-<span class="SpellE">OmniVerse</span> addresses common pain points in
-GEO analysis: platform heterogeneity, batch effects across studies, and
+robust signatures. OmniVerse addresses common pain points in GEO
+analysis: platform heterogeneity, batch effects across studies, and
 disjointed workflows by offering a unified, step-by-step pipeline from
-raw GSE download to validated diagnostics.</span>
+raw GSE download to validated diagnostics.
 
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-Gungsuh">Designed for researchers without deep programming expertise, it
+Designed for researchers without deep programming expertise, it
 automates complex tasks like WGCNA module detection, common gene
 intersection (DEGs ∩ modules), and ML consensus (RF/SVM/etc.) while
 exposing parameters for customization. All results are downloadable
-(CSV/RDS/PDF), with a narrative summary auto-generated for
-manuscripts.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-**<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Getting
-Start</span>**
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">To
-install this package, start R and enter:</span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image001.gif" v:shapes="Rectangle_x0020_2"
-width="571" height="116"
-alt="Text Box: if (!requireNamespace(&quot;BiocManager&quot;, quietly = TRUE)) install.packages(&quot;BiocManager&quot;) BiocManager::install(&quot;OmniVerse&quot;) " /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Once
-installed, the package can be loaded and attached to your current
-workspace as follows:</span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image002.gif" v:shapes="Rectangle_x0020_5"
-width="573" height="76"
-alt="Text Box: library(&quot;OmniVerse&quot;)" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">To
-launch the <span class="SpellE">OmniVerse</span> app, simply
-run:<span style="color:#4D4D4C"></span></span>
-
-<span lang="EN"><img src="vignette_files/image003.gif" v:shapes="Rectangle_x0020_1"
-width="573" height="76" alt="Text Box: runOmniVerse()" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">This
-opens an interactive web interface in your default browser where you
-can:</span>
-
-1.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;">Search and
-    download GEO datasets (single or multiple GSEs)</span>
-2.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:Cardo">Follow the guided workflow
-    through normalization → DE → WGCNA → enrichment →
-    ML</span><span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-3.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;">Download
-    publication-ready results and auto-generated analysis summary</span>
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image004.gif" v:shapes="image41.png"
-width="624" height="930" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#4D4D4C"></span>
-
- 
-
-## <span id="_bx899tmubd1l"></span>**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Section: Selecting the Analysis Framework</span>** [section-selecting-the-analysis-framework]
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">In this step, you define the
-core biological platform, the scope of your data, and the statistical
-model used to identify differentially expressed (DE) genes.</span>
-
-### <span id="_gmppa7nmqdkj"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#4D4D4C">1. Choose Platform</span>** [choose-platform]
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">The first step is to identify
-the technology used to generate your
-<span class="SpellE">transcriptomics</span> data.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#4D4D4C"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>**<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">RNA-<span class="SpellE">seq</span>:</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">
-Select this for high-throughput sequencing data (raw or normalized
-counts).</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#4D4D4C"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#4D4D4C"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>**<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">Microarray:</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">
-Select this for intensity-based data from platforms like
-<span class="SpellE">Affymetrix</span> or Illumina
-beads.</span><span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;color:#4D4D4C"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#4D4D4C"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>**<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">Merged
-(Both):</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"> Use
-this if your project integrates both RNA-<span class="SpellE">seq</span>
-and Microarray data into a meta-analysis.</span><span lang="EN"
-style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;color:#4D4D4C"></span>
-
-### <span id="_yrd0netv0r5v"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#4D4D4C">2. Datasets Configuration</span>** [datasets-configuration]
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">This section determines how
-the tool handles technical variation between different
-experiments.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#4D4D4C"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>**<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">Single dataset (1
-GSE):</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"> Best
-for a single experiment. Batch correction is typically skipped as the
-samples are assumed to be processed under uniform
-conditions.</span><span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#4D4D4C"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#4D4D4C"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>**<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">Multiple
-datasets:</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">
-Choose this if you are combining data from different studies or
-laboratories. The tool will recommend **batch correction** (e.g.,
-<span class="SpellE">ComBat</span> or SVA) to remove non-biological "lab
-effects" before downstream analysis.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;color:#4D4D4C"></span>
-
-### <span id="_k3dc7d56bb4w"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#4D4D4C">3. Differential Expression (DE) Method</span>** [differential-expression-de-method]
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#4D4D4C">The choice of method depends
-on your platform and the statistical distribution of your data:</span>
-
-|  |  |  |
-|----|----|----|
-| **<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Method</span>**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span> | **<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Recommendation</span>**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span> | **<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Statistical Basis</span>**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span> |
-| <span class="SpellE">**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">limma</span>**</span><span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span> | <span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Microarray / Mixed data</span> | <span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Empirical Bayes linear modeling.</span> |
-| <span class="SpellE">**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">limma-voom</span>**</span><span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span> | <span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">RNA-<span class="SpellE">seq</span> counts</span> | <span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Transforms counts to log-CPM and estimates mean-variance relationship.</span> |
-| **<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">DESeq2</span>**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span> | **<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">RNA-<span class="SpellE">seq</span> counts</span>**<span lang="EN" style="font-size:12.0pt;
-  line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-  &quot;Times New Roman&quot;;color:#4D4D4C"></span> | <span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Uses a **Negative Binomial** distribution; excellent for small sample sizes.</span> |
-| <span class="SpellE">**<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">edgeR</span>**</span><span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span> | <span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">RNA-<span class="SpellE">seq</span> counts</span> | <span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-  mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C">Uses quasi-likelihood to account for <span class="SpellE">overdispersion</span> in count data.</span> |
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#4D4D4C"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image005.gif" v:shapes="image2.png" width="624"
-height="367" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:141%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-## <span id="_fkv2leyrwqf9"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-125%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Multi-GSE Analysis Workflows</span>** [multi-gse-analysis-workflows]
-
-## <span id="_xq6srztp8ss7"></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Quick Example.1Multiple Bulk-RNA Datasets</span>** [quick-example.1multiple-bulk-rna-datasets]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Example:
-GSE50760 + GSE104836</span>
-
-<span lang="EN"><img src="vignette_files/image006.gif" v:shapes="Rectangle_x0020_4"
-width="573" height="76"
-alt="Text Box: library(OmniVerse) runOmniVerse() " /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C">\# <span class="GramE">In</span> the
-app:</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C">\# 1. Step 1: Enter "</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">GSE50760,
-GSE104836</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Cardo;color:#8E908C">" → Download both
-datasets</span><span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-<span lang="EN"><img src="vignette_files/image007.gif" v:shapes="image35.png"
-width="624" height="301" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-### <span id="_70ynaxlnniqx"></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">2. Gene Overlap Analysis</span>*** [gene-overlap-analysis]
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Venn &
-<span class="SpellE">UpSet</span> Plots</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C">: These tools quantify how many genes are shared across
-your different datasets.</span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Roboto Mono&quot;;color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Dataset
-Compatibility</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">: In
-this case, both **GSE104836** and **GSE50760** share an identical set of
-**37,673 genes**, indicating perfect alignment for a
-meta-analysis.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Roboto Mono&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image008.gif" v:shapes="image37.png"
-width="624" height="408" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-### <span id="_b0ik18gfk190"></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">2.1 Expression Distribution (QC Plots)</span>*** [expression-distribution-qc-plots]
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Boxplot</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Visualizes the range of raw expression values for every sample;
-horizontal consistency across "boxes" suggests high-quality, comparable
-data.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Roboto Mono&quot;;color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Density
-Plot</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Shows the frequency of expression levels. The "hockey-stick" curve (high
-density at low values) is typical for raw
-RNA-<span class="SpellE">seq</span> data and confirms that normalization
-is required to balance the distribution.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Roboto Mono&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image009.gif" v:shapes="image52.png"
-width="624" height="240" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Roboto Mono&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image010.gif" v:shapes="image13.png"
-width="624" height="262" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-## <span id="_39qru1af5lpj"></span>***<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">2.2 Outlier Detection and Sample Filtering</span>*** [outlier-detection-and-sample-filtering]
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">The
-final checkpoint in Quality Control is identifying "outliers"—samples
-that behave so differently from the rest of the group that they might
-negatively impact the statistical power of your analysis.</span>*
-
-### <span id="_jo7zggnoxuab"></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C"><span style="mso-spacerun:yes"> </span>Principal Component Analysis (PCA)</span>*** [principal-component-analysis-pca]
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">The
-PCA plot reduces thousands of gene expressions into two main dimensions
-(\$PC1\$ and \$PC2\$) to show how samples relate to each other.</span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Clustering:</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">
-Samples from the same dataset (pink vs. blue) generally cluster
-together.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">The
-Ellipse:</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"> The
-dashed line represents the <span class="SpellE">**Mahalanobis**</span>
-**threshold**.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Detection:</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"> Any
-sample falling outside this circle (marked with a **triangle**) is
-flagged as a statistical outlier. In your data, sample **GSM1228184** is
-clearly separated from the main group.</span><span lang="EN"
-style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-### <span id="_4z8nl8t9ae17"></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C"><span style="mso-spacerun:yes"> </span>Sample Connectivity</span>*** [sample-connectivity]
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">This
-bar chart measures how well each sample "connects" or correlates with
-all other samples in the network.</span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">The Red Dashed
-Line:</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"> This
-is the threshold (\$mean - 2 \times SD\$).</span><span lang="EN"
-style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Low
-Connectivity:</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">
-Samples with connectivity significantly lower than the rest of the group
-are often technically flawed or degraded.</span><span lang="EN"
-style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-### <span id="_icsiaiw39tbv"></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C"><span style="mso-spacerun:yes"> </span>Outlier Summary & Exclusion</span>*** [outlier-summary-exclusion]
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">The
-tool provides a definitive table and an action box to clean your
-data:</span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Outlier Summary
-Table:</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">
-Lists specific metrics like
-<span class="SpellE">**Mahal_Distance**</span>. For example,
-**GSM1228184** has a distance of **7.56**, exceeding the **7.38**
-threshold.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Exclude Selected
-Outliers:</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"> This
-interactive panel allows you to check the flagged samples and click the
-red button to remove them from all future steps.</span><span lang="EN"
-style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-<img src="vignette_files/image011.gif" data-align="left"
-data-hspace="12" v:shapes="image51.png" width="538" height="351" />*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-***<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>***
-
- 
-
-***<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"><span style="mso-spacerun:yes"> </span>4:
-Select Groups</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">, you
-define the biological comparison for your study by assigning samples to
-specific categories.</span>*
-
-### <span id="_6i90g3sgnb07"></span><span class="GramE">***<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">4.1<span style="mso-spacerun:yes">  </span>Metadata</span>***</span>***<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"> Exploration & Selection</span>*** [metadata-exploration-selection]
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span><span class="SpellE">***<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">Phenodata</span>***</span>***<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">
-Browser</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Browse metadata columns (e.g., </span><span lang="EN"
-style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#188038">tissue<span class="GramE">:ch1</span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">,
-</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#188038">title</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">)
-across your datasets to identify where group information is
-stored.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Column
-Selection</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Choose the relevant phenotype column for each dataset and click
-**Extract Groups** to pull raw labels.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-### <span id="_dhgm94l8gmxg"></span><span class="GramE">***<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">4.2<span style="mso-spacerun:yes">  </span>Group</span>***</span>***<span lang="EN" style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"> Categorization</span>*** [group-categorization]
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Standardization</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Manually map various raw labels (e.g., "primary colorectal cancer" or
-"colon cancer tissue") into a single consistent group name like
-**"Disease"**.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Control
-Assignment</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Assign baseline samples (e.g., "<span class="SpellE">nontumor</span>
-colon tissue") to a **"Normal"** group to serve as the reference for
-comparison.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span><span lang="EN"><img src="vignette_files/image012.gif" v:shapes="image42.png"
-width="624" height="317" /><img src="vignette_files/image013.gif" v:shapes="image1.png" width="624"
-height="323" /><img src="vignette_files/image014.gif" v:shapes="image18.png"
-width="624" height="402" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-***<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">Final
-Count</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Confirm the total sample size (e.g., **28 Normal** vs. **45 Disease**)
-and the final gene count (21,927) before proceeding.</span>*
-
-<span lang="EN"><img src="vignette_files/image015.gif" v:shapes="image34.png"
-width="624" height="373" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-<span class="GramE">*<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">5.Batch</span>*</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">
-effect removal:</span>*
-
-<span lang="EN"><img src="vignette_files/image016.gif" v:shapes="image22.png"
-width="624" height="273" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image017.gif" v:shapes="image17.png"
-width="624" height="399" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-<span lang="EN"><img src="vignette_files/image018.gif" v:shapes="image6.png" width="624"
-height="394" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-*<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C">To wrap up your vignette, here is a concise description
-for the **Differential Expression (DE) Results** section:</span>*
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
- 
-
-### <span id="_yzjrj8xso10s"></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Step 6: Differential Expression Results</span>*** [step-6-differential-expression-results]
-
-*<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C">This final step identifies genes with statistically
-significant changes between your defined groups (e.g., Disease vs.
-Normal).</span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">DE
-Parameters</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Setting a <span class="SpellE">**LogFC**</span> **cutoff of 1** filters
-for genes with at least a 2-fold expression change, while an **Adj.
-P-value of 0.05** ensures statistical reliability by minimizing false
-positives.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Volcano
-Plot</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-This visualizes the global distribution of your data. **Up-regulated
-genes** (red) show increased expression in the disease group, while
-**Down-regulated genes** (blue) show a significant
-decrease.</span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Top 50
-<span class="SpellE">Heatmap</span></span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">: The
-platform clusters the **top 50 DEGs** to show consistent expression
-patterns across samples. This provides a high-level view of the
-"molecular signature" defining the disease state.</span><span lang="EN"
-style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image017.gif" v:shapes="image43.png"
-width="624" height="399" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image019.gif" v:shapes="image36.png"
-width="619" height="283" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image020.gif" v:shapes="image5.png" width="624"
-height="314" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
- 
-
-### <span id="_p8dpwlrhoiyb"></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Step 7: WGCNA Analysis</span>*** [step-7-wgcna-analysis]
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">WGCNA
-identifies clusters (modules) of co-expressed genes and relates them to
-your biological groups (Disease vs. Normal).</span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Soft-Threshold
-Selection</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">: The
-analysis uses a power function to achieve a **Scale-Free Topology**.
-Based on the plots, a power (soft-threshold) is chosen where the R\^2
-curve flattens (typically \>0.80) to ensure a biologically meaningful
-network.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Module
-Generation</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Genes are grouped into distinct color-coded modules (e.g., Turquoise,
-Blue, Brown) based on their expression similarity.</span><span lang="EN"
-style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Module-Trait
-Relationship</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Each module is correlated with the sample groups. A **Positive
-Correlation** (red) indicates the module is up-regulated in Disease,
-while a **Negative Correlation** (blue) indicates
-down-regulation.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-color:#8E908C"></span>*
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;color:#8E908C;mso-bidi-font-style:
-italic"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">    
-</span></span></span>***<span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;;color:#8E908C">Hub Gene
-Identification</span>****<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C">:
-Within the most significant modules, genes with the highest **Module
-Membership (MM)** and **Gene Significance (GS)** are identified as "Hub
-Genes," serving as key drivers of the disease
-profile.</span><span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image021.gif" v:shapes="image24.png"
-width="624" height="260" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image022.gif" v:shapes="image10.png"
-width="624" height="392" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image023.gif" v:shapes="image19.png"
-width="624" height="388" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
- 
-
-<span lang="EN"><img src="vignette_files/image024.gif" v:shapes="image11.png"
-width="624" height="359" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-<span lang="EN"><img src="vignette_files/image025.gif" v:shapes="image8.png" width="624"
-height="403" /></span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#8E908C"></span>*
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C"></span>*
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image026.gif" v:shapes="image47.png"
-width="623" height="328" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image027.gif" v:shapes="image44.png"
-width="624" height="401" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-### <span id="_97jnbv4hc3we"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:black">Common Genes & KEGG Pathway Analysis</span>** [common-genes-kegg-pathway-analysis]
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Identifying Common
-Genes</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: The platform
-intersects the **Top DEGs** with the most significant **WGCNA Module
-Genes** to identify a "high-confidence" gene set that is both
-differentially expressed and highly co-expressed.</span><span lang="EN"
-style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">GO (Gene Ontology)
-analysis identifies the specific biological processes, cellular
-components, and molecular functions significantly enriched within your
-target gene set.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">KEGG
-Enrichment</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: These common
-genes are mapped against the **KEGG Database** to identify statistically
-enriched biological pathways.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"><img src="vignette_files/image028.gif" v:shapes="image30.png"
-width="624" height="289" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image029.gif" v:shapes="image32.png"
-width="624" height="306" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image030.gif" v:shapes="image26.png"
-width="624" height="322" /><img src="vignette_files/image031.gif" v:shapes="image16.png"
-width="624" height="364" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image032.gif" v:shapes="image23.png"
-width="581" height="446" /><img src="vignette_files/image033.gif" v:shapes="image40.png"
-width="581" height="372" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-### <span id="_6eq51l74sjkv"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:black">Step 10: PPI Network and Hub Gene Identification</span>** [step-10-ppi-network-and-hub-gene-identification]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">This
-step visualizes the physical and functional interactions between your
-candidate proteins to identify central biological drivers.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">PPI Network
-Construction</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: The common genes
-are mapped to the STRING database to build an interaction network, where
-nodes represent proteins and edges represent documented
-interactions.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Interaction
-Threshold</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: A confidence
-score threshold (typically **\> 0.40** for medium or **\> 0.70** for
-high confidence) is applied to filter out weak or predicted
-interactions, ensuring only robust connections
-remain.</span><span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Hub Gene Selection
-(N-Factor)</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: Using the
-<span class="SpellE">**cytoHubba**</span> plugin or degree-centrality
-algorithms, we select the top **N-factor** genes (e.g., top 10 or 20)
-with the highest connectivity.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Network
-Visualization</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: The final graph
-highlights these "Hubs" in warmer colors (red/orange) to signify their
-critical role as the most influential nodes in the disease-associated
-network.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image034.gif" v:shapes="image20.png"
-width="624" height="265" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image035.gif" v:shapes="image4.png" width="624"
-height="243" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image023.gif" v:shapes="image15.png"
-width="624" height="388" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-### <span id="_1wqhkbz5vpg4"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:black">Step 11: Machine Learning Classification</span>** [step-11-machine-learning-classification]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">This
-step evaluates how well the selected hub genes can distinguish between
-**Disease** and **Normal** samples.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Model
-Selection</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: Common algorithms
-used include **Random Forest (RF)** for robustness, **Support Vector
-Machines (SVM)** for high-dimensional accuracy, and **LASSO Regression**
-for further feature refinement.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"><img src="vignette_files/image036.gif" v:shapes="image27.png"
-width="624" height="393" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image037.gif" v:shapes="image3.png" width="624"
-height="297" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-### <span id="_lasi9lllok49"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:black">Step 11: Internal and External Validation</span>** [step-11-internal-and-external-validation]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Validation
-ensures that the identified biomarkers and machine learning models are
-robust, reproducible, and not the result of over-fitting to a single
-dataset.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Internal
-Validation</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">:</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">○<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Uses the original
-discovery datasets (e.g., GSE50760 and GSE104836).</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">○<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Employs techniques
-like **k-fold cross-validation** or a **70/30 train-test split** to
-assess model stability.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">○<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Metrics like the
-**Confusion Matrix** and **ROC-AUC** are calculated to confirm high
-diagnostic accuracy within the study population.</span><span lang="EN"
-style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">External
-Validation</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">:</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">○<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Tests the model and
-hub genes on entirely independent datasets (e.g., TCGA or a separate GSE
-study) not seen during the training phase.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">○<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Verifies that the
-**Hub Genes** (like *INHBA* or *MMP7*) maintain consistent expression
-patterns (up/down-regulation) in different patient
-cohorts.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">○<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">A high **Validation
-AUC** proves the biomarkers are universal signatures of the disease
-rather than technical artifacts of the original
-lab.</span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-Georgia"></span>
-
-<span lang="EN"><img src="vignette_files/image038.gif" v:shapes="image25.png"
-width="624" height="331" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image039.gif" v:shapes="image7.png" width="624"
-height="295" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-### <span id="_noivzchisiqb"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:black">Step 12: AUC-Based Gene Selection and Comparison</span>** [step-12-auc-based-gene-selection-and-comparison]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">The
-**ROC (Receiver Operating Characteristic)** curve and its **AUC (Area
-<span class="GramE">Under</span> the Curve)** score are the "gold
-standards" for determining how effectively a gene can distinguish
-between Disease and Normal samples.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Calculating AUC
-Scores</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: We calculate an
-individual AUC score for each candidate gene from your PPI and ML
-feature list. A score of **1.0** represents perfect classification,
-while **0.5** represents random chance.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Internal
-Comparison</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: We compare the
-AUC scores within your primary discovery dataset. Genes with an **AUC \>
-0.85** are prioritized as strong "internal" biomarkers with high
-sensitivity and specificity.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">External
-Cross-Validation</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: To ensure these
-genes aren't "over-fitted" to one study, we run the same AUC analysis on
-an **External Validation Dataset**. We specifically select genes that
-maintain a high AUC (e.g., **\> 0.80**) across both internal and
-external cohorts.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Selecting Top
-Biomarkers</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: The final
-"Hub-Biomarkers" are chosen based on a combination
-of:</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">1.<span style="font:7.0pt &quot;Times New Roman&quot;">     
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">High
-AUC</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"> in both discovery
-and validation sets.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:
-&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">2.<span style="font:7.0pt &quot;Times New Roman&quot;">     
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Consistency</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"> in expression
-direction (always <span class="GramE">Up</span> or always
-Down).</span><span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">3.<span style="font:7.0pt &quot;Times New Roman&quot;">     
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Low
-P-value</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"> in the initial DE
-analysis.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image040.gif" v:shapes="image45.png"
-width="624" height="407" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image041.gif" v:shapes="image38.png"
-width="624" height="356" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image042.gif" v:shapes="image50.png"
-width="624" height="293" /><img src="vignette_files/image043.gif" v:shapes="image29.png"
-width="624" height="263" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">13
-Nomogram Model</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">The
-Nomogram translates the statistical results of your machine learning
-model into a visual scoring system for clinical use.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Construction</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: Each of the
-selected **Hub Genes** (e.g., *INHBA*, *MMP7*) is assigned a point scale
-based on its regression coefficient. The sum of these points corresponds
-to a specific **Predicted Probability** of the
-<span class="GramE">disease .</span></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Calibration
-Plot</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: We test the
-nomogram's accuracy by plotting **Predicted vs. Observed** outcomes. A
-curve close to the 45-degree diagonal indicates that the model's
-predictions are highly <span class="GramE">reliable
-.</span></span><span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Decision Curve
-Analysis (DCA)</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: This test
-calculates the "Net Benefit" of using the nomogram in a clinical setting
-compared to a "treat-all" or "treat-none"
-strategy.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Internal/External
-Testing</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: We run the
-nomogram on both the discovery and validation cohorts to ensure the
-**C-index** (concordance index) remains consistently high (e.g., **\>
-0.80**), proving the model's practical utility.</span><span lang="EN"
-style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Georgia"></span>
-
-<span lang="EN"><img src="vignette_files/image044.gif" v:shapes="image39.png"
-width="624" height="303" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN"><img src="vignette_files/image045.gif" v:shapes="image28.png"
-width="624" height="347" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image046.gif" v:shapes="image21.png"
-width="624" height="241" /></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>**
-
-## <span id="_mzzvjr55j7rm"></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#1F1F1F">14. GSEA Analysis</span>** [gsea-analysis]
-
-## <span id="_rrhtmv540bnu"></span><span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#1F1F1F">Unlike KEGG or GO which only look at the "Top" genes, GSEA considers the entire ranked list of genes to identify subtle but coordinated shifts in biological pathways.</span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>** [unlike-kegg-or-go-which-only-look-at-the-top-genes-gsea-considers-the-entire-ranked-list-of-genes-to-identify-subtle-but-coordinated-shifts-in-biological-pathways.]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-## <span id="_8q2exvnhstwq"></span><span lang="EN"><img src="vignette_files/image047.gif" v:shapes="image33.png"
-width="624" height="328" /></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>** [section]
-
-## <span id="_la0l3jwvmqs1"></span><span lang="EN"><img src="vignette_files/image048.gif" v:shapes="image14.png"
-width="624" height="336" /></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>** [section-1]
-
-### <span id="_tbuv7ww98ep0"></span>**<span lang="EN" style="font-size:12.0pt;line-height:
-115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:black">15.<span style="mso-spacerun:yes">  </span>Immune Cell Infiltration Analysis</span>** [immune-cell-infiltration-analysis]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">This
-step uses algorithms like **CIBERSORT**,
-<span class="SpellE">**ssGSEA**</span>, or
-<span class="SpellE">**xCell**</span> to estimate the relative abundance
-of different infiltrating immune cells (e.g., T cells, Macrophages, B
-cells) from your bulk gene expression data.</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Relative Abundance
-(<span class="SpellE">Barplot</span>)</span>**<span lang="EN"
-style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">: Displays the proportion of 22 (or more)
-different immune cell types across all individual samples. Each bar
-represents a sample, and the colored segments show the immune
-composition, allowing you to see overall
-heterogeneity.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Differential
-Infiltration (Violin or Box Plots)</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">:
-Compares the immune landscape between your defined groups (Disease vs.
-Normal). These plots highlight which specific immune cells are
-significantly enriched or depleted in the disease
-state.</span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Immune Cell
-Correlation
-(<span class="SpellE">Correlogram</span>/Matrix)</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">: A
-<span class="SpellE">heatmap</span> that evaluates the relationships
-between different immune cell populations. Red indicates positive
-correlation (cells that infiltrate together), while blue indicates
-negative correlation (mutually exclusive cells).  
-+1</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:
-&quot;Times New Roman&quot;,serif"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Gene-Immune
-Correlation (Scatter Plots)</span>**<span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">:
-Analyzes the relationship between your previously identified **Hub
-Genes** (e.g., from WGCNA/PPI) and specific immune cell types. This
-helps determine if your key biomarkers are directly driving or
-suppressing specific immune responses.</span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif"></span>
-
-<span lang="EN"><img src="vignette_files/image049.gif" v:shapes="image12.png"
-width="624" height="298" /><img src="vignette_files/image025.gif" v:shapes="image9.png" width="624"
-height="403" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN"><img src="vignette_files/image050.gif" v:shapes="image48.png"
-width="624" height="414" /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
- 
-
-### <span id="_stdtqk3ddu4s"></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:black">Step 16: Summary and Conclusion</span>** [step-16-summary-and-conclusion]
-
-## <span lang="EN" style="font-size:12.0pt;
-line-height:125%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">This final step synthesizes the findings from the entire bioinformatics and machine learning pipeline, highlighting the clinical and biological significance of your study.</span> [this-final-step-synthesizes-the-findings-from-the-entire-bioinformatics-and-machine-learning-pipeline-highlighting-the-clinical-and-biological-significance-of-your-study.]
-
-## <span lang="EN" style="font-size:12.0pt;
-line-height:125%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Workflow Recap: The study successfully integrated Differential Expression (DE), WGCNA, and Protein-Protein Interaction (PPI) networks to narrow down thousands of genes into a highly specific subset of disease drivers.</span> [workflow-recap-the-study-successfully-integrated-differential-expression-de-wgcna-and-protein-protein-interaction-ppi-networks-to-narrow-down-thousands-of-genes-into-a-highly-specific-subset-of-disease-drivers.]
-
-## <span lang="EN" style="font-size:12.0pt;
-line-height:125%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Biomarker Discovery: Using advanced Machine Learning algorithms, we identified and validated robust Hub Genes that maintain high diagnostic accuracy (High AUC) across both internal and external independent datasets.</span> [biomarker-discovery-using-advanced-machine-learning-algorithms-we-identified-and-validated-robust-hub-genes-that-maintain-high-diagnostic-accuracy-high-auc-across-both-internal-and-external-independent-datasets.]
-
-## <span id="_ujipbemyef3d"></span><span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Clinical Utility: The translation of these ML features into a clinical Nomogram provides a practical, highly calibrated tool for personalized disease prediction.</span> [clinical-utility-the-translation-of-these-ml-features-into-a-clinical-nomogram-provides-a-practical-highly-calibrated-tool-for-personalized-disease-prediction.]
-
-## <span id="_fp5j7dsj5050"></span><span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Biological Mechanisms: Functional enrichment (KEGG/GO/GSEA) and Immune Infiltration analyses mapped out the underlying molecular pathways and microenvironment changes, offering new insights into disease pathogenesis and potential therapeutic targets.</span> [biological-mechanisms-functional-enrichment-kegggogsea-and-immune-infiltration-analyses-mapped-out-the-underlying-molecular-pathways-and-microenvironment-changes-offering-new-insights-into-disease-pathogenesis-and-potential-therapeutic-targets.]
-
-## <span id="_sj9vf4xmm9fc"></span><span lang="EN"><img src="vignette_files/image051.gif" v:shapes="image31.png"
-width="624" height="412" /></span><span id="_39hf5prvde00"></span><span id="_ellrurq504h4"></span><span id="_16wdshcet751"></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;"></span>** [section-2]
-
-## <span id="_q7cw27fq856r"></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Quick Example 2: Single GEO Dataset Analysis</span>** [quick-example-2-single-geo-dataset-analysis]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">The
-simplest workflow analyzes a single GEO dataset:</span>
-
-<span lang="EN"><img src="vignette_files/image006.gif" v:shapes="Rectangle_x0020_3"
-width="573" height="76"
-alt="Text Box: library(OmniVerse) runOmniVerse() " /></span><span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#4D4D4C"></span>
-
- 
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C">\# <span class="GramE">In</span> the
-app:</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;;
-color:#8E908C">\# 1. Step 1: Enter GSE ID (e.g.,
-"</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">GSE50760</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:Cardo;color:#8E908C">") →
-Download</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Cardo;color:#8E908C">\#
-2. Step 2: Select Disease/Normal grouping →
-Normalize</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-*<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:Cardo;color:#8E908C">\#
-3. Step 3-16: Run complete pipeline → Download
-results</span>*<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:141%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;;color:#4D4D4C"></span>
-
- 
-
-## <span id="_okyls8ejls4v"></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Input Requirements</span>** [input-requirements]
-
-<span class="SpellE"><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">OmniVerse</span></span><span lang="EN"
-style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;"> handles all microarray and bulk-RNA data
-processing internally from GEO accession numbers:</span>
-
-1.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;">GEO GSE
-    ID(s): Single GSE (e.g., "GSE50760") </span>
-2.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;">Group
-    labels: Disease vs Normal (auto-detected or user-defined)</span>
-3.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;">Analysis
-    parameters: Adjustable at each step (default values
-    Bioconductor-optimized)</span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">No
-pre-processing required - raw GEO data is automatically:</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Georgia&quot;,serif;
-mso-fareast-font-family:Georgia;mso-bidi-font-family:Georgia"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Downloaded via
-<span class="SpellE">GEOquery</span></span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Georgia&quot;,serif;
-mso-fareast-font-family:Georgia;mso-bidi-font-family:Georgia"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Platform-annotated (200+ GPLs
-supported)</span>
-
-<span lang="EN"
-style="font-size:12.0pt;line-height:115%;font-family:&quot;Georgia&quot;,serif;
-mso-fareast-font-family:Georgia;mso-bidi-font-family:Georgia"><span style="mso-list:Ignore">●<span style="font:7.0pt &quot;Times New Roman&quot;">      
-</span></span></span><span lang="EN" style="font-size:12.0pt;
-line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;">Normalized
-(RMA/<span class="SpellE">voom</span>)</span>
-
-<span lang="EN" style="font-size:
-12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-&quot;Times New Roman&quot;"></span>
-
- 
-
-## <span id="_22l9l0jd6pfp"></span>**<span lang="EN" style="font-size:12.0pt;line-height:125%;font-family:&quot;Times New Roman&quot;,serif;
-mso-fareast-font-family:&quot;Times New Roman&quot;">Workflow Summary</span>** [workflow-summary]
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">The
-app guides you through 16 steps:</span>
-
-1.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:Cardo">GEO Download → 2. Quality
-    Control → 3. Normalization </span><span lang="EN"
-    style="font-size:12.0pt;line-height:
-         115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-2.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:Cardo">Differential Expression
-    (<span class="SpellE">limma</span>/DESeq2) → 6. WGCNA → 7. Common
-    Genes (DEGs ∩ modules)</span><span lang="EN"
-    style="font-size:12.0pt;
-         line-height:115%;font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:
-         &quot;Times New Roman&quot;"></span>
-3.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:Cardo">GO/KEGG Enrichment → 9. PPI
-    Networks (<span class="SpellE">STRINGdb</span>) → 10. Machine
-    Learning</span><span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-4.  <span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:Cardo">ROC Validation → 12. Nomogram
-    → 13. GSEA → 14. Immune Deconvolution</span><span lang="EN"
-    style="font-size:12.0pt;line-height:115%;font-family:&quot;Times New Roman&quot;,serif;
-         mso-fareast-font-family:&quot;Times New Roman&quot;"></span>
-
-<span lang="EN" style="font-size:12.0pt;line-height:115%;
-font-family:&quot;Times New Roman&quot;,serif;mso-fareast-font-family:&quot;Times New Roman&quot;">Each
-step produces downloadable plots/tables with one-click PDF/CSV
-export</span>
-
-</div>
+(CSV/RDS/PDF), with a narrative summary auto-generated for manuscripts.
+
+**2. Installation**
+
+**2.1 Install Bioconductor Dependencies**
+
+**Requirements**
+
+GExPipe requires:
+
+-   **R ≥ 4.5.2**
+
+-   **Bioconductor 3.22 or later**
+
+To check your R version:
+
+R.version.string
+
+**2. Install GExPipe**
+
+From source (before Bioconductor release):
+
+install.packages(\".\", repos = NULL, type = \"source\")
+
+After Bioconductor acceptance:
+
+BiocManager::install(\"GExPipe\")
+
+**3. Launching the Application**
+
+library(GExPipe)\
+runGExPipe()
+
+Optional deployment:
+
+runGExPipe(port = 3838, host = \"0.0.0.0\")
+
+This opens an interactive web interface in your default browser where
+you can:
+
+1.  Search and download GEO datasets (single or multiple GSEs)
+
+2.  Follow the guided workflow through normalization → DE → WGCNA →
+    enrichment → ML
+
+3.  Download publication-ready results and auto-generated analysis
+    summary
+
+## Section: Selecting the Analysis Framework
+
+In this step, you define the core biological platform, the scope of your
+data, and the statistical model used to identify differentially
+expressed (DE) genes.
+
+### 3.1. Choose Platform
+
+The first step is to identify the technology used to generate your
+transcriptomics data.
+
+-   **RNA-seq:** Select this for high-throughput sequencing data (raw or
+    normalized counts).
+
+-   **Microarray:** Select this for intensity-based data from platforms
+    like Affymetrix or Illumina beads.
+
+-   **Merged (Both):** Use this if your project integrates both RNA-seq
+    and Microarray data into a meta-analysis.
+
+### 3. 2. Datasets Configuration
+
+This section determines how the tool handles technical variation between
+different experiments.
+
+-   **Single dataset (1 GSE):** Best for a single experiment. Batch
+    correction is typically skipped as the samples are assumed to be
+    processed under uniform conditions.
+
+-   **Multiple datasets:** Choose this if you are combining data from
+    different studies or laboratories. The tool will recommend **batch
+    correction** (e.g., ComBat or SVA) to remove non-biological \"lab
+    effects\" before downstream analysis.
+
+### 3.3. Differential Expression (DE) Method
+
+The choice of method depends on your platform and the statistical
+distribution of your data:
+
+  ---------------- -------------------- ----------------------------------------
+  **Method**       **Recommendation**   **Statistical Basis**
+
+  **limma**        Microarray / Mixed   Empirical Bayes linear modeling.
+                   data                 
+
+  **limma-voom**   RNA-seq counts       Transforms counts to log-CPM and
+                                        estimates mean-variance relationship.
+
+  **DESeq2**       **RNA-seq counts**   Uses a **Negative Binomial**
+                                        distribution; excellent for small sample
+                                        sizes.
+
+  **edgeR**        RNA-seq counts       Uses quasi-likelihood to account for
+                                        overdispersion in count data.
+  ---------------- -------------------- ----------------------------------------
+
+**4. Complete Workflow Description (All 16 Steps)**
+
+**Step 1: Download Data**
+
+**Purpose**
+
+Retrieve bulk RNA-seq or microarray datasets from GEO.
+
+**Method**
+
+-   Uses GEOquery
+
+-   Automatically extracts:
+
+    -   Expression matrices
+
+    -   Sample metadata
+
+    -   Platform annotation
+
+-   Maps probes → gene symbols (if microarray)
+
+-   Harmonizes gene identifiers across datasets
+
+-   Merges multiple GEO series
+
+**Outputs**
+
+-   Unified expression matrix
+
+-   Metadata table
+
+-   Gene overlap summary
+
+**Step 2: Quality Control & Visualization**
+
+Step 2 ensures dataset compatibility, detects outliers, and prepares
+samples for downstream analysis.
+
+## 2.1 Gene Overlap Analysis
+
+To assess compatibility across datasets:
+
+-   **Venn / UpSet plots** quantify shared genes.
+
+-   Gene intersection is calculated automatically.
+
+For example, if two datasets share the same gene set (e.g., 37,673
+genes), they are fully compatible for meta-analysis and integration.
+
+## 2.2 Expression Distribution (QC Plots)
+
+Raw expression distributions are inspected before normalization:
+
+-   **Boxplots** display sample-wise expression ranges. Similar box
+    heights indicate comparable data quality.
+
+-   **Density plots** show global distribution patterns. A typical
+    RNA-seq "hockey-stick" curve (high density at low values) confirms
+    the need for normalization.
+
+## 2.3 Outlier Detection
+
+Outliers are identified to prevent distortion of downstream statistical
+analyses.
+
+### Principal Component Analysis (PCA)
+
+-   Reduces gene expression into two principal components (PC1, PC2).
+
+-   Samples clustering together indicate similarity.
+
+-   A Mahalanobis-distance ellipse defines statistical boundaries.
+
+-   Samples outside the ellipse are flagged as potential outliers.
+
+### Sample Connectivity
+
+-   Measures correlation of each sample with all others.
+
+-   A threshold of **mean − 2 × SD** identifies low-connectivity
+    samples.
+
+-   Poorly connected samples may indicate technical issues.
+
+### Outlier Removal
+
+-   Flagged samples are summarized in a results table.
+
+-   Users can interactively exclude selected outliers.
+
+-   Exclusion updates all downstream analyses.
+
+**Step 3: Normalization**
+
+Normalization in **GExPipe** is platform-aware and adapts automatically
+to the data type:
+
+-   RNA-seq
+
+-   Microarray
+
+-   Combined (multi-platform integration)
+
+Users can choose:
+
+-   **Auto mode (recommended)**
+
+-   **Manual mode (advanced users)**
+
+## 3.1 Auto Mode 
+
+When **Auto mode** is selected, GExPipe automatically detects the
+platform and applies appropriate normalization:
+
+### RNA-seq
+
+-   **TMM normalization (edgeR)**
+
+-   Followed by **log2-CPM transformation**
+
+This approach:
+
+-   Corrects for library size differences
+
+-   Stabilizes variance
+
+-   Makes samples comparable
+
+-   Produces data suitable for limma-voom, WGCNA, PCA, and ML
+
+### Microarray (GEO Series Matrix)
+
+-   **Quantile normalization**
+
+This:
+
+-   Forces identical distribution across samples
+
+-   Reduces technical variability
+
+-   Is appropriate for processed GEO matrix files
+
+### Combined Datasets (RNA-seq + Microarray)
+
+-   **Global quantile normalization**
+
+After platform-specific preprocessing, GExPipe:
+
+1.  Intersects common genes
+
+2.  Merges datasets
+
+3.  Applies global quantile normalization
+
+4.  Enables downstream batch correction (Step 5)
+
+This ensures cross-platform comparability.
+
+**Step 4: Group Selection**
+
+**Purpose**
+
+Define biological comparisons.
+
+User selects:
+
+-   Metadata column
+
+-   Control group
+
+-   Disease group
+
+**Output**
+
+Design matrix for differential expression
+
+**Step 5: Batch Effect Correction**
+
+Step 5 improves signal quality by removing uninformative genes and
+correcting technical batch effects across datasets.
+
+## 5.1 Gene Filtering: Remove Low-Variance Genes
+
+Genes with minimal variation across samples contribute little to
+differential or network analysis and may introduce noise.
+
+### Variance Percentile Cutoff
+
+-   Users select a percentile threshold (e.g., 25%).
+
+-   Genes below this variance threshold are removed.
+
+-   The interface displays:
+
+    -   Number of genes retained
+
+    -   Number of genes filtered out
+
+This step:
+
+-   Reduces computational burden
+
+-   Improves WGCNA stability
+
+-   Enhances machine learning performance
+
+Filtering is applied only to normalized expression data used for
+downstream analyses.
+
+## 5.2 Batch Correction
+
+When integrating multiple datasets or experimental batches, technical
+variation may obscure biological signal. GExPipe provides multiple
+correction strategies.
+
+### Available Methods
+
+**ComBat-ref (Recommended)**
+
+-   Empirical Bayes adjustment with a reference batch
+
+-   Suitable when one dataset should remain biologically anchored
+
+**ComBat**
+
+-   Standard empirical Bayes batch correction
+
+-   Effective for multi-dataset integration
+
+**SVA (Surrogate Variable Analysis)**
+
+-   Identifies hidden confounding variables
+
+-   Useful when batch structure is unknown
+
+**limma removeBatchEffect**
+
+-   Linear model-based adjustment
+
+-   Fast and suitable for simple designs
+
+**Quantile + limma**
+
+-   Global quantile normalization followed by batch adjustment
+
+**Hybrid**
+
+-   Combined strategy for complex multi-platform datasets
+
+**Step 6: Differential Expression Analysis**
+
+**Methods Available**
+
+-   limma (microarray / voom RNA-seq)
+
+-   DESeq2 (RNA-seq)
+
+-   edgeR (RNA-seq)
+
+**Statistics**
+
+-   log2 Fold Change
+
+-   Adjusted p-value (FDR)
+
+**Visual Outputs**
+
+-   Volcano plot
+
+-   Heatmap of DEGs
+
+-   MA plot
+
+-   DEG result table (downloadable)
+
+**Step 7: WGCNA Analysis**
+
+**Purpose**
+
+Identify gene co-expression modules.
+
+**Procedure**
+
+1.  Soft-threshold power selection
+
+2.  Adjacency matrix construction
+
+3.  TOM similarity
+
+4.  Hierarchical clustering
+
+5.  Dynamic tree cut
+
+6.  Module eigengene calculation
+
+7.  Module--trait correlation
+
+**Outputs**
+
+-   Scale-free topology plot
+
+-   Dendrogram with module colors
+
+-   Module--trait heatmap
+
+-   Module eigengene Relationships
+
+-   Significant module analysis
+
+-   Module Genes list
+
+**Step 8: Common Genes (DEG ∩ WGCNA)**
+
+**Purpose**
+
+Increase biological relevance.
+
+Intersection of:
+
+-   Significant DEGs
+
+-   Trait-associated WGCNA modules
+
+**Outputs**
+
+-   Venn diagram
+
+-   Consensus gene list
+
+-   GO enrichment
+
+-   KEGG pathway enrichment
+
+**Step 9: PPI Network & Hub Genes**
+
+**Method**
+
+-   STRINGdb API query
+
+-   Network construction
+
+-   Degree centrality scoring
+
+**Hub Identification**
+
+-   Top degree nodes
+
+-   Consensus hub genes
+
+**Outputs**
+
+-   PPI network graph
+
+-   Hub ranking table
+
+-   Exportable edge list
+
+**Step 10: Machine Learning Biomarker Selection**
+
+**Implemented Algorithms**
+
+-   LASSO
+
+-   Elastic Net
+
+-   Ridge regression
+
+-   Random Forest
+
+-   SVM-RFE
+
+-   Boruta
+
+-   sPLS-DA
+
+-   XGBoost + SHAP
+
+**Strategy**
+
+-   Independent model selection
+
+-   Overlap integration (Venn)
+
+-   Final biomarker list
+
+**Outputs**
+
+-   Feature importance plots
+
+-   Coefficient plots
+
+-   SHAP summary
+
+-   Final gene panel
+
+**Step 11: Validation Setup**
+
+**Options**
+
+-   External GEO dataset
+
+-   Internal train/test split
+
+**Outputs**
+
+-   Prepared validation matrix
+
+-   Group verification
+
+**Step 12: ROC Curve Analysis**
+
+**Metrics**
+
+-   ROC curves
+
+-   AUC
+
+-   Sensitivity
+
+-   Specificity
+
+**Outputs**
+
+-   ROC plot (training)
+
+-   ROC plot (validation)
+
+-   AUC summary table
+
+**Step 13: Diagnostic Nomogram**
+
+**Method**
+
+-   Logistic regression
+
+-   rms package modeling
+
+**Outputs**
+
+-   Nomogram plot
+
+-   Calibration curve
+
+-   Decision curve analysis
+
+**Step 14: GSEA Analysis**
+
+**Purpose**
+
+Functional interpretation of ranked genes.
+
+**Method**
+
+-   clusterProfiler::GSEA
+
+-   MSigDB gene sets (if provided)
+
+**Outputs**
+
+-   Enrichment plots
+
+-   NES score
+
+-   FDR q-value
+
+-   Pathway ranking table
+
+**Step 15: Immune Cell Deconvolution**
+
+GExPipe provides immune infiltration estimation using transcriptomic
+deconvolution methods implemented via the **immunedeconv** framework.
+
+This module estimates immune cell abundance from normalized bulk RNA-seq
+or microarray expression data.
+
+**15.1 Implemented Methods**
+
+The following deconvolution algorithms are available:
+
+-   **xCell**
+
+-   **EPIC**
+
+-   **MCPcounter**
+
+All methods are accessed through the immunedeconv interface, which
+standardizes input formatting and output structure across algorithms.
+
+**15.2 Input Requirements**
+
+For accurate immune cell estimation, the expression matrix must meet the
+following criteria:
+
+-   Log2-transformed expression values (recommended)
+
+-   Gene-symbol annotated
+
+-   Human datasets only (compatible with org.Hs.eg.db)
+
+-   Adequate overlap with method-specific reference signatures
+
+Before running deconvolution, GExPipe automatically:
+
+1.  Standardizes gene symbols
+
+2.  Removes duplicated gene entries
+
+3.  Aligns gene identifiers to reference signature matrices
+
+4.  Verifies sufficient gene overlap required by the selected method
+
+If overlap is insufficient, the application notifies the user.
+
+**xCell**
+
+-   Signature-based enrichment method
+
+-   Uses gene-set enrichment to infer cell-type enrichment scores
+
+-   Produces **relative enrichment scores**, not direct proportions
+
+**Best suited for:**
+
+-   Broad immune landscape profiling
+
+-   Comparing relative immune differences between conditions
+
+-   Studies where absolute cell fractions are not required
+
+**EPIC**
+
+-   Reference-based deconvolution method
+
+-   Estimates fractions of:
+
+    -   Major immune cell populations
+
+    -   Cancer cells (when applicable)
+
+**Best suited for:**
+
+-   Tumor microenvironment studies
+
+-   Cancer vs normal tissue comparisons
+
+-   Estimation of immune--tumor composition
+
+**MCPcounter**
+
+-   Marker gene-based abundance estimation
+
+-   Quantifies immune and stromal populations using predefined marker
+    genes
+
+-   Robust across platforms (RNA-seq and microarray)
+
+**Best suited for:**
+
+-   Cross-platform datasets
+
+-   Large cohort studies
+
+-   Robust immune abundance scoring
+
+**15.5 Outputs**
+
+-   Immune Cell Composition Barplots
+
+-   Boxplots by Condition
+
+-   Correlation Heatmap
+
+-   Exportable Tables
+
+**Step 16: Results Summary**
+
+**Automatically Generates**
+
+-   Volcano plot
+
+-   Heatmap
+
+-   WGCNA summary
+
+-   PPI network
+
+-   ROC curve
+
+-   Nomogram
+
+-   GSEA enrichment
+
+-   Immune landscape
+
+-   Downloadable tables
+
+Produces publication-ready figures.
+
+**5. Data Export & Reproducibility**
+
+Users can export:
+
+-   DEG tables (CSV)
+
+-   Hub genes
+
+-   Machine learning selected genes
+
+-   ROC statistics
+
+-   Enrichment tables
+
+-   Immune proportions
+
+-   High-resolution figures
+
+All analysis steps are reproducible via logged parameters.
+
+**6. Recommended Workflow Strategy**
+
+For standard biomarker discovery:
+
+1.  Download GEO datasets
+
+2.  Normalize and correct batch
+
+3.  Perform DE analysis
+
+4.  Run WGCNA
+
+5.  Intersect DEGs and modules
+
+6.  Build PPI network
+
+7.  Apply machine learning
+
+8.  Validate biomarkers
+
+9.  Generate ROC and nomogram
+
+10. Perform pathway and immune analysis
+
+11. Export results
+
+**7. Applications**
+
+GExPipe is suitable for:
+
+-   Disease biomarker discovery
+
+-   Transcriptomic meta-analysis
+
+-   Network biology studies
+
+-   Machine-learning-based gene panel design
+
+-   Clinical translational research
+
+-   Publication-ready analysis pipelines
+
+**8. Conclusion**
+
+GExPipe provides a comprehensive, modular, and reproducible environment
+for gene expression analysis. By integrating statistical modeling,
+network biology, and machine learning into a single Shiny application,
+it bridges computational complexity and usability for biomedical
+researchers.

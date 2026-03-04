@@ -1,240 +1,212 @@
 # ==============================================================================
-# UI_RESULTS_SUMMARY.R - Step 16: Results Summary (compact list, 2 per row)
-# ==============================================================================
-# Single page: results in pipeline order (Step 3 → last): normalization, batch, DE, WGCNA,
-# common genes, GO/KEGG, PPI, ML Venn, GSEA, immune. Two items per row (column 6 + 6).
+# UI_RESULTS_SUMMARY.R - Step 16: Results Summary (aesthetic flow: summary → steps with arrow, description, figure)
 # ==============================================================================
 
-# Compact height for all results list items (short, less space)
-RESULTS_PLOT_HEIGHT <- "260px"
+RESULTS_PLOT_HEIGHT <- "280px"
+
+# Reusable step connector (arrow down)
+step_arrow <- function() {
+  tags$div(
+    style = "text-align: center; padding: 8px 0; color: #95a5a6;",
+    tags$span(icon("chevron-down"), style = "font-size: 20px;")
+  )
+}
+
+# Reusable step card wrapper: title (icon + text), description, then content
+step_card <- function(step_num, icon_name, title, description, status = "primary", ...) {
+  tagList(
+    step_arrow(),
+    box(
+      width = 12,
+      status = status,
+      solidHeader = TRUE,
+      collapsible = TRUE,
+      collapsed = FALSE,
+      title = tags$span(
+        icon(icon_name),
+        " ",
+        tags$span(style = "color: #2c3e50; font-weight: 600;", paste0("Step ", step_num, ": ", title))
+      ),
+      tags$p(description, style = "margin-bottom: 14px; font-size: 13px; color: #5a6c7d; line-height: 1.5;"),
+      ...
+    )
+  )
+}
 
 ui_results_summary <- tabItem(
   tabName = "results_summary",
-  h2(icon("file-alt"), " Results Summary", style = "color: #2c3e50; font-weight: 700; margin-bottom: 20px;"),
 
-  fluidRow(
-    box(
-      width = 12, status = "info", solidHeader = TRUE,
-      title = tags$span(icon("info-circle"), " About this page"),
-      tags$p("This page shows a narrative writeup (one paragraph summarizing the full pipeline from input to immune deconvolution) and all results in order: normalization, batch effect before/after, volcano, heatmap, WGCNA (soft threshold, sample tree, dendrogram, module-trait), common genes, GO & KEGG, PPI, machine learning Venn/UpSet, AUC/ROC curve, diagnostic nomogram, GSEA, and immune cell deconvolution. Each section includes a short summary and the relevant graph(s). Text and numbers update automatically with your data and inputs. Use the button below to download everything as a PDF.", style = "margin-bottom: 0; font-size: 14px;")
+  # ----- Page title -----
+  tags$div(
+    style = "margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #ecf0f1;",
+    tags$h2(
+      icon("file-alt"),
+      " Results Summary",
+      style = "color: #2c3e50; font-weight: 700; margin: 0; font-size: 28px;"
+    ),
+    tags$p(
+      "Pipeline overview and key results in order. One summary below, then each step with a short description and figure.",
+      style = "margin-top: 8px; margin-bottom: 0; color: #7f8c8d; font-size: 14px;"
     )
   ),
 
-  fluidRow(
-    column(12, align = "center", style = "margin-bottom: 25px;",
-           downloadButton("download_all_results_pdf",
-                          tagList(icon("download"), " Download all results (PDF)"),
-                          class = "btn-danger btn-lg",
-                          style = "font-size: 18px; padding: 14px 40px; border-radius: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);"))
-  ),
-
-  # ----- Narrative writeup (one paragraph, generalized from data) -----
-  fluidRow(
-    box(
-      title = tags$span(icon("align-left"), " Narrative writeup"),
-      width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p("Summary of the full pipeline from input data to immune deconvolution. Text updates automatically with your results and input values.", style = "margin-bottom: 10px; font-size: 12px; color: #555;"),
+  # ----- 1. Narrative summary (one paragraph) -----
+  box(
+    width = 12,
+    status = "info",
+    solidHeader = TRUE,
+    title = tags$span(icon("align-left"), " Pipeline summary"),
+    tags$div(
+      style = "padding: 16px 0 8px 0; font-size: 15px; line-height: 1.75; color: #2c3e50; text-align: justify; background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%); border-radius: 8px; padding: 20px !important;",
       uiOutput("results_summary_narrative")
     )
   ),
 
-  # ----- Cite this analysis -----
+  # ----- 2. Normalization & batch -----
+  step_arrow(),
   fluidRow(
-    box(
-      title = tags$span(icon("quote-right"), " Cite this analysis"),
-      width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-      uiOutput("citation_text")
+    column(6,
+      box(
+        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+        title = tags$span(icon("balance-scale"), " Step 3: Normalization"),
+        tags$p("Expression data normalized (e.g. log2, TMM, quantile). Gene counts and filtering applied.", style = "margin-bottom: 12px; font-size: 13px; color: #5a6c7d;"),
+        uiOutput("results_summary_norm_batch")
+      )
+    ),
+    column(6,
+      box(
+        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+        title = tags$span(icon("layer-group"), " Step 5: Batch correction"),
+        tags$p("Batch effect removed (e.g. ComBat, limma). Before/after comparison below.", style = "margin-bottom: 12px; font-size: 13px; color: #5a6c7d;"),
+        uiOutput("results_summary_batch_only")
+      )
     )
   ),
 
-  # ----- Results list: 2 per row, in pipeline step order (Step 3 → last) -----
-  # Row 1 (Step 3 & 5): Normalization | Batch effect removal
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("balance-scale"), " Normalization"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        uiOutput("results_summary_norm_batch"),
-        tags$p(tags$strong("Description:"), " Step 3 normalization applied to expression data.", style = "margin-top: 8px; font-size: 11px; color: #555;")
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("layer-group"), " Batch effect removal"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        uiOutput("results_summary_batch_only"),
-        tags$p(tags$strong("Description:"), " Step 5 batch correction (e.g. ComBat) applied.", style = "margin-top: 8px; font-size: 11px; color: #555;")
+  # ----- 3. Batch before vs after PCA -----
+  step_card(
+    "3–5", "chart-area", "Batch effect: Before vs After",
+    "PCA of expression before and after batch correction. Samples should mix better after correction.",
+    "primary",
+    plotOutput("results_summary_batch_before_after", height = RESULTS_PLOT_HEIGHT)
+  ),
+
+  # ----- 4. Differential expression -----
+  step_card(
+    "6", "chart-line", "Differential expression",
+    "DEGs identified (e.g. limma). Volcano: log2 FC vs adjusted P-value. Heatmap: top genes across samples.",
+    "success",
+    uiOutput("results_summary_de"),
+    tags$div(style = "margin-top: 12px;",
+      fluidRow(
+        column(6, plotOutput("results_summary_volcano", height = RESULTS_PLOT_HEIGHT)),
+        column(6, plotOutput("results_summary_de_heatmap", height = RESULTS_PLOT_HEIGHT))
       )
     )
   ),
-  # Row 1b: Batch effect before vs after PCA
+
+  # ----- 5. WGCNA -----
+  step_card(
+    "7", "project-diagram", "WGCNA co-expression",
+    "Soft-threshold choice, sample tree, gene dendrogram with module colors, and module–trait correlation.",
+    "primary",
+    uiOutput("results_summary_wgcna"),
+    fluidRow(
+      column(6, plotOutput("results_summary_soft_threshold", height = RESULTS_PLOT_HEIGHT)),
+      column(6, plotOutput("results_summary_sample_tree", height = RESULTS_PLOT_HEIGHT))
+    ),
+    fluidRow(
+      column(6, plotOutput("results_summary_wgcna_dendro", height = RESULTS_PLOT_HEIGHT)),
+      column(6, plotOutput("results_summary_module_trait", height = RESULTS_PLOT_HEIGHT))
+    )
+  ),
+
+  # ----- 6. Common genes & GO/KEGG -----
+  step_card(
+    "8", "venus-double", "Common genes (DEG ∩ WGCNA)",
+    "Intersection of DEGs and WGCNA module genes. This set is used for GO/KEGG enrichment and PPI.",
+    "success",
+    uiOutput("results_summary_common_genes")
+  ),
+
+  step_card(
+    "8", "sitemap", "GO & KEGG enrichment",
+    "Pathway enrichment of common genes. GO dotplot and KEGG bar plot.",
+    "info",
+    uiOutput("results_summary_go_kegg"),
+    fluidRow(
+      column(6, plotOutput("results_summary_go_plot", height = RESULTS_PLOT_HEIGHT)),
+      column(6, plotOutput("results_summary_kegg_plot", height = RESULTS_PLOT_HEIGHT))
+    )
+  ),
+
+  # ----- 7. PPI -----
+  step_card(
+    "9", "project-diagram", "PPI network",
+    "Protein–protein interaction network from common genes (STRINGdb). Hub genes by degree.",
+    "info",
+    uiOutput("results_summary_ppi"),
+    plotOutput("results_summary_ppi_plot", height = RESULTS_PLOT_HEIGHT)
+  ),
+
+  # ----- 8. Machine learning & ROC -----
+  step_card(
+    "10", "circle", "Machine learning – Venn/UpSet",
+    "Overlap of gene lists across selected ML methods. Common genes used for ROC and validation.",
+    "warning",
+    uiOutput("results_summary_ml"),
+    plotOutput("results_summary_ml_venn", height = RESULTS_PLOT_HEIGHT)
+  ),
+
+  step_card(
+    "12", "chart-line", "ROC curve",
+    "ROC/AUC for mean signature of ML common genes (training data).",
+    "success",
+    plotOutput("results_summary_roc_plot", height = RESULTS_PLOT_HEIGHT)
+  ),
+
+  # ----- 9. Nomogram -----
+  step_card(
+    "13", "calculator", "Diagnostic nomogram",
+    "Nomogram model and 70/30 validation. Training and validation AUC.",
+    "danger",
+    uiOutput("results_summary_nomogram_ui"),
+    plotOutput("results_summary_nomogram_plot", height = RESULTS_PLOT_HEIGHT)
+  ),
+
+  # ----- 10. GSEA -----
+  step_card(
+    "14", "chart-area", "GSEA",
+    "Gene Set Enrichment Analysis for target genes. Enrichment plot and pathways.",
+    "info",
+    uiOutput("results_summary_gsea"),
+    plotOutput("results_summary_gsea_plot", height = RESULTS_PLOT_HEIGHT)
+  ),
+
+  # ----- 11. Immune -----
+  step_card(
+    "15", "shield-alt", "Immune cell deconvolution",
+    "Estimated immune cell proportions (e.g. EPIC, xCell). Heatmap or boxplot.",
+    "primary",
+    uiOutput("results_summary_immune"),
+    plotOutput("results_summary_immune_plot", height = RESULTS_PLOT_HEIGHT)
+  ),
+
+  # ----- 12. Input & pipeline info -----
+  step_card(
+    "—", "dna", "Input & pipeline",
+    "Common genes and expression matrix size after preprocessing.",
+    "primary",
+    uiOutput("results_summary_input_genes")
+  ),
+
+  # ----- Cite (collapsible at bottom) -----
   fluidRow(
     column(12,
       box(
-        title = tags$span(icon("chart-area"), " Batch effect: Before vs After (PCA)"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("PCA of expression before and after batch correction. Samples should mix better after correction.", style = "margin-bottom: 8px; font-size: 12px; color: #555;"),
-        plotOutput("results_summary_batch_before_after", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 2 (Step 6): DE Volcano | DE Heatmap
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("chart-line"), " DE – Volcano"),
-        width = NULL, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Differential expression (limma): log2 FC vs adjusted P-value. Summary below.", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_de"),
-        plotOutput("results_summary_volcano", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("th"), " DE – Heatmap"),
-        width = NULL, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Heatmap of top DE genes across samples; rows scaled.", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        plotOutput("results_summary_de_heatmap", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 3 (Step 7): WGCNA soft threshold | WGCNA sample tree
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("project-diagram"), " WGCNA – Soft threshold"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Scale independence and mean connectivity for power selection.", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_wgcna"),
-        plotOutput("results_summary_soft_threshold", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("sitemap"), " WGCNA – Sample tree"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Sample clustering tree (WGCNA).", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        plotOutput("results_summary_sample_tree", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 4 (Step 7): WGCNA dendro | WGCNA module-trait
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("project-diagram"), " WGCNA – Dendrogram"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Gene dendrogram and module colors.", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        plotOutput("results_summary_wgcna_dendro", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("chart-bar"), " WGCNA – Module-trait"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Module–trait correlation heatmap.", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        plotOutput("results_summary_module_trait", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 5 (Step 8): Common significant genes (DEG ∩ WGCNA) | GO & KEGG
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("venus-double"), " Common significant genes"),
-        width = NULL, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        uiOutput("results_summary_common_genes"),
-        tags$p(tags$strong("Description:"), " DEG ∩ WGCNA; used for GO/KEGG and PPI.", style = "margin-top: 8px; font-size: 11px; color: #555;")
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("sitemap"), " GO & KEGG"),
-        width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("GO and KEGG enrichment of common genes (DEG ∩ WGCNA).", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_go_kegg"),
-        plotOutput("results_summary_go_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 6 (Step 9): KEGG plot | PPI
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("sitemap"), " KEGG enrichment"),
-        width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("KEGG pathway enrichment bar plot.", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        plotOutput("results_summary_kegg_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("project-diagram"), " PPI network"),
-        width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Protein–protein interaction network of common genes (top by degree).", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_ppi"),
-        plotOutput("results_summary_ppi_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 7 (Step 10): Machine learning – UpSet/Venn | Summary
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("circle"), " Machine learning – Venn/UpSet plot"),
-        width = NULL, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Overlap of gene lists across selected ML methods. Common genes used for ROC and GSEA.", style = "margin-bottom: 8px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_ml"),
-        plotOutput("results_summary_ml_venn", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("chart-line"), " AUC / ROC curve"),
-        width = NULL, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("ROC curve for mean signature of common ML genes (Step 12).", style = "margin-bottom: 8px; font-size: 12px; color: #555;"),
-        plotOutput("results_summary_roc_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 8: Nomogram | GSEA
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("calculator"), " Diagnostic nomogram"),
-        width = NULL, status = "danger", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Diagnostic nomogram validation (Step 13). Summary and nomogram plot.", style = "margin-bottom: 8px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_nomogram_ui"),
-        plotOutput("results_summary_nomogram_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("chart-area"), " GSEA"),
-        width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Gene Set Enrichment Analysis for target genes (Step 14).", style = "margin-bottom: 8px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_gsea"),
-        plotOutput("results_summary_gsea_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
-  ),
-  # Row 10: Immune | Input genes & pipeline
-  fluidRow(
-    column(6,
-      box(
-        title = tags$span(icon("shield-alt"), " Immune cell deconvolution"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p("Estimated immune cell proportions (e.g. EPIC, xCell).", style = "margin-bottom: 6px; font-size: 12px; color: #555;"),
-        uiOutput("results_summary_immune"),
-        plotOutput("results_summary_immune_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    column(6,
-      box(
-        title = tags$span(icon("dna"), " Input genes & pipeline"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        uiOutput("results_summary_input_genes"),
-        tags$p(tags$strong("Description:"), " Common genes and expression matrix size.", style = "margin-top: 8px; font-size: 11px; color: #555;")
+        title = tags$span(icon("quote-right"), " Cite this analysis"),
+        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        uiOutput("citation_text")
       )
     )
   )
