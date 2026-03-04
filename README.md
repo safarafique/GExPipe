@@ -117,10 +117,4 @@ R CMD build . --no-build-vignettes
 R CMD check GExPipe_0.99.0.tar.gz --no-build-vignettes --no-manual
 ```
 
-Fix any **ERROR**s and **WARNING**s before submission. Run `BiocCheck("GExPipe_0.99.0.tar.gz")` and address reported issues.
-
----
-
-## Optional
-
-Immune deconvolution can use the **immunedeconv** package if installed by the user (not on CRAN/Bioconductor). The app runs fully without it.
+Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.0.tar.gz")` and address any reported issues.
