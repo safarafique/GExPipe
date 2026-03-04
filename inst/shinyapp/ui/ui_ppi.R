@@ -167,47 +167,6 @@ ui_ppi <- tabItem(
     )
   ),
 
-  # ========== 5. NETWORK CENTRALITY–WEIGHTED ML ==========
-  fluidRow(
-    box(
-      title = tags$span(icon("weight-hanging"), " 5. Network Centrality–Weighted ML"),
-      width = 12, status = "info", solidHeader = TRUE,
-      tags$div(
-        class = "alert alert-info",
-        "Use PPI metrics (Degree, Betweenness, Closeness) to ",
-        tags$strong("weight features"),
-        " or ",
-        tags$strong("filter top network hubs"),
-        " for machine learning. Integrates biology + ML (common in Bioinformatics and Briefings in Bioinformatics)."
-      ),
-      fluidRow(
-        column(3,
-               radioButtons("ppi_centrality_mode",
-                            "Mode (this choice is used for Extract Data for ML):",
-                            choices = c("Filter top N by metric" = "filter", "Compute centrality weights only" = "weight"),
-                            selected = "filter")),
-        column(2,
-               numericInput("ppi_centrality_top_n", "Top N genes (for filter)", value = 20, min = 5, max = 100, step = 1)),
-        column(3,
-               selectInput("ppi_centrality_metric",
-                           "Centrality metric (for filter):",
-                           choices = c("Degree" = "Degree", "Betweenness" = "Betweenness", "Closeness" = "Closeness", "Composite (mean rank)" = "Composite"),
-                           selected = "Degree")),
-        column(2,
-               tags$div(style = "margin-top: 25px;",
-                        actionButton("ppi_apply_centrality",
-                                     tagList(icon("cogs"), " Apply"),
-                                     class = "btn-info btn-block")))
-      ),
-      uiOutput("ppi_centrality_status_ui"),
-      tags$hr(),
-      tags$h5("Centrality table (genes with Degree, Betweenness, Closeness, Weight)", style = "margin-top: 10px;"),
-      DT::dataTableOutput("ppi_centrality_table"),
-      tags$div(style = "margin-top: 10px;",
-               downloadButton("download_ppi_centrality_weighted", tagList(icon("download"), " Download centrality-weighted list (CSV)"), class = "btn-info"))
-    )
-  ),
-
   # ========== EXTRACT DATA FOR ML ==========
   fluidRow(
     box(
@@ -216,7 +175,7 @@ ui_ppi <- tabItem(
       tags$div(
         class = "alert alert-info",
         "Extract expression data (samples × genes) for ML from WGCNA datExpr. ",
-        "If you applied '5. Network Centrality-Weighted ML' above (Filter top N or weights), that chosen set is used; otherwise the gene set from the network graphs section is used. This matrix is used on the next tab for LASSO, Random Forest, SVM-RFE, etc."
+        "The gene set used here comes from your selection above (Hub genes only, Top N by degree, or manual) in the network graphs section. This matrix is used on the next tab for LASSO, Random Forest, SVM-RFE, etc."
       ),
       tags$div(style = "margin-bottom: 15px;",
                actionButton("extract_ml_data",
