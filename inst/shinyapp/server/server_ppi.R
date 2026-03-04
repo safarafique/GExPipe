@@ -43,6 +43,8 @@ server_ppi <- function(input, output, session, rv) {
     }
 
     genes <- unique(trimws(rv$common_genes_de_wgcna))
+    # Remove NA and empty gene symbols up front (avoids downstream NA issues in STRINGdb / igraph)
+    genes <- genes[!is.na(genes) & nzchar(genes)]
     valid_genes <- genes[genes %in% keys(org.Hs.eg.db::org.Hs.eg.db, keytype = "SYMBOL")]
     if (length(valid_genes) == 0) {
       showNotification("No valid gene symbols found for STRINGdb.", type = "error", duration = 8)
@@ -82,17 +84,50 @@ server_ppi <- function(input, output, session, rv) {
         incProgress(0.5, detail = "Building network...")
         from_col <- if ("from" %in% colnames(interactions)) "from" else if ("protein1" %in% colnames(interactions)) "protein1" else names(interactions)[1]
         to_col   <- if ("to" %in% colnames(interactions)) "to" else if ("protein2" %in% colnames(interactions)) "protein2" else names(interactions)[2]
+
+        # Remove edges with missing or invalid endpoints before creating the graph
+        sym_col <- if ("SYMBOL" %in% colnames(mapped)) {
+          "SYMBOL"
+        } else if ("gene" %in% colnames(mapped)) {
+          "gene"
+        } else {
+          colnames(mapped)[min(2, ncol(mapped))]
+        }
+        vertices_df <- data.frame(
+          STRING_id = mapped[[id_col]],
+          SYMBOL = mapped[[sym_col]],
+          stringsAsFactors = FALSE
+        )
+        vertices_df <- vertices_df[!is.na(vertices_df$STRING_id) & nzchar(trimws(vertices_df$STRING_id)), , drop = FALSE]
+        vertices_df <- vertices_df[!duplicated(vertices_df$STRING_id), , drop = FALSE]
+        if (nrow(vertices_df) == 0) stop("No unique vertices after removing duplicates.")
+
+        valid_vertex_ids <- vertices_df$STRING_id
+        edge_idx <- !is.na(interactions[[from_col]]) &
+          !is.na(interactions[[to_col]]) &
+          nzchar(trimws(as.character(interactions[[from_col]]))) &
+          nzchar(trimws(as.character(interactions[[to_col]]))) &
+          interactions[[from_col]] %in% valid_vertex_ids &
+          interactions[[to_col]] %in% valid_vertex_ids
+        interactions <- interactions[edge_idx, , drop = FALSE]
+        if (nrow(interactions) == 0) stop("No valid PPI edges after removing NA/invalid STRING IDs.")
+
         edge_list <- interactions[, c(from_col, to_col), drop = FALSE]
         colnames(edge_list) <- c("from", "to")
-        # Vertex names must match edge endpoints (STRING IDs). First column = vertex name (STRING_id).
-        # igraph requires unique vertex names: deduplicate by STRING_id (keep first row per ID).
-        sym_col <- if ("SYMBOL" %in% colnames(mapped)) "SYMBOL" else if ("gene" %in% colnames(mapped)) "gene" else colnames(mapped)[min(2, ncol(mapped))]
-        if (sym_col == id_col || is.na(sym_col)) sym_col <- id_col
-        vertices_df <- data.frame(STRING_id = mapped[[id_col]], SYMBOL = mapped[[sym_col]], stringsAsFactors = FALSE)
-        vertices_df <- vertices_df[!duplicated(vertices_df$STRING_id), ]
-        if (nrow(vertices_df) == 0) stop("No unique vertices after removing duplicates.")
+        # Final safety filter: remove any remaining edges with NA/empty endpoints
+        edge_list <- edge_list[
+          !is.na(edge_list$from) &
+            !is.na(edge_list$to) &
+            nzchar(trimws(as.character(edge_list$from))) &
+            nzchar(trimws(as.character(edge_list$to))),
+          ,
+          drop = FALSE
+        ]
+        if (nrow(edge_list) == 0) stop("No valid PPI edges after removing NA/empty endpoints.")
+
+        # igraph requires vertex names to match edge endpoints (STRING IDs)
         g <- igraph::graph_from_data_frame(d = edge_list, directed = FALSE, vertices = vertices_df)
-        if ("combined_score" %in% colnames(interactions)) E(g)$weight <- interactions$combined_score
+        if ("combined_score" %in% colnames(interactions)) igraph::E(g)$weight <- interactions$combined_score
         g <- igraph::simplify(g, remove.multiple = TRUE, remove.loops = TRUE)
 
         incProgress(0.6, detail = "Hub scores...")
@@ -133,7 +168,9 @@ server_ppi <- function(input, output, session, rv) {
         deg_vec <- igraph::degree(g)
         interactive_genes <- as.character(na.omit(unique(sym_attr[deg_vec > 0])))
         non_interactive_in_network <- as.character(na.omit(unique(sym_attr[deg_vec == 0])))
-        unmapped_genes <- setdiff(valid_genes, mapped[[sym_col]])
+        mapped_syms <- as.character(mapped[[sym_col]])
+        mapped_syms <- mapped_syms[!is.na(mapped_syms) & nzchar(trimws(mapped_syms))]
+        unmapped_genes <- setdiff(valid_genes, mapped_syms)
         non_interactive_genes <- c(unmapped_genes, non_interactive_in_network)
         non_interactive_genes <- unique(non_interactive_genes)
         deg_for_status <- deg_vec[match(interactive_genes, sym_attr)]
