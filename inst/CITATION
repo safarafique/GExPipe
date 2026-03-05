@@ -1,0 +1,8 @@
+citHeader("To cite GExPipe in publications use:")
+
+citEntry(entry = "Manual",
+  title = "GExPipe: Gene Expression Pipeline Shiny Application",
+  author = person("Safa", "Rafique", email = "safa.res.sbb@pu.edu.pk"),
+  year = "2026",
+  note = "R package version 0.99.0",
+  url = "https://github.com/safarafique/GExPipe")
