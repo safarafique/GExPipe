@@ -13,6 +13,8 @@ Authors@R: c(
            email = "farooq.sbb@pu.edu.pk", 
            role = "aut", 
            comment = "Prof."))
+Description: Shiny application (GExPipe) for high-throughput genomic analysis of bulk RNA-seq and
+    microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase).
   Description: Shiny application (GExPipe) for high-throughput genomic analysis of bulk RNA-seq and
   microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase,
   limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
