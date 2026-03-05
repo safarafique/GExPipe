@@ -118,3 +118,9 @@ R CMD check GExPipe_0.99.0.tar.gz --no-build-vignettes --no-manual
 ```
 
 Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.0.tar.gz")` and address any reported issues.
+
+---
+
+## Contributors
+
+- **Safa Rafique** — author and maintainer
