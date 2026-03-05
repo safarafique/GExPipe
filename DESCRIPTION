@@ -1,11 +1,19 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
 Version: 0.99.1
-Authors@R: 
-person("Safa", "Rafique", email = "safa.res.sbb@pu.edu.pk", role = c("aut", "cre")),
-    person("Naeem Mehmood", "Ashraf", email = "naeem.sbb@pu.edu.pk", role = c("aut", "cre"), comment = "Dr"),
-    person("Farooq", "Sabir", email = "farooq.sbb@pu.edu.pk", role = "aut", comment = "Prof.")
-Description: Shiny application (GExPipe) for high-throughput genomic analysis of bulk RNA-seq and
+Authors@R: c(
+    person("Safa", "Rafique", 
+           email = "safa.res.sbb@pu.edu.pk", 
+           role = c("aut", "cre")),
+    person("Naeem Mehmood", "Ashraf", 
+           email = "naeem.sbb@pu.edu.pk", 
+           role = "aut", 
+           comment = "Dr"),
+    person("Farooq", "Sabir", 
+           email = "farooq.sbb@pu.edu.pk", 
+           role = "aut", 
+           comment = "Prof."))
+  Description: Shiny application (GExPipe) for high-throughput genomic analysis of bulk RNA-seq and
   microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase,
   limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
   normalization, batch correction, differential expression, WGCNA, pathway enrichment,
