@@ -5,7 +5,7 @@
 | Resource      | Link |
 |---------------|------|
 | **Bioconductor** | [bioconductor.org/packages/GExPipe](https://bioconductor.org/packages/GExPipe) |
-| **GitHub**       | [github.com/safarafique/GExPipe-](https://github.com/safarafique/GExPipe-) |
+| **GitHub**       | [github.com/safarafique/GExPipe](https://github.com/safarafique/GExPipe) |
 | **Bug reports** | [Bioconductor Support · tag GExPipe](https://support.bioconductor.org/tag/GExPipe) |
 
 ---
