@@ -122,27 +122,10 @@ server_qc <- function(input, output, session, rv) {
     }
     if (length(sets) == 2) {
       tryCatch({
-        # Calculate intersection manually to ensure correct count
-        intersection <- intersect(sets[[1]], sets[[2]])
-        only_set1 <- setdiff(sets[[1]], sets[[2]])
-        only_set2 <- setdiff(sets[[2]], sets[[1]])
-        
-        # Create category names with totals
-        cat_names <- paste0(names(sets), " = ", format(sapply(sets, length), big.mark = ","))
-        
-        # If all genes are the same, show a simple message instead
-        if (length(intersection) == length(sets[[1]]) && length(intersection) == length(sets[[2]])) {
-          plot.new()
-          text(0.5, 0.5, 
-               paste0("All datasets have identical genes\n(", format(length(intersection), big.mark = ","), " genes)"),
-               cex = 1.8, col = "gray40")
-          return()
-        }
-        
-        # Create category names with totals displayed clearly
+        # Category names with totals displayed clearly
         cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
-        
-        venn.plot <- venn.diagram(
+
+        venn.plot <- VennDiagram::venn.diagram(
           x = sets,
           category.names = cat_names,
           filename = NULL,
@@ -150,8 +133,8 @@ server_qc <- function(input, output, session, rv) {
           disable.logging = TRUE,
           fill = c("#f39c12", "#3498db"),
           alpha = 0.6,
-          cex = 0.85,
-          cat.cex = 0.95,
+          cex = 0.9,
+          cat.cex = 1.0,
           cat.fontface = "bold",
           cat.pos = c(-20, 20),
           cat.dist = c(0.15, 0.15),
@@ -163,7 +146,8 @@ server_qc <- function(input, output, session, rv) {
           force.unique = TRUE,
           na = "remove"
         )
-        grid.draw(venn.plot)
+        grid::grid.newpage()
+        grid::grid.draw(venn.plot)
       }, error = function(e) {
         plot.new()
         text(0.5, 0.5, paste("Error creating Venn diagram:", e$message), cex = 1.2, col = "red")
@@ -334,10 +318,21 @@ server_qc <- function(input, output, session, rv) {
     upset_df <- as.data.frame(upset_matrix)
     max_set_size <- max(sapply(gene_lists, length))
     tryCatch({
-      upset(upset_df, sets = colnames(upset_df), keep.order = TRUE, order.by = "freq",
-            main.bar.color = "#3498db", sets.bar.color = "#e74c3c", matrix.color = "#2ecc71",
-            point.size = 4, line.size = 1.2, text.scale = c(1.8, 1.5, 1.5, 1.3, 1.8, 1.5),
-            mb.ratio = c(0.6, 0.4), set_size.show = TRUE, set_size.scale_max = max_set_size * 1.1)
+      UpSetR::upset(
+        upset_df,
+        sets = colnames(upset_df),
+        keep.order = TRUE,
+        order.by = "freq",
+        main.bar.color = "#3498db",
+        sets.bar.color = "#e74c3c",
+        matrix.color = "#2ecc71",
+        point.size = 3.5,
+        line.size = 1,
+        text.scale = c(1.4, 1.1, 1.1, 1, 1.4, 1.2),
+        mb.ratio = c(0.7, 0.3),
+        set_size.show = TRUE,
+        set_size.scale_max = max_set_size * 1.1
+      )
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error creating UpSet plot:", e$message), cex = 1.2, col = "red")

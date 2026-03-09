@@ -1235,49 +1235,52 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
   return(ids)
 }
 
-# Convert RNA-seq IDs to symbols (matches multi-platform pipeline script)
-convert_rnaseq_ids <- function(gene_ids, gse_id = NULL) {
+# Manual-style ID → symbol conversion used in pipeline_download_to_batch.R
+# Reused here so the Shiny app and manual script give identical results.
+convert_ids_to_symbols_simple <- function(gene_ids) {
+  if (!requireNamespace("org.Hs.eg.db", quietly = TRUE))
+    stop("Install org.Hs.eg.db: BiocManager::install('org.Hs.eg.db')")
+  db <- get("org.Hs.eg.db", asNamespace("org.Hs.eg.db"))
+  gene_ids <- as.character(gene_ids)
   sample_ids <- head(gene_ids[!is.na(gene_ids) & gene_ids != ""], min(100, length(gene_ids)))
   if (length(sample_ids) == 0) return(gene_ids)
-  is_likely_symbol <- mean(grepl("^[A-Za-z]", sample_ids), na.rm = TRUE) > 0.7 &&
-    mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) < 0.3
-  if (is_likely_symbol && !any(grepl("^[0-9]{5,}", sample_ids))) {
-    test_symbols <- head(sample_ids, 10)
-    verified <- tryCatch({
-      mapped <- AnnotationDbi::mapIds(org.Hs.eg.db, keys = test_symbols, column = "SYMBOL",
-                                      keytype = "SYMBOL", multiVals = "first")
-      sum(!is.na(mapped)) / length(test_symbols) > 0.5
-    }, error = function(e) FALSE)
-    if (verified) return(gene_ids)
+  # Already gene symbols?
+  if (mean(grepl("^[A-Za-z]", sample_ids), na.rm = TRUE) > 0.7 &&
+      mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) < 0.3) {
+    return(gene_ids)
   }
+  # Ensembl IDs
   if (any(grepl("^ENSG", sample_ids))) {
-    clean_keys <- gsub("\\..*", "", gene_ids)
-    gene_symbols <- tryCatch({
-      AnnotationDbi::mapIds(org.Hs.eg.db, keys = clean_keys, column = "SYMBOL",
-                             keytype = "ENSEMBL", multiVals = "first")
-    }, error = function(e) NULL)
-    if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(gene_ids) * 0.1) {
-      return(as.character(gene_symbols))
-    }
+    clean <- gsub("\\..*", "", gene_ids)
+    sym <- tryCatch(
+      suppressMessages(AnnotationDbi::mapIds(db, keys = clean, column = "SYMBOL",
+                                             keytype = "ENSEMBL", multiVals = "first")),
+      error = function(e) NULL
+    )
+    if (!is.null(sym) && sum(!is.na(sym)) > length(gene_ids) * 0.1)
+      return(as.character(sym))
   }
-  if (mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) > 0.7) {
+  # Entrez IDs
+  if (mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) > 0.5) {
     keys_entrez <- gsub("\\.0+$", "", as.character(gene_ids))
-    gene_symbols <- tryCatch({
-      AnnotationDbi::mapIds(org.Hs.eg.db, keys = keys_entrez, column = "SYMBOL",
-                            keytype = "ENTREZID", multiVals = "first")
-    }, error = function(e) NULL)
-    if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(gene_ids) * 0.1) {
-      return(as.character(gene_symbols))
-    }
-    bm_sym <- entrez_to_symbol_biomart(gene_ids)
-    if (!is.null(bm_sym) && sum(!is.na(bm_sym)) > length(gene_ids) * 0.1) {
-      return(bm_sym)
-    }
+    sym <- tryCatch(
+      suppressMessages(AnnotationDbi::mapIds(db, keys = keys_entrez, column = "SYMBOL",
+                                             keytype = "ENTREZID", multiVals = "first")),
+      error = function(e) NULL
+    )
+    if (!is.null(sym) && sum(!is.na(sym)) > length(gene_ids) * 0.1)
+      return(as.character(sym))
   }
-  return(gene_ids)
+  gene_ids
+}
+
+# Convert RNA-seq IDs to symbols – now a thin wrapper so app == manual script
+convert_rnaseq_ids <- function(gene_ids, gse_id = NULL) {
+  convert_ids_to_symbols_simple(gene_ids)
 }
 
 # Download NCBI-generated raw count matrices (matches script: multiple genome versions)
+# Returns first successful file (for backward compatibility).
 download_ncbi_raw_counts <- function(gse_id, dest_dir) {
   genome_versions <- c(
     "GRCh38.p13_NCBI", "GRCh38.p14_NCBI", "GRCh38.p12_NCBI",
@@ -1301,6 +1304,40 @@ download_ncbi_raw_counts <- function(gse_id, dest_dir) {
     if (!is.null(result)) return(result)
   }
   return(NULL)
+}
+
+# Try all NCBI genome versions and return the path with the MOST rows (fullest matrix).
+# Use this to maximize gene count when different versions have different filtering (e.g. 24k vs 37k).
+download_ncbi_raw_counts_best <- function(gse_id, dest_dir) {
+  genome_versions <- c(
+    "GRCh38.p13_NCBI", "GRCh38.p14_NCBI", "GRCh38.p12_NCBI",
+    "GRCh38.p11_NCBI", "GRCh38.p10_NCBI", "GRCh37.p13_NCBI",
+    "GRCh38_NCBI", "GRCh37_NCBI"
+  )
+  best_path <- NULL
+  best_nrow <- 0L
+  for (genome in genome_versions) {
+    filename <- paste0(gse_id, "_raw_counts_", genome, ".tsv.gz")
+    dest_file <- file.path(dest_dir, filename)
+    if (!file.exists(dest_file) || file.info(dest_file)$size < 1000) {
+      url <- paste0("https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=",
+                    gse_id, "&format=file&file=", filename)
+      tryCatch({
+        download.file(url, dest_file, mode = "wb", quiet = TRUE)
+      }, error = function(e) NULL, warning = function(w) NULL)
+    }
+    if (file.exists(dest_file) && file.info(dest_file)$size > 1000) {
+      n <- tryCatch({
+        df <- suppressWarnings(data.table::fread(dest_file, data.table = FALSE, nrows = 500000L))
+        nrow(df)
+      }, error = function(e) 0L)
+      if (n > best_nrow) {
+        best_nrow <- n
+        best_path <- dest_file
+      }
+    }
+  }
+  best_path
 }
 
 # Read count matrix (handles .gz; matches script)

@@ -82,9 +82,18 @@ server_validation <- function(input, output, session, rv) {
         # Step A: GSE IDs, platform, DE method
         tags$h4(icon("step-forward"), " Step A: Configure & Download", style = "color: #e67e22; margin-bottom: 10px;"),
         fluidRow(
-          column(4,
-            textAreaInput("ext_val_gse_ids", "Validation GSE IDs:",
-              value = "GSE142279", rows = 2, placeholder = "e.g. GSE142279")
+          column(
+            4,
+            textAreaInput(
+              "ext_val_gse_ids",
+              label = tags$span(
+                "Validation GSE IDs ",
+                tags$span("(e.g. GSE142279)", style = "font-weight: normal; color: #999; font-size: 12px;")
+              ),
+              value = "",
+              rows = 2,
+              placeholder = "GSE142279"
+            )
           ),
           column(3,
             radioButtons("ext_val_platform", "Platform Type:",
