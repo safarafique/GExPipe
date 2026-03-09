@@ -276,7 +276,8 @@ server_download <- function(input, output, session, rv) {
         }
       }
 
-      # --- Download RNA-seq (your code: NCBI raw first, then supp; fread; map; all_genes_list = rownames) ---
+      # --- Download RNA-seq: try GEO supplementary first (full gene set), then NCBI raw counts ---
+      # GEO supp often has full matrix (~39k rows -> ~37k symbols); NCBI raw can be filtered (~24k).
       if (length(rnaseq_ids) > 0) {
         log_text <- paste0(log_text, "\nDownloading RNA-seq Datasets...\n")
         rna_dir <- file.path(getwd(), "rna_data")
@@ -291,10 +292,8 @@ server_download <- function(input, output, session, rv) {
           dir.create(gse_dir, showWarnings = FALSE)
 
           supp_err <- NULL
-          count_file <- download_ncbi_raw_counts(gse_id, gse_dir)
-
-          if (is.null(count_file)) {
-            tryCatch({
+          count_file <- NULL
+          tryCatch({
               suppressMessages(invisible(capture.output(
                 GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE),
                 file = nullfile()
@@ -367,10 +366,32 @@ server_download <- function(input, output, session, rv) {
                 }
               }
             }, error = function(e) { supp_err <<- conditionMessage(e); NULL })
-          }
 
+          # Try NCBI (all genome versions) and keep the file with the most rows; then use best of GEO supp vs NCBI
+          ncbi_best <- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
+          nrow_supp <- 0L
+          if (!is.null(count_file)) {
+            nrow_supp <- tryCatch({
+              df <- suppressWarnings(data.table::fread(count_file, data.table = FALSE, nrows = 500000L))
+              nrow(df)
+            }, error = function(e) 0L)
+          }
+          nrow_ncbi <- 0L
+          if (!is.null(ncbi_best)) {
+            nrow_ncbi <- tryCatch({
+              df <- suppressWarnings(data.table::fread(ncbi_best, data.table = FALSE, nrows = 500000L))
+              nrow(df)
+            }, error = function(e) 0L)
+          }
+          if (nrow_ncbi > nrow_supp && !is.null(ncbi_best)) {
+            count_file <- ncbi_best
+            log_text <- paste0(log_text, "(NCBI ", nrow_ncbi, " rows) ")
+          } else if (!is.null(count_file)) {
+            log_text <- paste0(log_text, "(GEO supp ", nrow_supp, " rows) ")
+          }
+          if (is.null(count_file) && !is.null(ncbi_best)) count_file <- ncbi_best
           if (is.null(count_file)) {
-            reason <- "no count file (check internet or GSE may not have NCBI/supplementary counts)"
+            reason <- "no count file (check internet or GSE may not have GEO supp or NCBI counts)"
             if (!is.null(supp_err) && nzchar(supp_err)) {
               if (grepl("connection|timeout|hostname|resolve|HTTP|ssl", supp_err, ignore.case = TRUE)) {
                 reason <- "network/HTTP - check internet connection"
@@ -660,7 +681,7 @@ server_download <- function(input, output, session, rv) {
                 tags$p("Ensure both datasets use gene symbols. RNA-seq Entrez IDs are converted via org.Hs.eg.db and biomaRt.", style = "margin-top: 8px; font-size: 12px;"),
                 tags$ul(
                   style = "margin: 4px 0 0 0; padding-left: 18px; font-size: 12px; color: #333;",
-                  tags$li("Install biomaRt for Entrez→symbol fallback: BiocManager::install(\"biomaRt\")"),
+                  tags$li("Install biomaRt for Entrez->symbol fallback: BiocManager::install(\"biomaRt\")"),
                   tags$li("Check internet (biomaRt needs Ensembl access)"),
                   tags$li("See download log for sample row IDs per dataset")
                 ),
