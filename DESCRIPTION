@@ -14,13 +14,11 @@ Authors@R: c(
            role = "aut", 
            comment = "Prof."))
 Description: Shiny application (GExPipe) for high-throughput genomic analysis of bulk RNA-seq and
-    microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase).
-  Description: Shiny application (GExPipe) for high-throughput genomic analysis of bulk RNA-seq and
-  microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase,
-  limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
-  normalization, batch correction, differential expression, WGCNA, pathway enrichment,
-  PPI, machine learning, and optional immune deconvolution. Uses common data structures
-  (ExpressionSet, DGEList) for interoperability. Install with BiocManager::install("GExPipe") once available.
+    microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase,
+    limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
+    normalization, batch correction, differential expression, WGCNA, pathway enrichment,
+    PPI, machine learning, and optional immune deconvolution. Uses common data structures
+    (ExpressionSet, DGEList) for interoperability. Install with BiocManager::install("GExPipe") once available.
 License: MIT
 Encoding: UTF-8
 Depends: R (>= 4.5.2)
@@ -78,8 +76,10 @@ Suggests:
     affy (>= 1.74.0),
     biomaRt (>= 2.56.0),
     BiocCheck (>= 1.43.0),
+    BiocManager,
     Boruta (>= 8.0.0),
     cicerone (>= 0.1.0),
+    immunedeconv,
     knitr (>= 1.45.0),
     mixOmics (>= 6.0.0),
     oligo (>= 1.62.0),
