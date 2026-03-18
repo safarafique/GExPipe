@@ -222,13 +222,18 @@ server_validation <- function(input, output, session, rv) {
             suppressMessages(invisible(capture.output(md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE), file = nullfile()))); md
           }, error = function(e) NULL)
           if (is.null(micro_data)) { ext_log <- paste0(ext_log, "FAILED\n"); next }
-          known_platforms <- names(platform_to_annot); micro_eset <- NULL
+          micro_eset <- NULL
           if (is.list(micro_data) && length(micro_data) >= 1) {
-            plats <- vapply(micro_data, function(x) Biobase::annotation(x), character(1))
-            idx <- which(plats %in% known_platforms)[1]
-            if (!is.na(idx)) micro_eset <- micro_data[[idx]]
-          } else { if (Biobase::annotation(micro_data) %in% known_platforms) micro_eset <- micro_data }
-          if (is.null(micro_eset)) { ext_log <- paste0(ext_log, "SKIPPED (platform)\n"); next }
+            n_feat <- vapply(micro_data, function(x) {
+              tryCatch(nrow(Biobase::exprs(x)), error = function(e) 0L)
+            }, integer(1))
+            idx <- which.max(n_feat)
+            if (length(idx) == 0 || is.na(idx) || idx < 1) idx <- 1
+            micro_eset <- micro_data[[idx]]
+          } else {
+            micro_eset <- micro_data
+          }
+          if (is.null(micro_eset)) { ext_log <- paste0(ext_log, "FAILED\n"); next }
           micro_expr <- Biobase::exprs(micro_eset); fdata <- Biobase::fData(micro_eset)
           gene_symbols <- suppressMessages(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id))
           rownames(micro_expr) <- gene_symbols

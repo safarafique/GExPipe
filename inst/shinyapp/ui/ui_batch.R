@@ -99,6 +99,24 @@ ui_batch <- tabItem(
                                     width = "100%")
                      ),
                      tags$div(
+                       class = "alert alert-warning",
+                       style = "margin: 10px 0 0 0; font-size: 12px; line-height: 1.55;",
+                       icon("exclamation-triangle"),
+                       tags$strong(" Key note (confounding risk): "),
+                       "In this app, ",
+                       tags$strong("ComBat / ComBat-ref / Hybrid"),
+                       " run with ",
+                       tags$code("mod = NULL"),
+                       " (Condition is not protected). If ",
+                       tags$strong("Dataset/Platform is confounded with Condition"),
+                       " (e.g., one dataset is all Disease and another is all Normal), these methods can remove true biological signal. ",
+                       "In that situation, prefer ",
+                       tags$strong("limma removeBatchEffect"),
+                       " or ",
+                       tags$strong("SVA"),
+                       " to better preserve Condition effects."
+                     ),
+                     tags$div(
                        style = "margin-top: 20px;",
                        actionButton("apply_batch", 
                                     tagList(icon("magic"), " Apply Batch Correction"), 
