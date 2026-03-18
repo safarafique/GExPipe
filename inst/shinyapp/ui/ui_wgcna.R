@@ -518,7 +518,7 @@ ui_wgcna <- tabItem(
             column(6,
               tags$div(style = "margin-top: 25px;",
                 actionButton("generate_gs_mm_all_modules",
-                             tagList(icon("chart-scatter"), " Generate GS vs MM for all modules"),
+                             tagList(icon("braille"), " Generate GS vs MM for all modules"),
                              class = "btn-info btn-sm",
                              title = "Create GS vs MM plot for each signed module (using selected trait)")
               )
