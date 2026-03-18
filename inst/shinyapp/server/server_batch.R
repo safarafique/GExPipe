@@ -251,107 +251,36 @@ server_batch <- function(input, output, session, rv) {
     )
     
     withProgress(message = 'Batch correction...', value = 0, {
+      # Use shared R helper for variance filtering + batch correction
+      res <- gexp_batch_correct(
+        expr = rv$combined_expr,
+        metadata = rv$unified_metadata,
+        variance_percentile = input$variance_percentile,
+        method = input$batch_method
+      )
       
-      # Filter genes using user-selected percentile
-      gene_vars <- apply(rv$combined_expr, 1, var)
-      percentile <- input$variance_percentile / 100
-      cutoff <- quantile(gene_vars, percentile)
-      high_var <- gene_vars > cutoff
-      rv$expr_filtered <- rv$combined_expr[high_var, ]
+      rv$expr_filtered <- res$expr_filtered
+      rv$batch_corrected <- res$batch_corrected
       
-      design <- model.matrix(~ Condition, data = rv$unified_metadata)
-      
-      incProgress(0.5)
-      
-      # Apply method
-      if (input$batch_method == "limma") {
-        rv$batch_corrected <- limma::removeBatchEffect(
-          rv$expr_filtered,
-          batch = rv$unified_metadata$Dataset,
-          design = design
-        )
-      } else if (input$batch_method == "combat") {
-        rv$batch_corrected <- sva::ComBat(
-          rv$expr_filtered,
-          batch = rv$unified_metadata$Dataset,
-          mod = NULL, par.prior = TRUE, prior.plots = FALSE
-        )
-      } else if (input$batch_method == "quantile_limma") {
-        expr_q <- limma::normalizeBetweenArrays(rv$expr_filtered, method = "quantile")
-        rv$batch_corrected <- limma::removeBatchEffect(
-          expr_q,
-          batch = rv$unified_metadata$Dataset,
-          design = design
-        )
-      } else if (input$batch_method == "hybrid") {
-        expr_q <- limma::normalizeBetweenArrays(rv$expr_filtered, method = "quantile")
-        rv$batch_corrected <- sva::ComBat(
-          expr_q,
-          batch = rv$unified_metadata$Dataset,
-          mod = NULL, par.prior = TRUE, prior.plots = FALSE
-        )
-      } else if (input$batch_method == "combat_ref") {
-        sizes <- table(rv$unified_metadata$Dataset)
-        ref <- names(sizes)[which.max(sizes)]
-        rv$batch_corrected <- sva::ComBat(
-          rv$expr_filtered,
-          batch = rv$unified_metadata$Dataset,
-          mod = NULL, par.prior = TRUE, prior.plots = FALSE,
-          ref.batch = ref
-        )
-      } else if (input$batch_method == "sva") {
-        # Surrogate variable analysis: estimate hidden confounders, then ComBat with mod = design + SVs
-        mod <- model.matrix(~ Condition, data = rv$unified_metadata)
-        mod0 <- model.matrix(~ 1, data = rv$unified_metadata)
-        n_sv <- tryCatch(sva::num.sv(rv$expr_filtered, mod, method = "be"), error = function(e) 0L)
-        n_sv <- max(0L, min(n_sv, 10L))
-        if (n_sv > 0) {
-          svobj <- tryCatch(
-            sva::sva(as.matrix(rv$expr_filtered), mod, mod0, n.sv = n_sv),
-            error = function(e) NULL
-          )
-          if (!is.null(svobj) && ncol(svobj$sv) > 0) {
-            mod_sv <- cbind(mod, svobj$sv)
-            rv$batch_corrected <- sva::ComBat(
-              rv$expr_filtered,
-              batch = rv$unified_metadata$Dataset,
-              mod = mod_sv, par.prior = TRUE, prior.plots = FALSE
-            )
-          } else {
-            rv$batch_corrected <- sva::ComBat(
-              rv$expr_filtered,
-              batch = rv$unified_metadata$Dataset,
-              mod = mod, par.prior = TRUE, prior.plots = FALSE
-            )
-          }
-        } else {
-          rv$batch_corrected <- sva::ComBat(
-            rv$expr_filtered,
-            batch = rv$unified_metadata$Dataset,
-            mod = mod, par.prior = TRUE, prior.plots = FALSE
-          )
-        }
-      }
-      
-      # Calculate gene reduction
-      genes_before <- nrow(rv$combined_expr)
-      genes_after <- nrow(rv$batch_corrected)
-      genes_filtered <- genes_before - genes_after
-      filter_percent <- round(100 * genes_filtered / genes_before, 1)
+      genes_before <- res$genes_before
+      genes_after <- res$genes_after
+      filter_percent <- res$filter_percent
       
       rv$batch_complete <- TRUE
       rv$batch_running <- FALSE
       
       output$batch_log <- renderText({
-        paste0("✓ Batch correction complete\n",
-               "Method: ", input$batch_method, "\n\n",
-               "Gene Filtering:\n",
-               "  Before filter: ", format(genes_before, big.mark = ","), " genes\n",
-               "  After filter:  ", format(genes_after, big.mark = ","), " genes\n",
-               "  Filtered out:  ", format(genes_filtered, big.mark = ","), " genes (", filter_percent, "%)\n\n",
-               "Final Dataset:\n",
-               "  Genes: ", format(genes_after, big.mark = ","), "\n",
-               "  Samples: ", format(ncol(rv$batch_corrected), big.mark = ","))
+        paste0(
+          "✓ Batch correction complete\n",
+          "Method: ", input$batch_method, "\n\n",
+          "Gene Filtering:\n",
+          "  Before filter: ", format(genes_before, big.mark = ","), " genes\n",
+          "  After filter:  ", format(genes_after, big.mark = ","), " genes\n",
+          "  Filtered out:  ", format(genes_before - genes_after, big.mark = ","), " genes (", filter_percent, "%)\n\n",
+          "Final Dataset:\n",
+          "  Genes: ", format(genes_after, big.mark = ","), "\n",
+          "  Samples: ", format(ncol(rv$batch_corrected), big.mark = ",")
+        )
       })
       
       # Re-enable button
@@ -367,12 +296,17 @@ server_batch <- function(input, output, session, rv) {
         tags$div(
           tags$strong("✓ Batch correction complete!"),
           tags$br(),
-          tags$span("Genes filtered: ", format(genes_before, big.mark = ","), 
-                    " → ", format(genes_after, big.mark = ","), 
-                    " (", filter_percent, "% removed)"),
+          tags$span(
+            "Genes filtered: ",
+            format(genes_before, big.mark = ","), " → ",
+            format(genes_after, big.mark = ","), " (", filter_percent, "% removed)"
+          ),
           tags$br(),
-          tags$span("Final: ", format(genes_after, big.mark = ","), " genes, ", 
-                    format(ncol(rv$batch_corrected), big.mark = ","), " samples"),
+          tags$span(
+            "Final: ",
+            format(genes_after, big.mark = ","), " genes, ",
+            format(ncol(rv$batch_corrected), big.mark = ","), " samples"
+          ),
           style = "font-size: 13px;"
         ),
         type = "message", duration = 8

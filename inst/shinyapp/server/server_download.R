@@ -161,15 +161,13 @@ server_download <- function(input, output, session, rv) {
       # STEP 1: AUTOMATED DATA DOWNLOAD (pipeline: store raw, no mapping yet)
       # --------------------------------------------------------------------------
 
-      # --- Download Microarray (pipeline: getGEO, exprs, pData, store; require platform in platform_to_annot) ---
-      missing_platform_gses <- character(0)
+      # --- Download Microarray (pipeline: getGEO, exprs, pData, store; platform auto-detected) ---
       skip_fail_reasons <- list()
       if (length(micro_ids) > 0) {
         micro_dir <- file.path(getwd(), "micro_data")
         dir.create(micro_dir, showWarnings = FALSE, recursive = TRUE)
         if (is.null(rv$micro_cel_paths)) rv$micro_cel_paths <- list()
         log_text <- paste0(log_text, "Downloading Microarray Datasets...\n")
-        known_platforms <- names(platform_to_annot)
         for (i in seq_along(micro_ids)) {
           incProgress(1 / (length(rnaseq_ids) + length(micro_ids)))
           gse_id <- micro_ids[i]
@@ -195,36 +193,29 @@ server_download <- function(input, output, session, rv) {
             next
           }
 
-          # When GSE has multiple platforms, use first that matches platform_to_annot (global.R)
+          # When GSE has multiple platforms, choose the ExpressionSet with the most features.
           if (is.list(micro_data) && length(micro_data) >= 1) {
             platforms <- vapply(micro_data, function(x) Biobase::annotation(x), character(1))
-            idx <- which(platforms %in% known_platforms)[1]
-            if (!is.na(idx)) {
-              micro_eset <- micro_data[[idx]]
-              platform_id <- Biobase::annotation(micro_eset)
-              plat_type <- if (!is.null(platform_id_to_type) && platform_id %in% names(platform_id_to_type)) platform_id_to_type[[platform_id]] else "supported"
-              log_text <- paste0(log_text, "Platform ", platform_id, " - ", plat_type, ". ")
+            n_feat <- vapply(micro_data, function(x) {
+              tryCatch(nrow(Biobase::exprs(x)), error = function(e) 0L)
+            }, integer(1))
+            idx <- which.max(n_feat)
+            if (length(idx) == 0 || is.na(idx) || idx < 1) idx <- 1
+            micro_eset <- micro_data[[idx]]
+            platform_id <- Biobase::annotation(micro_eset)
+            if (length(micro_data) > 1) {
+              log_text <- paste0(
+                log_text,
+                "Platforms: ", paste(unique(platforms), collapse = ", "),
+                ". Using ", platform_id, ". "
+              )
             } else {
-              # No known platform for this GSE: record and skip
-              platform_id <- platforms[1]
-              missing_platform_gses <- c(missing_platform_gses, gse_id)
-              reason <- paste0("platform ID missing (", platform_id, " not in app list)")
-              log_text <- paste0(log_text, "SKIPPED: ", reason, ".\n")
-              skip_fail_reasons[[gse_id]] <- paste0("Microarray: ", reason)
-              next
+              log_text <- paste0(log_text, "Platform ", platform_id, ". ")
             }
           } else {
             micro_eset <- micro_data
             platform_id <- Biobase::annotation(micro_eset)
-            if (!(platform_id %in% known_platforms)) {
-              missing_platform_gses <- c(missing_platform_gses, gse_id)
-              reason <- paste0("platform ID missing (", platform_id, " not in app list)")
-              log_text <- paste0(log_text, "SKIPPED: ", reason, ".\n")
-              skip_fail_reasons[[gse_id]] <- paste0("Microarray: ", reason)
-              next
-            }
-            plat_type <- if (!is.null(platform_id_to_type) && platform_id %in% names(platform_id_to_type)) platform_id_to_type[[platform_id]] else "supported"
-            log_text <- paste0(log_text, "Platform ", platform_id, " - ", plat_type, ". ")
+            log_text <- paste0(log_text, "Platform ", platform_id, ". ")
           }
           micro_expr <- Biobase::exprs(micro_eset)
           pdata <- Biobase::pData(micro_eset)
@@ -260,19 +251,6 @@ server_download <- function(input, output, session, rv) {
               log_text <<- paste0(log_text, "\n")
             }
           }, error = function(e) { log_text <<- paste0(log_text, "\n") })
-        }
-        # Show error notification if any microarray GSEs had missing platform
-        if (length(missing_platform_gses) > 0) {
-          showNotification(
-            tags$div(
-              icon("exclamation-circle"),
-              tags$strong("Platform ID missing"),
-              tags$p(paste(missing_platform_gses, collapse = ", "), style = "margin-top: 6px;"),
-              tags$p("These GSE(s) were skipped. Add the platform in global.R or remove them.", style = "margin-top: 4px; font-size: 12px;")
-            ),
-            type = "error",
-            duration = 10
-          )
         }
       }
 

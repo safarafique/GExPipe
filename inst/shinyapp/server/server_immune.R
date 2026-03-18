@@ -72,7 +72,10 @@ server_immune <- function(input, output, session, rv) {
         return(NULL)
       }
       if (!requireNamespace("immunedeconv", quietly = TRUE)) {
-        showNotification("Package immunedeconv not installed. Optional: install from GitHub: remotes::install_github('omnideconv/immunedeconv')", type = "error", duration = 10)
+        showNotification(
+          "Package immunedeconv not installed. Install it to run immune deconvolution (e.g., BiocManager::install('immunedeconv')).",
+          type = "error", duration = 10
+        )
         return(NULL)
       }
       method <- input$immune_method
