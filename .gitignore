@@ -24,6 +24,10 @@ inst/shinyapp/rna_data/
 inst/shinyapp/ext_val_rna/
 inst/shinyapp/csv_exports/
 
+# GEO platform annotation caches (can be >1 GB)
+inst/shinyapp/*.soft.gz
+inst/shinyapp/*.soft
+
 # Vignette artifacts (Word/HTML export)
 vignettes/vignette_files/
 vignettes/vignette.htm
