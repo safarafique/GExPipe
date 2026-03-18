@@ -1,7 +1,7 @@
 # ==============================================================================
 # APP.R - GExPipe (Gene Expression Pipeline) launcher
 # ==============================================================================
-# Run: source("app.R") or Run App in RStudio. Dependencies auto-install on first run.
+# Run: use GExPipe::runGExPipe() (recommended) or Run App in RStudio.
 # ==============================================================================
 
 cat("\n  GExPipe — Gene Expression Pipeline\n  Loading...\n\n")
@@ -33,6 +33,5 @@ if (inherits(err_server, "error")) {
 
 cat("  ✓ Ready. Starting Shiny app...\n\n")
 
-# Run the app and open in your default browser (browser interface, not RStudio Viewer)
-app <- shinyApp(ui = ui, server = server)
-runApp(app, launch.browser = TRUE)
+# Return the Shiny app object (shiny::runApp() will run it)
+shinyApp(ui = ui, server = server)

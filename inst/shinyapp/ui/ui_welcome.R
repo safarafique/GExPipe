@@ -89,12 +89,9 @@ ui_welcome <- fluidPage(
         ), function(x) {
           tags$div(
             class = "badge-pop",
-            style = sprintf(
-              "background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06)); backdrop-filter: blur(12px);
+            style = "background: linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.06)); backdrop-filter: blur(12px);
                border: 1px solid rgba(255,255,255,0.25); padding: 14px 22px; border-radius: 16px; color: #fff; font-weight: 700; font-size: 13px;
                box-shadow: 0 6px 20px rgba(0,0,0,0.25); transition: transform 0.3s, box-shadow 0.3s;",
-              x[[3]]
-            ),
             tags$span(style = sprintf("color: %s; font-size: 20px; display: block; margin-bottom: 3px; font-weight: 800; text-shadow: 0 0 20px %s40;", x[[3]], x[[3]]), x[[1]]),
             tags$span(style = "opacity: 0.92; font-size: 11px; font-weight: 600; letter-spacing: 0.3px;", x[[2]])
           )

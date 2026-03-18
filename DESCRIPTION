@@ -19,12 +19,12 @@ Description: Shiny application (GExPipe) for high-throughput genomic analysis of
     normalization, batch correction, differential expression, WGCNA, pathway enrichment,
     PPI, machine learning, and optional immune deconvolution. Uses common data structures
     (ExpressionSet, DGEList) for interoperability. Install with BiocManager::install("GExPipe") once available.
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
-Depends: R (>= 4.5.2)
-biocViews: Software, GeneExpression, RNASeq, Microarray, DifferentialExpression,
-    Pathways, Network, Visualization
-URL:https://github.com/safarafique/GExPipe
+Depends: R (>= 4.5.0)
+biocViews: Software, ShinyApp, GeneExpression, RNASeq, Microarray,
+    DifferentialExpression, Pathways, Network, Visualization
+URL: https://github.com/safarafique/GExPipe
 BugReports: https://github.com/Bioconductor/Contributions/issues/4162
 Imports:
     AnnotationDbi (>= 1.72.0),
@@ -88,7 +88,6 @@ Suggests:
     rmda (>= 1.6.0),
     SHAPforxgboost (>= 0.1.0),
     xgboost (>= 2.0.0)
-VignetteBuilder: knitr
 SystemRequirements: GNU make
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
