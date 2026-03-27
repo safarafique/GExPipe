@@ -53,3 +53,17 @@ This is a non-Shiny helper version of the Step 3 logic:
 \item optional extraction of RNA-seq raw counts for count-based DE.
 }
 }
+\examples{
+set.seed(1)
+m1 <- matrix(abs(rnorm(120)), nrow = 20, ncol = 6)
+m2 <- matrix(abs(rnorm(120)), nrow = 20, ncol = 6)
+rownames(m1) <- rownames(m2) <- paste0("Gene", seq_len(20))
+colnames(m1) <- paste0("D1_S", seq_len(6))
+colnames(m2) <- paste0("D2_S", seq_len(6))
+out <- gexp_normalize_and_intersect(
+  micro_expr_list = list(D1 = m1, D2 = m2),
+  rna_counts_list = list(),
+  de_method = "limma"
+)
+dim(out$combined_expr)
+}

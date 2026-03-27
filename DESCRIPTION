@@ -3,7 +3,7 @@ Title: GExPipe: Gene Expression Pipeline Shiny Application
 Version: 0.99.2
 Authors@R: c(
     person("Safa", "Rafique", 
-           email = "safa.res.sbb@pu.edu.pk", 
+           email = "safa.sandhu@gmail.com", 
            role = c("aut", "cre")),
     person("Naeem Mehmood", "Ashraf", 
            email = "naeem.sbb@pu.edu.pk", 
@@ -17,12 +17,12 @@ Description: Shiny application (GExPipe) for high-throughput genomic analysis of
     microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase,
     limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
     normalization, batch correction, differential expression, WGCNA, pathway enrichment,
-    PPI, machine learning, and optional immune deconvolution. Uses common data structures
+    PPI, and machine learning. Uses common data structures
     (ExpressionSet, DGEList) for interoperability. Install with BiocManager::install("GExPipe") once available.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.5.0)
-biocViews: Software, ShinyApp, GeneExpression, RNASeq, Microarray,
+biocViews: Software, ShinyApps, GeneExpression, RNASeq, Microarray,
     DifferentialExpression, Pathways, Network, Visualization
 URL: https://github.com/safarafique/GExPipe
 BugReports: https://github.com/Bioconductor/Contributions/issues/4162
@@ -79,7 +79,6 @@ Suggests:
     BiocManager,
     Boruta (>= 8.0.0),
     cicerone (>= 0.1.0),
-    immunedeconv,
     knitr (>= 1.45.0),
     mixOmics (>= 6.0.0),
     oligo (>= 1.62.0),
@@ -87,7 +86,11 @@ Suggests:
     rms (>= 6.7.0),
     rmda (>= 1.6.0),
     SHAPforxgboost (>= 0.1.0),
+    shinytest2 (>= 0.3.0),
+    testthat (>= 3.0.0),
     xgboost (>= 2.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
 SystemRequirements: GNU make
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
