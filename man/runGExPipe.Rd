@@ -14,12 +14,12 @@ runGExPipe(
 \item{launch.browser}{If TRUE, open the app in the default browser (default).
 Set to FALSE in Google Colab or headless servers (no local browser).}
 
-\item{port}{The TCP port to listen on (0 = random available port).}
+\item{port}{The TCP port to listen on.}
 
 \item{host}{The host to bind. Use "0.0.0.0" in Google Colab so port forwarding works.}
 }
 \value{
-Invisible. Runs the Shiny app.
+A Shiny app object. Users should run it with \code{\link[shiny:runApp]{shiny::runApp()}}.
 }
 \description{
 Launches the GExPipe Shiny app for multi-omics RNA analysis (bulk RNA-seq,
@@ -28,8 +28,7 @@ WGCNA, pathway enrichment, PPI, machine learning, and more).
 }
 \examples{
 if (interactive()) {
-  runGExPipe()
-  runGExPipe(launch.browser = TRUE, port = 3838)
-  # In Google Colab: runGExPipe(launch.browser = FALSE, host = "0.0.0.0", port = 3838)
+  app <- runGExPipe(launch.browser = TRUE, port = 3838)
+  shiny::runApp(app)
 }
 }

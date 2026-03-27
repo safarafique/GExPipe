@@ -33,5 +33,5 @@ if (inherits(err_server, "error")) {
 
 cat("  ✓ Ready. Starting Shiny app...\n\n")
 
-# Return the Shiny app object (shiny::runApp() will run it)
+# Return the Shiny app object (user code will run it)
 shinyApp(ui = ui, server = server)

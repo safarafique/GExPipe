@@ -36,3 +36,16 @@ P.Value, adj.P.Val, Significance}
 Wrapper for the limma-based DE pipeline used in Step 6. This version
 currently implements the limma path; other methods can be added later.
 }
+\examples{
+expr <- matrix(rnorm(240), nrow = 24)
+rownames(expr) <- paste0("Gene", seq_len(nrow(expr)))
+colnames(expr) <- paste0("S", seq_len(ncol(expr)))
+metadata <- data.frame(
+  Dataset = rep(c("D1", "D2"), each = 5),
+  Condition = rep(c("Normal", "Disease"), times = 5),
+  row.names = colnames(expr),
+  stringsAsFactors = FALSE
+)
+de <- gexp_run_de(expr, metadata, method = "limma", logfc_cutoff = 0.1, padj_cutoff = 0.5)
+head(de$de_results$Gene)
+}
