@@ -1,0 +1,119 @@
+---
+title: "GExPipe Shiny testing and CI reproducibility"
+author: "GExPipe Team"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{GExPipe Shiny testing and CI reproducibility}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+## Why this vignette exists
+
+Bioconductor review expects Shiny packages to be tested in addition to standard unit tests.  
+This vignette documents how `GExPipe` is exercised in:
+
+- regular testthat runs,
+- non-interactive CI-like sessions, and
+- local manual smoke checks.
+
+## App object contract
+
+The package exposes `runGExPipe()` as the Shiny entrypoint. In vignette/check context we keep this check side-effect free (no port binding).
+
+```{r app-contract}
+library(GExPipe)
+
+exists("runGExPipe", where = asNamespace("GExPipe"), inherits = FALSE)
+"launch.browser" %in% names(formals(GExPipe::runGExPipe))
+```
+
+Launch only in interactive use:
+
+```{r launch-interactive, eval=FALSE}
+if (interactive()) {
+  shiny::runApp(app)
+}
+```
+
+## Automated Shiny smoke test
+
+The package includes a `shinytest2` smoke test (see `tests/testthat/test-shiny-integration.R`) that:
+
+1. builds an app from package source,
+2. starts an `AppDriver`,
+3. confirms successful app startup.
+
+Run only that test:
+
+```{r run-shinytest-only, eval=FALSE}
+devtools::test(filter = "shiny-integration")
+```
+
+Run all tests:
+
+```{r run-all-tests, eval=FALSE}
+devtools::test()
+```
+
+## Non-interactive CI behavior
+
+The Shiny smoke test is designed to run in non-interactive sessions (for CI/check contexts), with a controlled opt-out:
+
+- if `CI=true` and `GEXPIPE_SKIP_SHINYTEST2=true`, the test is skipped intentionally,
+- otherwise it attempts to run and reports startup issues explicitly.
+
+Example CI-style run:
+
+```{r ci-style-run, eval=FALSE}
+Sys.setenv(CI = "true")
+Sys.unsetenv("GEXPIPE_SKIP_SHINYTEST2")
+devtools::test(filter = "shiny-integration")
+Sys.unsetenv("CI")
+```
+
+Optional opt-out:
+
+```{r ci-opt-out, eval=FALSE}
+Sys.setenv(CI = "true", GEXPIPE_SKIP_SHINYTEST2 = "true")
+devtools::test(filter = "shiny-integration")
+Sys.unsetenv("CI")
+Sys.unsetenv("GEXPIPE_SKIP_SHINYTEST2")
+```
+
+## Manual reviewer checklist
+
+Run the following in a fresh R session from package root:
+
+```{r manual-reviewer-checklist, eval=FALSE}
+pkgload::load_all(".", quiet = TRUE, export_all = FALSE)
+inherits(GExPipe::runGExPipe(FALSE), "shiny.appobj")
+
+devtools::test(filter = "shiny-integration")
+devtools::test()
+
+tarball <- devtools::build(path = tempdir())
+rcmdcheck::rcmdcheck(tarball, args = "--no-manual", error_on = "warning")
+BiocCheck::BiocCheck(".", `quit-with-status` = FALSE)
+```
+
+## Troubleshooting
+
+- **Chromium/Chrome not available**: install/update browser backend used by `chromote`.
+- **App startup timeout**: inspect test logs and check duplicate IDs or long blocking operations at startup.
+- **Environment-only failures**: re-run with explicit `CI` and `GEXPIPE_SKIP_SHINYTEST2` settings to verify gating behavior.
+
+## Session information
+
+```{r session-info}
+sessionInfo()
+```

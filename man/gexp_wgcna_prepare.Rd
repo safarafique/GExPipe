@@ -44,3 +44,16 @@ This helper mirrors the "Prepare WGCNA Data" step:
 companion sample info and gene-variance table.
 }
 }
+\examples{
+expr <- matrix(rnorm(600), nrow = 60)
+rownames(expr) <- paste0("Gene", seq_len(nrow(expr)))
+colnames(expr) <- paste0("S", seq_len(ncol(expr)))
+metadata <- data.frame(
+  SampleID = colnames(expr),
+  Condition = rep(c("Normal", "Disease"), each = 5),
+  Dataset = rep(c("D1", "D2"), each = 5),
+  stringsAsFactors = FALSE
+)
+prep <- gexp_wgcna_prepare(expr, metadata, gene_mode = "top_variable", top_genes = 50)
+dim(prep$datExpr)
+}
