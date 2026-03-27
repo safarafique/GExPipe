@@ -3,7 +3,6 @@
 ^\.gitignore$
 ^\.Rproj\.user$
 ^.*\.Rproj$
-^tests$
 ^build_for_bioc\.ps1$
 ^README\.md$
 ^SUBMISSION\.md$
@@ -28,3 +27,7 @@
 ^scripts/
 ^vignettes/~\$
 ^vignettes/.*\.tmp$
+^gexpipe-workflow\.R$
+^gexpipe-workflow\.html$
+^doc$
+^Meta$

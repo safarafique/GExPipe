@@ -38,3 +38,16 @@ This helper wraps the Step 5 logic:
 \item reports gene reduction statistics.
 }
 }
+\examples{
+expr <- matrix(rnorm(200), nrow = 20)
+rownames(expr) <- paste0("Gene", seq_len(nrow(expr)))
+colnames(expr) <- paste0("S", seq_len(ncol(expr)))
+metadata <- data.frame(
+  Dataset = rep(c("D1", "D2"), each = 5),
+  Condition = rep(c("Normal", "Disease"), times = 5),
+  row.names = colnames(expr),
+  stringsAsFactors = FALSE
+)
+out <- gexp_batch_correct(expr, metadata, variance_percentile = 10, method = "limma")
+dim(out$batch_corrected)
+}

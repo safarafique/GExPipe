@@ -24,6 +24,19 @@ utils::globalVariables(c("."))
 #'   \item{de_results}{data.frame with columns Gene, logFC, AveExpr,
 #'     P.Value, adj.P.Val, Significance}
 #'   \item{sig_genes}{subset of de_results with Significance != "Not Significant"}
+#'
+#' @examples
+#' expr <- matrix(rnorm(240), nrow = 24)
+#' rownames(expr) <- paste0("Gene", seq_len(nrow(expr)))
+#' colnames(expr) <- paste0("S", seq_len(ncol(expr)))
+#' metadata <- data.frame(
+#'   Dataset = rep(c("D1", "D2"), each = 5),
+#'   Condition = rep(c("Normal", "Disease"), times = 5),
+#'   row.names = colnames(expr),
+#'   stringsAsFactors = FALSE
+#' )
+#' de <- gexp_run_de(expr, metadata, method = "limma", logfc_cutoff = 0.1, padj_cutoff = 0.5)
+#' head(de$de_results$Gene)
 #' @export
 gexp_run_de <- function(
   expr,

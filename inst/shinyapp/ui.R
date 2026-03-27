@@ -27,7 +27,6 @@ source("ui/ui_validation.R", local = FALSE)
 source("ui/ui_roc.R", local = FALSE)
 source("ui/ui_nomogram.R", local = FALSE)
 source("ui/ui_gsea.R", local = FALSE)
-source("ui/ui_immune.R", local = FALSE)
 source("ui/ui_results_summary.R", local = FALSE)
 
 # Main analysis dashboard (shown after user clicks "Go to Analysis" on welcome page)
@@ -107,10 +106,7 @@ ui_analysis <- dashboardPage(
       menuItem("14. GSEA Analysis", tabName = "gsea",
                icon = icon("project-diagram", class = "fa-lg"),
                badgeLabel = "GSEA", badgeColor = "teal"),
-      menuItem("15. Immune Cell Deconvolution", tabName = "immune",
-               icon = icon("shield-alt", class = "fa-lg"),
-               badgeLabel = "Immune", badgeColor = "purple"),
-      menuItem("16. Results Summary", tabName = "results_summary",
+      menuItem("15. Results Summary", tabName = "results_summary",
                icon = icon("file-alt", class = "fa-lg"),
                badgeLabel = "PDF", badgeColor = "red")
     ),
@@ -1052,7 +1048,6 @@ ui_analysis <- dashboardPage(
       ui_roc,
       ui_nomogram,
       ui_gsea,
-      ui_immune,
       ui_results_summary
     )
   )
