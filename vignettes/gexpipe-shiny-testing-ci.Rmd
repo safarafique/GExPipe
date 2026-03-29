@@ -19,12 +19,12 @@ knitr::opts_chunk$set(
 
 ## Why this vignette exists
 
-Bioconductor review expects Shiny packages to be tested in addition to standard unit tests.  
+Bioconductor review expects Shiny packages to be tested in addition to standard unit tests.\
 This vignette documents how `GExPipe` is exercised in:
 
-- regular testthat runs,
-- non-interactive CI-like sessions, and
-- local manual smoke checks.
+-   regular testthat runs,
+-   non-interactive CI-like sessions, and
+-   local manual smoke checks.
 
 ## App object contract
 
@@ -37,11 +37,41 @@ exists("runGExPipe", where = asNamespace("GExPipe"), inherits = FALSE)
 "launch.browser" %in% names(formals(GExPipe::runGExPipe))
 ```
 
-Launch only in interactive use:
+Suggested testing packages (Bioconductor [Shiny testing section](https://contributions.bioconductor.org/shiny.html#testing)):
+
+```{r testing-suggests-available}
+data.frame(
+  package = c("testthat", "shinytest2", "chromote"),
+  available = vapply(
+    c("testthat", "shinytest2", "chromote"),
+    requireNamespace,
+    logical(1L),
+    quietly = TRUE
+  ),
+  row.names = NULL
+)
+```
+
+Launch only in interactive use. Keep **`app <- runGExPipe(...)` and `runApp(app)` inside one `if (interactive()) { ... }` block** (as below). That way `app` always exists before `runApp`, and if someone knits with `eval=TRUE` by mistake, non-interactive builds skip the whole block (no server, no stray `runApp(app)` after a failed assignment).
+
+**Important:** `shiny::runApp()` **blocks** the R session: the console stays busy until you **Stop** the app (RStudio red Stop icon). That is normal—not a hang.
+
+**How to tell “working” vs “broken”:**
+
+| What you see | Meaning |
+|----|----|
+| `GExPipe: building Shiny UI...` then (pause) then `GExPipe: app object built` | `runGExPipe()` finished; pause can be **minutes** on first run. |
+| After `runApp(app)`: `GExPipe: Shiny onStart...` then **`Listening on http://127.0.0.1:PORT`** | Server is up — open that URL in a browser (`launch.browser = FALSE` does not open it for you). |
+| **No** `>` prompt while the app runs | **Expected** — the session is serving the app, not stuck. |
+| **No** `Listening on...` after **10+ minutes** | Unusual — interrupt (Stop), update packages, try again; avoid `inst/shinyapp` Run App if you see `global.R` “Loading packages” text (slower path). |
+
+This chunk stays `eval=FALSE` for knitting; to try the app, run **the entire chunk** in the Console, not only the `runApp` lines.
 
 ```{r launch-interactive, eval=FALSE}
+# Use a fixed port (e.g. 3838) or launch.browser = TRUE — port = 0 is not a valid browser URL.
 if (interactive()) {
-  shiny::runApp(app)
+  app <- GExPipe::runGExPipe(launch.browser = TRUE, port = 3838)
+  shiny::runApp(app, port = 3838)
 }
 ```
 
@@ -49,19 +79,29 @@ if (interactive()) {
 
 The package includes a `shinytest2` smoke test (see `tests/testthat/test-shiny-integration.R`) that:
 
-1. builds an app from package source,
-2. starts an `AppDriver`,
-3. confirms successful app startup.
+1.  builds an app from package source,
+2.  starts an `AppDriver`,
+3.  confirms successful app startup.
 
-Run only that test:
+Run only that test (from package root):
 
 ```{r run-shinytest-only, eval=FALSE}
+testthat::test_local(filter = "shiny-integration")
+```
+
+Equivalent:
+
+```{r run-shinytest-only-devtools, eval=FALSE}
 devtools::test(filter = "shiny-integration")
 ```
 
 Run all tests:
 
 ```{r run-all-tests, eval=FALSE}
+testthat::test_local()
+```
+
+```{r run-all-tests-devtools, eval=FALSE}
 devtools::test()
 ```
 
@@ -69,8 +109,8 @@ devtools::test()
 
 The Shiny smoke test is designed to run in non-interactive sessions (for CI/check contexts), with a controlled opt-out:
 
-- if `CI=true` and `GEXPIPE_SKIP_SHINYTEST2=true`, the test is skipped intentionally,
-- otherwise it attempts to run and reports startup issues explicitly.
+-   if `CI=true` and `GEXPIPE_SKIP_SHINYTEST2=true`, the test is skipped intentionally,
+-   otherwise it attempts to run and reports startup issues explicitly.
 
 Example CI-style run:
 
@@ -98,19 +138,19 @@ Run the following in a fresh R session from package root:
 pkgload::load_all(".", quiet = TRUE, export_all = FALSE)
 inherits(GExPipe::runGExPipe(FALSE), "shiny.appobj")
 
-devtools::test(filter = "shiny-integration")
-devtools::test()
+testthat::test_local(filter = "shiny-integration")
+testthat::test_local()
 
 tarball <- devtools::build(path = tempdir())
 rcmdcheck::rcmdcheck(tarball, args = "--no-manual", error_on = "warning")
-BiocCheck::BiocCheck(".", `quit-with-status` = FALSE)
+BiocCheck::BiocCheck(tarball, `quit-with-status` = FALSE)
 ```
 
 ## Troubleshooting
 
-- **Chromium/Chrome not available**: install/update browser backend used by `chromote`.
-- **App startup timeout**: inspect test logs and check duplicate IDs or long blocking operations at startup.
-- **Environment-only failures**: re-run with explicit `CI` and `GEXPIPE_SKIP_SHINYTEST2` settings to verify gating behavior.
+-   **Chromium/Chrome not available**: install/update browser backend used by `chromote`.
+-   **App startup timeout** (`did not become stable`): shinytest2 blocks until `window.shinytest2.ready` (Shiny session initialized). The app defers heavy namespace attachment when **`options(shiny.testmode = TRUE)`** and **`gexpipe.minimal_attach_in_testmode`** is true (default): only **shiny / shinydashboard / shinyjs / DT** attach before the first response; the rest run after **`session$onFlushed()`**. The smoke test child uses **`library(GExPipe)`** when installed (`R CMD check`), or **`pkgload::load_all()`** from source (slower; set **`GEXPIPE_SHINYTEST2_USE_PKGLOAD=1`** to force it). Increase **`GEXPIPE_SHINYTEST2_MS`** if the child is slow (default **600000** ms). `AppDriver(..., wait = FALSE)` skips the 200 ms idle wait. With `shiny.testmode = TRUE`, the 5s network poll is off.
+-   **Environment-only failures**: re-run with explicit `CI` and `GEXPIPE_SKIP_SHINYTEST2` settings to verify gating behavior.
 
 ## Session information
 
