@@ -1,5 +1,14 @@
 # GExPipe NEWS
 
+## Version 0.99.3
+
+- Shiny UI/server orchestration consolidated under `R/` per Bioconductor Shiny guidelines; `runGExPipe()` returns the app object only (no `runApp()` in package source).
+- New vignette `gexpipe-shiny-architecture.Rmd` with runnable chunks documenting layout and testing expectations.
+- `runGExPipe()` man-page examples now include a non-interactive check-friendly construction line.
+- Added `tests/testthat/test-runGExPipe.R`; `tests/testthat.R` trimmed to standard `test_check("GExPipe")`.
+- Suggests: `chromote`, `pkgload` (for shinytest2 smoke test and source-based checks).
+- Main vignette `GExPipe.Rmd`: expanded post–WGCNA sections (common genes, UpSet, GO BP/MF/CC, KEGG ORA + plots, STRING PPI, ML + importance, ROC, D1/D2 validation holdout, GSEA GO + KEGG, MsigDB).
+
 ## Version 0.99.0
 
 - Initial release.

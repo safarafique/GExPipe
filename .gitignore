@@ -9,6 +9,8 @@
 # Build and check artifacts
 OmniVerse.Rcheck/
 OmniVerse.BiocCheck/
+GExPipe.Rcheck/
+GExPipe.BiocCheck/
 *.tar.gz
 /*.tar.gz
 /*.Rcheck/

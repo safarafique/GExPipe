@@ -4,7 +4,6 @@
 ^\.Rproj\.user$
 ^.*\.Rproj$
 ^build_for_bioc\.ps1$
-^README\.md$
 ^SUBMISSION\.md$
 ^BIOC_SUBMISSION_CHECKLIST\.md$
 ^GExPipe\.BiocCheck$
