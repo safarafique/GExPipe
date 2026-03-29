@@ -185,19 +185,52 @@ head(wgcna_prep$gene_variance_table, 3)
 The package function returns a Shiny app object; launch only in interactive sessions.
 
 ```{r app-object}
-app <- runGExPipe(launch.browser = FALSE)
+# Faster first build during R CMD check / vignette builds (full attach if you omit these).
+options(
+  shiny.testmode = TRUE,
+  gexpipe.minimal_attach_in_testmode = TRUE,
+  gexpipe.wgcna_threads = 0L
+)
+app <- runGExPipe(launch.browser = FALSE, port = 3838L)
 inherits(app, "shiny.appobj")
 ```
 
 ```{r launch-app-interactive, eval=FALSE}
+# runApp() blocks until you click Stop in RStudio. Use launch.browser = TRUE or port = 3838 (not 0) to open the app in a browser.
 if (interactive()) {
-  shiny::runApp(app)
+  app <- GExPipe::runGExPipe(launch.browser = TRUE, port = 3838)
+  shiny::runApp(app, port = 3838)
 }
 ```
 
-## Shiny testing and CI notes
+## Testing the Shiny app
 
-For reviewer-facing Shiny test execution details (including `shinytest2` smoke tests and non-interactive CI behavior), see:
+Automated tests live under `tests/testthat/`. **Unit tests** cover exported pipeline functions; **`shinytest2`** provides a smoke test that starts the app built via `GExPipe::runGExPipe()` (see `tests/testthat/test-shiny-integration.R`).
+
+### Run tests from package source
+
+In R, set the working directory to the **package root** (the folder that contains `DESCRIPTION`), then:
+
+```{r run-tests-local, eval=FALSE}
+# All tests (recommended before submission)
+testthat::test_local()
+
+# Only the Shiny smoke test (faster; needs shinytest2 + chromote)
+testthat::test_local(filter = "shiny-integration")
+```
+
+Equivalent using **devtools** (same directory):
+
+```{r run-tests-devtools, eval=FALSE}
+devtools::test()
+devtools::test(filter = "shiny-integration")
+```
+
+The Shiny smoke test may **skip** if the browser backend is unavailable or startup times out; see `vignettes/gexpipe-shiny-testing-ci.Rmd` for CI variables (`CI`, `GEXPIPE_SKIP_SHINYTEST2`) and troubleshooting.
+
+### More detail
+
+For reviewer-facing notes (CI, opt-out, manual checklist, `rcmdcheck` / `BiocCheck`), see:
 
 - `vignettes/gexpipe-shiny-testing-ci.Rmd`
 
@@ -216,8 +249,8 @@ If your local branch still has incomplete exported functions or data objects, us
 5. Rebuild docs and run checks:
    - `devtools::document()`
    - `devtools::build_vignettes()`
-   - `devtools::test()`
-   - `devtools::check()`
+   - `testthat::test_local()` (or `devtools::test()`)
+   - `devtools::check()` (or `R CMD build` + `R CMD check` on the tarball)
 
 ## Optional GEO workflow (interactive / network-dependent)
 
