@@ -14,21 +14,52 @@ runGExPipe(
 \item{launch.browser}{If TRUE, open the app in the default browser (default).
 Set to FALSE in Google Colab or headless servers (no local browser).}
 
-\item{port}{The TCP port to listen on.}
+\item{port}{TCP port for Shiny. Use a \strong{positive} port (e.g. \code{3838}) when you will open
+the app manually in a browser. \strong{\code{0}} means "pick a free port" (fine for automated
+tests); some setups print \verb{http://127.0.0.1:0}, which \strong{cannot} be pasted into a
+browser - then use \code{launch.browser = TRUE} or \code{port = 3838}.}
 
 \item{host}{The host to bind. Use "0.0.0.0" in Google Colab so port forwarding works.}
 }
 \value{
-A Shiny app object. Users should run it with \code{\link[shiny:runApp]{shiny::runApp()}}.
+A Shiny app object. Users should run it with \code{\link[shiny:runApp]{shiny::runApp()}}, which
+starts the server and \strong{blocks} the R session until the app is stopped
+(e.g. RStudio Stop button).
 }
 \description{
 Launches the GExPipe Shiny app for multi-omics RNA analysis (bulk RNA-seq,
 microarray, GEO download, QC, normalization, differential expression,
 WGCNA, pathway enrichment, PPI, machine learning, and more).
 }
+\section{Startup time}{
+
+The welcome screen loads first; the full dashboard (15 tabs) is inserted only after
+\strong{Go to Analysis}, so the first response avoids sourcing every tab UI file.
+\code{runGExPipe()} still builds a lazy session UI, and attaching many analysis packages
+on first open can take \strong{tens of seconds to a few minutes} on a cold session (DLL loads).
+Prefer \code{GExPipe::runGExPipe()} from an \strong{installed} package rather than opening
+\verb{inst/shinyapp/} in RStudio (that path runs \code{global.R}, which can auto-install
+packages and is slower).
+
+Optional tuning before \code{runGExPipe()}:
+\itemize{
+\item \code{options(gexpipe.wgcna_threads = 1L)} - fewer WGCNA threads (less parallel setup noise).
+\item \code{options(gexpipe.wgcna_threads = 0L)} or \code{FALSE} - skip \code{\link[WGCNA:allowWGCNAThreads]{WGCNA::enableWGCNAThreads()}} at app start.
+\item \code{options(shiny.testmode = TRUE)} with \code{options(gexpipe.minimal_attach_in_testmode = TRUE)} (default
+when unset) attaches only the Shiny stack first, then the rest after the first flush, so
+automated tests can connect quickly. Set \code{gexpipe.minimal_attach_in_testmode = FALSE} for a
+full attach on the first tick (e.g. deep \code{shinytest2} scenarios).
+}
+}
+
 \examples{
+# Non-interactive: build an app object (this runs during R CMD check / `example()`).
+app <- runGExPipe(launch.browser = FALSE, port = 0L)
+stopifnot(inherits(app, "shiny.appobj"))
+
+# Interactive: launch in a browser (blocks until the app is stopped).
 if (interactive()) {
-  app <- runGExPipe(launch.browser = TRUE, port = 3838)
-  shiny::runApp(app)
+  app <- runGExPipe(launch.browser = TRUE, port = 3838L)
+  shiny::runApp(app, port = 3838L)
 }
 }

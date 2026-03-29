@@ -141,7 +141,23 @@ core_needed <- c(
   "gexp_register_workspace_observers",
   "gexp_register_help_observers"
 )
-missing_core <- core_needed[!vapply(core_needed, exists, logical(1), mode = "function", inherits = TRUE)]
+
+# exists() must not be passed bare to vapply() — the default env is wrong, so internal
+# (non-exported) functions in GExPipe:: would look "missing" and trigger stop() + wrapup errors.
+.gexpipe_has_core_fn <- function(nm) {
+  if (exists(nm, mode = "function", inherits = TRUE)) {
+    return(TRUE)
+  }
+  if (requireNamespace("GExPipe", quietly = TRUE)) {
+    ns <- asNamespace("GExPipe")
+    if (exists(nm, envir = ns, inherits = FALSE, mode = "function")) {
+      return(TRUE)
+    }
+  }
+  FALSE
+}
+
+missing_core <- core_needed[!vapply(core_needed, .gexpipe_has_core_fn, logical(1))]
 if (length(missing_core) > 0) {
   local_r_files <- c(
     file.path(getwd(), "..", "..", "R", "gexpipe_shiny_helpers.R"),
@@ -169,7 +185,7 @@ if (length(missing_core) > 0) {
   }
 }
 
-missing_core <- core_needed[!vapply(core_needed, exists, logical(1), mode = "function", inherits = TRUE)]
+missing_core <- core_needed[!vapply(core_needed, .gexpipe_has_core_fn, logical(1))]
 if (length(missing_core) > 0) {
   stop(
     "Missing core GExPipe functions: ", paste(missing_core, collapse = ", "),
