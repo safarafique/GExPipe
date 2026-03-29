@@ -1,7 +1,4 @@
 gexp_app_server <- function(input, output, session) {
-  # Ensure packages are attached (no installation here).
-  gexp_app_attach_packages()
-
   missing_pkgs <- getOption("omniVerse.missingPkgs", character(0))
   if (length(missing_pkgs) > 0L) {
     tryCatch({
@@ -178,6 +175,13 @@ gexp_app_server <- function(input, output, session) {
 
   output$show_analysis <- shiny::reactive(rv$show_analysis)
   shiny::outputOptions(output, "show_analysis", suspendWhenHidden = FALSE)
+
+  output$analysis_dashboard <- shiny::renderUI({
+    shiny::req(rv$show_analysis)
+    gexp_app_analysis_dashboard_ui()
+  })
+  shiny::outputOptions(output, "analysis_dashboard", suspendWhenHidden = FALSE)
+
   shiny::observeEvent(input$go_to_analysis, {
     rv$show_analysis <- TRUE
   })
@@ -207,34 +211,41 @@ gexp_app_server <- function(input, output, session) {
     }
   })
 
-  # Register cross-cutting observers extracted into R/
-  gexp_register_pipeline_observers(input, output, session, rv)
-  gexp_register_navigation_observers(input, output, session, rv)
-  gexp_register_workspace_observers(input, output, session, rv)
-  gexp_register_help_observers(input, output, session, rv)
-
-  # Call step server modules (defined under R/; migrated from inst/shinyapp/server/)
-  server_download(input, output, session, rv)
-  server_qc(input, output, session, rv)
-  server_normalize(input, output, session, rv)
-  server_groups(input, output, session, rv)
-  server_batch(input, output, session, rv)
-  server_results(input, output, session, rv)
-  server_wgcna(input, output, session, rv)
-  server_common_genes(input, output, session, rv)
-  server_ppi(input, output, session, rv)
-  server_ml(input, output, session, rv)
-  server_validation(input, output, session, rv)
-  server_roc(input, output, session, rv)
-  server_nomogram(input, output, session, rv)
-  server_gsea(input, output, session, rv)
-  server_results_summary(input, output, session, rv)
-
-  # Start tour if available (optional).
-  shiny::observeEvent(input$start_tour, {
-    if (!is.null(guide)) {
-      tryCatch(guide$init()$start(), error = function(e) NULL)
+  # Heavy work deferred to first flush: sourcing ~15 server modules was blocking the initial
+  # server tick and shinytest2 session stability. UI already ran phase-1 attach in test mode.
+  session$onFlushed(function() {
+    if (!isTRUE(getOption("gexpipe.attach.done", FALSE))) {
+      options(gexpipe.attach.allow_full_now = TRUE)
+      gexp_app_attach_packages()
+      options(gexpipe.attach.allow_full_now = NULL)
     }
-  })
+
+    gexp_register_pipeline_observers(input, output, session, rv)
+    gexp_register_navigation_observers(input, output, session, rv)
+    gexp_register_workspace_observers(input, output, session, rv)
+    gexp_register_help_observers(input, output, session, rv)
+
+    server_download(input, output, session, rv)
+    server_qc(input, output, session, rv)
+    server_normalize(input, output, session, rv)
+    server_groups(input, output, session, rv)
+    server_batch(input, output, session, rv)
+    server_results(input, output, session, rv)
+    server_wgcna(input, output, session, rv)
+    server_common_genes(input, output, session, rv)
+    server_ppi(input, output, session, rv)
+    server_ml(input, output, session, rv)
+    server_validation(input, output, session, rv)
+    server_roc(input, output, session, rv)
+    server_nomogram(input, output, session, rv)
+    server_gsea(input, output, session, rv)
+    server_results_summary(input, output, session, rv)
+
+    shiny::observeEvent(input$start_tour, {
+      if (!is.null(guide)) {
+        tryCatch(guide$init()$start(), error = function(e) NULL)
+      }
+    })
+  }, once = TRUE)
 }
 

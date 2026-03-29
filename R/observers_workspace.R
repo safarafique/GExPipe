@@ -42,6 +42,12 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
   for (nm in setdiff(names(state), "saved_step")) {
     tryCatch({ rv[[nm]] <- state[[nm]] }, error = function(e) NULL)
   }
+  # Deferred analysis UI: legacy .rds may omit show_analysis; infer from pipeline progress.
+  if (!("show_analysis" %in% names(state)) && !isTRUE(rv$show_analysis)) {
+    if (isTRUE(rv$download_complete) || isTRUE(rv$normalization_complete) || isTRUE(rv$batch_complete)) {
+      rv$show_analysis <- TRUE
+    }
+  }
   if (!is.null(rv$all_genes_list) && is.list(rv$all_genes_list)) {
     rv$dataset_count <- length(rv$all_genes_list)
     rv$single_dataset <- isTRUE(rv$dataset_count == 1)
@@ -165,6 +171,9 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
   output$download_workspace_results <- workspace_download_handler()
 
   shiny::observe({
+    if (isTRUE(getOption("shiny.testmode"))) {
+      return()
+    }
     if (!isTRUE(rv$download_complete)) return()
     if (is.null(rv$download_complete_at)) rv$download_complete_at <- Sys.time()
     if (isTRUE(rv$auto_save_after_download_done)) return()

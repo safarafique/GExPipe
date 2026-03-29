@@ -1,14 +1,12 @@
-gexp_app_ui <- function() {
-  if (!requireNamespace("shiny", quietly = TRUE)) {
-    stop("Package 'shiny' is required to run the GExPipe app.")
+## Full analysis UI (15 tabs). Built only when user enters analysis mode so cold start
+## and shinytest2 do not source every tab file on first HTTP response.
+gexp_app_analysis_dashboard_ui <- function() {
+  # Ensure full namespace attach before any tab UI sources (race: user clicks Go before onFlushed).
+  if (!isTRUE(getOption("gexpipe.attach.done", FALSE))) {
+    options(gexpipe.attach.allow_full_now = TRUE)
+    gexp_app_attach_packages()
   }
-
-  # Attach packages and source any remaining UI modules.
-  gexp_app_attach_packages()
-
-  # `ui_*` objects are defined in `R/` (migrated) and/or `inst/shinyapp/` (still pending).
-  # The full analysis dashboard is shown after user clicks "Go to Analysis".
-  ui_analysis <- shinydashboard::dashboardPage(
+  shinydashboard::dashboardPage(
     skin = "purple",
     shinydashboard::dashboardHeader(
       title = shiny::tags$span(
@@ -115,7 +113,26 @@ gexp_app_ui <- function() {
       ")),
       # Styles/scripts + online/offline badge wiring are in the existing UI modules.
       shiny::tags$head(
-        shiny::tags$script(shiny::HTML("
+        shiny::tags$script(shiny::HTML(
+          if (isTRUE(getOption("shiny.testmode"))) {
+            # No setInterval: periodic setInputValue prevents shinytest2 "stable" detection.
+            "
+          (function() {
+            function setStatus(isOnline) {
+              var el = document.getElementById('net_status_badge');
+              if (!el) return;
+              el.classList.remove('online','offline');
+              el.classList.add(isOnline ? 'online' : 'offline');
+              el.innerHTML = (isOnline ? '<i class=\"fa fa-wifi\"></i><span> Online</span>' : '<i class=\"fa fa-exclamation-triangle\"></i><span> Offline</span>');
+              if (window.Shiny) Shiny.setInputValue('online_status', !!isOnline, {priority: 'event'});
+            }
+            setStatus(navigator.onLine);
+            window.addEventListener('online', function() { setStatus(true); });
+            window.addEventListener('offline', function() { setStatus(false); });
+          })();
+        "
+          } else {
+            "
           (function() {
             function setStatus(isOnline) {
               var el = document.getElementById('net_status_badge');
@@ -130,7 +147,9 @@ gexp_app_ui <- function() {
             window.addEventListener('offline', function() { setStatus(false); });
             setInterval(function() { setStatus(navigator.onLine); }, 5000);
           })();
-        "))
+        "
+          }
+        ))
       ),
       shiny::uiOutput("pipeline_progress"),
       shiny::tags$script(shiny::HTML("
@@ -161,11 +180,19 @@ gexp_app_ui <- function() {
       )
     )
   )
+}
+
+gexp_app_ui <- function() {
+  if (!requireNamespace("shiny", quietly = TRUE)) {
+    stop("Package 'shiny' is required to run the GExPipe app.")
+  }
+
+  gexp_app_attach_packages()
 
   shiny::fluidPage(
     shinyjs::useShinyjs(),
     shiny::conditionalPanel(condition = "!output.show_analysis", gexp_ui_welcome()),
-    shiny::conditionalPanel(condition = "output.show_analysis", ui_analysis)
+    shiny::uiOutput("analysis_dashboard")
   )
 }
 
