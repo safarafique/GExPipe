@@ -19,12 +19,15 @@ gexp_app_attach_packages <- function() {
         miss <- c(miss, p)
         next
       }
-      tryCatch({
-        pkg_search <- paste0("package:", p)
-        if (!pkg_search %in% search()) {
-          base::attachNamespace(asNamespace(p))
-        }
-      }, error = function(e) NULL)
+      tryCatch(
+        {
+          pkg_search <- paste0("package:", p)
+          if (!pkg_search %in% search()) {
+            base::attachNamespace(asNamespace(p))
+          }
+        },
+        error = function(e) NULL
+      )
     }
     if (length(miss) > 0L) {
       stop(
@@ -43,8 +46,8 @@ gexp_app_attach_packages <- function() {
   # from tab loaders once allow_full_now is set / attach.done is TRUE.
   if (
     test_minimal &&
-    isTRUE(getOption("gexpipe.attach.shiny_stack_only_done", FALSE)) &&
-    !isTRUE(getOption("gexpipe.attach.allow_full_now", FALSE))
+      isTRUE(getOption("gexpipe.attach.shiny_stack_only_done", FALSE)) &&
+      !isTRUE(getOption("gexpipe.attach.allow_full_now", FALSE))
   ) {
     return(invisible(NULL))
   }
@@ -71,13 +74,16 @@ gexp_app_attach_packages <- function() {
       if (p %in% required) missing <- c(missing, p)
       next
     }
-    tryCatch({
-      pkg_search <- paste0("package:", p)
-      if (!pkg_search %in% search()) {
-        # Source-loaded Shiny modules rely on unqualified symbols; attach namespace.
-        base::attachNamespace(asNamespace(p))
-      }
-    }, error = function(e) NULL)
+    tryCatch(
+      {
+        pkg_search <- paste0("package:", p)
+        if (!pkg_search %in% search()) {
+          # Source-loaded Shiny modules rely on unqualified symbols; attach namespace.
+          base::attachNamespace(asNamespace(p))
+        }
+      },
+      error = function(e) NULL
+    )
   }
 
   if (length(missing) > 0L) {
@@ -95,18 +101,21 @@ gexp_app_attach_packages <- function() {
   # enableWGCNAThreads before WGCNA is attached.
   wgcna_opt <- getOption("gexpipe.wgcna_threads", NULL)
   if (!identical(wgcna_opt, 0L) && !identical(wgcna_opt, FALSE) && isNamespaceLoaded("WGCNA")) {
-    tryCatch({
-      if (exists("enableWGCNAThreads", mode = "function", where = asNamespace("WGCNA"))) {
-        n_threads <- if (is.null(wgcna_opt)) {
-          max(1L, parallel::detectCores() - 1L)
-        } else {
-          as.integer(wgcna_opt)
+    tryCatch(
+      {
+        if (exists("enableWGCNAThreads", mode = "function", where = asNamespace("WGCNA"))) {
+          n_threads <- if (is.null(wgcna_opt)) {
+            max(1L, parallel::detectCores() - 1L)
+          } else {
+            as.integer(wgcna_opt)
+          }
+          if (length(n_threads) == 1L && !is.na(n_threads) && n_threads > 0L) {
+            WGCNA::enableWGCNAThreads(nThreads = n_threads)
+          }
         }
-        if (length(n_threads) == 1L && !is.na(n_threads) && n_threads > 0L) {
-          WGCNA::enableWGCNAThreads(nThreads = n_threads)
-        }
-      }
-    }, error = function(e) NULL)
+      },
+      error = function(e) NULL
+    )
   }
 
   invisible(NULL)
@@ -168,16 +177,22 @@ gexp_app_onStart <- function() {
     file.path(getwd(), "..", "inst", rel_path)
   )
   hits <- candidates[file.exists(candidates)]
-  if (length(hits) >= 1L) return(hits[1])
+  if (length(hits) >= 1L) {
+    return(hits[1])
+  }
 
   # Fall back to installed package location.
   p <- system.file(rel_path, package = "GExPipe")
-  if (nzchar(p) && file.exists(p)) return(p)
+  if (nzchar(p) && file.exists(p)) {
+    return(p)
+  }
 
   if (startsWith(rel_path, "shiny_src/")) {
     alt_rel <- sub("^shiny_src/", "shinyapp/", rel_path)
     p2 <- system.file(alt_rel, package = "GExPipe")
-    if (nzchar(p2) && file.exists(p2)) return(p2)
+    if (nzchar(p2) && file.exists(p2)) {
+      return(p2)
+    }
   }
 
   stop(
@@ -186,4 +201,3 @@ gexp_app_onStart <- function() {
     ". Run from package root or install the package."
   )
 }
-

@@ -77,7 +77,7 @@ gexp_run_de <- function(
     metadata$Dataset <- factor(metadata$Dataset)
     design <- stats::model.matrix(~ Dataset + Condition, data = metadata)
   } else {
-    design <- stats::model.matrix(~ Condition, data = metadata)
+    design <- stats::model.matrix(~Condition, data = metadata)
   }
 
   # Fit limma model
@@ -115,4 +115,3 @@ gexp_run_de <- function(
     sig_genes = sig_genes
   )
 }
-

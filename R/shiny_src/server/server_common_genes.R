@@ -3,7 +3,6 @@
 # ==============================================================================
 
 server_common_genes <- function(input, output, session, rv) {
-  
   # ---------- COMMON GENES ----------
   observeEvent(input$compute_common_genes, {
     # Check prerequisites with clear messages (instead of silent req)
@@ -52,16 +51,18 @@ server_common_genes <- function(input, output, session, rv) {
       showNotification(paste("Found", length(common), "common genes (DEG ∩ WGCNA)."), type = "message", duration = 5)
     }
   })
-  
+
   output$common_genes_placeholder_ui <- renderUI({
-    if (!is.null(rv$common_genes_de_wgcna)) return(NULL)
+    if (!is.null(rv$common_genes_de_wgcna)) {
+      return(NULL)
+    }
     tags$div(
       class = "alert alert-warning",
       icon("hand-point-right"),
       " Click 'Compute Common Genes' to find overlap between DEGs and WGCNA significant module genes. Requires Step 6 (DE) and Step 7 (Identify Significant Modules) completed."
     )
   })
-  
+
   output$common_genes_summary_ui <- renderUI({
     req(rv$common_genes_de_wgcna)
     n_common <- length(rv$common_genes_de_wgcna)
@@ -89,47 +90,51 @@ server_common_genes <- function(input, output, session, rv) {
     n_wgcna <- rv$common_genes_wgcna_n
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 8 complete."), " Common genes: ", n_common, " (DEG: ", n_deg, ", WGCNA sig. modules: ", n_wgcna, "). Venn above; GO/KEGG and PPI use this set."))
+      tags$p(tags$strong("Step 8 complete."), " Common genes: ", n_common, " (DEG: ", n_deg, ", WGCNA sig. modules: ", n_wgcna, "). Venn above; GO/KEGG and PPI use this set.")
+    )
   })
 
   # Venn diagram: DEG vs WGCNA (common genes overlap)
-  output$common_genes_venn_plot <- renderPlot({
-    req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
-    deg_set <- rv$common_genes_deg_list
-    wgcna_set <- rv$common_genes_wgcna_list
-    if (length(deg_set) == 0 && length(wgcna_set) == 0) {
-      plot.new()
-      text(0.5, 0.5, "No DEG or WGCNA genes to show.", cex = 1.2)
-      return(invisible(NULL))
-    }
-    grid::grid.newpage()
-    vp <- VennDiagram::venn.diagram(
-      x = list(DEG = deg_set, WGCNA = wgcna_set),
-      category.names = c("DEG", "WGCNA"),
-      filename = NULL,
-      output = TRUE,
-      disable.logging = TRUE,
-      imagetype = "png",
-      height = 2200,
-      width = 2200,
-      resolution = 200,
-      compression = "lzw",
-      lwd = 2.5,
-      lty = "blank",
-      fill = c("#E41A1C", "#377EB8"),
-      alpha = 0.65,
-      cex = 1.4,
-      fontface = "bold",
-      cat.cex = 1.3,
-      cat.fontface = "bold",
-      cat.col = c("#E41A1C", "#377EB8"),
-      margin = 0.08,
-      main = "Common Genes (DEG \u2229 WGCNA)",
-      main.cex = 1.4,
-      main.fontface = "bold"
-    )
-    grid::grid.draw(vp)
-  }, height = 420)
+  output$common_genes_venn_plot <- renderPlot(
+    {
+      req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
+      deg_set <- rv$common_genes_deg_list
+      wgcna_set <- rv$common_genes_wgcna_list
+      if (length(deg_set) == 0 && length(wgcna_set) == 0) {
+        plot.new()
+        text(0.5, 0.5, "No DEG or WGCNA genes to show.", cex = 1.2)
+        return(invisible(NULL))
+      }
+      grid::grid.newpage()
+      vp <- VennDiagram::venn.diagram(
+        x = list(DEG = deg_set, WGCNA = wgcna_set),
+        category.names = c("DEG", "WGCNA"),
+        filename = NULL,
+        output = TRUE,
+        disable.logging = TRUE,
+        imagetype = "png",
+        height = 2200,
+        width = 2200,
+        resolution = 200,
+        compression = "lzw",
+        lwd = 2.5,
+        lty = "blank",
+        fill = c("#E41A1C", "#377EB8"),
+        alpha = 0.65,
+        cex = 1.4,
+        fontface = "bold",
+        cat.cex = 1.3,
+        cat.fontface = "bold",
+        cat.col = c("#E41A1C", "#377EB8"),
+        margin = 0.08,
+        main = "Common Genes (DEG \u2229 WGCNA)",
+        main.cex = 1.4,
+        main.fontface = "bold"
+      )
+      grid::grid.draw(vp)
+    },
+    height = 420
+  )
 
   output$download_common_genes_venn_png <- downloadHandler(
     filename = function() "common_genes_venn_DEG_WGCNA.png",
@@ -137,7 +142,9 @@ server_common_genes <- function(input, output, session, rv) {
       req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
       deg_set <- rv$common_genes_deg_list
       wgcna_set <- rv$common_genes_wgcna_list
-      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
+      if (length(deg_set) == 0 && length(wgcna_set) == 0) {
+        return()
+      }
       png(file, width = 8 * 150, height = 8 * 150, res = 150, bg = "white")
       grid::grid.newpage()
       vp <- VennDiagram::venn.diagram(
@@ -176,7 +183,9 @@ server_common_genes <- function(input, output, session, rv) {
       req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
       deg_set <- rv$common_genes_deg_list
       wgcna_set <- rv$common_genes_wgcna_list
-      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
+      if (length(deg_set) == 0 && length(wgcna_set) == 0) {
+        return()
+      }
       pdf(file, width = 8, height = 8, bg = "white")
       grid::grid.newpage()
       vp <- VennDiagram::venn.diagram(
@@ -207,12 +216,12 @@ server_common_genes <- function(input, output, session, rv) {
       dev.off()
     }
   )
-  
+
   output$common_genes_table <- DT::renderDataTable({
     req(rv$common_genes_df)
     DT::datatable(rv$common_genes_df, options = list(pageLength = 25), rownames = FALSE, filter = "top")
   })
-  
+
   output$download_common_genes <- downloadHandler(
     filename = function() "common_genes_DEG_WGCNA.csv",
     content = function(file) {
@@ -221,7 +230,7 @@ server_common_genes <- function(input, output, session, rv) {
       write.csv(rv$common_genes_df, file.path(CSV_EXPORT_DIR(), "common_genes_DEG_WGCNA.csv"), row.names = FALSE)
     }
   )
-  
+
   # ---------- GO ENRICHMENT ----------
   observeEvent(input$run_go_enrichment, {
     req(rv$common_genes_de_wgcna)
@@ -238,43 +247,66 @@ server_common_genes <- function(input, output, session, rv) {
       showNotification("No ENTREZ IDs found for common genes. Check gene symbols.", type = "error", duration = 8)
       return()
     }
-    
+
     pcut <- input$go_pvalue_cutoff
     qcut <- input$go_qvalue_cutoff
-    
+
     withProgress(message = "GO enrichment...", value = 0.3, {
-      rv$go_bp <- tryCatch({
-        clusterProfiler::enrichGO(gene = entrez$ENTREZID, OrgDb = org.Hs.eg.db::org.Hs.eg.db,
-                                  ont = "BP", pAdjustMethod = "BH", pvalueCutoff = pcut, qvalueCutoff = qcut)
-      }, error = function(e) NULL)
+      rv$go_bp <- tryCatch(
+        {
+          clusterProfiler::enrichGO(
+            gene = entrez$ENTREZID, OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+            ont = "BP", pAdjustMethod = "BH", pvalueCutoff = pcut, qvalueCutoff = qcut
+          )
+        },
+        error = function(e) NULL
+      )
       incProgress(0.3)
-      rv$go_mf <- tryCatch({
-        clusterProfiler::enrichGO(gene = entrez$ENTREZID, OrgDb = org.Hs.eg.db::org.Hs.eg.db,
-                                  ont = "MF", pAdjustMethod = "BH", pvalueCutoff = pcut, qvalueCutoff = qcut)
-      }, error = function(e) NULL)
+      rv$go_mf <- tryCatch(
+        {
+          clusterProfiler::enrichGO(
+            gene = entrez$ENTREZID, OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+            ont = "MF", pAdjustMethod = "BH", pvalueCutoff = pcut, qvalueCutoff = qcut
+          )
+        },
+        error = function(e) NULL
+      )
       incProgress(0.2)
-      rv$go_cc <- tryCatch({
-        clusterProfiler::enrichGO(gene = entrez$ENTREZID, OrgDb = org.Hs.eg.db::org.Hs.eg.db,
-                                  ont = "CC", pAdjustMethod = "BH", pvalueCutoff = pcut, qvalueCutoff = qcut)
-      }, error = function(e) NULL)
+      rv$go_cc <- tryCatch(
+        {
+          clusterProfiler::enrichGO(
+            gene = entrez$ENTREZID, OrgDb = org.Hs.eg.db::org.Hs.eg.db,
+            ont = "CC", pAdjustMethod = "BH", pvalueCutoff = pcut, qvalueCutoff = qcut
+          )
+        },
+        error = function(e) NULL
+      )
       incProgress(0.2)
     })
     showNotification("GO enrichment complete.", type = "message", duration = 4)
   })
-  
+
   output$go_enrichment_status_ui <- renderUI({
-    if (is.null(rv$go_bp) && is.null(rv$go_mf) && is.null(rv$go_cc)) return(NULL)
+    if (is.null(rv$go_bp) && is.null(rv$go_mf) && is.null(rv$go_cc)) {
+      return(NULL)
+    }
     n_bp <- if (!is.null(rv$go_bp) && inherits(rv$go_bp, "enrichResult")) nrow(as.data.frame(rv$go_bp)) else 0
     n_mf <- if (!is.null(rv$go_mf) && inherits(rv$go_mf, "enrichResult")) nrow(as.data.frame(rv$go_mf)) else 0
     n_cc <- if (!is.null(rv$go_cc) && inherits(rv$go_cc, "enrichResult")) nrow(as.data.frame(rv$go_cc)) else 0
-    tags$div(class = "alert alert-info",
-             "BP: ", n_bp, " terms | MF: ", n_mf, " terms | CC: ", n_cc, " terms")
+    tags$div(
+      class = "alert alert-info",
+      "BP: ", n_bp, " terms | MF: ", n_mf, " terms | CC: ", n_cc, " terms"
+    )
   })
-  
+
   make_go_dot_plot <- function(go_obj, title) {
-    if (is.null(go_obj) || !inherits(go_obj, "enrichResult")) return(NULL)
+    if (is.null(go_obj) || !inherits(go_obj, "enrichResult")) {
+      return(NULL)
+    }
     df <- as.data.frame(go_obj)
-    if (nrow(df) == 0) return(NULL)
+    if (nrow(df) == 0) {
+      return(NULL)
+    }
     n_show <- min(20, nrow(df))
     enrichplot::dotplot(go_obj, showCategory = n_show, x = "GeneRatio", color = "p.adjust", size = "Count") +
       ggplot2::scale_color_continuous(low = "#E64B35", high = "#4DBBD5", name = "p.adjust") +
@@ -288,68 +320,107 @@ server_common_genes <- function(input, output, session, rv) {
   }
 
   output$go_bp_plot <- renderPlot({
-    tryCatch({
-      p <- make_go_dot_plot(rv$go_bp, "GO Biological Process")
-      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
-    })
+    tryCatch(
+      {
+        p <- make_go_dot_plot(rv$go_bp, "GO Biological Process")
+        if (!is.null(p)) {
+          print(p)
+        } else {
+          plot.new()
+          text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2)
+        }
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
+      }
+    )
   })
 
   output$go_mf_plot <- renderPlot({
-    tryCatch({
-      p <- make_go_dot_plot(rv$go_mf, "GO Molecular Function")
-      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
-    })
+    tryCatch(
+      {
+        p <- make_go_dot_plot(rv$go_mf, "GO Molecular Function")
+        if (!is.null(p)) {
+          print(p)
+        } else {
+          plot.new()
+          text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2)
+        }
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
+      }
+    )
   })
 
   output$go_cc_plot <- renderPlot({
-    tryCatch({
-      p <- make_go_dot_plot(rv$go_cc, "GO Cellular Component")
-      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
-    })
+    tryCatch(
+      {
+        p <- make_go_dot_plot(rv$go_cc, "GO Cellular Component")
+        if (!is.null(p)) {
+          print(p)
+        } else {
+          plot.new()
+          text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2)
+        }
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
+      }
+    )
   })
 
   go_plot_to_file <- function(go_obj, title, file, device = "png") {
     p <- make_go_dot_plot(go_obj, title)
-    if (is.null(p)) return()
-    if (device == "png")
+    if (is.null(p)) {
+      return()
+    }
+    if (device == "png") {
       ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
-    else
+    } else {
       ggplot2::ggsave(file, plot = p, width = 9, height = 6, device = "pdf", bg = "white")
+    }
   }
   output$download_go_bp_png <- downloadHandler(
     filename = function() "GO_Enrichment_Biological_Process.png",
-    content = function(file) { go_plot_to_file(rv$go_bp, "GO Biological Process", file, "png") }
+    content = function(file) {
+      go_plot_to_file(rv$go_bp, "GO Biological Process", file, "png")
+    }
   )
   output$download_go_bp_pdf <- downloadHandler(
     filename = function() "GO_Enrichment_Biological_Process.pdf",
-    content = function(file) { go_plot_to_file(rv$go_bp, "GO Biological Process", file, "pdf") }
+    content = function(file) {
+      go_plot_to_file(rv$go_bp, "GO Biological Process", file, "pdf")
+    }
   )
   output$download_go_mf_png <- downloadHandler(
     filename = function() "GO_Enrichment_Molecular_Function.png",
-    content = function(file) { go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "png") }
+    content = function(file) {
+      go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "png")
+    }
   )
   output$download_go_mf_pdf <- downloadHandler(
     filename = function() "GO_Enrichment_Molecular_Function.pdf",
-    content = function(file) { go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "pdf") }
+    content = function(file) {
+      go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "pdf")
+    }
   )
   output$download_go_cc_png <- downloadHandler(
     filename = function() "GO_Enrichment_Cellular_Component.png",
-    content = function(file) { go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "png") }
+    content = function(file) {
+      go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "png")
+    }
   )
   output$download_go_cc_pdf <- downloadHandler(
     filename = function() "GO_Enrichment_Cellular_Component.pdf",
-    content = function(file) { go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "pdf") }
+    content = function(file) {
+      go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "pdf")
+    }
   )
-  
+
   output$download_go_results <- downloadHandler(
     filename = function() "GO_Enrichment_Common_Genes.csv",
     content = function(file) {
@@ -357,22 +428,31 @@ server_common_genes <- function(input, output, session, rv) {
       out <- list()
       if (!is.null(rv$go_bp) && inherits(rv$go_bp, "enrichResult")) {
         df <- as.data.frame(rv$go_bp)
-        if (nrow(df) > 0) { df$Ontology <- "BP"; out[[length(out) + 1]] <- df }
+        if (nrow(df) > 0) {
+          df$Ontology <- "BP"
+          out[[length(out) + 1]] <- df
+        }
       }
       if (!is.null(rv$go_mf) && inherits(rv$go_mf, "enrichResult")) {
         df <- as.data.frame(rv$go_mf)
-        if (nrow(df) > 0) { df$Ontology <- "MF"; out[[length(out) + 1]] <- df }
+        if (nrow(df) > 0) {
+          df$Ontology <- "MF"
+          out[[length(out) + 1]] <- df
+        }
       }
       if (!is.null(rv$go_cc) && inherits(rv$go_cc, "enrichResult")) {
         df <- as.data.frame(rv$go_cc)
-        if (nrow(df) > 0) { df$Ontology <- "CC"; out[[length(out) + 1]] <- df }
+        if (nrow(df) > 0) {
+          df$Ontology <- "CC"
+          out[[length(out) + 1]] <- df
+        }
       }
       data_out <- if (length(out) == 0) data.frame() else do.call(rbind, out)
       if (length(out) == 0) write.csv(data_out, file) else write.csv(data_out, file, row.names = FALSE)
       if (length(out) == 0) write.csv(data_out, file.path(CSV_EXPORT_DIR(), "GO_Enrichment_Common_Genes.csv")) else write.csv(data_out, file.path(CSV_EXPORT_DIR(), "GO_Enrichment_Common_Genes.csv"), row.names = FALSE)
     }
   )
-  
+
   # ---------- KEGG ENRICHMENT ----------
   observeEvent(input$run_kegg_enrichment, {
     req(rv$common_genes_de_wgcna)
@@ -389,18 +469,25 @@ server_common_genes <- function(input, output, session, rv) {
       showNotification("No ENTREZ IDs found for common genes.", type = "error", duration = 8)
       return()
     }
-    
+
     withProgress(message = "KEGG enrichment...", value = 0.5, {
-      rv$kegg_enrichment <- tryCatch({
-        clusterProfiler::enrichKEGG(gene = entrez$ENTREZID, organism = "hsa",
-                                     pvalueCutoff = input$kegg_pvalue_cutoff)
-      }, error = function(e) NULL)
+      rv$kegg_enrichment <- tryCatch(
+        {
+          clusterProfiler::enrichKEGG(
+            gene = entrez$ENTREZID, organism = "hsa",
+            pvalueCutoff = input$kegg_pvalue_cutoff
+          )
+        },
+        error = function(e) NULL
+      )
     })
     showNotification("KEGG enrichment complete.", type = "message", duration = 4)
   })
-  
+
   output$kegg_enrichment_status_ui <- renderUI({
-    if (is.null(rv$kegg_enrichment)) return(NULL)
+    if (is.null(rv$kegg_enrichment)) {
+      return(NULL)
+    }
     df_k <- kegg_result_df(rv$kegg_enrichment)
     n <- if (is.null(df_k)) 0 else nrow(df_k)
     tags$div(class = "alert alert-info", "KEGG pathways found: ", n)
@@ -408,50 +495,67 @@ server_common_genes <- function(input, output, session, rv) {
 
   # Safely get KEGG enrichment as a plain data frame (handles enrichResult, keggResult, different package versions)
   kegg_result_df <- function(obj) {
-    if (is.null(obj)) return(NULL)
+    if (is.null(obj)) {
+      return(NULL)
+    }
     ok_class <- inherits(obj, "enrichResult") || inherits(obj, "keggResult") ||
       (isS4(obj) && "result" %in% methods::slotNames(obj))
-    if (!ok_class) return(NULL)
+    if (!ok_class) {
+      return(NULL)
+    }
     df <- tryCatch(
       as.data.frame(obj, stringsAsFactors = FALSE),
       error = function(e) {
-        if (isS4(obj) && "result" %in% methods::slotNames(obj))
+        if (isS4(obj) && "result" %in% methods::slotNames(obj)) {
           as.data.frame(methods::slot(obj, "result"), stringsAsFactors = FALSE)
-        else
+        } else {
           NULL
+        }
       }
     )
-    if (is.null(df) || nrow(df) == 0) return(df)
+    if (is.null(df) || nrow(df) == 0) {
+      return(df)
+    }
     # Normalize column names for different clusterProfiler versions
     nms <- names(df)
     nms_l <- tolower(nms)
-    if (!"Description" %in% nms && "description" %in% nms_l)
+    if (!"Description" %in% nms && "description" %in% nms_l) {
       df$Description <- df[[nms[which(nms_l == "description")[1]]]]
-    if (!"GeneRatio" %in% nms && "generatio" %in% nms_l)
+    }
+    if (!"GeneRatio" %in% nms && "generatio" %in% nms_l) {
       df$GeneRatio <- df[[nms[which(nms_l == "generatio")[1]]]]
-    if (!"geneID" %in% nms && "geneid" %in% nms_l)
+    }
+    if (!"geneID" %in% nms && "geneid" %in% nms_l) {
       df$geneID <- df[[nms[which(nms_l == "geneid")[1]]]]
-    if (!"p.adjust" %in% nms && "padjust" %in% nms_l)
+    }
+    if (!"p.adjust" %in% nms && "padjust" %in% nms_l) {
       df$p.adjust <- df[[nms[which(nms_l == "padjust")[1]]]]
-    if (!"ID" %in% nms && "id" %in% nms_l)
+    }
+    if (!"ID" %in% nms && "id" %in% nms_l) {
       df$ID <- df[[nms[which(nms_l == "id")[1]]]]
+    }
     df
   }
 
   kegg_geneid_count <- function(geneID) {
-    if (is.null(geneID)) return(integer(0))
+    if (is.null(geneID)) {
+      return(integer(0))
+    }
     sep <- if (any(grepl("/", as.character(geneID), fixed = TRUE))) "/" else ","
     lengths(strsplit(as.character(geneID), sep, fixed = TRUE))
   }
 
   make_kegg_barplot <- function() {
     df <- kegg_result_df(rv$kegg_enrichment)
-    if (is.null(df) || nrow(df) == 0) return(NULL)
+    if (is.null(df) || nrow(df) == 0) {
+      return(NULL)
+    }
     n_show <- min(20, nrow(df))
     o <- order(as.numeric(df$p.adjust))
     df <- df[o, ][seq_len(n_show), , drop = FALSE]
-    if (!"Count" %in% names(df) && "geneID" %in% names(df))
+    if (!"Count" %in% names(df) && "geneID" %in% names(df)) {
       df$Count <- kegg_geneid_count(df$geneID)
+    }
     if (!"Count" %in% names(df)) df$Count <- 1L
     df$Description <- factor(df$Description, levels = rev(unique(as.character(df$Description))))
     ggplot2::ggplot(df, ggplot2::aes(x = Description, y = Count, fill = p.adjust)) +
@@ -469,16 +573,21 @@ server_common_genes <- function(input, output, session, rv) {
 
   output$kegg_barplot <- renderPlot(
     {
-      tryCatch({
-        p <- make_kegg_barplot()
-        if (!is.null(p)) print(p) else {
+      tryCatch(
+        {
+          p <- make_kegg_barplot()
+          if (!is.null(p)) {
+            print(p)
+          } else {
+            plot.new()
+            text(0.5, 0.5, if (is.null(rv$kegg_enrichment)) "Run KEGG enrichment first" else "No significant KEGG pathways", cex = 1.2)
+          }
+        },
+        error = function(e) {
           plot.new()
-          text(0.5, 0.5, if (is.null(rv$kegg_enrichment)) "Run KEGG enrichment first" else "No significant KEGG pathways", cex = 1.2)
+          text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red")
         }
-      }, error = function(e) {
-        plot.new()
-        text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red")
-      })
+      )
     },
     width = 550,
     height = 500,
@@ -505,8 +614,12 @@ server_common_genes <- function(input, output, session, rv) {
   # Returns chord_df, pathways (IDs), pathway_info (ID, Description, p.adjust) for list and legend
   kegg_chord_data <- function() {
     kdf <- kegg_result_df(rv$kegg_enrichment)
-    if (is.null(kdf) || nrow(kdf) == 0) return(NULL)
-    if (!"ID" %in% names(kdf) || !"geneID" %in% names(kdf)) return(NULL)
+    if (is.null(kdf) || nrow(kdf) == 0) {
+      return(NULL)
+    }
+    if (!"ID" %in% names(kdf) || !"geneID" %in% names(kdf)) {
+      return(NULL)
+    }
     top_n <- tryCatch(min(max(2, as.integer(input$kegg_chord_top_n)), nrow(kdf), 30), error = function(e) min(10, nrow(kdf)))
     top_pathways <- head(kdf, top_n)
     pathway_info <- top_pathways[, c("ID", "Description", "p.adjust")]
@@ -523,7 +636,9 @@ server_common_genes <- function(input, output, session, rv) {
     )
     pathway_genes <- merge(pathway_genes, entrez_to_sym, by = "ENTREZID", all.x = TRUE)
     pathway_genes <- pathway_genes[!is.na(pathway_genes$SYMBOL) & pathway_genes$SYMBOL != "", ]
-    if (nrow(pathway_genes) == 0) return(NULL)
+    if (nrow(pathway_genes) == 0) {
+      return(NULL)
+    }
     chord_df <- data.frame(Pathway = pathway_genes$Pathway, Gene = pathway_genes$SYMBOL, stringsAsFactors = FALSE)
     pathways <- unique(chord_df$Pathway)
     list(
@@ -551,8 +666,9 @@ server_common_genes <- function(input, output, session, rv) {
   # Pathway list table (same pathways as chord) for UI
   output$kegg_pathway_list_table <- DT::renderDataTable({
     dat <- kegg_chord_data()
-    if (is.null(dat) || !"pathway_info" %in% names(dat) || nrow(dat$pathway_info) == 0)
+    if (is.null(dat) || !"pathway_info" %in% names(dat) || nrow(dat$pathway_info) == 0) {
       return(data.frame(Pathway = character(), Description = character(), `p.adjust` = numeric(), stringsAsFactors = FALSE))
+    }
     df <- dat$pathway_info
     names(df) <- c("Pathway ID", "Description", "p.adjust")
     DT::datatable(df, options = list(pageLength = 12, scrollX = TRUE, scrollY = "560px"), rownames = FALSE, filter = "top", class = "compact stripe")
@@ -561,61 +677,64 @@ server_common_genes <- function(input, output, session, rv) {
   output$kegg_chord_plot <- renderPlot(
     {
       circlize::circos.clear()
-      tryCatch({
-        dat <- kegg_chord_data()
-        if (is.null(dat)) {
+      tryCatch(
+        {
+          dat <- kegg_chord_data()
+          if (is.null(dat)) {
+            plot.new()
+            text(0.5, 0.5, "Run KEGG enrichment first or no pathway–gene links.", cex = 1.1)
+            return(invisible(NULL))
+          }
+          chord_df <- dat$chord_df
+          pathways <- dat$pathways
+          genes <- unique(chord_df$Gene)
+          n_path <- length(pathways)
+          n_genes <- length(genes)
+          if (n_path < 1 || n_genes < 1) {
+            plot.new()
+            text(0.5, 0.5, "No pathway–gene links to draw.", cex = 1.1)
+            return(invisible(NULL))
+          }
+          pathway_colors <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(min(8, max(3, n_path)), "Set2"))(n_path)
+          pathway_cols <- setNames(pathway_colors, pathways)
+          gene_to_path <- chord_df[match(genes, chord_df$Gene), "Pathway"]
+          gene_cols <- setNames(pathway_colors[match(gene_to_path, pathways)], genes)
+          grid_colors <- c(pathway_cols, gene_cols)
+          circlize::circos.par(gap.degree = c(rep(3, n_path), rep(0.3, n_genes)), start.degree = 90)
+          circlize::chordDiagram(
+            chord_df,
+            annotationTrack = "grid",
+            grid.col = grid_colors,
+            transparency = 0.2,
+            directional = 0,
+            order = c(pathways, genes),
+            preAllocateTracks = list(track.height = 0.12)
+          )
+          circlize::circos.track(
+            track.index = 1,
+            panel.fun = function(x, y) {
+              sector.index <- circlize::get.cell.meta.data("sector.index")
+              if (sector.index %in% pathways) {
+                circlize::circos.text(
+                  circlize::get.cell.meta.data("xcenter"),
+                  circlize::get.cell.meta.data("ylim")[1] + 0.5,
+                  sector.index,
+                  facing = "clockwise",
+                  niceFacing = TRUE,
+                  adj = c(0, 0.5),
+                  cex = 0.85
+                )
+              }
+            },
+            bg.border = NA
+          )
+          circlize::circos.clear()
+        },
+        error = function(e) {
           plot.new()
-          text(0.5, 0.5, "Run KEGG enrichment first or no pathway–gene links.", cex = 1.1)
-          return(invisible(NULL))
+          text(0.5, 0.5, paste("Chord error:", conditionMessage(e)), cex = 1, col = "red")
         }
-        chord_df <- dat$chord_df
-        pathways <- dat$pathways
-        genes <- unique(chord_df$Gene)
-        n_path <- length(pathways)
-        n_genes <- length(genes)
-        if (n_path < 1 || n_genes < 1) {
-          plot.new()
-          text(0.5, 0.5, "No pathway–gene links to draw.", cex = 1.1)
-          return(invisible(NULL))
-        }
-        pathway_colors <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(min(8, max(3, n_path)), "Set2"))(n_path)
-        pathway_cols <- setNames(pathway_colors, pathways)
-        gene_to_path <- chord_df[match(genes, chord_df$Gene), "Pathway"]
-        gene_cols <- setNames(pathway_colors[match(gene_to_path, pathways)], genes)
-        grid_colors <- c(pathway_cols, gene_cols)
-        circlize::circos.par(gap.degree = c(rep(3, n_path), rep(0.3, n_genes)), start.degree = 90)
-        circlize::chordDiagram(
-          chord_df,
-          annotationTrack = "grid",
-          grid.col = grid_colors,
-          transparency = 0.2,
-          directional = 0,
-          order = c(pathways, genes),
-          preAllocateTracks = list(track.height = 0.12)
-        )
-        circlize::circos.track(
-          track.index = 1,
-          panel.fun = function(x, y) {
-            sector.index <- circlize::get.cell.meta.data("sector.index")
-            if (sector.index %in% pathways) {
-              circlize::circos.text(
-                circlize::get.cell.meta.data("xcenter"),
-                circlize::get.cell.meta.data("ylim")[1] + 0.5,
-                sector.index,
-                facing = "clockwise",
-                niceFacing = TRUE,
-                adj = c(0, 0.5),
-                cex = 0.85
-              )
-            }
-          },
-          bg.border = NA
-        )
-        circlize::circos.clear()
-      }, error = function(e) {
-        plot.new()
-        text(0.5, 0.5, paste("Chord error:", conditionMessage(e)), cex = 1, col = "red")
-      })
+      )
       circlize::circos.clear()
     },
     width = 700,
@@ -623,7 +742,7 @@ server_common_genes <- function(input, output, session, rv) {
     res = 96,
     alt = "KEGG chord diagram"
   )
-  
+
   kegg_chord_to_file <- function(file, dev_fun) {
     dat <- kegg_chord_data()
     if (is.null(dat)) {
@@ -673,7 +792,7 @@ server_common_genes <- function(input, output, session, rv) {
       kegg_chord_to_file(file, function(f) pdf(f, width = 9, height = 8.67, bg = "white"))
     }
   )
-  
+
   output$download_kegg_results <- downloadHandler(
     filename = function() "KEGG_Enrichment_Common_Genes.csv",
     content = function(file) {
@@ -711,7 +830,9 @@ server_common_genes <- function(input, output, session, rv) {
   })
 
   output$common_genes_extracted_ml_status_ui <- renderUI({
-    if (is.null(rv$extracted_data_ml)) return(NULL)
+    if (is.null(rv$extracted_data_ml)) {
+      return(NULL)
+    }
     tags$div(
       class = "alert alert-success",
       icon("check-circle"),
@@ -720,10 +841,13 @@ server_common_genes <- function(input, output, session, rv) {
   })
 
   output$common_genes_download_extracted_ml_ui <- renderUI({
-    if (is.null(rv$extracted_data_ml)) return(NULL)
+    if (is.null(rv$extracted_data_ml)) {
+      return(NULL)
+    }
     downloadButton("download_common_genes_extracted_ml",
-                  tagList(icon("download"), " Download Extracted Data (CSV)"),
-                  class = "btn-info")
+      tagList(icon("download"), " Download Extracted Data (CSV)"),
+      class = "btn-info"
+    )
   })
 
   output$download_common_genes_extracted_ml <- downloadHandler(

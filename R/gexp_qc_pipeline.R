@@ -183,7 +183,9 @@ gexp_qc_gene_overlap_summary <- function(all_genes_list, common_genes) {
     Dataset = names(all_genes_list),
     Total_Genes = vapply(all_genes_list, length, integer(1)),
     Pct_in_Common = vapply(all_genes_list, function(x) {
-      if (length(x) == 0) return(0)
+      if (length(x) == 0) {
+        return(0)
+      }
       round(100 * common_count / length(x), 1)
     }, numeric(1)),
     stringsAsFactors = FALSE
@@ -212,7 +214,9 @@ gexp_qc_prepare_venn_sets <- function(all_genes_list, max_sets = 5L) {
   n_use <- min(as.integer(max_sets), length(all_genes_list))
   sets <- all_genes_list[seq_len(n_use)]
   sets <- lapply(sets, function(x) {
-    if (is.null(x)) return(character(0))
+    if (is.null(x)) {
+      return(character(0))
+    }
     x <- as.character(x)
     x <- x[!is.na(x) & nzchar(x)]
     unique(x)
@@ -245,7 +249,9 @@ gexp_qc_prepare_upset_data <- function(all_genes_list) {
     return(list(ok = FALSE, message = "Need 2+ datasets for UpSet plot"))
   }
   gene_lists <- lapply(all_genes_list, function(x) {
-    if (is.null(x)) return(character(0))
+    if (is.null(x)) {
+      return(character(0))
+    }
     as.character(x)
   })
   gene_lists <- gene_lists[vapply(gene_lists, length, integer(1)) > 0]
@@ -344,4 +350,3 @@ gexp_qc_prepare_density_data <- function(combined_expr_raw, max_samples = 50L) {
     colors = grDevices::rainbow(n_use)
   )
 }
-

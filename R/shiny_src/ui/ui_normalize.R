@@ -3,52 +3,53 @@
 # ==============================================================================
 
 ui_normalize <- tabItem(
-    tabName = "normalize",
-    h2(icon("balance-scale"), " Step 3: Data Normalization"),
+  tabName = "normalize",
+  h2(icon("balance-scale"), " Step 3: Data Normalization"),
 
-    # Auto-handled banner (visible when DESeq2 or edgeR is selected)
-    conditionalPanel(
-      condition = "input.de_method == 'deseq2' || input.de_method == 'edger'",
-      fluidRow(
-        box(
-          width = 12, status = "success", solidHeader = TRUE,
-          title = tags$span(icon("check-circle"), " Normalization Auto-Handled (Count-based DE Mode)"),
+  # Auto-handled banner (visible when DESeq2 or edgeR is selected)
+  conditionalPanel(
+    condition = "input.de_method == 'deseq2' || input.de_method == 'edger'",
+    fluidRow(
+      box(
+        width = 12, status = "success", solidHeader = TRUE,
+        title = tags$span(icon("check-circle"), " Normalization Auto-Handled (Count-based DE Mode)"),
+        tags$div(
+          style = "padding: 15px; background: linear-gradient(135deg, #d5f5e3 0%, #abebc6 100%); border-radius: 8px;",
+          tags$p(
+            icon("dna"), tags$strong(" You selected a count-based DE method (DESeq2 / edgeR)."),
+            style = "font-size: 15px; margin-bottom: 10px; color: #1e8449;"
+          ),
+          tags$ul(
+            style = "font-size: 13px; color: #2c3e50; line-height: 2;",
+            tags$li(tags$strong("For DE analysis:"), " DESeq2 uses median-of-ratios normalization; edgeR uses TMM normalization. Both work directly on raw counts — no manual normalization needed."),
+            tags$li(tags$strong("For downstream steps:"), " Normalization was run automatically in the background (TMM + quantile) so that WGCNA, heatmaps, and other visualizations work correctly."),
+            tags$li(tags$strong("Next step:"), " Proceed to ", tags$b("Step 4: Select Groups"), " — this step is already done for you.")
+          ),
           tags$div(
-            style = "padding: 15px; background: linear-gradient(135deg, #d5f5e3 0%, #abebc6 100%); border-radius: 8px;",
-            tags$p(
-              icon("dna"), tags$strong(" You selected a count-based DE method (DESeq2 / edgeR)."),
-              style = "font-size: 15px; margin-bottom: 10px; color: #1e8449;"
-            ),
-            tags$ul(
-              style = "font-size: 13px; color: #2c3e50; line-height: 2;",
-              tags$li(tags$strong("For DE analysis:"), " DESeq2 uses median-of-ratios normalization; edgeR uses TMM normalization. Both work directly on raw counts — no manual normalization needed."),
-              tags$li(tags$strong("For downstream steps:"), " Normalization was run automatically in the background (TMM + quantile) so that WGCNA, heatmaps, and other visualizations work correctly."),
-              tags$li(tags$strong("Next step:"), " Proceed to ", tags$b("Step 4: Select Groups"), " — this step is already done for you.")
-            ),
-            tags$div(
-              style = "text-align: center; margin-top: 15px;",
-              actionButton("go_to_groups_from_norm", tagList(icon("arrow-right"), " Go to Step 4: Select Groups"),
-                          class = "btn-success btn-lg", style = "font-size: 16px; padding: 12px 30px; border-radius: 25px;")
+            style = "text-align: center; margin-top: 15px;",
+            actionButton("go_to_groups_from_norm", tagList(icon("arrow-right"), " Go to Step 4: Select Groups"),
+              class = "btn-success btn-lg", style = "font-size: 16px; padding: 12px 30px; border-radius: 25px;"
             )
           )
         )
       )
-    ),
+    )
+  ),
 
-    # Standard normalization content (hidden when DESeq2 or edgeR is selected)
-    conditionalPanel(
-      condition = "input.de_method != 'deseq2' && input.de_method != 'edger'",
-      fluidRow(
-        box(
-          title = tags$span(icon("info-circle"), " About this step"),
-          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-          tags$p(tags$strong("Purpose:"), " Normalize expression data to make samples comparable and reduce technical variation. Platform-specific methods are applied for accuracy.", style = "margin-bottom: 8px;"),
-          tags$p(tags$strong("Methods:"), " RNA-seq: TMM (trimmed mean of M-values) + log2-CPM; Microarray: log2 transform + quantile normalization; Merged: global quantile normalization. Low-expression and non-common genes are filtered.", style = "margin-bottom: 0;")
-        )
-      ),
+  # Standard normalization content (hidden when DESeq2 or edgeR is selected)
+  conditionalPanel(
+    condition = "input.de_method != 'deseq2' && input.de_method != 'edger'",
     fluidRow(
       box(
-        title = tags$span(icon("cogs"), " Normalization Strategy"), 
+        title = tags$span(icon("info-circle"), " About this step"),
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+        tags$p(tags$strong("Purpose:"), " Normalize expression data to make samples comparable and reduce technical variation. Platform-specific methods are applied for accuracy.", style = "margin-bottom: 8px;"),
+        tags$p(tags$strong("Methods:"), " RNA-seq: TMM (trimmed mean of M-values) + log2-CPM; Microarray: log2 transform + quantile normalization; Merged: global quantile normalization. Low-expression and non-common genes are filtered.", style = "margin-bottom: 0;")
+      )
+    ),
+    fluidRow(
+      box(
+        title = tags$span(icon("cogs"), " Normalization Strategy"),
         width = 12, status = "success", solidHeader = TRUE,
         tags$div(
           style = "padding: 10px 0;",
@@ -83,21 +84,27 @@ ui_normalize <- tabItem(
           ),
           tags$p(tags$strong("Normalization method choices:"), style = "margin-bottom: 10px;"),
           fluidRow(
-            column(6,
-                   tags$label("Microarray:", style = "font-weight: bold;"),
-                   radioButtons("micro_norm_method", label = NULL,
-                               choices = list(
-                                 "Quantile (default, for Series Matrix)" = "quantile",
-                                 "RMA (probe-level; requires CEL in GEO supplementary)" = "rma"
-                               ), selected = "quantile", width = "100%")
+            column(
+              6,
+              tags$label("Microarray:", style = "font-weight: bold;"),
+              radioButtons("micro_norm_method",
+                label = NULL,
+                choices = list(
+                  "Quantile (default, for Series Matrix)" = "quantile",
+                  "RMA (probe-level; requires CEL in GEO supplementary)" = "rma"
+                ), selected = "quantile", width = "100%"
+              )
             ),
-            column(6,
-                   tags$label("RNA-seq:", style = "font-weight: bold;"),
-                   radioButtons("rnaseq_norm_method", label = NULL,
-                               choices = list(
-                                 "TMM + log2-CPM (recommended)" = "TMM",
-                                 "log2(CPM+1) only (quick exploration)" = "log2cpm_only"
-                               ), selected = "TMM", width = "100%")
+            column(
+              6,
+              tags$label("RNA-seq:", style = "font-weight: bold;"),
+              radioButtons("rnaseq_norm_method",
+                label = NULL,
+                choices = list(
+                  "TMM + log2-CPM (recommended)" = "TMM",
+                  "log2(CPM+1) only (quick exploration)" = "log2cpm_only"
+                ), selected = "TMM", width = "100%"
+              )
             )
           ),
           tags$div(
@@ -131,17 +138,17 @@ ui_normalize <- tabItem(
           hr(),
           tags$div(
             style = "text-align: center;",
-            actionButton("apply_normalization", "Apply Normalization", 
-                         icon = icon("check-circle"), class = "btn-success btn-lg",
-                         style = "font-size: 16px; padding: 12px 30px;")
+            actionButton("apply_normalization", "Apply Normalization",
+              icon = icon("check-circle"), class = "btn-success btn-lg",
+              style = "font-size: 16px; padding: 12px 30px;"
+            )
           )
         )
       )
     ),
-    
     fluidRow(
       box(
-        title = tags$span(icon("chart-bar"), " Normalization Quality Assessment"), 
+        title = tags$span(icon("chart-bar"), " Normalization Quality Assessment"),
         width = 12, status = "primary", solidHeader = TRUE,
         tags$div(
           style = "padding: 10px 0;",
@@ -154,113 +161,129 @@ ui_normalize <- tabItem(
         )
       )
     ),
-    
     fluidRow(
       box(
-        title = tags$span(icon("chart-bar"), " Expression Distribution by Dataset"), 
+        title = tags$span(icon("chart-bar"), " Expression Distribution by Dataset"),
         width = 12, status = "info", solidHeader = TRUE,
         plotOutput("normalization_plot", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_plot_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       )
     ),
-    
     fluidRow(
       box(
-        title = tags$span(icon("wave-square"), " Overall Expression Distribution"), 
+        title = tags$span(icon("wave-square"), " Overall Expression Distribution"),
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("normalization_density", height = "350px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_density_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_density_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_density_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       ),
       box(
-        title = tags$span(icon("chart-line"), " Quantile-Quantile (Q-Q) Plot"), 
+        title = tags$span(icon("chart-line"), " Quantile-Quantile (Q-Q) Plot"),
         width = 6, status = "warning", solidHeader = TRUE,
         plotOutput("normalization_qq", height = "350px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_qq_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_qq_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_qq_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       )
     ),
-    
     fluidRow(
       box(
-        title = tags$span(icon("chart-bar"), " Median & Range Alignment"), 
+        title = tags$span(icon("chart-bar"), " Median & Range Alignment"),
         width = 6, status = "info", solidHeader = TRUE,
         plotOutput("normalization_median_range", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_median_range_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_median_range_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_median_range_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       ),
       box(
-        title = tags$span(icon("wave-square"), " Distribution Overlap"), 
+        title = tags$span(icon("wave-square"), " Distribution Overlap"),
         width = 6, status = "primary", solidHeader = TRUE,
         plotOutput("normalization_distribution_overlap", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_dist_overlap_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_dist_overlap_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_dist_overlap_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       )
     ),
-    
     fluidRow(
       box(
-        title = tags$span(icon("chart-area"), " Intensity Bias - MA Plot"), 
+        title = tags$span(icon("chart-area"), " Intensity Bias - MA Plot"),
         width = 6, status = "warning", solidHeader = TRUE,
         plotOutput("normalization_ma_plot", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_ma_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_ma_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_ma_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       ),
       box(
-        title = tags$span(icon("dot-circle"), " Variance Stability - Mean-Variance Plot"), 
+        title = tags$span(icon("dot-circle"), " Variance Stability - Mean-Variance Plot"),
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("normalization_mean_variance", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_mv_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_mv_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_mv_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       )
     ),
-    
     fluidRow(
       box(
-        title = tags$span(icon("th"), " Sample Correlation - Before Normalization"), 
+        title = tags$span(icon("th"), " Sample Correlation - Before Normalization"),
         width = 6, status = "danger", solidHeader = TRUE,
         plotOutput("normalization_corr_before", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_corr_before_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_corr_before_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_corr_before_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       ),
       box(
-        title = tags$span(icon("th"), " Sample Correlation - After Normalization"), 
+        title = tags$span(icon("th"), " Sample Correlation - After Normalization"),
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("normalization_corr_after", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
+        tags$div(
+          style = "margin-top: 6px;",
           downloadButton("dl_norm_corr_after_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_corr_after_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          downloadButton("dl_norm_corr_after_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs")
+        )
       )
     ),
-    
     fluidRow(
       box(
-        title = tags$span(icon("file-alt"), " Normalization Summary"), 
+        title = tags$span(icon("file-alt"), " Normalization Summary"),
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$div(
           id = "normalization_summary_panel",
           tags$div(
             style = "margin-bottom: 20px;",
-            tags$h4(icon("table"), " Gene Count Statistics", 
-                   style = "color: #2c3e50; margin-bottom: 15px;"),
+            tags$h4(icon("table"), " Gene Count Statistics",
+              style = "color: #2c3e50; margin-bottom: 15px;"
+            ),
             tableOutput("normalization_summary_table"),
-            tags$div(style = "margin-top: 10px;",
-              downloadButton("download_normalization_summary_csv", tagList(icon("download"), " Summary table (CSV)"), class = "btn-info btn-sm"))
+            tags$div(
+              style = "margin-top: 10px;",
+              downloadButton("download_normalization_summary_csv", tagList(icon("download"), " Summary table (CSV)"), class = "btn-info btn-sm")
+            )
           ),
           tags$hr(),
           tags$div(
             style = "margin-top: 20px;",
-            tags$h4(icon("file-alt"), " Detailed Log", 
-                   style = "color: #2c3e50; margin-bottom: 15px;"),
+            tags$h4(icon("file-alt"), " Detailed Log",
+              style = "color: #2c3e50; margin-bottom: 15px;"
+            ),
             verbatimTextOutput("normalization_log")
           ),
           tags$div(
@@ -275,14 +298,20 @@ ui_normalize <- tabItem(
       box(
         title = tags$span(icon("file-alt"), " Process Summary"),
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-        uiOutput("normalize_process_summary_ui"))
+        uiOutput("normalize_process_summary_ui")
+      )
     ),
     fluidRow(
-      box(width = 12, status = "info", solidHeader = FALSE,
-          tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
-                   actionButton("next_page_normalize", "Next: Select Groups",
-                                icon = icon("arrow-right"), class = "btn-success btn-lg",
-                                style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+      box(
+        width = 12, status = "info", solidHeader = FALSE,
+        tags$div(
+          class = "next-btn", style = "text-align: center; padding: 20px 0;",
+          actionButton("next_page_normalize", "Next: Select Groups",
+            icon = icon("arrow-right"), class = "btn-success btn-lg",
+            style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
+          )
+        )
+      )
     )
-    ) # end conditionalPanel for limma mode
-  )
+  ) # end conditionalPanel for limma mode
+)

@@ -43,9 +43,9 @@ ui_welcome <- fluidPage(
       .watermark-welcome { position: fixed; bottom: 24px; right: 28px; font-size: 13px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255,255,255,0.12); pointer-events: none; z-index: 0; font-family: 'Outfit', sans-serif; }
     "))
   ),
-  style = "min-height: 100vh; background: linear-gradient(135deg, #0e0a1f 0%, #1e1b4b 18%, #312e81 35%, #1e3a5f 52%, #4c1d95 70%, #0f172a 100%); 
+  style = "min-height: 100vh; background: linear-gradient(135deg, #0e0a1f 0%, #1e1b4b 18%, #312e81 35%, #1e3a5f 52%, #4c1d95 70%, #0f172a 100%);
             background-size: 400% 400%; animation: gradientShift 18s ease infinite;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
             padding: 56px 24px; font-family: 'Outfit', 'Space Grotesk', 'Segoe UI', sans-serif;
             position: relative; overflow-x: hidden;",
   tags$style(HTML("
@@ -164,21 +164,31 @@ ui_welcome <- fluidPage(
       tags$ul(
         style = "text-align: left; padding-left: 26px; margin: 0 0 38px 0; color: #475569; font-size: 14px; line-height: 2.1;
                  list-style: none;",
-        tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
-                icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
-                "Supports both RNA-seq and microarray in one workflow"),
-        tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
-                icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
-                "Multi-dataset merge with common gene mapping across platforms"),
-        tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
-                icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
-                "Step-by-step pipeline with guided options and validation"),
-        tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
-                icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
-                "Publication-ready figures and downloadable results"),
-        tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
-                icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
-                "Optional workspace save/load to resume analyses")
+        tags$li(
+          style = "position: relative; padding-left: 8px; margin: 6px 0;",
+          icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
+          "Supports both RNA-seq and microarray in one workflow"
+        ),
+        tags$li(
+          style = "position: relative; padding-left: 8px; margin: 6px 0;",
+          icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
+          "Multi-dataset merge with common gene mapping across platforms"
+        ),
+        tags$li(
+          style = "position: relative; padding-left: 8px; margin: 6px 0;",
+          icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
+          "Step-by-step pipeline with guided options and validation"
+        ),
+        tags$li(
+          style = "position: relative; padding-left: 8px; margin: 6px 0;",
+          icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
+          "Publication-ready figures and downloadable results"
+        ),
+        tags$li(
+          style = "position: relative; padding-left: 8px; margin: 6px 0;",
+          icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
+          "Optional workspace save/load to resume analyses"
+        )
       ),
       tags$p(
         style = "color: #64748b; font-size: 14px; font-weight: 600; margin-bottom: 8px; text-align: center;",

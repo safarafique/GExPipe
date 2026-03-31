@@ -81,19 +81,22 @@ gexp_user_guideline_modal_ui <- function() {
 
 gexp_register_help_observers <- function(input, output, session, rv) {
   # nocov start
-  shiny::observeEvent(input$online_status, {
-    if (isFALSE(input$online_status)) {
-      shiny::showNotification(
-        shiny::tags$div(
-          shiny::icon("exclamation-triangle"),
-          shiny::tags$strong("Internet connection lost (Offline)."),
-          shiny::tags$p("Downloads may fail until you are back online.", style = "margin-top: 6px;")
-        ),
-        type = "error",
-        duration = 8
-      )
-    }
-  }, ignoreInit = TRUE)
+  shiny::observeEvent(input$online_status,
+    {
+      if (isFALSE(input$online_status)) {
+        shiny::showNotification(
+          shiny::tags$div(
+            shiny::icon("exclamation-triangle"),
+            shiny::tags$strong("Internet connection lost (Offline)."),
+            shiny::tags$p("Downloads may fail until you are back online.", style = "margin-top: 6px;")
+          ),
+          type = "error",
+          duration = 8
+        )
+      }
+    },
+    ignoreInit = TRUE
+  )
 
   shiny::observeEvent(input$start_tour, {
     shiny::showModal(shiny::modalDialog(
