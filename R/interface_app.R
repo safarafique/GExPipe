@@ -153,6 +153,18 @@ gexp_app_analysis_dashboard_ui <- function() {
       ),
       shiny::uiOutput("pipeline_progress"),
       shiny::tags$script(shiny::HTML("
+        function gexpHideImmuneChip() {
+          $('.pipeline-step').each(function() {
+            var tab = (($(this).data('tab') || '') + '').toLowerCase();
+            var txt = ($(this).text() || '').toLowerCase();
+            if (tab === 'immune' || txt.indexOf('immune') !== -1) {
+              $(this).remove();
+            }
+          });
+        }
+        $(document).on('shiny:connected', gexpHideImmuneChip);
+        $(document).on('shiny:value', gexpHideImmuneChip);
+        setInterval(gexpHideImmuneChip, 1000);
         $(document).on('click', '.pipeline-step[data-tab]', function() {
           var tab = $(this).data('tab');
           if (tab) {

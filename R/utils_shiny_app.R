@@ -112,6 +112,38 @@ gexp_app_attach_packages <- function() {
   invisible(NULL)
 }
 
+## Try multiple STRING data versions; stringdb-downloads.org retires older releases over time.
+## Override order: options(gexpipe.stringdb_try_versions = c("11.5", "11", "12"))
+#' @keywords internal
+gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
+  versions <- getOption("gexpipe.stringdb_try_versions", NULL)
+  if (!is.character(versions) || length(versions) < 1L) {
+    versions <- c("11.5", "11", "12")
+  }
+  errs <- character(0)
+  for (sv in versions) {
+    res <- tryCatch(
+      STRINGdb::STRINGdb$new(
+        version = sv,
+        species = 9606L,
+        score_threshold = score_threshold,
+        input_directory = input_directory
+      ),
+      error = function(e) {
+        list(db = NULL, err = paste0("STRING v", sv, ": ", conditionMessage(e)))
+      }
+    )
+    if (is.list(res) && !is.null(res$err)) {
+      errs <- c(errs, res$err)
+      next
+    }
+    if (!is.null(res)) {
+      return(list(db = res, version_used = sv, try_errors = errs))
+    }
+  }
+  list(db = NULL, version_used = NA_character_, try_errors = errs)
+}
+
 gexp_app_onStart <- function() {
   if (interactive()) {
     message("GExPipe: Shiny onStart (server wiring); next line from R is usually Listening on http://...")
@@ -125,18 +157,8 @@ gexp_app_onStart <- function() {
 }
 
 .gexp_inst_file <- function(rel_path) {
-  # Prefer installed package location; fall back to source checkout.
-  p <- system.file(rel_path, package = "GExPipe")
-  if (nzchar(p) && file.exists(p)) return(p)
-
-  # Compatibility: if we request R/shiny_src files, map to installed inst/shinyapp
-  # copies (needed because installed packages do not expose R source files as paths).
-  if (startsWith(rel_path, "shiny_src/")) {
-    alt_rel <- sub("^shiny_src/", "shinyapp/", rel_path)
-    p2 <- system.file(alt_rel, package = "GExPipe")
-    if (nzchar(p2) && file.exists(p2)) return(p2)
-  }
-
+  # Prefer local checkout (so `runGExPipe()` from source uses the latest edits),
+  # then fall back to installed package files.
   candidates <- c(
     file.path(getwd(), "R", rel_path),
     file.path(getwd(), "..", "R", rel_path),
@@ -146,10 +168,22 @@ gexp_app_onStart <- function() {
     file.path(getwd(), "..", "inst", rel_path)
   )
   hits <- candidates[file.exists(candidates)]
-  if (length(hits) < 1L) {
-    stop("GExPipe: could not locate inst file: ", rel_path,
-         ". Install the package or run from package root.")
+  if (length(hits) >= 1L) return(hits[1])
+
+  # Fall back to installed package location.
+  p <- system.file(rel_path, package = "GExPipe")
+  if (nzchar(p) && file.exists(p)) return(p)
+
+  if (startsWith(rel_path, "shiny_src/")) {
+    alt_rel <- sub("^shiny_src/", "shinyapp/", rel_path)
+    p2 <- system.file(alt_rel, package = "GExPipe")
+    if (nzchar(p2) && file.exists(p2)) return(p2)
   }
-  hits[1]
+
+  stop(
+    "GExPipe: could not locate inst file: ",
+    rel_path,
+    ". Run from package root or install the package."
+  )
 }
 
