@@ -7,7 +7,6 @@
 ui_gsea <- tabItem(
   tabName = "gsea",
   h2(icon("project-diagram"), " Step 14: GSEA Analysis (Signature Genes)"),
-
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
@@ -16,13 +15,13 @@ ui_gsea <- tabItem(
       tags$p(tags$strong("Requirements:"), " Run ML (Step 10) for common genes, or have common genes from Step 8. Batch-corrected expression must be available.", style = "margin-bottom: 0;")
     )
   ),
-
   fluidRow(
     box(
       title = tags$span(icon("cogs"), " Run GSEA"),
       width = 12, status = "primary", solidHeader = TRUE,
       fluidRow(
-        column(7,
+        column(
+          7,
           selectInput("gsea_collection", "Gene Set Collection(s):",
             choices = c(
               "Hallmark (H)" = "H",
@@ -33,21 +32,23 @@ ui_gsea <- tabItem(
               "Immunologic Signatures (C7)" = "C7",
               "Oncogenic Signatures (C6)" = "C6"
             ),
-            selected = "H", multiple = TRUE, width = "100%")
+            selected = "H", multiple = TRUE, width = "100%"
+          )
         ),
         column(5, uiOutput("gsea_collection_info_ui"))
       ),
       fluidRow(
         column(4, tags$p(tags$strong("Target genes:"), " Common ML genes (from Step 10) or common DEG+WGCNA genes. You can also type custom gene symbols (comma-separated)."), style = "padding-top: 8px;"),
         column(5, textAreaInput("gsea_target_genes", "Custom target genes (optional, comma-separated)", value = "", rows = 3, placeholder = "Leave empty to use common ML genes")),
-        column(3, tags$div(style = "margin-top: 25px;",
-                 actionButton("run_gsea", tagList(icon("play"), " Run GSEA"), class = "btn-primary btn-lg btn-block")))
+        column(3, tags$div(
+          style = "margin-top: 25px;",
+          actionButton("run_gsea", tagList(icon("play"), " Run GSEA"), class = "btn-primary btn-lg btn-block")
+        ))
       ),
       uiOutput("gsea_status_ui"),
       uiOutput("gsea_placeholder_ui")
     )
   ),
-
   fluidRow(
     box(
       title = tags$span(icon("chart-area"), " GSEA per gene (plot and pathway list)"),
@@ -60,14 +61,20 @@ ui_gsea <- tabItem(
     box(
       title = tags$span(icon("file-alt"), " Process Summary"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-      uiOutput("gsea_process_summary_ui"))
+      uiOutput("gsea_process_summary_ui")
+    )
   ),
   fluidRow(
-    box(width = 12, status = "primary", solidHeader = FALSE,
-        tags$div(style = "text-align: center; padding: 20px 0;",
-                 actionButton("next_page_gsea_to_results",
-                             tagList(icon("file-alt"), " Continue to Results Summary"),
-                             class = "btn-success btn-lg",
-                             style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+    box(
+      width = 12, status = "primary", solidHeader = FALSE,
+      tags$div(
+        style = "text-align: center; padding: 20px 0;",
+        actionButton("next_page_gsea_to_results",
+          tagList(icon("file-alt"), " Continue to Results Summary"),
+          class = "btn-success btn-lg",
+          style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
+        )
+      )
+    )
   )
 )

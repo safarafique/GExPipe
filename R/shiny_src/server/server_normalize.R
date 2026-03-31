@@ -3,7 +3,6 @@
 # ==============================================================================
 
 server_normalize <- function(input, output, session, rv) {
-
   # Store last ggplot for each normalization plot (for download)
   norm_plots <- reactiveValues(
     plot = NULL, density = NULL, qq = NULL, median_range = NULL,
@@ -16,7 +15,9 @@ server_normalize <- function(input, output, session, rv) {
   # - manual: allow user to choose alternatives
   observe({
     mode <- if (is.null(input$normalize_mode) || !nzchar(input$normalize_mode)) "auto" else input$normalize_mode
-    if (!requireNamespace("shinyjs", quietly = TRUE)) return()
+    if (!requireNamespace("shinyjs", quietly = TRUE)) {
+      return()
+    }
     if (identical(mode, "auto")) {
       tryCatch(updateRadioButtons(session, "micro_norm_method", selected = "quantile"), error = function(e) NULL)
       tryCatch(updateRadioButtons(session, "rnaseq_norm_method", selected = "TMM"), error = function(e) NULL)
@@ -31,29 +32,36 @@ server_normalize <- function(input, output, session, rv) {
   })
 
   output$normalization_timer <- renderText({
-    if (!isTRUE(rv$normalize_running) || is.null(rv$normalize_start)) return("00:00")
+    if (!isTRUE(rv$normalize_running) || is.null(rv$normalize_start)) {
+      return("00:00")
+    }
     invalidateLater(1000, session)
     elapsed <- as.integer(difftime(Sys.time(), rv$normalize_start, units = "secs"))
     sprintf("%02d:%02d", elapsed %/% 60, elapsed %% 60)
   })
-  
+
   observeEvent(input$apply_normalization, {
     if (!isTRUE(rv$download_complete)) {
       showNotification(
-        tags$div(icon("exclamation-triangle"), tags$strong(" Step 1 required:"),
-                 " Complete data download (Step 1) before normalizing."),
-        type = "error", duration = 6)
+        tags$div(
+          icon("exclamation-triangle"), tags$strong(" Step 1 required:"),
+          " Complete data download (Step 1) before normalizing."
+        ),
+        type = "error", duration = 6
+      )
       return()
     }
-    
+
     # Disable button and show loading
     shinyjs::disable("apply_normalization")
-    shinyjs::html("apply_normalization", 
-                  HTML('<i class="fa fa-spinner fa-spin"></i> Normalizing...'))
-    
+    shinyjs::html(
+      "apply_normalization",
+      HTML('<i class="fa fa-spinner fa-spin"></i> Normalizing...')
+    )
+
     rv$normalize_start <- Sys.time()
     rv$normalize_running <- TRUE
-    
+
     # Show processing notification
     showNotification(
       tags$div(
@@ -67,8 +75,8 @@ server_normalize <- function(input, output, session, rv) {
       duration = NULL,
       id = "normalize_processing"
     )
-    
-    withProgress(message = 'Normalizing...', value = 0, {
+
+    withProgress(message = "Normalizing...", value = 0, {
       log_text <- "Normalizing data...\n\n"
       all_expr_norm <- list()
       normalization_stats <- list()
@@ -119,37 +127,41 @@ server_normalize <- function(input, output, session, rv) {
             norm_info <- attr(expr_norm, "normalization_info")
             all_expr_norm[[gse]] <- expr_norm
             normalization_stats[[gse]] <- norm_info
-            log_text <- paste0(log_text, "  ", gse, ": ", format(norm_info$initial_genes, big.mark = ","), " → ",
-                              format(norm_info$final_genes, big.mark = ","), " genes ✓\n")
+            log_text <- paste0(
+              log_text, "  ", gse, ": ", format(norm_info$initial_genes, big.mark = ","), " → ",
+              format(norm_info$final_genes, big.mark = ","), " genes ✓\n"
+            )
           }
         }
       }
-      
+
       incProgress(0.5)
-      
+
       # Normalize RNA-seq
       if (length(rv$rna_counts_list) > 0) {
         log_text <- paste0(log_text, "\nRNA-seq normalization (method: ", rnaseq_norm_method, "):\n")
         for (gse in names(rv$rna_counts_list)) {
           expr_norm <- normalize_rnaseq(rv$rna_counts_list[[gse]], dataset_name = gse, method = rnaseq_norm_method)
           norm_info <- attr(expr_norm, "normalization_info")
-          
+
           all_expr_norm[[gse]] <- expr_norm
           normalization_stats[[gse]] <- norm_info
-          
-          log_text <- paste0(log_text, "  ", gse, ": ", 
-                            format(norm_info$initial_genes, big.mark = ","), " → ",
-                            format(norm_info$genes_after_filtering, big.mark = ","),
-                            " (removed ", format(norm_info$genes_removed, big.mark = ","), " low-expression) ✓\n")
+
+          log_text <- paste0(
+            log_text, "  ", gse, ": ",
+            format(norm_info$initial_genes, big.mark = ","), " → ",
+            format(norm_info$genes_after_filtering, big.mark = ","),
+            " (removed ", format(norm_info$genes_removed, big.mark = ","), " low-expression) ✓\n"
+          )
         }
       }
-      
+
       # Calculate statistics before filtering
       gene_lists <- lapply(all_expr_norm, rownames)
       initial_total <- sum(sapply(normalization_stats, function(info) {
         if (!is.null(info)) info$initial_genes else 0
       }), na.rm = TRUE)
-      
+
       after_filter_total <- sum(sapply(normalization_stats, function(info) {
         if (!is.null(info)) {
           if (!is.null(info$genes_after_filtering)) {
@@ -157,15 +169,19 @@ server_normalize <- function(input, output, session, rv) {
           } else {
             info$final_genes
           }
-        } else 0
+        } else {
+          0
+        }
       }), na.rm = TRUE)
-      
+
       rnaseq_removed <- sum(sapply(normalization_stats, function(info) {
         if (!is.null(info) && !is.null(info$genes_removed)) {
           info$genes_removed
-        } else 0
+        } else {
+          0
+        }
       }), na.rm = TRUE)
-      
+
       # Automatically filter to common genes (intersection) - required for downstream analysis
       log_text <- paste0(log_text, "\nAutomatic gene filtering (background process):\n")
       log_text <- paste0(log_text, "  Filtering to common genes ensures consistent gene sets across datasets.\n")
@@ -181,7 +197,7 @@ server_normalize <- function(input, output, session, rv) {
       final_count <- length(rv$common_genes)
 
       log_text <- paste0(log_text, "  ✓ Common genes identified: ", format(length(rv$common_genes), big.mark = ","), "\n")
-      
+
       # Store statistics for reporting
       rv$normalization_stats <- list(
         initial_total = initial_total,
@@ -190,7 +206,7 @@ server_normalize <- function(input, output, session, rv) {
         final_count = final_count,
         filter_method = "intersection"
       )
-      
+
       # Store pre-combined normalized data for visualization
       rv$all_expr_norm_list <- all_expr_norm
 
@@ -222,18 +238,20 @@ server_normalize <- function(input, output, session, rv) {
           # Ensure integer counts (round any fractional values from gene mapping)
           rv$raw_counts_for_deseq2 <- round(rv$raw_counts_for_deseq2)
           storage.mode(rv$raw_counts_for_deseq2) <- "integer"
-          log_text <- paste0(log_text, "  ✓ Raw counts saved for DESeq2: ",
-                            format(nrow(rv$raw_counts_for_deseq2), big.mark = ","), " genes × ",
-                            format(ncol(rv$raw_counts_for_deseq2), big.mark = ","), " samples\n")
+          log_text <- paste0(
+            log_text, "  ✓ Raw counts saved for DESeq2: ",
+            format(nrow(rv$raw_counts_for_deseq2), big.mark = ","), " genes × ",
+            format(ncol(rv$raw_counts_for_deseq2), big.mark = ","), " samples\n"
+          )
         }
       }
-      
+
       # Create metadata
       micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
       rna_n <- if (length(rv$rna_counts_list) > 0) sum(vapply(rv$rna_counts_list, ncol, integer(1))) else 0L
       platform_labels <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
       dataset_labels <- rep(names(all_expr_norm), times = vapply(all_expr_norm, ncol, integer(1)))
-      
+
       rv$unified_metadata <- data.frame(
         SampleID = colnames(rv$combined_expr),
         Platform = platform_labels,
@@ -241,10 +259,10 @@ server_normalize <- function(input, output, session, rv) {
         Condition = NA_character_,
         row.names = colnames(rv$combined_expr)
       )
-      
+
       total_genes <- nrow(rv$combined_expr)
       total_samples <- ncol(rv$combined_expr)
-      
+
       # Store metadata for DESeq2 raw counts (align samples if raw counts were saved)
       if (!is.null(rv$raw_counts_for_deseq2)) {
         raw_samples <- colnames(rv$raw_counts_for_deseq2)
@@ -255,7 +273,7 @@ server_normalize <- function(input, output, session, rv) {
           rv$raw_counts_metadata <- rv$unified_metadata[rv$unified_metadata$SampleID %in% common_samples, , drop = FALSE]
         }
       }
-      
+
       # Create detailed summary table
       summary_data <- data.frame(
         Dataset = names(normalization_stats),
@@ -269,55 +287,67 @@ server_normalize <- function(input, output, session, rv) {
             } else {
               x$final_genes
             }
-          } else 0
+          } else {
+            0
+          }
         }),
         Final_Common_Genes = final_count,
         stringsAsFactors = FALSE
       )
-      
+
       # Add totals row
-      summary_data <- rbind(summary_data,
-                            data.frame(
-                              Dataset = "TOTAL/COMMON",
-                              Initial_Genes = sum(summary_data$Initial_Genes),
-                              After_Filtering = sum(summary_data$After_Filtering),
-                              Final_Common_Genes = final_count,
-                              stringsAsFactors = FALSE
-                            ))
-      
+      summary_data <- rbind(
+        summary_data,
+        data.frame(
+          Dataset = "TOTAL/COMMON",
+          Initial_Genes = sum(summary_data$Initial_Genes),
+          After_Filtering = sum(summary_data$After_Filtering),
+          Final_Common_Genes = final_count,
+          stringsAsFactors = FALSE
+        )
+      )
+
       rv$normalization_summary_table <- summary_data
-      
+
       # Generate detailed summary
-      log_text <- paste0(log_text, "\n✓ Normalization Complete!\n",
-                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
-                         "Gene Statistics Summary:\n",
-                         "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n")
-      
+      log_text <- paste0(
+        log_text, "\n✓ Normalization Complete!\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        "Gene Statistics Summary:\n",
+        "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n"
+      )
+
       if (rnaseq_removed > 0) {
-        log_text <- paste0(log_text,
-                           "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
-                           "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n")
+        log_text <- paste0(
+          log_text,
+          "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
+          "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n"
+        )
       }
-      
-      log_text <- paste0(log_text,
-                         "  Gene Filtering:           ", filter_status, "\n",
-                         filter_note,
-                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
-                         "Final Dataset:\n",
-                         "  Genes:   ", format(total_genes, big.mark = ","), "\n",
-                         "  Samples: ", format(total_samples, big.mark = ","), "\n",
-                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
-                         "\nNote: Gene count may be reduced after group selection\n",
-                         "      and variance filtering in batch correction.\n")
-      
+
+      log_text <- paste0(
+        log_text,
+        "  Gene Filtering:           ", filter_status, "\n",
+        filter_note,
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        "Final Dataset:\n",
+        "  Genes:   ", format(total_genes, big.mark = ","), "\n",
+        "  Samples: ", format(total_samples, big.mark = ","), "\n",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+        "\nNote: Gene count may be reduced after group selection\n",
+        "      and variance filtering in batch correction.\n"
+      )
+
       # Generate report caption
       rv$normalization_caption <- paste0(
         "Gene Expression Normalization Pipeline: Starting with ",
         format(initial_total, big.mark = ","), " total genes across ",
         length(all_expr_norm), " dataset(s)",
         if (rnaseq_removed > 0) {
-          paste0(", ", format(rnaseq_removed, big.mark = ","),
-                 " genes were removed due to low-expression filtering (RNA-seq)")
+          paste0(
+            ", ", format(rnaseq_removed, big.mark = ","),
+            " genes were removed due to low-expression filtering (RNA-seq)"
+          )
         },
         ", resulting in ", format(after_filter_total, big.mark = ","),
         " genes after individual dataset normalization. ",
@@ -325,27 +355,33 @@ server_normalize <- function(input, output, session, rv) {
         format(final_count, big.mark = ","),
         " high-confidence genes present in all datasets were retained for downstream analysis."
       )
-      
+
       rv$normalization_complete <- TRUE
       rv$normalize_running <- FALSE
-      
-      output$normalization_log <- renderText({ log_text })
-      
+
+      output$normalization_log <- renderText({
+        log_text
+      })
+
       # Re-enable button
       shinyjs::enable("apply_normalization")
-      shinyjs::html("apply_normalization", 
-                    HTML('<i class="fa fa-check-circle"></i> Apply Normalization'))
-      
+      shinyjs::html(
+        "apply_normalization",
+        HTML('<i class="fa fa-check-circle"></i> Apply Normalization')
+      )
+
       # Remove processing notification
       removeNotification("normalize_processing")
-      
+
       # Show notification with gene count
       showNotification(
         tags$div(
           tags$strong("✓ Normalization complete!"),
           tags$br(),
-          tags$span("Genes: ", format(total_genes, big.mark = ","),
-                    " | Samples: ", format(total_samples, big.mark = ",")),
+          tags$span(
+            "Genes: ", format(total_genes, big.mark = ","),
+            " | Samples: ", format(total_samples, big.mark = ",")
+          ),
           style = "font-size: 13px;"
         ),
         type = "message", duration = 6
@@ -354,7 +390,7 @@ server_normalize <- function(input, output, session, rv) {
 
     rv$normalize_running <- FALSE
   })
-  
+
   # ==========================================================================
   # AUTO-NORMALIZE FOR COUNT-BASED METHODS (silent, no UI interaction)
   # ==========================================================================
@@ -362,107 +398,123 @@ server_normalize <- function(input, output, session, rv) {
   # downstream steps (WGCNA, heatmaps, etc.) have normalized data — the user
   # stays on the current tab and just sees a brief notification.
   observeEvent(rv$download_complete, {
-    if (!isTRUE(rv$download_complete)) return()
-    if (is.null(input$de_method) || !(input$de_method %in% c("deseq2", "edger", "limma_voom"))) return()
-    if (isTRUE(rv$normalization_complete)) return()
-    
-    # Run the same normalization logic silently
-    tryCatch({
-      rv$normalize_running <- TRUE
-      
-      all_expr_norm <- list()
-      
-      # Normalize microarray
-      if (length(rv$micro_expr_list) > 0) {
-        for (gse in names(rv$micro_expr_list)) {
-          all_expr_norm[[gse]] <- normalize_microarray(rv$micro_expr_list[[gse]], dataset_name = gse)
-        }
-      }
-      
-      # Normalize RNA-seq
-      if (length(rv$rna_counts_list) > 0) {
-        for (gse in names(rv$rna_counts_list)) {
-          all_expr_norm[[gse]] <- normalize_rnaseq(rv$rna_counts_list[[gse]], dataset_name = gse)
-        }
-      }
-      
-      # Filter to common genes
-      gene_lists <- lapply(all_expr_norm, rownames)
-      rv$common_genes <- Reduce(intersect, gene_lists)
-      for (i in seq_along(all_expr_norm)) {
-        all_expr_norm[[i]] <- all_expr_norm[[i]][rv$common_genes, ]
-      }
+    if (!isTRUE(rv$download_complete)) {
+      return()
+    }
+    if (is.null(input$de_method) || !(input$de_method %in% c("deseq2", "edger", "limma_voom"))) {
+      return()
+    }
+    if (isTRUE(rv$normalization_complete)) {
+      return()
+    }
 
-      # Save raw counts for DESeq2 before global normalization
-      if (length(rv$rna_counts_list) > 0) {
-        raw_counts_list <- list()
-        for (gse in names(rv$rna_counts_list)) {
-          raw_mat <- as.matrix(rv$rna_counts_list[[gse]])
-          common_in_raw <- intersect(rv$common_genes, rownames(raw_mat))
-          if (length(common_in_raw) > 0) {
-            raw_counts_list[[gse]] <- raw_mat[common_in_raw, , drop = FALSE]
+    # Run the same normalization logic silently
+    tryCatch(
+      {
+        rv$normalize_running <- TRUE
+
+        all_expr_norm <- list()
+
+        # Normalize microarray
+        if (length(rv$micro_expr_list) > 0) {
+          for (gse in names(rv$micro_expr_list)) {
+            all_expr_norm[[gse]] <- normalize_microarray(rv$micro_expr_list[[gse]], dataset_name = gse)
           }
         }
-        if (length(raw_counts_list) > 0) {
-          rv$raw_counts_for_deseq2 <- round(do.call(cbind, raw_counts_list))
-          storage.mode(rv$raw_counts_for_deseq2) <- "integer"
+
+        # Normalize RNA-seq
+        if (length(rv$rna_counts_list) > 0) {
+          for (gse in names(rv$rna_counts_list)) {
+            all_expr_norm[[gse]] <- normalize_rnaseq(rv$rna_counts_list[[gse]], dataset_name = gse)
+          }
         }
-      }
-      
-      # Combine and apply global quantile normalization
-      combined_before_global <- do.call(cbind, all_expr_norm)
-      rv$combined_expr_before_global_norm <- combined_before_global
-      rv$combined_expr <- limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
-      rv$all_expr_norm_list <- all_expr_norm
-      
-      # Create metadata
-      micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
-      rna_n   <- if (length(rv$rna_counts_list) > 0) sum(vapply(rv$rna_counts_list, ncol, integer(1))) else 0L
-      platform_labels <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
-      dataset_labels  <- rep(names(all_expr_norm), times = vapply(all_expr_norm, ncol, integer(1)))
-      
-      rv$unified_metadata <- data.frame(
-        SampleID  = colnames(rv$combined_expr),
-        Platform  = platform_labels,
-        Dataset   = dataset_labels,
-        Condition = NA_character_,
-        row.names = colnames(rv$combined_expr)
-      )
-      
-      # Align raw counts metadata
-      if (!is.null(rv$raw_counts_for_deseq2)) {
-        common_samp <- intersect(colnames(rv$raw_counts_for_deseq2), rv$unified_metadata$SampleID)
-        if (length(common_samp) > 0) {
-          rv$raw_counts_for_deseq2 <- rv$raw_counts_for_deseq2[, common_samp, drop = FALSE]
-          rv$raw_counts_metadata   <- rv$unified_metadata[rv$unified_metadata$SampleID %in% common_samp, , drop = FALSE]
+
+        # Filter to common genes
+        gene_lists <- lapply(all_expr_norm, rownames)
+        rv$common_genes <- Reduce(intersect, gene_lists)
+        for (i in seq_along(all_expr_norm)) {
+          all_expr_norm[[i]] <- all_expr_norm[[i]][rv$common_genes, ]
         }
+
+        # Save raw counts for DESeq2 before global normalization
+        if (length(rv$rna_counts_list) > 0) {
+          raw_counts_list <- list()
+          for (gse in names(rv$rna_counts_list)) {
+            raw_mat <- as.matrix(rv$rna_counts_list[[gse]])
+            common_in_raw <- intersect(rv$common_genes, rownames(raw_mat))
+            if (length(common_in_raw) > 0) {
+              raw_counts_list[[gse]] <- raw_mat[common_in_raw, , drop = FALSE]
+            }
+          }
+          if (length(raw_counts_list) > 0) {
+            rv$raw_counts_for_deseq2 <- round(do.call(cbind, raw_counts_list))
+            storage.mode(rv$raw_counts_for_deseq2) <- "integer"
+          }
+        }
+
+        # Combine and apply global quantile normalization
+        combined_before_global <- do.call(cbind, all_expr_norm)
+        rv$combined_expr_before_global_norm <- combined_before_global
+        rv$combined_expr <- limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
+        rv$all_expr_norm_list <- all_expr_norm
+
+        # Create metadata
+        micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
+        rna_n <- if (length(rv$rna_counts_list) > 0) sum(vapply(rv$rna_counts_list, ncol, integer(1))) else 0L
+        platform_labels <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
+        dataset_labels <- rep(names(all_expr_norm), times = vapply(all_expr_norm, ncol, integer(1)))
+
+        rv$unified_metadata <- data.frame(
+          SampleID  = colnames(rv$combined_expr),
+          Platform  = platform_labels,
+          Dataset   = dataset_labels,
+          Condition = NA_character_,
+          row.names = colnames(rv$combined_expr)
+        )
+
+        # Align raw counts metadata
+        if (!is.null(rv$raw_counts_for_deseq2)) {
+          common_samp <- intersect(colnames(rv$raw_counts_for_deseq2), rv$unified_metadata$SampleID)
+          if (length(common_samp) > 0) {
+            rv$raw_counts_for_deseq2 <- rv$raw_counts_for_deseq2[, common_samp, drop = FALSE]
+            rv$raw_counts_metadata <- rv$unified_metadata[rv$unified_metadata$SampleID %in% common_samp, , drop = FALSE]
+          }
+        }
+
+        rv$normalization_complete <- TRUE
+        rv$normalize_running <- FALSE
+
+        method_label <- if (!is.null(input$de_method) && input$de_method == "edger") "edgeR" else "DESeq2"
+        showNotification(
+          tags$div(
+            icon("check-circle"),
+            tags$strong(paste0(" Auto-normalization complete (", method_label, " mode).")),
+            tags$br(),
+            tags$span(paste0(
+              "Genes: ", format(nrow(rv$combined_expr), big.mark = ","),
+              " | Samples: ", format(ncol(rv$combined_expr), big.mark = ",")
+            ))
+          ),
+          type = "message", duration = 5
+        )
+      },
+      error = function(e) {
+        rv$normalize_running <- FALSE
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong(" Auto-normalization failed: "), conditionMessage(e)
+          ),
+          type = "error", duration = 8
+        )
       }
-      
-      rv$normalization_complete <- TRUE
-      rv$normalize_running <- FALSE
-      
-      method_label <- if (!is.null(input$de_method) && input$de_method == "edger") "edgeR" else "DESeq2"
-      showNotification(
-        tags$div(icon("check-circle"),
-                 tags$strong(paste0(" Auto-normalization complete (", method_label, " mode).")),
-                 tags$br(),
-                 tags$span(paste0("Genes: ", format(nrow(rv$combined_expr), big.mark = ","),
-                                  " | Samples: ", format(ncol(rv$combined_expr), big.mark = ",")))),
-        type = "message", duration = 5)
-      
-    }, error = function(e) {
-      rv$normalize_running <- FALSE
-      showNotification(
-        tags$div(icon("exclamation-triangle"),
-                 tags$strong(" Auto-normalization failed: "), conditionMessage(e)),
-        type = "error", duration = 8)
-    })
+    )
   })
-  
+
   # Normalization quality visualization: Box plots showing distribution before/after
   output$normalization_plot <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     # Use before global normalization if available, otherwise use current combined_expr
     expr_before <- if (!is.null(rv$combined_expr_before_global_norm)) {
       rv$combined_expr_before_global_norm
@@ -472,129 +524,142 @@ server_normalize <- function(input, output, session, rv) {
       # Fallback: use a subset of current data
       rv$combined_expr
     }
-    
+
     expr_after <- rv$combined_expr
-    
-    tryCatch({
-      # Ensure same dimensions
-      common_genes <- intersect(rownames(expr_before), rownames(expr_after))
-      common_samples <- intersect(colnames(expr_before), colnames(expr_after))
-      
-      if (length(common_genes) == 0 || length(common_samples) == 0) {
-        stop("No common genes or samples for comparison")
-      }
-      
-      expr_before <- expr_before[common_genes, common_samples, drop = FALSE]
-      expr_after <- expr_after[common_genes, common_samples, drop = FALSE]
-      
-      # Sample a subset of genes for faster plotting (if too many)
-      n_genes <- nrow(expr_before)
-      if (n_genes > 10000) {
-        set.seed(123)
-        sample_genes <- sample(1:n_genes, 10000)
-        expr_before <- expr_before[sample_genes, ]
-        expr_after <- expr_after[sample_genes, ]
-      }
-      
-      # Prepare data for plotting
-      n_samples <- min(50, ncol(expr_before))  # Limit to 50 samples for readability
-      if (ncol(expr_before) > n_samples) {
-        set.seed(123)
-        sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
-        expr_before <- expr_before[, sample_idx]
-        expr_after <- expr_after[, sample_idx]
-      }
-      
-      # Create data frames for plotting
-      plot_data_before <- data.frame(
-        Expression = as.vector(expr_before),
-        Sample = rep(colnames(expr_before), each = nrow(expr_before)),
-        Dataset = rep(rv$unified_metadata$Dataset[match(colnames(expr_before), rv$unified_metadata$SampleID)], 
-                     each = nrow(expr_before)),
-        Stage = "Before Normalization"
-      )
-      
-      plot_data_after <- data.frame(
-        Expression = as.vector(expr_after),
-        Sample = rep(colnames(expr_after), each = nrow(expr_after)),
-        Dataset = rep(rv$unified_metadata$Dataset[match(colnames(expr_after), rv$unified_metadata$SampleID)], 
-                     each = nrow(expr_after)),
-        Stage = "After Normalization"
-      )
-      
-      # Combine
-      plot_data <- rbind(plot_data_before, plot_data_after)
-      plot_data$Stage <- factor(plot_data$Stage, levels = c("Before Normalization", "After Normalization"))
-      
-      # Create box plot
-      p <- ggplot(plot_data, aes(x = Stage, y = Expression, fill = Stage)) +
-        geom_boxplot(alpha = 0.7, outlier.size = 0.5, outlier.alpha = 0.3) +
-        scale_fill_manual(values = c("Before Normalization" = "#e74c3c", 
-                                     "After Normalization" = "#2ecc71")) +
-        facet_wrap(~ Dataset, scales = "free_y", ncol = min(3, length(unique(plot_data$Dataset)))) +
-        theme_bw(base_size = 12) +
-        labs(
-          title = "Normalization Effect: Expression Distribution Comparison",
-          subtitle = paste0("Showing distribution of expression values before and after normalization"),
-          x = "",
-          y = "Expression Value",
-          fill = "Stage"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-          plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray50", margin = margin(b = 15)),
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "top",
-          legend.title = element_text(face = "bold"),
-          panel.grid.major = element_line(color = "gray90"),
-          panel.grid.minor = element_line(color = "gray95"),
-          strip.background = element_rect(fill = "#3498db", color = "white"),
-          strip.text = element_text(color = "white", face = "bold")
-        )
-      norm_plots$plot <- p
-      print(p)
-      
-    }, error = function(e) {
-      # Fallback: Simple density plot
-      tryCatch({
+
+    tryCatch(
+      {
+        # Ensure same dimensions
+        common_genes <- intersect(rownames(expr_before), rownames(expr_after))
+        common_samples <- intersect(colnames(expr_before), colnames(expr_after))
+
+        if (length(common_genes) == 0 || length(common_samples) == 0) {
+          stop("No common genes or samples for comparison")
+        }
+
+        expr_before <- expr_before[common_genes, common_samples, drop = FALSE]
+        expr_after <- expr_after[common_genes, common_samples, drop = FALSE]
+
+        # Sample a subset of genes for faster plotting (if too many)
+        n_genes <- nrow(expr_before)
+        if (n_genes > 10000) {
+          set.seed(123)
+          sample_genes <- sample(1:n_genes, 10000)
+          expr_before <- expr_before[sample_genes, ]
+          expr_after <- expr_after[sample_genes, ]
+        }
+
+        # Prepare data for plotting
+        n_samples <- min(50, ncol(expr_before)) # Limit to 50 samples for readability
+        if (ncol(expr_before) > n_samples) {
+          set.seed(123)
+          sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
+          expr_before <- expr_before[, sample_idx]
+          expr_after <- expr_after[, sample_idx]
+        }
+
+        # Create data frames for plotting
         plot_data_before <- data.frame(
-          Expression = as.vector(rv$combined_expr_raw),
+          Expression = as.vector(expr_before),
+          Sample = rep(colnames(expr_before), each = nrow(expr_before)),
+          Dataset = rep(rv$unified_metadata$Dataset[match(colnames(expr_before), rv$unified_metadata$SampleID)],
+            each = nrow(expr_before)
+          ),
           Stage = "Before Normalization"
         )
+
         plot_data_after <- data.frame(
-          Expression = as.vector(rv$combined_expr),
+          Expression = as.vector(expr_after),
+          Sample = rep(colnames(expr_after), each = nrow(expr_after)),
+          Dataset = rep(rv$unified_metadata$Dataset[match(colnames(expr_after), rv$unified_metadata$SampleID)],
+            each = nrow(expr_after)
+          ),
           Stage = "After Normalization"
         )
+
+        # Combine
         plot_data <- rbind(plot_data_before, plot_data_after)
         plot_data$Stage <- factor(plot_data$Stage, levels = c("Before Normalization", "After Normalization"))
-        
-        p <- ggplot(plot_data, aes(x = Expression, fill = Stage, color = Stage)) +
-          geom_density(alpha = 0.6) +
-          scale_fill_manual(values = c("Before Normalization" = "#e74c3c", 
-                                       "After Normalization" = "#2ecc71")) +
-          scale_color_manual(values = c("Before Normalization" = "#c0392b", 
-                                       "After Normalization" = "#27ae60")) +
-          theme_bw(base_size = 14) +
+
+        # Create box plot
+        p <- ggplot(plot_data, aes(x = Stage, y = Expression, fill = Stage)) +
+          geom_boxplot(alpha = 0.7, outlier.size = 0.5, outlier.alpha = 0.3) +
+          scale_fill_manual(values = c(
+            "Before Normalization" = "#e74c3c",
+            "After Normalization" = "#2ecc71"
+          )) +
+          facet_wrap(~Dataset, scales = "free_y", ncol = min(3, length(unique(plot_data$Dataset)))) +
+          theme_bw(base_size = 12) +
           labs(
-            title = "Normalization Effect: Expression Distribution",
-            x = "Expression Value",
-            y = "Density",
-            fill = "Stage",
-            color = "Stage"
+            title = "Normalization Effect: Expression Distribution Comparison",
+            subtitle = paste0("Showing distribution of expression values before and after normalization"),
+            x = "",
+            y = "Expression Value",
+            fill = "Stage"
           ) +
           theme(
             plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-            legend.position = "top"
+            plot.subtitle = element_text(size = 12, hjust = 0.5, color = "gray50", margin = margin(b = 15)),
+            axis.text.x = element_text(angle = 45, hjust = 1),
+            legend.position = "top",
+            legend.title = element_text(face = "bold"),
+            panel.grid.major = element_line(color = "gray90"),
+            panel.grid.minor = element_line(color = "gray95"),
+            strip.background = element_rect(fill = "#3498db", color = "white"),
+            strip.text = element_text(color = "white", face = "bold")
           )
         norm_plots$plot <- p
         print(p)
-      }, error = function(e2) {
-        plot.new()
-        text(0.5, 0.5, "Unable to generate normalization plot", cex = 1.2)
-      })
-    })
+      },
+      error = function(e) {
+        # Fallback: Simple density plot
+        tryCatch(
+          {
+            plot_data_before <- data.frame(
+              Expression = as.vector(rv$combined_expr_raw),
+              Stage = "Before Normalization"
+            )
+            plot_data_after <- data.frame(
+              Expression = as.vector(rv$combined_expr),
+              Stage = "After Normalization"
+            )
+            plot_data <- rbind(plot_data_before, plot_data_after)
+            plot_data$Stage <- factor(plot_data$Stage, levels = c("Before Normalization", "After Normalization"))
+
+            p <- ggplot(plot_data, aes(x = Expression, fill = Stage, color = Stage)) +
+              geom_density(alpha = 0.6) +
+              scale_fill_manual(values = c(
+                "Before Normalization" = "#e74c3c",
+                "After Normalization" = "#2ecc71"
+              )) +
+              scale_color_manual(values = c(
+                "Before Normalization" = "#c0392b",
+                "After Normalization" = "#27ae60"
+              )) +
+              theme_bw(base_size = 14) +
+              labs(
+                title = "Normalization Effect: Expression Distribution",
+                x = "Expression Value",
+                y = "Density",
+                fill = "Stage",
+                color = "Stage"
+              ) +
+              theme(
+                plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+                legend.position = "top"
+              )
+            norm_plots$plot <- p
+            print(p)
+          },
+          error = function(e2) {
+            plot.new()
+            text(0.5, 0.5, "Unable to generate normalization plot", cex = 1.2)
+          }
+        )
+      }
+    )
   })
-  
+
   # Helper function to get expression data for comparison
   get_expr_comparison <- function() {
     expr_before <- if (!is.null(rv$combined_expr_before_global_norm)) {
@@ -604,471 +669,605 @@ server_normalize <- function(input, output, session, rv) {
     } else {
       rv$combined_expr
     }
-    
+
     expr_after <- rv$combined_expr
-    
+
     # Ensure same dimensions
     common_genes <- intersect(rownames(expr_before), rownames(expr_after))
     common_samples <- intersect(colnames(expr_before), colnames(expr_after))
-    
+
     if (length(common_genes) == 0 || length(common_samples) == 0) {
       return(NULL)
     }
-    
+
     expr_before <- expr_before[common_genes, common_samples, drop = FALSE]
     expr_after <- expr_after[common_genes, common_samples, drop = FALSE]
-    
+
     return(list(before = expr_before, after = expr_after))
   }
-  
+
   # Plot 2: Density plots showing overall distribution
   output$normalization_density <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     expr_data <- get_expr_comparison()
     if (is.null(expr_data)) {
       plot.new()
       text(0.5, 0.5, "Unable to generate plot", cex = 1.2)
       return()
     }
-    
+
     expr_before <- expr_data$before
     expr_after <- expr_data$after
-    
-    tryCatch({
-      # Sample genes if too many
-      n_genes <- nrow(expr_before)
-      if (n_genes > 50000) {
-        set.seed(123)
-        sample_genes <- sample(seq_len(n_genes), 50000)
-        expr_before <- expr_before[sample_genes, ]
-        expr_after <- expr_after[sample_genes, ]
-      }
-      
-      plot_data_before <- data.frame(
-        Expression = as.vector(expr_before),
-        Stage = "Before Normalization"
-      )
-      plot_data_after <- data.frame(
-        Expression = as.vector(expr_after),
-        Stage = "After Normalization"
-      )
-      plot_data <- rbind(plot_data_before, plot_data_after)
-      plot_data$Stage <- factor(plot_data$Stage, levels = c("Before Normalization", "After Normalization"))
-      
-      p <- ggplot(plot_data, aes(x = Expression, fill = Stage, color = Stage)) +
-        geom_density(alpha = 0.6, linewidth = 0.8) +
-        scale_fill_manual(values = c("Before Normalization" = "#e74c3c", 
-                                     "After Normalization" = "#2ecc71")) +
-        scale_color_manual(values = c("Before Normalization" = "#c0392b", 
-                                     "After Normalization" = "#27ae60")) +
-        theme_bw(base_size = 14) +
-        labs(
-          title = "Normalization Effect: Overall Expression Distribution",
-          subtitle = "Density plots showing expression value distributions",
-          x = "Expression Value",
-          y = "Density",
-          fill = "Stage",
-          color = "Stage"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-          plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-          legend.position = "top",
-          legend.title = element_text(face = "bold"),
-          panel.grid.major = element_line(color = "gray90"),
-          panel.grid.minor = element_line(color = "gray95")
+
+    tryCatch(
+      {
+        # Sample genes if too many
+        n_genes <- nrow(expr_before)
+        if (n_genes > 50000) {
+          set.seed(123)
+          sample_genes <- sample(seq_len(n_genes), 50000)
+          expr_before <- expr_before[sample_genes, ]
+          expr_after <- expr_after[sample_genes, ]
+        }
+
+        plot_data_before <- data.frame(
+          Expression = as.vector(expr_before),
+          Stage = "Before Normalization"
         )
-      norm_plots$density <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
+        plot_data_after <- data.frame(
+          Expression = as.vector(expr_after),
+          Stage = "After Normalization"
+        )
+        plot_data <- rbind(plot_data_before, plot_data_after)
+        plot_data$Stage <- factor(plot_data$Stage, levels = c("Before Normalization", "After Normalization"))
+
+        p <- ggplot(plot_data, aes(x = Expression, fill = Stage, color = Stage)) +
+          geom_density(alpha = 0.6, linewidth = 0.8) +
+          scale_fill_manual(values = c(
+            "Before Normalization" = "#e74c3c",
+            "After Normalization" = "#2ecc71"
+          )) +
+          scale_color_manual(values = c(
+            "Before Normalization" = "#c0392b",
+            "After Normalization" = "#27ae60"
+          )) +
+          theme_bw(base_size = 14) +
+          labs(
+            title = "Normalization Effect: Overall Expression Distribution",
+            subtitle = "Density plots showing expression value distributions",
+            x = "Expression Value",
+            y = "Density",
+            fill = "Stage",
+            color = "Stage"
+          ) +
+          theme(
+            plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+            plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
+            legend.position = "top",
+            legend.title = element_text(face = "bold"),
+            panel.grid.major = element_line(color = "gray90"),
+            panel.grid.minor = element_line(color = "gray95")
+          )
+        norm_plots$density <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
+      }
+    )
   })
-  
+
   # Plot 3: Sample correlation heatmap before normalization
   output$normalization_corr_before <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     expr_data <- get_expr_comparison()
     if (is.null(expr_data)) {
       plot.new()
       text(0.5, 0.5, "Unable to generate plot", cex = 1.2)
       return()
     }
-    
+
     expr_before <- expr_data$before
-    
-    tryCatch({
-      # Limit samples for performance
-      n_samples <- min(30, ncol(expr_before))
-      if (ncol(expr_before) > n_samples) {
-        set.seed(123)
-        sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
-        expr_before <- expr_before[, sample_idx]
+
+    tryCatch(
+      {
+        # Limit samples for performance
+        n_samples <- min(30, ncol(expr_before))
+        if (ncol(expr_before) > n_samples) {
+          set.seed(123)
+          sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
+          expr_before <- expr_before[, sample_idx]
+        }
+
+        # Calculate correlation
+        cor_matrix <- cor(expr_before, use = "pairwise.complete.obs")
+
+        # Convert to long format
+        cor_df <- expand.grid(Sample1 = colnames(cor_matrix), Sample2 = colnames(cor_matrix))
+        cor_df$Correlation <- as.vector(cor_matrix)
+
+        # Add dataset info
+        cor_df$Dataset1 <- rv$unified_metadata$Dataset[match(cor_df$Sample1, rv$unified_metadata$SampleID)]
+        cor_df$Dataset2 <- rv$unified_metadata$Dataset[match(cor_df$Sample2, rv$unified_metadata$SampleID)]
+
+        p <- ggplot(cor_df, aes(x = Sample1, y = Sample2, fill = Correlation)) +
+          geom_tile() +
+          scale_fill_gradient2(
+            low = "#e74c3c", mid = "white", high = "#3498db",
+            midpoint = 0.5, limits = c(0, 1)
+          ) +
+          theme_bw(base_size = 10) +
+          labs(
+            title = "Sample Correlation - Before Normalization",
+            subtitle = "Higher correlation (blue) indicates similar expression profiles",
+            x = "",
+            y = "",
+            fill = "Correlation"
+          ) +
+          theme(
+            plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+            plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
+            axis.text.x = element_text(angle = 90, hjust = 1, size = 7),
+            axis.text.y = element_text(size = 7),
+            legend.position = "right"
+          )
+        norm_plots$corr_before <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
       }
-      
-      # Calculate correlation
-      cor_matrix <- cor(expr_before, use = "pairwise.complete.obs")
-      
-      # Convert to long format
-      cor_df <- expand.grid(Sample1 = colnames(cor_matrix), Sample2 = colnames(cor_matrix))
-      cor_df$Correlation <- as.vector(cor_matrix)
-      
-      # Add dataset info
-      cor_df$Dataset1 <- rv$unified_metadata$Dataset[match(cor_df$Sample1, rv$unified_metadata$SampleID)]
-      cor_df$Dataset2 <- rv$unified_metadata$Dataset[match(cor_df$Sample2, rv$unified_metadata$SampleID)]
-      
-      p <- ggplot(cor_df, aes(x = Sample1, y = Sample2, fill = Correlation)) +
-        geom_tile() +
-        scale_fill_gradient2(low = "#e74c3c", mid = "white", high = "#3498db", 
-                            midpoint = 0.5, limits = c(0, 1)) +
-        theme_bw(base_size = 10) +
-        labs(
-          title = "Sample Correlation - Before Normalization",
-          subtitle = "Higher correlation (blue) indicates similar expression profiles",
-          x = "",
-          y = "",
-          fill = "Correlation"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
-          plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
-          axis.text.x = element_text(angle = 90, hjust = 1, size = 7),
-          axis.text.y = element_text(size = 7),
-          legend.position = "right"
-        )
-      norm_plots$corr_before <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
+    )
   })
-  
+
   # Plot 4: Sample correlation heatmap after normalization
   output$normalization_corr_after <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     expr_after <- rv$combined_expr
-    
-    tryCatch({
-      # Limit samples for performance
-      n_samples <- min(30, ncol(expr_after))
-      if (ncol(expr_after) > n_samples) {
-        set.seed(123)
-        sample_idx <- sample(seq_len(ncol(expr_after)), n_samples)
-        expr_after <- expr_after[, sample_idx]
+
+    tryCatch(
+      {
+        # Limit samples for performance
+        n_samples <- min(30, ncol(expr_after))
+        if (ncol(expr_after) > n_samples) {
+          set.seed(123)
+          sample_idx <- sample(seq_len(ncol(expr_after)), n_samples)
+          expr_after <- expr_after[, sample_idx]
+        }
+
+        # Calculate correlation
+        cor_matrix <- cor(expr_after, use = "pairwise.complete.obs")
+
+        # Convert to long format
+        cor_df <- expand.grid(Sample1 = colnames(cor_matrix), Sample2 = colnames(cor_matrix))
+        cor_df$Correlation <- as.vector(cor_matrix)
+
+        # Add dataset info
+        cor_df$Dataset1 <- rv$unified_metadata$Dataset[match(cor_df$Sample1, rv$unified_metadata$SampleID)]
+        cor_df$Dataset2 <- rv$unified_metadata$Dataset[match(cor_df$Sample2, rv$unified_metadata$SampleID)]
+
+        p <- ggplot(cor_df, aes(x = Sample1, y = Sample2, fill = Correlation)) +
+          geom_tile() +
+          scale_fill_gradient2(
+            low = "#e74c3c", mid = "white", high = "#3498db",
+            midpoint = 0.5, limits = c(0, 1)
+          ) +
+          theme_bw(base_size = 10) +
+          labs(
+            title = "Sample Correlation - After Normalization",
+            subtitle = "Normalized samples should show more uniform correlations",
+            x = "",
+            y = "",
+            fill = "Correlation"
+          ) +
+          theme(
+            plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
+            plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
+            axis.text.x = element_text(angle = 90, hjust = 1, size = 7),
+            axis.text.y = element_text(size = 7),
+            legend.position = "right"
+          )
+        norm_plots$corr_after <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
       }
-      
-      # Calculate correlation
-      cor_matrix <- cor(expr_after, use = "pairwise.complete.obs")
-      
-      # Convert to long format
-      cor_df <- expand.grid(Sample1 = colnames(cor_matrix), Sample2 = colnames(cor_matrix))
-      cor_df$Correlation <- as.vector(cor_matrix)
-      
-      # Add dataset info
-      cor_df$Dataset1 <- rv$unified_metadata$Dataset[match(cor_df$Sample1, rv$unified_metadata$SampleID)]
-      cor_df$Dataset2 <- rv$unified_metadata$Dataset[match(cor_df$Sample2, rv$unified_metadata$SampleID)]
-      
-      p <- ggplot(cor_df, aes(x = Sample1, y = Sample2, fill = Correlation)) +
-        geom_tile() +
-        scale_fill_gradient2(low = "#e74c3c", mid = "white", high = "#3498db", 
-                            midpoint = 0.5, limits = c(0, 1)) +
-        theme_bw(base_size = 10) +
-        labs(
-          title = "Sample Correlation - After Normalization",
-          subtitle = "Normalized samples should show more uniform correlations",
-          x = "",
-          y = "",
-          fill = "Correlation"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
-          plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
-          axis.text.x = element_text(angle = 90, hjust = 1, size = 7),
-          axis.text.y = element_text(size = 7),
-          legend.position = "right"
-        )
-      norm_plots$corr_after <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
+    )
   })
-  
+
   # Plot 5: Quantile-Quantile (Q-Q) plot
   output$normalization_qq <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     expr_data <- get_expr_comparison()
     if (is.null(expr_data)) {
       plot.new()
       text(0.5, 0.5, "Unable to generate plot", cex = 1.2)
       return()
     }
-    
+
     expr_before <- expr_data$before
     expr_after <- expr_data$after
-    
-    tryCatch({
-      # Sample genes for Q-Q plot
-      n_genes <- min(10000, nrow(expr_before))
-      if (nrow(expr_before) > n_genes) {
-        set.seed(123)
-        sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
-        expr_before <- expr_before[sample_genes, ]
-        expr_after <- expr_after[sample_genes, ]
-      }
-      
-      # Get quantiles
-      q_before <- quantile(as.vector(expr_before), probs = seq(0, 1, 0.01), na.rm = TRUE)
-      q_after <- quantile(as.vector(expr_after), probs = seq(0, 1, 0.01), na.rm = TRUE)
-      
-      qq_df <- data.frame(
-        Before = q_before,
-        After = q_after
-      )
-      
-      # Calculate reference line (y=x)
-      min_val <- min(c(qq_df$Before, qq_df$After), na.rm = TRUE)
-      max_val <- max(c(qq_df$Before, qq_df$After), na.rm = TRUE)
-      
-      p <- ggplot(qq_df, aes(x = Before, y = After)) +
-        geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed", linewidth = 1) +
-        geom_point(color = "#3498db", alpha = 0.6, size = 2) +
-        theme_bw(base_size = 14) +
-        labs(
-          title = "Quantile-Quantile (Q-Q) Plot",
-          subtitle = "Points on diagonal line indicate successful normalization",
-          x = "Quantiles - Before Normalization",
-          y = "Quantiles - After Normalization"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-          plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-          panel.grid.major = element_line(color = "gray90"),
-          panel.grid.minor = element_line(color = "gray95")
+
+    tryCatch(
+      {
+        # Sample genes for Q-Q plot
+        n_genes <- min(10000, nrow(expr_before))
+        if (nrow(expr_before) > n_genes) {
+          set.seed(123)
+          sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
+          expr_before <- expr_before[sample_genes, ]
+          expr_after <- expr_after[sample_genes, ]
+        }
+
+        # Get quantiles
+        q_before <- quantile(as.vector(expr_before), probs = seq(0, 1, 0.01), na.rm = TRUE)
+        q_after <- quantile(as.vector(expr_after), probs = seq(0, 1, 0.01), na.rm = TRUE)
+
+        qq_df <- data.frame(
+          Before = q_before,
+          After = q_after
         )
-      norm_plots$qq <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
+
+        # Calculate reference line (y=x)
+        min_val <- min(c(qq_df$Before, qq_df$After), na.rm = TRUE)
+        max_val <- max(c(qq_df$Before, qq_df$After), na.rm = TRUE)
+
+        p <- ggplot(qq_df, aes(x = Before, y = After)) +
+          geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed", linewidth = 1) +
+          geom_point(color = "#3498db", alpha = 0.6, size = 2) +
+          theme_bw(base_size = 14) +
+          labs(
+            title = "Quantile-Quantile (Q-Q) Plot",
+            subtitle = "Points on diagonal line indicate successful normalization",
+            x = "Quantiles - Before Normalization",
+            y = "Quantiles - After Normalization"
+          ) +
+          theme(
+            plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+            plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
+            panel.grid.major = element_line(color = "gray90"),
+            panel.grid.minor = element_line(color = "gray95")
+          )
+        norm_plots$qq <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
+      }
+    )
   })
-  
+
   # Plot 6: Median & Range Alignment - Boxplot
   output$normalization_median_range <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     expr_after <- rv$combined_expr
-    
-    tryCatch({
-      # Limit samples for readability
-      n_samples <- min(50, ncol(expr_after))
-      if (ncol(expr_after) > n_samples) {
-        set.seed(123)
-        sample_idx <- sample(seq_len(ncol(expr_after)), n_samples)
-        expr_after <- expr_after[, sample_idx]
-      }
-      
-      # Calculate median and range for each sample
-      sample_stats <- data.frame(
-        Sample = colnames(expr_after),
-        Median = apply(expr_after, 2, median, na.rm = TRUE),
-        Q25 = apply(expr_after, 2, quantile, 0.25, na.rm = TRUE),
-        Q75 = apply(expr_after, 2, quantile, 0.75, na.rm = TRUE),
-        Dataset = rv$unified_metadata$Dataset[match(colnames(expr_after), rv$unified_metadata$SampleID)]
-      )
-      
-      # Create boxplot data
-      plot_data <- data.frame(
-        Sample = rep(colnames(expr_after), each = nrow(expr_after)),
-        Expression = as.vector(expr_after),
-        Dataset = rep(sample_stats$Dataset, each = nrow(expr_after))
-      )
-      
-      p <- ggplot(plot_data, aes(x = Sample, y = Expression, fill = Dataset)) +
-        geom_boxplot(alpha = 0.7, outlier.size = 0.5, outlier.alpha = 0.3) +
-        theme_bw(base_size = 11) +
-        labs(
-          title = "Median & Range Alignment",
-          subtitle = "Aligned medians and ranges indicate successful normalization",
-          x = "Sample",
-          y = "Expression Value",
-          fill = "Dataset"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-          plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-          axis.text.x = element_text(angle = 90, hjust = 1, size = 7),
-          legend.position = "right",
-          panel.grid.major = element_line(color = "gray90"),
-          panel.grid.minor = element_line(color = "gray95")
+
+    tryCatch(
+      {
+        # Limit samples for readability
+        n_samples <- min(50, ncol(expr_after))
+        if (ncol(expr_after) > n_samples) {
+          set.seed(123)
+          sample_idx <- sample(seq_len(ncol(expr_after)), n_samples)
+          expr_after <- expr_after[, sample_idx]
+        }
+
+        # Calculate median and range for each sample
+        sample_stats <- data.frame(
+          Sample = colnames(expr_after),
+          Median = apply(expr_after, 2, median, na.rm = TRUE),
+          Q25 = apply(expr_after, 2, quantile, 0.25, na.rm = TRUE),
+          Q75 = apply(expr_after, 2, quantile, 0.75, na.rm = TRUE),
+          Dataset = rv$unified_metadata$Dataset[match(colnames(expr_after), rv$unified_metadata$SampleID)]
         )
-      norm_plots$median_range <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
+
+        # Create boxplot data
+        plot_data <- data.frame(
+          Sample = rep(colnames(expr_after), each = nrow(expr_after)),
+          Expression = as.vector(expr_after),
+          Dataset = rep(sample_stats$Dataset, each = nrow(expr_after))
+        )
+
+        p <- ggplot(plot_data, aes(x = Sample, y = Expression, fill = Dataset)) +
+          geom_boxplot(alpha = 0.7, outlier.size = 0.5, outlier.alpha = 0.3) +
+          theme_bw(base_size = 11) +
+          labs(
+            title = "Median & Range Alignment",
+            subtitle = "Aligned medians and ranges indicate successful normalization",
+            x = "Sample",
+            y = "Expression Value",
+            fill = "Dataset"
+          ) +
+          theme(
+            plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+            plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
+            axis.text.x = element_text(angle = 90, hjust = 1, size = 7),
+            legend.position = "right",
+            panel.grid.major = element_line(color = "gray90"),
+            panel.grid.minor = element_line(color = "gray95")
+          )
+        norm_plots$median_range <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
+      }
+    )
   })
-  
+
   # Plot 7: Distribution Overlap - Density Plot
   output$normalization_distribution_overlap <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     expr_data <- get_expr_comparison()
     if (is.null(expr_data)) {
       plot.new()
       text(0.5, 0.5, "Unable to generate plot", cex = 1.2)
       return()
     }
-    
+
     expr_before <- expr_data$before
     expr_after <- expr_data$after
-    
-    tryCatch({
-      # Sample genes if too many
-      n_genes <- min(50000, nrow(expr_before))
-      if (nrow(expr_before) > n_genes) {
-        set.seed(123)
-        sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
-        expr_before <- expr_before[sample_genes, ]
-        expr_after <- expr_after[sample_genes, ]
+
+    tryCatch(
+      {
+        # Sample genes if too many
+        n_genes <- min(50000, nrow(expr_before))
+        if (nrow(expr_before) > n_genes) {
+          set.seed(123)
+          sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
+          expr_before <- expr_before[sample_genes, ]
+          expr_after <- expr_after[sample_genes, ]
+        }
+
+        # Limit samples
+        n_samples <- min(20, ncol(expr_before))
+        if (ncol(expr_before) > n_samples) {
+          set.seed(123)
+          sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
+          expr_before <- expr_before[, sample_idx]
+          expr_after <- expr_after[, sample_idx]
+        }
+
+        # Create density data for multiple samples
+        plot_data_list <- list()
+
+        for (i in seq_len(ncol(expr_before))) {
+          sample_name <- colnames(expr_before)[i]
+          dataset_name <- rv$unified_metadata$Dataset[match(sample_name, rv$unified_metadata$SampleID)]
+
+          # Before
+          dens_before <- density(expr_before[, i], na.rm = TRUE)
+          plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
+            x = dens_before$x,
+            y = dens_before$y,
+            Sample = sample_name,
+            Dataset = dataset_name,
+            Stage = "Before"
+          )
+
+          # After
+          dens_after <- density(expr_after[, i], na.rm = TRUE)
+          plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
+            x = dens_after$x,
+            y = dens_after$y,
+            Sample = sample_name,
+            Dataset = dataset_name,
+            Stage = "After"
+          )
+        }
+
+        plot_data <- do.call(rbind, plot_data_list)
+        plot_data$Stage <- factor(plot_data$Stage, levels = c("Before", "After"))
+
+        p <- ggplot(plot_data, aes(x = x, y = y, color = Stage, group = interaction(Sample, Stage))) +
+          geom_line(alpha = 0.6, linewidth = 0.7) +
+          scale_color_manual(values = c("Before" = "#e74c3c", "After" = "#2ecc71")) +
+          facet_wrap(~Dataset, scales = "free", ncol = min(2, length(unique(plot_data$Dataset)))) +
+          theme_bw(base_size = 12) +
+          labs(
+            title = "Distribution Overlap",
+            subtitle = "Overlapping distributions indicate successful normalization",
+            x = "Expression Value",
+            y = "Density",
+            color = "Stage"
+          ) +
+          theme(
+            plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+            plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
+            legend.position = "top",
+            panel.grid.major = element_line(color = "gray90"),
+            panel.grid.minor = element_line(color = "gray95"),
+            strip.background = element_rect(fill = "#3498db", color = "white"),
+            strip.text = element_text(color = "white", face = "bold")
+          )
+        norm_plots$distribution_overlap <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
       }
-      
-      # Limit samples
-      n_samples <- min(20, ncol(expr_before))
-      if (ncol(expr_before) > n_samples) {
-        set.seed(123)
-        sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
-        expr_before <- expr_before[, sample_idx]
-        expr_after <- expr_after[, sample_idx]
-      }
-      
-      # Create density data for multiple samples
-      plot_data_list <- list()
-      
-      for (i in seq_len(ncol(expr_before))) {
-        sample_name <- colnames(expr_before)[i]
-        dataset_name <- rv$unified_metadata$Dataset[match(sample_name, rv$unified_metadata$SampleID)]
-        
-        # Before
-        dens_before <- density(expr_before[, i], na.rm = TRUE)
-        plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
-          x = dens_before$x,
-          y = dens_before$y,
-          Sample = sample_name,
-          Dataset = dataset_name,
-          Stage = "Before"
-        )
-        
-        # After
-        dens_after <- density(expr_after[, i], na.rm = TRUE)
-        plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
-          x = dens_after$x,
-          y = dens_after$y,
-          Sample = sample_name,
-          Dataset = dataset_name,
-          Stage = "After"
-        )
-      }
-      
-      plot_data <- do.call(rbind, plot_data_list)
-      plot_data$Stage <- factor(plot_data$Stage, levels = c("Before", "After"))
-      
-      p <- ggplot(plot_data, aes(x = x, y = y, color = Stage, group = interaction(Sample, Stage))) +
-        geom_line(alpha = 0.6, linewidth = 0.7) +
-        scale_color_manual(values = c("Before" = "#e74c3c", "After" = "#2ecc71")) +
-        facet_wrap(~ Dataset, scales = "free", ncol = min(2, length(unique(plot_data$Dataset)))) +
-        theme_bw(base_size = 12) +
-        labs(
-          title = "Distribution Overlap",
-          subtitle = "Overlapping distributions indicate successful normalization",
-          x = "Expression Value",
-          y = "Density",
-          color = "Stage"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-          plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
-          legend.position = "top",
-          panel.grid.major = element_line(color = "gray90"),
-          panel.grid.minor = element_line(color = "gray95"),
-          strip.background = element_rect(fill = "#3498db", color = "white"),
-          strip.text = element_text(color = "white", face = "bold")
-        )
-      norm_plots$distribution_overlap <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
+    )
   })
-  
+
   # Plot 8: Intensity Bias - MA-Plot
   output$normalization_ma_plot <- renderPlot({
     req(rv$normalization_complete, rv$combined_expr)
-    
+
     expr_data <- get_expr_comparison()
     if (is.null(expr_data)) {
       plot.new()
       text(0.5, 0.5, "Unable to generate plot", cex = 1.2)
       return()
     }
-    
+
     expr_before <- expr_data$before
     expr_after <- expr_data$after
-    
-    tryCatch({
-      # Sample genes
-      n_genes <- min(10000, nrow(expr_before))
-      if (nrow(expr_before) > n_genes) {
-        set.seed(123)
-        sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
-        expr_before <- expr_before[sample_genes, ]
-        expr_after <- expr_after[sample_genes, ]
+
+    tryCatch(
+      {
+        # Sample genes
+        n_genes <- min(10000, nrow(expr_before))
+        if (nrow(expr_before) > n_genes) {
+          set.seed(123)
+          sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
+          expr_before <- expr_before[sample_genes, ]
+          expr_after <- expr_after[sample_genes, ]
+        }
+
+        # Use first two samples for MA plot (or compare median before vs after)
+        if (ncol(expr_before) >= 2) {
+          # Compare two samples
+          sample1 <- expr_before[, 1]
+          sample2 <- expr_before[, 2]
+
+          # Calculate M and A
+          M_before <- sample1 - sample2
+          A_before <- (sample1 + sample2) / 2
+
+          sample1_after <- expr_after[, 1]
+          sample2_after <- expr_after[, 2]
+          M_after <- sample1_after - sample2_after
+          A_after <- (sample1_after + sample2_after) / 2
+
+          ma_data <- rbind(
+            data.frame(M = M_before, A = A_before, Stage = "Before Normalization"),
+            data.frame(M = M_after, A = A_after, Stage = "After Normalization")
+          )
+          ma_data$Stage <- factor(ma_data$Stage, levels = c("Before Normalization", "After Normalization"))
+
+          p <- ggplot(ma_data, aes(x = A, y = M, color = Stage)) +
+            geom_point(alpha = 0.3, size = 0.5) +
+            geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+            geom_smooth(method = "loess", se = TRUE, linewidth = 1.2) +
+            scale_color_manual(values = c(
+              "Before Normalization" = "#e74c3c",
+              "After Normalization" = "#2ecc71"
+            )) +
+            facet_wrap(~Stage, ncol = 2) +
+            theme_bw(base_size = 12) +
+            labs(
+              title = "Intensity Bias - MA Plot",
+              subtitle = "M = log2(sample1) - log2(sample2), A = (log2(sample1) + log2(sample2))/2",
+              x = "A (Average Intensity)",
+              y = "M (Intensity Difference)",
+              color = "Stage"
+            ) +
+            theme(
+              plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+              plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
+              legend.position = "none",
+              panel.grid.major = element_line(color = "gray90"),
+              panel.grid.minor = element_line(color = "gray95")
+            )
+        } else {
+          # Compare median before vs after
+          median_before <- apply(expr_before, 1, median, na.rm = TRUE)
+          median_after <- apply(expr_after, 1, median, na.rm = TRUE)
+
+          M <- median_before - median_after
+          A <- (median_before + median_after) / 2
+
+          ma_data <- data.frame(M = M, A = A)
+
+          p <- ggplot(ma_data, aes(x = A, y = M)) +
+            geom_point(alpha = 0.3, size = 0.5, color = "#3498db") +
+            geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.8) +
+            geom_smooth(method = "loess", se = TRUE, linewidth = 1.2, color = "#2ecc71") +
+            theme_bw(base_size = 12) +
+            labs(
+              title = "Intensity Bias - MA Plot",
+              subtitle = "M = median(before) - median(after), A = (median(before) + median(after))/2",
+              x = "A (Average Intensity)",
+              y = "M (Intensity Difference)"
+            ) +
+            theme(
+              plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+              plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
+              panel.grid.major = element_line(color = "gray90"),
+              panel.grid.minor = element_line(color = "gray95")
+            )
+        }
+        norm_plots$ma_plot <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
       }
-      
-      # Use first two samples for MA plot (or compare median before vs after)
-      if (ncol(expr_before) >= 2) {
-        # Compare two samples
-        sample1 <- expr_before[, 1]
-        sample2 <- expr_before[, 2]
-        
-        # Calculate M and A
-        M_before <- sample1 - sample2
-        A_before <- (sample1 + sample2) / 2
-        
-        sample1_after <- expr_after[, 1]
-        sample2_after <- expr_after[, 2]
-        M_after <- sample1_after - sample2_after
-        A_after <- (sample1_after + sample2_after) / 2
-        
-        ma_data <- rbind(
-          data.frame(M = M_before, A = A_before, Stage = "Before Normalization"),
-          data.frame(M = M_after, A = A_after, Stage = "After Normalization")
+    )
+  })
+
+  # Plot 9: Variance Stability - Mean-Variance Plot
+  output$normalization_mean_variance <- renderPlot({
+    req(rv$normalization_complete, rv$combined_expr)
+
+    expr_data <- get_expr_comparison()
+    if (is.null(expr_data)) {
+      plot.new()
+      text(0.5, 0.5, "Unable to generate plot", cex = 1.2)
+      return()
+    }
+
+    expr_before <- expr_data$before
+    expr_after <- expr_data$after
+
+    tryCatch(
+      {
+        # Sample genes
+        n_genes <- min(10000, nrow(expr_before))
+        if (nrow(expr_before) > n_genes) {
+          set.seed(123)
+          sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
+          expr_before <- expr_before[sample_genes, ]
+          expr_after <- expr_after[sample_genes, ]
+        }
+
+        # Calculate mean and variance for each gene
+        mean_before <- rowMeans(expr_before, na.rm = TRUE)
+        var_before <- apply(expr_before, 1, var, na.rm = TRUE)
+
+        mean_after <- rowMeans(expr_after, na.rm = TRUE)
+        var_after <- apply(expr_after, 1, var, na.rm = TRUE)
+
+        mv_data <- rbind(
+          data.frame(Mean = mean_before, Variance = var_before, Stage = "Before Normalization"),
+          data.frame(Mean = mean_after, Variance = var_after, Stage = "After Normalization")
         )
-        ma_data$Stage <- factor(ma_data$Stage, levels = c("Before Normalization", "After Normalization"))
-        
-        p <- ggplot(ma_data, aes(x = A, y = M, color = Stage)) +
+        mv_data$Stage <- factor(mv_data$Stage, levels = c("Before Normalization", "After Normalization"))
+
+        # Remove infinite and NA values
+        mv_data <- mv_data[is.finite(mv_data$Mean) & is.finite(mv_data$Variance) &
+          !is.na(mv_data$Mean) & !is.na(mv_data$Variance), ]
+
+        p <- ggplot(mv_data, aes(x = Mean, y = Variance, color = Stage)) +
           geom_point(alpha = 0.3, size = 0.5) +
-          geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
           geom_smooth(method = "loess", se = TRUE, linewidth = 1.2) +
-          scale_color_manual(values = c("Before Normalization" = "#e74c3c", 
-                                       "After Normalization" = "#2ecc71")) +
-          facet_wrap(~ Stage, ncol = 2) +
+          scale_color_manual(values = c(
+            "Before Normalization" = "#e74c3c",
+            "After Normalization" = "#2ecc71"
+          )) +
+          scale_y_log10() +
+          scale_x_log10() +
+          facet_wrap(~Stage, ncol = 2) +
           theme_bw(base_size = 12) +
           labs(
-            title = "Intensity Bias - MA Plot",
-            subtitle = "M = log2(sample1) - log2(sample2), A = (log2(sample1) + log2(sample2))/2",
-            x = "A (Average Intensity)",
-            y = "M (Intensity Difference)",
+            title = "Variance Stability - Mean-Variance Plot",
+            subtitle = "Stable variance across expression levels indicates successful normalization",
+            x = "Mean Expression (log10)",
+            y = "Variance (log10)",
             color = "Stage"
           ) +
           theme(
@@ -1078,138 +1277,99 @@ server_normalize <- function(input, output, session, rv) {
             panel.grid.major = element_line(color = "gray90"),
             panel.grid.minor = element_line(color = "gray95")
           )
-      } else {
-        # Compare median before vs after
-        median_before <- apply(expr_before, 1, median, na.rm = TRUE)
-        median_after <- apply(expr_after, 1, median, na.rm = TRUE)
-        
-        M <- median_before - median_after
-        A <- (median_before + median_after) / 2
-        
-        ma_data <- data.frame(M = M, A = A)
-        
-        p <- ggplot(ma_data, aes(x = A, y = M)) +
-          geom_point(alpha = 0.3, size = 0.5, color = "#3498db") +
-          geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 0.8) +
-          geom_smooth(method = "loess", se = TRUE, linewidth = 1.2, color = "#2ecc71") +
-          theme_bw(base_size = 12) +
-          labs(
-            title = "Intensity Bias - MA Plot",
-            subtitle = "M = median(before) - median(after), A = (median(before) + median(after))/2",
-            x = "A (Average Intensity)",
-            y = "M (Intensity Difference)"
-          ) +
-          theme(
-            plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-            plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
-            panel.grid.major = element_line(color = "gray90"),
-            panel.grid.minor = element_line(color = "gray95")
-          )
+        norm_plots$mean_variance <- p
+        print(p)
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
       }
-      norm_plots$ma_plot <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
+    )
   })
-  
-  # Plot 9: Variance Stability - Mean-Variance Plot
-  output$normalization_mean_variance <- renderPlot({
-    req(rv$normalization_complete, rv$combined_expr)
-    
-    expr_data <- get_expr_comparison()
-    if (is.null(expr_data)) {
-      plot.new()
-      text(0.5, 0.5, "Unable to generate plot", cex = 1.2)
-      return()
-    }
-    
-    expr_before <- expr_data$before
-    expr_after <- expr_data$after
-    
-    tryCatch({
-      # Sample genes
-      n_genes <- min(10000, nrow(expr_before))
-      if (nrow(expr_before) > n_genes) {
-        set.seed(123)
-        sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
-        expr_before <- expr_before[sample_genes, ]
-        expr_after <- expr_after[sample_genes, ]
-      }
-      
-      # Calculate mean and variance for each gene
-      mean_before <- rowMeans(expr_before, na.rm = TRUE)
-      var_before <- apply(expr_before, 1, var, na.rm = TRUE)
-      
-      mean_after <- rowMeans(expr_after, na.rm = TRUE)
-      var_after <- apply(expr_after, 1, var, na.rm = TRUE)
-      
-      mv_data <- rbind(
-        data.frame(Mean = mean_before, Variance = var_before, Stage = "Before Normalization"),
-        data.frame(Mean = mean_after, Variance = var_after, Stage = "After Normalization")
-      )
-      mv_data$Stage <- factor(mv_data$Stage, levels = c("Before Normalization", "After Normalization"))
-      
-      # Remove infinite and NA values
-      mv_data <- mv_data[is.finite(mv_data$Mean) & is.finite(mv_data$Variance) & 
-                        !is.na(mv_data$Mean) & !is.na(mv_data$Variance), ]
-      
-      p <- ggplot(mv_data, aes(x = Mean, y = Variance, color = Stage)) +
-        geom_point(alpha = 0.3, size = 0.5) +
-        geom_smooth(method = "loess", se = TRUE, linewidth = 1.2) +
-        scale_color_manual(values = c("Before Normalization" = "#e74c3c", 
-                                     "After Normalization" = "#2ecc71")) +
-        scale_y_log10() +
-        scale_x_log10() +
-        facet_wrap(~ Stage, ncol = 2) +
-        theme_bw(base_size = 12) +
-        labs(
-          title = "Variance Stability - Mean-Variance Plot",
-          subtitle = "Stable variance across expression levels indicates successful normalization",
-          x = "Mean Expression (log10)",
-          y = "Variance (log10)",
-          color = "Stage"
-        ) +
-        theme(
-          plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-          plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray50"),
-          legend.position = "none",
-          panel.grid.major = element_line(color = "gray90"),
-          panel.grid.minor = element_line(color = "gray95")
-        )
-      norm_plots$mean_variance <- p
-      print(p)
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
-    })
-  })
-  
+
   # Download handlers for each normalization plot (PNG/PDF)
   norm_save <- function(p, file, device = "png") {
-    if (is.null(p)) return()
-    if (device == "png") ggplot2::ggsave(file, plot = p, width = 9, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
-    else ggplot2::ggsave(file, plot = p, width = 9, height = 5, device = "pdf", bg = "white")
+    if (is.null(p)) {
+      return()
+    }
+    if (device == "png") {
+      ggplot2::ggsave(file, plot = p, width = 9, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    } else {
+      ggplot2::ggsave(file, plot = p, width = 9, height = 5, device = "pdf", bg = "white")
+    }
   }
-  output$dl_norm_plot_png <- downloadHandler(filename = function() "Normalization_Distribution.png", content = function(file) { req(norm_plots$plot); norm_save(norm_plots$plot, file, "png") })
-  output$dl_norm_plot_pdf <- downloadHandler(filename = function() "Normalization_Distribution.pdf", content = function(file) { req(norm_plots$plot); norm_save(norm_plots$plot, file, "pdf") })
-  output$dl_norm_density_png <- downloadHandler(filename = function() "Normalization_Density.png", content = function(file) { req(norm_plots$density); norm_save(norm_plots$density, file, "png") })
-  output$dl_norm_density_pdf <- downloadHandler(filename = function() "Normalization_Density.pdf", content = function(file) { req(norm_plots$density); norm_save(norm_plots$density, file, "pdf") })
-  output$dl_norm_qq_png <- downloadHandler(filename = function() "Normalization_QQ.png", content = function(file) { req(norm_plots$qq); norm_save(norm_plots$qq, file, "png") })
-  output$dl_norm_qq_pdf <- downloadHandler(filename = function() "Normalization_QQ.pdf", content = function(file) { req(norm_plots$qq); norm_save(norm_plots$qq, file, "pdf") })
-  output$dl_norm_median_range_png <- downloadHandler(filename = function() "Normalization_Median_Range.png", content = function(file) { req(norm_plots$median_range); norm_save(norm_plots$median_range, file, "png") })
-  output$dl_norm_median_range_pdf <- downloadHandler(filename = function() "Normalization_Median_Range.pdf", content = function(file) { req(norm_plots$median_range); norm_save(norm_plots$median_range, file, "pdf") })
-  output$dl_norm_dist_overlap_png <- downloadHandler(filename = function() "Normalization_Distribution_Overlap.png", content = function(file) { req(norm_plots$distribution_overlap); norm_save(norm_plots$distribution_overlap, file, "png") })
-  output$dl_norm_dist_overlap_pdf <- downloadHandler(filename = function() "Normalization_Distribution_Overlap.pdf", content = function(file) { req(norm_plots$distribution_overlap); norm_save(norm_plots$distribution_overlap, file, "pdf") })
-  output$dl_norm_ma_png <- downloadHandler(filename = function() "Normalization_MA_Plot.png", content = function(file) { req(norm_plots$ma_plot); norm_save(norm_plots$ma_plot, file, "png") })
-  output$dl_norm_ma_pdf <- downloadHandler(filename = function() "Normalization_MA_Plot.pdf", content = function(file) { req(norm_plots$ma_plot); norm_save(norm_plots$ma_plot, file, "pdf") })
-  output$dl_norm_mv_png <- downloadHandler(filename = function() "Normalization_Mean_Variance.png", content = function(file) { req(norm_plots$mean_variance); norm_save(norm_plots$mean_variance, file, "png") })
-  output$dl_norm_mv_pdf <- downloadHandler(filename = function() "Normalization_Mean_Variance.pdf", content = function(file) { req(norm_plots$mean_variance); norm_save(norm_plots$mean_variance, file, "pdf") })
-  output$dl_norm_corr_before_png <- downloadHandler(filename = function() "Normalization_Corr_Before.png", content = function(file) { req(norm_plots$corr_before); norm_save(norm_plots$corr_before, file, "png") })
-  output$dl_norm_corr_before_pdf <- downloadHandler(filename = function() "Normalization_Corr_Before.pdf", content = function(file) { req(norm_plots$corr_before); norm_save(norm_plots$corr_before, file, "pdf") })
-  output$dl_norm_corr_after_png <- downloadHandler(filename = function() "Normalization_Corr_After.png", content = function(file) { req(norm_plots$corr_after); norm_save(norm_plots$corr_after, file, "png") })
-  output$dl_norm_corr_after_pdf <- downloadHandler(filename = function() "Normalization_Corr_After.pdf", content = function(file) { req(norm_plots$corr_after); norm_save(norm_plots$corr_after, file, "pdf") })
+  output$dl_norm_plot_png <- downloadHandler(filename = function() "Normalization_Distribution.png", content = function(file) {
+    req(norm_plots$plot)
+    norm_save(norm_plots$plot, file, "png")
+  })
+  output$dl_norm_plot_pdf <- downloadHandler(filename = function() "Normalization_Distribution.pdf", content = function(file) {
+    req(norm_plots$plot)
+    norm_save(norm_plots$plot, file, "pdf")
+  })
+  output$dl_norm_density_png <- downloadHandler(filename = function() "Normalization_Density.png", content = function(file) {
+    req(norm_plots$density)
+    norm_save(norm_plots$density, file, "png")
+  })
+  output$dl_norm_density_pdf <- downloadHandler(filename = function() "Normalization_Density.pdf", content = function(file) {
+    req(norm_plots$density)
+    norm_save(norm_plots$density, file, "pdf")
+  })
+  output$dl_norm_qq_png <- downloadHandler(filename = function() "Normalization_QQ.png", content = function(file) {
+    req(norm_plots$qq)
+    norm_save(norm_plots$qq, file, "png")
+  })
+  output$dl_norm_qq_pdf <- downloadHandler(filename = function() "Normalization_QQ.pdf", content = function(file) {
+    req(norm_plots$qq)
+    norm_save(norm_plots$qq, file, "pdf")
+  })
+  output$dl_norm_median_range_png <- downloadHandler(filename = function() "Normalization_Median_Range.png", content = function(file) {
+    req(norm_plots$median_range)
+    norm_save(norm_plots$median_range, file, "png")
+  })
+  output$dl_norm_median_range_pdf <- downloadHandler(filename = function() "Normalization_Median_Range.pdf", content = function(file) {
+    req(norm_plots$median_range)
+    norm_save(norm_plots$median_range, file, "pdf")
+  })
+  output$dl_norm_dist_overlap_png <- downloadHandler(filename = function() "Normalization_Distribution_Overlap.png", content = function(file) {
+    req(norm_plots$distribution_overlap)
+    norm_save(norm_plots$distribution_overlap, file, "png")
+  })
+  output$dl_norm_dist_overlap_pdf <- downloadHandler(filename = function() "Normalization_Distribution_Overlap.pdf", content = function(file) {
+    req(norm_plots$distribution_overlap)
+    norm_save(norm_plots$distribution_overlap, file, "pdf")
+  })
+  output$dl_norm_ma_png <- downloadHandler(filename = function() "Normalization_MA_Plot.png", content = function(file) {
+    req(norm_plots$ma_plot)
+    norm_save(norm_plots$ma_plot, file, "png")
+  })
+  output$dl_norm_ma_pdf <- downloadHandler(filename = function() "Normalization_MA_Plot.pdf", content = function(file) {
+    req(norm_plots$ma_plot)
+    norm_save(norm_plots$ma_plot, file, "pdf")
+  })
+  output$dl_norm_mv_png <- downloadHandler(filename = function() "Normalization_Mean_Variance.png", content = function(file) {
+    req(norm_plots$mean_variance)
+    norm_save(norm_plots$mean_variance, file, "png")
+  })
+  output$dl_norm_mv_pdf <- downloadHandler(filename = function() "Normalization_Mean_Variance.pdf", content = function(file) {
+    req(norm_plots$mean_variance)
+    norm_save(norm_plots$mean_variance, file, "pdf")
+  })
+  output$dl_norm_corr_before_png <- downloadHandler(filename = function() "Normalization_Corr_Before.png", content = function(file) {
+    req(norm_plots$corr_before)
+    norm_save(norm_plots$corr_before, file, "png")
+  })
+  output$dl_norm_corr_before_pdf <- downloadHandler(filename = function() "Normalization_Corr_Before.pdf", content = function(file) {
+    req(norm_plots$corr_before)
+    norm_save(norm_plots$corr_before, file, "pdf")
+  })
+  output$dl_norm_corr_after_png <- downloadHandler(filename = function() "Normalization_Corr_After.png", content = function(file) {
+    req(norm_plots$corr_after)
+    norm_save(norm_plots$corr_after, file, "png")
+  })
+  output$dl_norm_corr_after_pdf <- downloadHandler(filename = function() "Normalization_Corr_After.pdf", content = function(file) {
+    req(norm_plots$corr_after)
+    norm_save(norm_plots$corr_after, file, "pdf")
+  })
 
   output$download_normalization_summary_csv <- downloadHandler(
     filename = function() "Normalization_Summary_Table.csv",
@@ -1229,29 +1389,35 @@ server_normalize <- function(input, output, session, rv) {
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
       tags$p(tags$strong("Step 3 complete."), " Normalization applied per dataset; see table and log below for gene counts (initial, after filtering, final common)."),
-      tags$p("Final common genes: ", format(n_genes, big.mark = ","), "."))
+      tags$p("Final common genes: ", format(n_genes, big.mark = ","), ".")
+    )
   })
 
   # Render summary table
-  output$normalization_summary_table <- renderTable({
-    req(rv$normalization_summary_table)
-    
-    # Format numbers with commas
-    summary_table <- rv$normalization_summary_table
-    summary_table$Initial_Genes <- format(summary_table$Initial_Genes, big.mark = ",")
-    summary_table$After_Filtering <- format(summary_table$After_Filtering, big.mark = ",")
-    summary_table$Final_Common_Genes <- format(summary_table$Final_Common_Genes, big.mark = ",")
-    
-    summary_table
-  }, striped = TRUE, bordered = TRUE, hover = TRUE, 
-     spacing = "m", width = "100%", align = "l")
-  
+  output$normalization_summary_table <- renderTable(
+    {
+      req(rv$normalization_summary_table)
+
+      # Format numbers with commas
+      summary_table <- rv$normalization_summary_table
+      summary_table$Initial_Genes <- format(summary_table$Initial_Genes, big.mark = ",")
+      summary_table$After_Filtering <- format(summary_table$After_Filtering, big.mark = ",")
+      summary_table$Final_Common_Genes <- format(summary_table$Final_Common_Genes, big.mark = ",")
+
+      summary_table
+    },
+    striped = TRUE,
+    bordered = TRUE,
+    hover = TRUE,
+    spacing = "m",
+    width = "100%",
+    align = "l"
+  )
+
   output$next_to_groups_btn <- renderUI({
     req(rv$normalization_complete)
-    actionButton("go_to_groups", "Next: Select Groups", 
-                 icon = icon("arrow-right"), class = "btn-success btn-lg")
+    actionButton("go_to_groups", "Next: Select Groups",
+      icon = icon("arrow-right"), class = "btn-success btn-lg"
+    )
   })
-  
 }
-
-

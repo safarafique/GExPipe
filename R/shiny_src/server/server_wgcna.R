@@ -12,37 +12,41 @@
 # ==============================================================================
 
 server_wgcna <- function(input, output, session, rv) {
-  
   output$wgcna_timer <- renderText({
     wgcna_running <- isTRUE(rv$wgcna_running)
     wgcna_start <- rv$wgcna_start
-    
-    if (!wgcna_running || is.null(wgcna_start)) return("00:00")
+
+    if (!wgcna_running || is.null(wgcna_start)) {
+      return("00:00")
+    }
     invalidateLater(1000, session)
     elapsed <- as.integer(difftime(Sys.time(), wgcna_start, units = "secs"))
     sprintf("%02d:%02d", elapsed %/% 60, elapsed %% 60)
   })
-  
+
   # Helper function to add log messages
   add_wgcna_log <- function(message) {
     timestamp <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
     rv$wgcna_log_messages <- c(rv$wgcna_log_messages, paste0("[", timestamp, "] ", message))
   }
-  
+
   # ---------- STEP 1: DATA PREPARATION ----------
   observeEvent(input$prepare_wgcna, {
     # Require batch correction to be complete
     if (!isTRUE(rv$batch_complete) || is.null(rv$batch_corrected) || is.null(rv$unified_metadata)) {
       showNotification(
-        tags$div(icon("exclamation-triangle"), tags$strong(" Step 5 required:"),
-                 " Complete batch correction (Step 5) and ensure group labels are applied before running WGCNA."),
-        type = "error", duration = 6)
+        tags$div(
+          icon("exclamation-triangle"), tags$strong(" Step 5 required:"),
+          " Complete batch correction (Step 5) and ensure group labels are applied before running WGCNA."
+        ),
+        type = "error", duration = 6
+      )
       return()
     }
     batch_complete <- TRUE
     batch_corrected <- rv$batch_corrected
     unified_metadata <- rv$unified_metadata
-    
+
     # Check if DE analysis has been run (optional but recommended)
     de_results <- rv$de_results
     if (is.null(de_results)) {
@@ -58,15 +62,17 @@ server_wgcna <- function(input, output, session, rv) {
         type = "warning", duration = 5
       )
     }
-    
+
     # Disable button and show loading
     shinyjs::disable("prepare_wgcna")
-    shinyjs::html("prepare_wgcna", 
-                  HTML('<i class="fa fa-spinner fa-spin"></i> Preparing...'))
-    
+    shinyjs::html(
+      "prepare_wgcna",
+      HTML('<i class="fa fa-spinner fa-spin"></i> Preparing...')
+    )
+
     rv$wgcna_start <- Sys.time()
     rv$wgcna_running <- TRUE
-    
+
     showNotification(
       tags$div(
         tags$div(class = "status-indicator processing"),
@@ -79,154 +85,164 @@ server_wgcna <- function(input, output, session, rv) {
       duration = NULL,
       id = "wgcna_prepare_processing"
     )
-    
+
     withProgress(message = "Preparing WGCNA data", value = 0.5, {
-      tryCatch({
-        # Use batch corrected data if available
-        expr_mat <- rv$batch_corrected
-        
-        if (is.null(expr_mat)) {
-          expr_mat <- rv$combined_expr
-        }
-        
-        if (is.null(expr_mat)) {
-          stop("No expression data available. Please complete batch correction first.")
-        }
-        
-        add_wgcna_log("Starting WGCNA data preparation...")
-        
-        # Remove samples with too many NAs
-        good_samples <- colSums(is.na(expr_mat)) < nrow(expr_mat) * 0.5
-        expr_mat <- expr_mat[, good_samples, drop = FALSE]
-        
-        # Match samples with metadata (by rownames or SampleID column)
-        meta <- rv$unified_metadata
-        samp_ids <- if ("SampleID" %in% names(meta)) meta$SampleID else rownames(meta)
-        if (is.null(samp_ids)) samp_ids <- rownames(meta)
-        common_samples <- intersect(colnames(expr_mat), as.character(samp_ids))
-        if (length(common_samples) == 0) {
-          common_samples <- intersect(colnames(expr_mat), rownames(meta))
-        }
-        if (length(common_samples) == 0) {
-          stop("No matching samples between expression data and metadata. Check that batch correction and group selection used the same sample IDs.")
-        }
-        expr_mat <- expr_mat[, common_samples, drop = FALSE]
-        # Subset metadata to common_samples; use SampleID match if rownames don't match
-        if (all(common_samples %in% rownames(meta))) {
-          sample_info <- meta[common_samples, , drop = FALSE]
-        } else if ("SampleID" %in% names(meta)) {
-          sample_info <- meta[match(common_samples, meta$SampleID), , drop = FALSE]
-          rownames(sample_info) <- common_samples
-        } else {
-          sample_info <- meta[match(common_samples, rownames(meta)), , drop = FALSE]
-          rownames(sample_info) <- common_samples
-        }
-        
-        # Check for good samples and genes
-        if (!requireNamespace("WGCNA", quietly = TRUE)) {
-          stop("WGCNA package not installed. Please install it: BiocManager::install('WGCNA')")
-        }
-        
-        gsg <- WGCNA::goodSamplesGenes(t(expr_mat), verbose = 3)
-        if (!gsg$allOK) {
-          expr_mat <- t(expr_mat)[gsg$goodSamples, gsg$goodGenes]
-          expr_mat <- t(expr_mat)
-          add_wgcna_log(paste("Filtered:", sum(!gsg$goodSamples), "samples,", 
-                            sum(!gsg$goodGenes), "genes removed"))
-        }
-        
-        gene_mode <- if (!is.null(input$wgcna_gene_mode)) input$wgcna_gene_mode else "top_variable"
-        # Variance is needed later for wgcna_gene_variance_table in both modes
-        vars <- apply(expr_mat, 1, var, na.rm = TRUE)
-        if (gene_mode == "all_common") {
-          expr_top <- expr_mat
-          add_wgcna_log(paste("Using all common genes:", nrow(expr_top), "genes"))
-        } else {
-          # Select top variable genes (wgcna_top_genes only exists when top_variable is selected)
-          top_n <- min(
-            if (!is.null(input$wgcna_top_genes)) as.integer(input$wgcna_top_genes) else 5000L,
-            length(vars)
+      tryCatch(
+        {
+          # Use batch corrected data if available
+          expr_mat <- rv$batch_corrected
+
+          if (is.null(expr_mat)) {
+            expr_mat <- rv$combined_expr
+          }
+
+          if (is.null(expr_mat)) {
+            stop("No expression data available. Please complete batch correction first.")
+          }
+
+          add_wgcna_log("Starting WGCNA data preparation...")
+
+          # Remove samples with too many NAs
+          good_samples <- colSums(is.na(expr_mat)) < nrow(expr_mat) * 0.5
+          expr_mat <- expr_mat[, good_samples, drop = FALSE]
+
+          # Match samples with metadata (by rownames or SampleID column)
+          meta <- rv$unified_metadata
+          samp_ids <- if ("SampleID" %in% names(meta)) meta$SampleID else rownames(meta)
+          if (is.null(samp_ids)) samp_ids <- rownames(meta)
+          common_samples <- intersect(colnames(expr_mat), as.character(samp_ids))
+          if (length(common_samples) == 0) {
+            common_samples <- intersect(colnames(expr_mat), rownames(meta))
+          }
+          if (length(common_samples) == 0) {
+            stop("No matching samples between expression data and metadata. Check that batch correction and group selection used the same sample IDs.")
+          }
+          expr_mat <- expr_mat[, common_samples, drop = FALSE]
+          # Subset metadata to common_samples; use SampleID match if rownames don't match
+          if (all(common_samples %in% rownames(meta))) {
+            sample_info <- meta[common_samples, , drop = FALSE]
+          } else if ("SampleID" %in% names(meta)) {
+            sample_info <- meta[match(common_samples, meta$SampleID), , drop = FALSE]
+            rownames(sample_info) <- common_samples
+          } else {
+            sample_info <- meta[match(common_samples, rownames(meta)), , drop = FALSE]
+            rownames(sample_info) <- common_samples
+          }
+
+          # Check for good samples and genes
+          if (!requireNamespace("WGCNA", quietly = TRUE)) {
+            stop("WGCNA package not installed. Please install it: BiocManager::install('WGCNA')")
+          }
+
+          gsg <- WGCNA::goodSamplesGenes(t(expr_mat), verbose = 3)
+          if (!gsg$allOK) {
+            expr_mat <- t(expr_mat)[gsg$goodSamples, gsg$goodGenes]
+            expr_mat <- t(expr_mat)
+            add_wgcna_log(paste(
+              "Filtered:", sum(!gsg$goodSamples), "samples,",
+              sum(!gsg$goodGenes), "genes removed"
+            ))
+          }
+
+          gene_mode <- if (!is.null(input$wgcna_gene_mode)) input$wgcna_gene_mode else "top_variable"
+          # Variance is needed later for wgcna_gene_variance_table in both modes
+          vars <- apply(expr_mat, 1, var, na.rm = TRUE)
+          if (gene_mode == "all_common") {
+            expr_top <- expr_mat
+            add_wgcna_log(paste("Using all common genes:", nrow(expr_top), "genes"))
+          } else {
+            # Select top variable genes (wgcna_top_genes only exists when top_variable is selected)
+            top_n <- min(
+              if (!is.null(input$wgcna_top_genes)) as.integer(input$wgcna_top_genes) else 5000L,
+              length(vars)
+            )
+            keep_genes <- names(sort(vars, decreasing = TRUE))[1:top_n]
+            expr_top <- expr_mat[keep_genes, , drop = FALSE]
+            add_wgcna_log(paste("Selected top", top_n, "most variable genes"))
+          }
+
+          # Filter by minimum samples (use safe default if input not set)
+          min_frac <- if (!is.null(input$wgcna_min_samples)) as.numeric(input$wgcna_min_samples) else 0.5
+          min_frac <- max(0.1, min(1, min_frac))
+          min_samples <- ceiling(min_frac * ncol(expr_top))
+          keep <- rowSums(!is.na(expr_top)) >= min_samples
+          expr_top <- expr_top[keep, , drop = FALSE]
+
+          # Require minimum dimensions for meaningful WGCNA
+          if (nrow(expr_top) < 20L) {
+            stop("Too few genes (", nrow(expr_top), ") after filtering. Use 'All genes' or larger 'Top Variable Genes' (e.g. 3000–5000) or lower 'Min Samples' fraction.")
+          }
+          if (ncol(expr_top) < 3L) {
+            stop("Too few samples (", ncol(expr_top), "). Need at least 3 samples for WGCNA.")
+          }
+
+          # Transpose for WGCNA (samples as rows, genes as columns)
+          datExpr <- t(expr_top)
+          rv$datExpr <- datExpr
+          # Store gene list and selection scores (variance = basis for "top variable" selection; rank 1 = highest variance)
+          final_genes <- colnames(datExpr)
+          rv$wgcna_top_variable_genes <- final_genes
+          gene_var <- vars[final_genes]
+          rv$wgcna_gene_variance_table <- data.frame(
+            Rank = seq_along(final_genes),
+            Gene = final_genes,
+            Variance = round(as.numeric(gene_var), 6),
+            stringsAsFactors = FALSE
           )
-          keep_genes <- names(sort(vars, decreasing = TRUE))[1:top_n]
-          expr_top <- expr_mat[keep_genes, , drop = FALSE]
-          add_wgcna_log(paste("Selected top", top_n, "most variable genes"))
-        }
-        
-        # Filter by minimum samples (use safe default if input not set)
-        min_frac <- if (!is.null(input$wgcna_min_samples)) as.numeric(input$wgcna_min_samples) else 0.5
-        min_frac <- max(0.1, min(1, min_frac))
-        min_samples <- ceiling(min_frac * ncol(expr_top))
-        keep <- rowSums(!is.na(expr_top)) >= min_samples
-        expr_top <- expr_top[keep, , drop = FALSE]
-        
-        # Require minimum dimensions for meaningful WGCNA
-        if (nrow(expr_top) < 20L) {
-          stop("Too few genes (", nrow(expr_top), ") after filtering. Use 'All genes' or larger 'Top Variable Genes' (e.g. 3000–5000) or lower 'Min Samples' fraction.")
-        }
-        if (ncol(expr_top) < 3L) {
-          stop("Too few samples (", ncol(expr_top), "). Need at least 3 samples for WGCNA.")
-        }
-        
-        # Transpose for WGCNA (samples as rows, genes as columns)
-        datExpr <- t(expr_top)
-        rv$datExpr <- datExpr
-        # Store gene list and selection scores (variance = basis for "top variable" selection; rank 1 = highest variance)
-        final_genes <- colnames(datExpr)
-        rv$wgcna_top_variable_genes <- final_genes
-        gene_var <- vars[final_genes]
-        rv$wgcna_gene_variance_table <- data.frame(
-          Rank = seq_along(final_genes),
-          Gene = final_genes,
-          Variance = round(as.numeric(gene_var), 6),
-          stringsAsFactors = FALSE
-        )
-        rv$wgcna_sample_info <- sample_info[rownames(datExpr), , drop = FALSE]
-        rv$wgcna_prepared <- TRUE
-        rv$wgcna_datExpr_before_exclude <- NULL
-        rv$wgcna_sample_info_before_exclude <- NULL
+          rv$wgcna_sample_info <- sample_info[rownames(datExpr), , drop = FALSE]
+          rv$wgcna_prepared <- TRUE
+          rv$wgcna_datExpr_before_exclude <- NULL
+          rv$wgcna_sample_info_before_exclude <- NULL
 
-        # Sample clustering tree (for outlier check: one bad sample can ruin the network)
-        st <- hclust(dist(datExpr), method = "average")
-        rv$wgcna_sample_tree <- st
-        rv$wgcna_excluded_samples <- character(0)  # reset exclusion when re-preparing
-        rv$wgcna_suggested_outliers <- character(0)
+          # Sample clustering tree (for outlier check: one bad sample can ruin the network)
+          st <- hclust(dist(datExpr), method = "average")
+          rv$wgcna_sample_tree <- st
+          rv$wgcna_excluded_samples <- character(0) # reset exclusion when re-preparing
+          rv$wgcna_suggested_outliers <- character(0)
 
-        rv$wgcna_complete <- FALSE
-        
-        add_wgcna_log(paste("WGCNA data prepared:", nrow(datExpr), "samples x", 
-                          ncol(datExpr), "genes"))
-        
-        # Re-enable button
-        shinyjs::enable("prepare_wgcna")
-        shinyjs::html("prepare_wgcna", 
-                      HTML('<i class="fa fa-check-circle"></i> Prepare WGCNA Data'))
-        
-        removeNotification("wgcna_prepare_processing")
-        
-        showNotification(
-          tags$div(
-            tags$strong("✓ WGCNA data prepared!"),
-            tags$br(),
-            tags$span("Samples: ", nrow(datExpr), " | Genes: ", ncol(datExpr)),
-            style = "font-size: 13px;"
-          ),
-          type = "message", duration = 6
-        )
-        
-      }, error = function(e) {
-        rv$wgcna_running <- FALSE
-        shinyjs::enable("prepare_wgcna")
-        shinyjs::html("prepare_wgcna", 
-                      HTML('<i class="fa fa-exclamation-triangle"></i> Prepare WGCNA Data'))
-        removeNotification("wgcna_prepare_processing")
-        showNotification(paste("Error:", e$message), type = "error", duration = 10)
-        add_wgcna_log(paste("ERROR:", e$message))
-      })
+          rv$wgcna_complete <- FALSE
+
+          add_wgcna_log(paste(
+            "WGCNA data prepared:", nrow(datExpr), "samples x",
+            ncol(datExpr), "genes"
+          ))
+
+          # Re-enable button
+          shinyjs::enable("prepare_wgcna")
+          shinyjs::html(
+            "prepare_wgcna",
+            HTML('<i class="fa fa-check-circle"></i> Prepare WGCNA Data')
+          )
+
+          removeNotification("wgcna_prepare_processing")
+
+          showNotification(
+            tags$div(
+              tags$strong("✓ WGCNA data prepared!"),
+              tags$br(),
+              tags$span("Samples: ", nrow(datExpr), " | Genes: ", ncol(datExpr)),
+              style = "font-size: 13px;"
+            ),
+            type = "message", duration = 6
+          )
+        },
+        error = function(e) {
+          rv$wgcna_running <- FALSE
+          shinyjs::enable("prepare_wgcna")
+          shinyjs::html(
+            "prepare_wgcna",
+            HTML('<i class="fa fa-exclamation-triangle"></i> Prepare WGCNA Data')
+          )
+          removeNotification("wgcna_prepare_processing")
+          showNotification(paste("Error:", e$message), type = "error", duration = 10)
+          add_wgcna_log(paste("ERROR:", e$message))
+        }
+      )
     })
-    
+
     rv$wgcna_running <- FALSE
   })
-  
+
   output$wgcna_qc_status <- renderUI({
     if (!isTRUE(rv$wgcna_prepared)) {
       tags$div(
@@ -250,9 +266,11 @@ server_wgcna <- function(input, output, session, rv) {
       )
     }
   })
-  
+
   output$wgcna_gene_list_ui <- renderUI({
-    if (!isTRUE(rv$wgcna_prepared) || is.null(rv$wgcna_top_variable_genes)) return(NULL)
+    if (!isTRUE(rv$wgcna_prepared) || is.null(rv$wgcna_top_variable_genes)) {
+      return(NULL)
+    }
     genes <- rv$wgcna_top_variable_genes
     n <- length(genes)
     tags$div(
@@ -265,15 +283,17 @@ server_wgcna <- function(input, output, session, rv) {
       tags$div(
         style = "margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;",
         downloadButton("download_wgcna_gene_list",
-                       tagList(icon("download"), " Gene list (Rank & Variance)"),
-                       class = "btn-sm btn-info"),
+          tagList(icon("download"), " Gene list (Rank & Variance)"),
+          class = "btn-sm btn-info"
+        ),
         downloadButton("download_wgcna_scaled_expr",
-                       tagList(icon("download"), " Scaled expression (z-score)"),
-                       class = "btn-sm btn-success")
+          tagList(icon("download"), " Scaled expression (z-score)"),
+          class = "btn-sm btn-success"
+        )
       )
     )
   })
-  
+
   output$download_wgcna_gene_list <- downloadHandler(
     filename = function() {
       n <- length(rv$wgcna_top_variable_genes)
@@ -286,7 +306,7 @@ server_wgcna <- function(input, output, session, rv) {
       write.csv(df, file.path(CSV_EXPORT_DIR(), basename(file)), row.names = FALSE)
     }
   )
-  
+
   output$download_wgcna_scaled_expr <- downloadHandler(
     filename = function() {
       n <- length(rv$wgcna_top_variable_genes)
@@ -304,11 +324,13 @@ server_wgcna <- function(input, output, session, rv) {
       write.csv(df, file.path(CSV_EXPORT_DIR(), fname), row.names = FALSE)
     }
   )
-  
+
   # Per-sample merge height from hclust (height at which sample joins the tree)
   get_sample_merge_heights <- function(ht) {
     n <- length(ht$labels)
-    if (n < 2) return(setNames(numeric(n), ht$labels))
+    if (n < 2) {
+      return(setNames(numeric(n), ht$labels))
+    }
     merge <- ht$merge
     height <- ht$height
     join_height <- numeric(n)
@@ -351,7 +373,9 @@ server_wgcna <- function(input, output, session, rv) {
     suggested <- rv$wgcna_suggested_outliers
     sample_ids <- rownames(rv$datExpr)
     found <- intersect(suggested, sample_ids)
-    if (length(found) == 0) return()
+    if (length(found) == 0) {
+      return()
+    }
     if (is.null(rv$wgcna_datExpr_before_exclude)) {
       rv$wgcna_datExpr_before_exclude <- rv$datExpr
       rv$wgcna_sample_info_before_exclude <- rv$wgcna_sample_info
@@ -374,10 +398,14 @@ server_wgcna <- function(input, output, session, rv) {
   })
 
   output$wgcna_suggested_outliers_ui <- renderUI({
-    if (!isTRUE(rv$wgcna_prepared)) return(NULL)
+    if (!isTRUE(rv$wgcna_prepared)) {
+      return(NULL)
+    }
     suggested <- rv$wgcna_suggested_outliers
     if (is.null(suggested)) suggested <- character(0)
-    if (length(suggested) == 0) return(NULL)
+    if (length(suggested) == 0) {
+      return(NULL)
+    }
     tags$div(
       style = "margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;",
       tags$p(tags$small(tags$strong("Suggested outliers:"), paste(suggested, collapse = ", ")), style = "margin: 0 0 6px 0;"),
@@ -414,14 +442,17 @@ server_wgcna <- function(input, output, session, rv) {
     }
     to_exclude <- trimws(strsplit(txt, split = "[,]")[[1]])
     to_exclude <- to_exclude[nzchar(to_exclude)]
-    if (length(to_exclude) == 0) return()
+    if (length(to_exclude) == 0) {
+      return()
+    }
     sample_ids <- rownames(rv$datExpr)
     found <- intersect(to_exclude, sample_ids)
     not_found <- setdiff(to_exclude, sample_ids)
     if (length(found) == 0) {
       showNotification(
         paste("None of the given IDs match current samples. Current sample IDs: ", paste(head(sample_ids, 10), collapse = ", "), if (length(sample_ids) > 10) " ..." else ""),
-        type = "warning", duration = 6)
+        type = "warning", duration = 6
+      )
       return()
     }
     # Store backup on first exclusion so we can restore if user clears the box
@@ -441,11 +472,14 @@ server_wgcna <- function(input, output, session, rv) {
     }
     showNotification(
       paste("Excluded ", length(found), " sample(s). Re-run 'Build Network' (Step 3) if you had already run it.", sep = ""),
-      type = "message", duration = 5)
+      type = "message", duration = 5
+    )
   })
 
   output$wgcna_exclude_status <- renderUI({
-    if (!isTRUE(rv$wgcna_prepared)) return(NULL)
+    if (!isTRUE(rv$wgcna_prepared)) {
+      return(NULL)
+    }
     excl <- rv$wgcna_excluded_samples
     if (length(excl) == 0) {
       tags$p(tags$small(icon("check"), " No samples excluded.", style = "color: #28a745; margin-top: 8px;"))
@@ -467,20 +501,26 @@ server_wgcna <- function(input, output, session, rv) {
     n_genes <- ncol(rv$datExpr)
     d <- as.dendrogram(ht)
     set_edge_par <- function(node) {
-      if (is.leaf(node)) return(node)
+      if (is.leaf(node)) {
+        return(node)
+      }
       attr(node, "edgePar") <- list(col = "#2980b9", lwd = 1.4)
       node
     }
     d <- dendrapply(d, set_edge_par)
     leaf_cex <- max(0.25, min(0.55, 28 / n_samp))
     set_leaf_par <- function(node) {
-      if (!is.leaf(node)) return(node)
+      if (!is.leaf(node)) {
+        return(node)
+      }
       attr(node, "nodePar") <- list(cex = leaf_cex, pch = NA)
       node
     }
     d <- dendrapply(d, set_leaf_par)
-    op <- par(mar = c(6, 4.5, 5, 1.5), bg = "white", fg = "#2c3e50", xpd = NA,
-              plt = c(0.14, 0.98, 0.22, 0.88))
+    op <- par(
+      mar = c(6, 4.5, 5, 1.5), bg = "white", fg = "#2c3e50", xpd = NA,
+      plt = c(0.14, 0.98, 0.22, 0.88)
+    )
     on.exit(par(op), add = TRUE)
     plot(d, main = "", xlab = "", ylab = "Height", sub = "", leaflab = "perpendicular", axes = FALSE)
     title(main = "Sample clustering (outlier check)", line = 2.8, col.main = "#1a252f", font.main = 2, cex.main = 1.2)
@@ -491,22 +531,29 @@ server_wgcna <- function(input, output, session, rv) {
     box(col = "gray85", lwd = 1)
   }
 
-  output$wgcna_sample_tree <- renderPlot({
-    draw_wgcna_sample_tree()
-  }, width = 960, height = 420, res = 96)
-  
+  output$wgcna_sample_tree <- renderPlot(
+    {
+      draw_wgcna_sample_tree()
+    },
+    width = 960,
+    height = 420,
+    res = 96
+  )
+
   # ---------- STEP 2: SOFT THRESHOLD ----------
   observeEvent(input$pick_soft_threshold, {
     req(rv$datExpr)
-    
+
     # Clear any stale connections from download/other steps to avoid "invalid connection" errors
     closeAllConnections()
-    
+
     # Disable button
     shinyjs::disable("pick_soft_threshold")
-    shinyjs::html("pick_soft_threshold", 
-                  HTML('<i class="fa fa-spinner fa-spin"></i> Calculating...'))
-    
+    shinyjs::html(
+      "pick_soft_threshold",
+      HTML('<i class="fa fa-spinner fa-spin"></i> Calculating...')
+    )
+
     showNotification(
       tags$div(
         tags$div(class = "status-indicator processing"),
@@ -519,72 +566,81 @@ server_wgcna <- function(input, output, session, rv) {
       duration = NULL,
       id = "wgcna_threshold_processing"
     )
-    
-    tryCatch({
-      if (!requireNamespace("WGCNA", quietly = TRUE)) {
-        stop("WGCNA package not installed.")
-      }
-      
-      power_max <- max(12L, min(30L, as.integer(input$wgcna_power_max)))
-      powers <- c(1:10, seq(12, power_max, by = 2))
-      add_wgcna_log(paste("Calculating soft threshold for powers:", paste(powers, collapse = ", ")))
-      
-      # Use a local copy of datExpr to avoid reactive access during long computation
-      datExpr <- as.matrix(rv$datExpr)
-      n_genes <- ncol(datExpr)
-      # Always use blockSize to avoid connection/memory errors (especially on Windows with threading)
-      block_size <- if (n_genes > 10000) 2000L else if (n_genes > 5000) 4000L else 5000L
-      # Disable WGCNA multi-threading to avoid "invalid connection" (parallel backend can fail in Shiny/Windows)
-      tryCatch(
-        if (is.function(get0("disableWGCNAThreads", envir = getNamespace("WGCNA"), inherits = FALSE)))
-          WGCNA::disableWGCNAThreads(),
-        error = function(e) NULL
-      )
-      # verbose = 0 to avoid writing to stdout (can trigger connection errors in Shiny)
-      sft <- WGCNA::pickSoftThreshold(datExpr, powerVector = powers, verbose = 0,
-                                      networkType = "signed", blockSize = block_size)
-      
-      rv$soft_threshold <- sft
-      rv$soft_threshold_powers <- powers
-      # Auto-fill Step 3 power so user can go straight to Build Network
-      rec_power <- sft$powerEstimate
-      if ((is.na(rec_power) || length(rec_power) == 0) && !is.null(sft$fitIndices) && nrow(sft$fitIndices) > 0) {
-        signedR2 <- -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2]
-        rec_power <- sft$fitIndices[which.max(signedR2), 1]
-      }
-      if (length(rec_power) && !is.na(rec_power)) {
-        rec_power <- max(1L, min(30L, as.integer(rec_power)))
-        tryCatch(updateNumericInput(session, "wgcna_power", value = rec_power), error = function(e) NULL)
-      }
-      add_wgcna_log("Soft-threshold calculation complete")
-      
-      shinyjs::enable("pick_soft_threshold")
-      shinyjs::html("pick_soft_threshold", 
-                    HTML('<i class="fa fa-check-circle"></i> Calculate Soft Threshold'))
-      
-      removeNotification("wgcna_threshold_processing")
-      
-      showNotification("Soft-threshold calculation complete.", type = "message", duration = 5)
-      
-    }, error = function(e) {
-      closeAllConnections()
-      shinyjs::enable("pick_soft_threshold")
-      shinyjs::html("pick_soft_threshold", 
-                    HTML('<i class="fa fa-exclamation-triangle"></i> Calculate Soft Threshold'))
-      removeNotification("wgcna_threshold_processing")
-      msg <- conditionMessage(e)
-      add_wgcna_log(paste("ERROR:", msg))
-      if (grepl("connection|invalid", msg, ignore.case = TRUE)) {
-        showNotification(
-          "Soft threshold failed (connection/memory). Connections were reset. If you ran Download earlier, try again; otherwise reduce genes or power range.",
-          type = "error", duration = 12
+
+    tryCatch(
+      {
+        if (!requireNamespace("WGCNA", quietly = TRUE)) {
+          stop("WGCNA package not installed.")
+        }
+
+        power_max <- max(12L, min(30L, as.integer(input$wgcna_power_max)))
+        powers <- c(1:10, seq(12, power_max, by = 2))
+        add_wgcna_log(paste("Calculating soft threshold for powers:", paste(powers, collapse = ", ")))
+
+        # Use a local copy of datExpr to avoid reactive access during long computation
+        datExpr <- as.matrix(rv$datExpr)
+        n_genes <- ncol(datExpr)
+        # Always use blockSize to avoid connection/memory errors (especially on Windows with threading)
+        block_size <- if (n_genes > 10000) 2000L else if (n_genes > 5000) 4000L else 5000L
+        # Disable WGCNA multi-threading to avoid "invalid connection" (parallel backend can fail in Shiny/Windows)
+        tryCatch(
+          if (is.function(get0("disableWGCNAThreads", envir = getNamespace("WGCNA"), inherits = FALSE))) {
+            WGCNA::disableWGCNAThreads()
+          },
+          error = function(e) NULL
         )
-      } else {
-        showNotification(paste("Error:", msg), type = "error", duration = 10)
+        # verbose = 0 to avoid writing to stdout (can trigger connection errors in Shiny)
+        sft <- WGCNA::pickSoftThreshold(datExpr,
+          powerVector = powers, verbose = 0,
+          networkType = "signed", blockSize = block_size
+        )
+
+        rv$soft_threshold <- sft
+        rv$soft_threshold_powers <- powers
+        # Auto-fill Step 3 power so user can go straight to Build Network
+        rec_power <- sft$powerEstimate
+        if ((is.na(rec_power) || length(rec_power) == 0) && !is.null(sft$fitIndices) && nrow(sft$fitIndices) > 0) {
+          signedR2 <- -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2]
+          rec_power <- sft$fitIndices[which.max(signedR2), 1]
+        }
+        if (length(rec_power) && !is.na(rec_power)) {
+          rec_power <- max(1L, min(30L, as.integer(rec_power)))
+          tryCatch(updateNumericInput(session, "wgcna_power", value = rec_power), error = function(e) NULL)
+        }
+        add_wgcna_log("Soft-threshold calculation complete")
+
+        shinyjs::enable("pick_soft_threshold")
+        shinyjs::html(
+          "pick_soft_threshold",
+          HTML('<i class="fa fa-check-circle"></i> Calculate Soft Threshold')
+        )
+
+        removeNotification("wgcna_threshold_processing")
+
+        showNotification("Soft-threshold calculation complete.", type = "message", duration = 5)
+      },
+      error = function(e) {
+        closeAllConnections()
+        shinyjs::enable("pick_soft_threshold")
+        shinyjs::html(
+          "pick_soft_threshold",
+          HTML('<i class="fa fa-exclamation-triangle"></i> Calculate Soft Threshold')
+        )
+        removeNotification("wgcna_threshold_processing")
+        msg <- conditionMessage(e)
+        add_wgcna_log(paste("ERROR:", msg))
+        if (grepl("connection|invalid", msg, ignore.case = TRUE)) {
+          showNotification(
+            "Soft threshold failed (connection/memory). Connections were reset. If you ran Download earlier, try again; otherwise reduce genes or power range.",
+            type = "error", duration = 12
+          )
+        } else {
+          showNotification(paste("Error:", msg), type = "error", duration = 10)
+        }
       }
-    })
+    )
   })
-  
+
   draw_soft_threshold_plot <- function() {
     req(rv$soft_threshold)
     sft <- rv$soft_threshold
@@ -597,15 +653,19 @@ server_wgcna <- function(input, output, session, rv) {
     on.exit(par(op), add = TRUE)
     x1 <- sft$fitIndices[, 1]
     y1 <- -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2]
-    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "Scale Free Topology Model Fit, signed R²",
-         type = "n", main = "Scale independence", col.main = "#1a252f")
+    plot(x1, y1,
+      xlab = "Soft Threshold (power)", ylab = "Scale Free Topology Model Fit, signed R²",
+      type = "n", main = "Scale independence", col.main = "#1a252f"
+    )
     points(x1, y1, pch = 19, col = "#2980b9", cex = 1.2)
     text(x1, y1, labels = powers, cex = 0.85, col = "#1a252f", pos = 4, offset = 0.3)
     abline(h = 0.8, col = "#e74c3c", lty = 2, lwd = 1.5)
     box(col = "gray85", lwd = 1)
     y2 <- sft$fitIndices[, 5]
-    plot(x1, y2, xlab = "Soft Threshold (power)", ylab = "Mean Connectivity",
-         type = "n", main = "Mean connectivity", col.main = "#1a252f")
+    plot(x1, y2,
+      xlab = "Soft Threshold (power)", ylab = "Mean Connectivity",
+      type = "n", main = "Mean connectivity", col.main = "#1a252f"
+    )
     points(x1, y2, pch = 19, col = "#27ae60", cex = 1.2)
     text(x1, y2, labels = powers, cex = 0.85, col = "#1a252f", pos = 4, offset = 0.3)
     box(col = "gray85", lwd = 1)
@@ -614,10 +674,10 @@ server_wgcna <- function(input, output, session, rv) {
   output$soft_threshold_plot <- renderPlot({
     draw_soft_threshold_plot()
   })
-  
+
   output$soft_threshold_result <- renderUI({
     req(rv$soft_threshold)
-    
+
     sft <- rv$soft_threshold
     best_power <- if (length(sft$powerEstimate)) sft$powerEstimate else NA
     fitIndices <- sft$fitIndices
@@ -628,10 +688,13 @@ server_wgcna <- function(input, output, session, rv) {
     max_r2 <- max(signedR2, na.rm = TRUE)
     power_at_max <- fitIndices[which.max(signedR2), 1]
     if (length(power_at_max) > 1) power_at_max <- power_at_max[1]
-    
+
     if (is.na(best_power)) {
-      best_hint <- if (length(power_at_max) && !is.na(power_at_max))
-        paste0("Best R² = ", round(max_r2, 2), " at power ", power_at_max, ". ") else ""
+      best_hint <- if (length(power_at_max) && !is.na(power_at_max)) {
+        paste0("Best R² = ", round(max_r2, 2), " at power ", power_at_max, ". ")
+      } else {
+        ""
+      }
       tags$div(
         class = "alert alert-warning",
         icon("info-circle"),
@@ -648,19 +711,21 @@ server_wgcna <- function(input, output, session, rv) {
       )
     }
   })
-  
+
   # ---------- STEP 3: NETWORK CONSTRUCTION ----------
   observeEvent(input$run_wgcna, {
     req(rv$datExpr)
-    
+
     # Disable button
     shinyjs::disable("run_wgcna")
-    shinyjs::html("run_wgcna", 
-                  HTML('<i class="fa fa-spinner fa-spin"></i> Building Network...'))
-    
+    shinyjs::html(
+      "run_wgcna",
+      HTML('<i class="fa fa-spinner fa-spin"></i> Building Network...')
+    )
+
     rv$wgcna_start <- Sys.time()
     rv$wgcna_running <- TRUE
-    
+
     showNotification(
       tags$div(
         tags$div(class = "status-indicator processing"),
@@ -673,144 +738,162 @@ server_wgcna <- function(input, output, session, rv) {
       duration = NULL,
       id = "wgcna_network_processing"
     )
-    
+
     withProgress(message = "Running WGCNA network construction", value = 0.5, {
-      tryCatch({
-        if (!requireNamespace("WGCNA", quietly = TRUE)) {
-          stop("WGCNA package not installed.")
-        }
-        # Avoid threading issues on some systems
-        if (exists("disableWGCNAThreads", mode = "function", where = asNamespace("WGCNA"))) {
-          WGCNA::disableWGCNAThreads()
-        }
-        
-        # Ensure matrix: samples as rows, genes as columns
-        datExpr <- as.matrix(rv$datExpr)
-        if (ncol(datExpr) < 10 || nrow(datExpr) < 3) {
-          stop("datExpr too small: need at least 10 genes and 3 samples. Re-run Step 1 with more genes/samples.")
-        }
-        
-        # Safe defaults so run completes and graph appears (no error from missing/invalid inputs)
-        power <- tryCatch(max(1L, min(30L, as.integer(input$wgcna_power))), error = function(e) 6L)
-        if (length(power) == 0 || is.na(power)) power <- 6L
-        minModuleSize <- tryCatch(max(10L, min(200L, as.integer(input$wgcna_min_module_size))), error = function(e) 30L)
-        if (length(minModuleSize) == 0 || is.na(minModuleSize)) minModuleSize <- 30L
-        mergeCutHeight <- 0.25  # fixed default: merge modules with eigengene cor > 0.75
-        deepSplit <- tryCatch(max(0L, min(4L, as.integer(input$wgcna_deep_split))), error = function(e) 2L)
-        if (length(deepSplit) == 0 || is.na(deepSplit)) deepSplit <- 2L
-        
-        add_wgcna_log(paste("Building network with power =", power, 
-                          ", minModuleSize =", minModuleSize,
-                          ", mergeCutHeight =", mergeCutHeight))
-        
-        # Build adjacency matrix
-        incProgress(0.2, detail = "Building adjacency matrix...")
-        adjacency <- WGCNA::adjacency(datExpr, power = power, type = "signed")
-        
-        # Calculate TOM
-        incProgress(0.3, detail = "Calculating TOM...")
-        TOM <- WGCNA::TOMsimilarity(adjacency, TOMType = "signed")
-        dissTOM <- 1 - TOM
-        rm(adjacency)
-        gc(verbose = FALSE)
-        
-        # Gene tree
-        incProgress(0.4, detail = "Building gene tree...")
-        geneTree <- hclust(as.dist(dissTOM), method = "average")
-        # Store tree early so dendrogram can render even if later steps fail
-        rv$geneTree <- geneTree
-        
-        # Dynamic module detection (deepSplit: 0=conservative, 4=more modules)
-        # cutreeDynamic is from dynamicTreeCut (WGCNA dependency), not exported by WGCNA
-        incProgress(0.6, detail = "Detecting modules...")
-        dynamicMods <- dynamicTreeCut::cutreeDynamic(
-          dendro = geneTree,
-          distM = dissTOM,
-          deepSplit = deepSplit,
-          pamRespectsDendro = FALSE,
-          minClusterSize = minModuleSize
-        )
-        # Ensure integer module labels; NA -> 0 (grey) so labels2colors never fails
-        dynamicMods <- as.integer(dynamicMods)
-        dynamicMods[is.na(dynamicMods)] <- 0L
-        dynamicColors <- WGCNA::labels2colors(dynamicMods)
-        if (length(dynamicColors) != ncol(datExpr)) {
-          stop("Module assignment length (", length(dynamicColors), ") != number of genes (", ncol(datExpr), ").")
-        }
-        
-        # Module eigengenes
-        incProgress(0.8, detail = "Calculating module eigengenes...")
-        MEList <- tryCatch(
-          WGCNA::moduleEigengenes(datExpr, colors = dynamicColors),
-          error = function(e) { add_wgcna_log(paste("moduleEigengenes warning:", e$message)); NULL }
-        )
-        MEs <- if (!is.null(MEList)) MEList$eigengenes else NULL
-        
-        # Merge similar modules (or use unmerged / single-module fallback)
-        incProgress(0.9, detail = "Merging modules...")
-        mergedColors <- dynamicColors
-        mergedMEs <- MEs
-        if (is.null(MEs) || ncol(MEs) < 1) {
-          me_vec <- as.numeric(scale(rowMeans(datExpr, na.rm = TRUE)))
-          mergedMEs <- data.frame(MEgrey = me_vec, row.names = rownames(datExpr))
-          add_wgcna_log("Single module (e.g. all grey); storing as-is.")
-        } else {
-          merge_result <- tryCatch({
-            MEDiss <- 1 - cor(MEs, use = "pairwise.complete.obs")
-            MEDiss[is.na(MEDiss)] <- 1
-            WGCNA::mergeCloseModules(datExpr, dynamicColors,
-                                     cutHeight = mergeCutHeight, verbose = 3, trapErrors = TRUE)
-          }, error = function(e) { add_wgcna_log(paste("mergeCloseModules:", e$message)); NULL })
-          if (!is.null(merge_result) && !is.null(merge_result$colors) && isTRUE(merge_result$allOK)) {
-            mergedColors <- merge_result$colors
-            mergedMEs <- if (!is.null(merge_result$newMEs)) merge_result$newMEs else MEs
-          } else {
-            add_wgcna_log("Using unmerged module colors.")
+      tryCatch(
+        {
+          if (!requireNamespace("WGCNA", quietly = TRUE)) {
+            stop("WGCNA package not installed.")
           }
+          # Avoid threading issues on some systems
+          if (exists("disableWGCNAThreads", mode = "function", where = asNamespace("WGCNA"))) {
+            WGCNA::disableWGCNAThreads()
+          }
+
+          # Ensure matrix: samples as rows, genes as columns
+          datExpr <- as.matrix(rv$datExpr)
+          if (ncol(datExpr) < 10 || nrow(datExpr) < 3) {
+            stop("datExpr too small: need at least 10 genes and 3 samples. Re-run Step 1 with more genes/samples.")
+          }
+
+          # Safe defaults so run completes and graph appears (no error from missing/invalid inputs)
+          power <- tryCatch(max(1L, min(30L, as.integer(input$wgcna_power))), error = function(e) 6L)
+          if (length(power) == 0 || is.na(power)) power <- 6L
+          minModuleSize <- tryCatch(max(10L, min(200L, as.integer(input$wgcna_min_module_size))), error = function(e) 30L)
+          if (length(minModuleSize) == 0 || is.na(minModuleSize)) minModuleSize <- 30L
+          mergeCutHeight <- 0.25 # fixed default: merge modules with eigengene cor > 0.75
+          deepSplit <- tryCatch(max(0L, min(4L, as.integer(input$wgcna_deep_split))), error = function(e) 2L)
+          if (length(deepSplit) == 0 || is.na(deepSplit)) deepSplit <- 2L
+
+          add_wgcna_log(paste(
+            "Building network with power =", power,
+            ", minModuleSize =", minModuleSize,
+            ", mergeCutHeight =", mergeCutHeight
+          ))
+
+          # Build adjacency matrix
+          incProgress(0.2, detail = "Building adjacency matrix...")
+          adjacency <- WGCNA::adjacency(datExpr, power = power, type = "signed")
+
+          # Calculate TOM
+          incProgress(0.3, detail = "Calculating TOM...")
+          TOM <- WGCNA::TOMsimilarity(adjacency, TOMType = "signed")
+          dissTOM <- 1 - TOM
+          rm(adjacency)
+          gc(verbose = FALSE)
+
+          # Gene tree
+          incProgress(0.4, detail = "Building gene tree...")
+          geneTree <- hclust(as.dist(dissTOM), method = "average")
+          # Store tree early so dendrogram can render even if later steps fail
+          rv$geneTree <- geneTree
+
+          # Dynamic module detection (deepSplit: 0=conservative, 4=more modules)
+          # cutreeDynamic is from dynamicTreeCut (WGCNA dependency), not exported by WGCNA
+          incProgress(0.6, detail = "Detecting modules...")
+          dynamicMods <- dynamicTreeCut::cutreeDynamic(
+            dendro = geneTree,
+            distM = dissTOM,
+            deepSplit = deepSplit,
+            pamRespectsDendro = FALSE,
+            minClusterSize = minModuleSize
+          )
+          # Ensure integer module labels; NA -> 0 (grey) so labels2colors never fails
+          dynamicMods <- as.integer(dynamicMods)
+          dynamicMods[is.na(dynamicMods)] <- 0L
+          dynamicColors <- WGCNA::labels2colors(dynamicMods)
+          if (length(dynamicColors) != ncol(datExpr)) {
+            stop("Module assignment length (", length(dynamicColors), ") != number of genes (", ncol(datExpr), ").")
+          }
+
+          # Module eigengenes
+          incProgress(0.8, detail = "Calculating module eigengenes...")
+          MEList <- tryCatch(
+            WGCNA::moduleEigengenes(datExpr, colors = dynamicColors),
+            error = function(e) {
+              add_wgcna_log(paste("moduleEigengenes warning:", e$message))
+              NULL
+            }
+          )
+          MEs <- if (!is.null(MEList)) MEList$eigengenes else NULL
+
+          # Merge similar modules (or use unmerged / single-module fallback)
+          incProgress(0.9, detail = "Merging modules...")
+          mergedColors <- dynamicColors
+          mergedMEs <- MEs
+          if (is.null(MEs) || ncol(MEs) < 1) {
+            me_vec <- as.numeric(scale(rowMeans(datExpr, na.rm = TRUE)))
+            mergedMEs <- data.frame(MEgrey = me_vec, row.names = rownames(datExpr))
+            add_wgcna_log("Single module (e.g. all grey); storing as-is.")
+          } else {
+            merge_result <- tryCatch(
+              {
+                MEDiss <- 1 - cor(MEs, use = "pairwise.complete.obs")
+                MEDiss[is.na(MEDiss)] <- 1
+                WGCNA::mergeCloseModules(datExpr, dynamicColors,
+                  cutHeight = mergeCutHeight, verbose = 3, trapErrors = TRUE
+                )
+              },
+              error = function(e) {
+                add_wgcna_log(paste("mergeCloseModules:", e$message))
+                NULL
+              }
+            )
+            if (!is.null(merge_result) && !is.null(merge_result$colors) && isTRUE(merge_result$allOK)) {
+              mergedColors <- merge_result$colors
+              mergedMEs <- if (!is.null(merge_result$newMEs)) merge_result$newMEs else MEs
+            } else {
+              add_wgcna_log("Using unmerged module colors.")
+            }
+          }
+
+          # Always store results so UI updates (figures and data appear)
+          rv$moduleColors <- mergedColors
+          rv$dynamicColors <- mergedColors
+          rv$MEs <- mergedMEs
+          rv$wgcna_complete <- TRUE
+
+          n_modules <- length(unique(mergedColors))
+          add_wgcna_log(paste("WGCNA network construction complete. Detected", n_modules, "modules"))
+
+          # Re-enable button and update UI
+          shinyjs::enable("run_wgcna")
+          shinyjs::html(
+            "run_wgcna",
+            HTML('<i class="fa fa-check-circle"></i> Build Network')
+          )
+          removeNotification("wgcna_network_processing")
+          showNotification(
+            tags$div(
+              tags$strong("✓ Network construction complete!"),
+              tags$br(),
+              tags$span("Modules detected: ", n_modules),
+              style = "font-size: 13px;"
+            ),
+            type = "message", duration = 6
+          )
+        },
+        error = function(e) {
+          rv$wgcna_running <- FALSE
+          shinyjs::enable("run_wgcna")
+          shinyjs::html(
+            "run_wgcna",
+            HTML('<i class="fa fa-exclamation-triangle"></i> Build Network')
+          )
+          removeNotification("wgcna_network_processing")
+          showNotification(paste("Error:", e$message), type = "error", duration = 10)
+          add_wgcna_log(paste("ERROR:", e$message))
         }
-        
-        # Always store results so UI updates (figures and data appear)
-        rv$moduleColors <- mergedColors
-        rv$dynamicColors <- mergedColors
-        rv$MEs <- mergedMEs
-        rv$wgcna_complete <- TRUE
-        
-        n_modules <- length(unique(mergedColors))
-        add_wgcna_log(paste("WGCNA network construction complete. Detected", n_modules, "modules"))
-        
-        # Re-enable button and update UI
-        shinyjs::enable("run_wgcna")
-        shinyjs::html("run_wgcna", 
-                      HTML('<i class="fa fa-check-circle"></i> Build Network'))
-        removeNotification("wgcna_network_processing")
-        showNotification(
-          tags$div(
-            tags$strong("✓ Network construction complete!"),
-            tags$br(),
-            tags$span("Modules detected: ", n_modules),
-            style = "font-size: 13px;"
-          ),
-          type = "message", duration = 6
-        )
-        
-    }, error = function(e) {
-      rv$wgcna_running <- FALSE
-      shinyjs::enable("run_wgcna")
-      shinyjs::html("run_wgcna", 
-                    HTML('<i class="fa fa-exclamation-triangle"></i> Build Network'))
-      removeNotification("wgcna_network_processing")
-      showNotification(paste("Error:", e$message), type = "error", duration = 10)
-      add_wgcna_log(paste("ERROR:", e$message))
+      )
     })
+
+    rv$wgcna_running <- FALSE
   })
-  
-  rv$wgcna_running <- FALSE
-})
-  
+
   output$wgcna_module_info <- renderUI({
     wgcna_complete <- isTRUE(rv$wgcna_complete)
     module_colors <- rv$moduleColors
-    
+
     if (!wgcna_complete) {
       tags$div(
         class = "alert alert-warning",
@@ -820,7 +903,7 @@ server_wgcna <- function(input, output, session, rv) {
     } else {
       n_modules <- length(unique(module_colors))
       module_table <- table(module_colors)
-      
+
       tags$div(
         class = "alert alert-success",
         icon("check-circle"),
@@ -830,36 +913,41 @@ server_wgcna <- function(input, output, session, rv) {
       )
     }
   })
-  
+
   draw_wgcna_dendrogram <- function() {
     req(rv$geneTree, rv$moduleColors)
     if (!requireNamespace("WGCNA", quietly = TRUE)) {
-      par(bg = "white"); plot.new(); text(0.5, 0.5, "WGCNA package required", cex = 1.2)
+      par(bg = "white")
+      plot.new()
+      text(0.5, 0.5, "WGCNA package required", cex = 1.2)
       return(invisible(NULL))
     }
     op <- par(bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
     WGCNA::plotDendroAndColors(rv$geneTree,
-                               rv$moduleColors,
-                               "Module Colors",
-                               main = "Gene Dendrogram and Module Colors",
-                               dendroLabels = FALSE, hang = 0.03,
-                               addGuide = TRUE, guideHang = 0.05)
+      rv$moduleColors,
+      "Module Colors",
+      main = "Gene Dendrogram and Module Colors",
+      dendroLabels = FALSE, hang = 0.03,
+      addGuide = TRUE, guideHang = 0.05
+    )
   }
 
   output$wgcna_dendrogram <- renderPlot({
     draw_wgcna_dendrogram()
   })
-  
+
   # ---------- STEP 4: MODULE-TRAIT & GS/MM ----------
   observeEvent(input$calculate_module_trait, {
     req(rv$datExpr, rv$dynamicColors, rv$wgcna_sample_info)
-    
+
     # Disable button
     shinyjs::disable("calculate_module_trait")
-    shinyjs::html("calculate_module_trait", 
-                  HTML('<i class="fa fa-spinner fa-spin"></i> Calculating...'))
-    
+    shinyjs::html(
+      "calculate_module_trait",
+      HTML('<i class="fa fa-spinner fa-spin"></i> Calculating...')
+    )
+
     showNotification(
       tags$div(
         tags$div(class = "status-indicator processing"),
@@ -872,142 +960,157 @@ server_wgcna <- function(input, output, session, rv) {
       duration = NULL,
       id = "wgcna_module_trait_processing"
     )
-    
+
     withProgress(message = "Calculating GS, MM & module-trait correlations", value = 0.3, {
-      tryCatch({
-        if (!requireNamespace("WGCNA", quietly = TRUE)) {
-          stop("WGCNA package not installed.")
-        }
-        
-        if (length(rv$dynamicColors) != ncol(rv$datExpr)) {
-          stop("ERROR: dynamicColors and datExpr mismatch. Rebuild network.")
-        }
-        
-        add_wgcna_log("Calculating module eigengenes...")
-        MEs <- WGCNA::moduleEigengenes(rv$datExpr,
-                                      rv$dynamicColors)$eigengenes
-        rv$MEs <- MEs
-        
-        # Prepare trait data (use Condition if present, else first factor/numeric)
-        sample_info <- rv$wgcna_sample_info
-        cond_col <- if ("Condition" %in% names(sample_info)) "Condition" else NULL
-        if (is.null(cond_col)) {
-          fac_cols <- names(sample_info)[vapply(sample_info, function(x) is.factor(x) || is.character(x), logical(1))]
-          if (length(fac_cols) > 0) cond_col <- fac_cols[1]
-        }
-        if (!is.null(cond_col)) {
-          unique_groups <- unique(sample_info[[cond_col]])
-          unique_groups <- unique_groups[!is.na(unique_groups) & as.character(unique_groups) != ""]
-        } else {
-          unique_groups <- character(0)
-        }
-        if (length(unique_groups) <= 1) {
-          trait_data <- data.frame(Trait1 = rnorm(nrow(sample_info)))
-          rownames(trait_data) <- rownames(sample_info)
-        } else {
-          trait_data <- data.frame(row.names = rownames(sample_info))
-          for (g in unique_groups) {
-            trait_data[[as.character(g)]] <- ifelse(sample_info[[cond_col]] == g, 1, 0)
+      tryCatch(
+        {
+          if (!requireNamespace("WGCNA", quietly = TRUE)) {
+            stop("WGCNA package not installed.")
           }
-          # Add "Disease vs Normal" (or "A vs B") so both show on one line when selected
-          if (length(unique_groups) == 2L) {
-            ug <- as.character(unique_groups)
-            if ("Normal" %in% ug && "Disease" %in% ug) {
-              both_label <- "Disease vs Normal"
-              trait_data[[both_label]] <- trait_data[["Disease"]]
-            } else {
-              both_label <- paste(ug, collapse = " vs ")
-              trait_data[[both_label]] <- trait_data[[ug[1]]]
+
+          if (length(rv$dynamicColors) != ncol(rv$datExpr)) {
+            stop("ERROR: dynamicColors and datExpr mismatch. Rebuild network.")
+          }
+
+          add_wgcna_log("Calculating module eigengenes...")
+          MEs <- WGCNA::moduleEigengenes(
+            rv$datExpr,
+            rv$dynamicColors
+          )$eigengenes
+          rv$MEs <- MEs
+
+          # Prepare trait data (use Condition if present, else first factor/numeric)
+          sample_info <- rv$wgcna_sample_info
+          cond_col <- if ("Condition" %in% names(sample_info)) "Condition" else NULL
+          if (is.null(cond_col)) {
+            fac_cols <- names(sample_info)[vapply(sample_info, function(x) is.factor(x) || is.character(x), logical(1))]
+            if (length(fac_cols) > 0) cond_col <- fac_cols[1]
+          }
+          if (!is.null(cond_col)) {
+            unique_groups <- unique(sample_info[[cond_col]])
+            unique_groups <- unique_groups[!is.na(unique_groups) & as.character(unique_groups) != ""]
+          } else {
+            unique_groups <- character(0)
+          }
+          if (length(unique_groups) <= 1) {
+            trait_data <- data.frame(Trait1 = rnorm(nrow(sample_info)))
+            rownames(trait_data) <- rownames(sample_info)
+          } else {
+            trait_data <- data.frame(row.names = rownames(sample_info))
+            for (g in unique_groups) {
+              trait_data[[as.character(g)]] <- ifelse(sample_info[[cond_col]] == g, 1, 0)
+            }
+            # Add "Disease vs Normal" (or "A vs B") so both show on one line when selected
+            if (length(unique_groups) == 2L) {
+              ug <- as.character(unique_groups)
+              if ("Normal" %in% ug && "Disease" %in% ug) {
+                both_label <- "Disease vs Normal"
+                trait_data[[both_label]] <- trait_data[["Disease"]]
+              } else {
+                both_label <- paste(ug, collapse = " vs ")
+                trait_data[[both_label]] <- trait_data[[ug[1]]]
+              }
             }
           }
-        }
-        rv$trait_data <- trait_data
-        
-        add_wgcna_log("Calculating module-trait correlations...")
-        moduleTraitCor <- cor(MEs, trait_data, use = "pairwise.complete.obs")
-        moduleTraitPvalue <- WGCNA::corPvalueStudent(moduleTraitCor,
-                                                    nSamples = nrow(MEs))
-        
-        rv$moduleTraitCor <- moduleTraitCor
-        rv$moduleTraitPvalue <- moduleTraitPvalue
-        
-        add_wgcna_log("Calculating Gene Significance (GS) and Module Membership (MM)...")
-        trait_vector <- trait_data[, 1]
-        
-        geneTraitSignificance <- as.data.frame(
-          cor(rv$datExpr, trait_vector, use = "p")
-        )
-        names(geneTraitSignificance) <- "GS"
-        GSPvalue <- as.data.frame(
-          WGCNA::corPvalueStudent(as.matrix(geneTraitSignificance),
-                                 nrow(rv$datExpr))
-        )
-        names(GSPvalue) <- "GS.pvalue"
-        
-        modNames <- substring(names(MEs), 3)
-        geneModuleMembership <- as.data.frame(
-          cor(rv$datExpr, MEs, use = "p")
-        )
-        MMPvalue <- as.data.frame(
-          WGCNA::corPvalueStudent(as.matrix(geneModuleMembership),
-                                 nrow(rv$datExpr))
-        )
-        names(geneModuleMembership) <- paste("MM", modNames, sep = "")
-        names(MMPvalue) <- paste("p.MM", modNames, sep = "")
-        
-        # Create gene metrics dataframe
-        gene_metrics <- data.frame(
-          Gene = colnames(rv$datExpr),
-          Module = rv$dynamicColors,
-          GS = geneTraitSignificance$GS,
-          GS.pvalue = GSPvalue$GS.pvalue,
-          stringsAsFactors = FALSE
-        )
-        
-        gene_metrics$MM <- NA
-        gene_metrics$MM.pvalue <- NA
-        
-        for (i in seq_len(nrow(gene_metrics))) {
-          module_col <- paste0("MM", gene_metrics$Module[i])
-          p_col <- paste0("p.MM", gene_metrics$Module[i])
-          if (module_col %in% names(geneModuleMembership)) {
-            gene_metrics$MM[i] <- geneModuleMembership[i, module_col]
-            gene_metrics$MM.pvalue[i] <- MMPvalue[i, p_col]
+          rv$trait_data <- trait_data
+
+          add_wgcna_log("Calculating module-trait correlations...")
+          moduleTraitCor <- cor(MEs, trait_data, use = "pairwise.complete.obs")
+          moduleTraitPvalue <- WGCNA::corPvalueStudent(moduleTraitCor,
+            nSamples = nrow(MEs)
+          )
+
+          rv$moduleTraitCor <- moduleTraitCor
+          rv$moduleTraitPvalue <- moduleTraitPvalue
+
+          add_wgcna_log("Calculating Gene Significance (GS) and Module Membership (MM)...")
+          trait_vector <- trait_data[, 1]
+
+          geneTraitSignificance <- as.data.frame(
+            cor(rv$datExpr, trait_vector, use = "p")
+          )
+          names(geneTraitSignificance) <- "GS"
+          GSPvalue <- as.data.frame(
+            WGCNA::corPvalueStudent(
+              as.matrix(geneTraitSignificance),
+              nrow(rv$datExpr)
+            )
+          )
+          names(GSPvalue) <- "GS.pvalue"
+
+          modNames <- substring(names(MEs), 3)
+          geneModuleMembership <- as.data.frame(
+            cor(rv$datExpr, MEs, use = "p")
+          )
+          MMPvalue <- as.data.frame(
+            WGCNA::corPvalueStudent(
+              as.matrix(geneModuleMembership),
+              nrow(rv$datExpr)
+            )
+          )
+          names(geneModuleMembership) <- paste("MM", modNames, sep = "")
+          names(MMPvalue) <- paste("p.MM", modNames, sep = "")
+
+          # Create gene metrics dataframe
+          gene_metrics <- data.frame(
+            Gene = colnames(rv$datExpr),
+            Module = rv$dynamicColors,
+            GS = geneTraitSignificance$GS,
+            GS.pvalue = GSPvalue$GS.pvalue,
+            stringsAsFactors = FALSE
+          )
+
+          gene_metrics$MM <- NA
+          gene_metrics$MM.pvalue <- NA
+
+          for (i in seq_len(nrow(gene_metrics))) {
+            module_col <- paste0("MM", gene_metrics$Module[i])
+            p_col <- paste0("p.MM", gene_metrics$Module[i])
+            if (module_col %in% names(geneModuleMembership)) {
+              gene_metrics$MM[i] <- geneModuleMembership[i, module_col]
+              gene_metrics$MM.pvalue[i] <- MMPvalue[i, p_col]
+            }
           }
+
+          rv$gene_metrics <- gene_metrics
+          rv$geneModuleMembership <- geneModuleMembership
+          rv$MMPvalue <- MMPvalue
+
+          add_wgcna_log(paste("✓ GS/MM calculated for", nrow(gene_metrics), "genes"))
+          add_wgcna_log("Module-trait correlation complete")
+
+          # Re-enable button
+          shinyjs::enable("calculate_module_trait")
+          shinyjs::html(
+            "calculate_module_trait",
+            HTML('<i class="fa fa-check-circle"></i> Calculate Module-Trait')
+          )
+
+          removeNotification("wgcna_module_trait_processing")
+
+          showNotification("Module-trait & GS/MM calculated", type = "message", duration = 5)
+        },
+        error = function(e) {
+          shinyjs::enable("calculate_module_trait")
+          shinyjs::html(
+            "calculate_module_trait",
+            HTML('<i class="fa fa-exclamation-triangle"></i> Calculate Module-Trait')
+          )
+          removeNotification("wgcna_module_trait_processing")
+          showNotification(paste("Error:", e$message), type = "error", duration = 10)
+          add_wgcna_log(paste("ERROR:", e$message))
         }
-        
-        rv$gene_metrics <- gene_metrics
-        rv$geneModuleMembership <- geneModuleMembership
-        rv$MMPvalue <- MMPvalue
-        
-        add_wgcna_log(paste("✓ GS/MM calculated for", nrow(gene_metrics), "genes"))
-        add_wgcna_log("Module-trait correlation complete")
-        
-        # Re-enable button
-        shinyjs::enable("calculate_module_trait")
-        shinyjs::html("calculate_module_trait", 
-                      HTML('<i class="fa fa-check-circle"></i> Calculate Module-Trait'))
-        
-        removeNotification("wgcna_module_trait_processing")
-        
-        showNotification("Module-trait & GS/MM calculated", type = "message", duration = 5)
-        
-      }, error = function(e) {
-        shinyjs::enable("calculate_module_trait")
-        shinyjs::html("calculate_module_trait", 
-                      HTML('<i class="fa fa-exclamation-triangle"></i> Calculate Module-Trait'))
-        removeNotification("wgcna_module_trait_processing")
-        showNotification(paste("Error:", e$message), type = "error", duration = 10)
-        add_wgcna_log(paste("ERROR:", e$message))
-      })
+      )
     })
   })
-  
+
   output$module_trait_heatmap <- renderPlot({
     req(rv$moduleTraitCor)
-    
+
     if (!requireNamespace("WGCNA", quietly = TRUE)) {
-      par(bg = "white"); plot.new(); text(0.5, 0.5, "WGCNA package required", cex = 1.2)
+      par(bg = "white")
+      plot.new()
+      text(0.5, 0.5, "WGCNA package required", cex = 1.2)
       return()
     }
     op <- par(bg = "white", fg = "#2c3e50")
@@ -1024,15 +1127,15 @@ server_wgcna <- function(input, output, session, rv) {
       main = "Module-Trait Relationships"
     )
   })
-  
+
   output$significant_module_count_ui <- renderUI({
     req(rv$moduleTraitCor, rv$moduleTraitPvalue)
-    
+
     p_threshold <- input$gs_pval_threshold
     cor_threshold <- input$mm_cor_threshold
     n_pos <- 0
     n_neg <- 0
-    
+
     for (module in rownames(rv$moduleTraitPvalue)) {
       pval <- rv$moduleTraitPvalue[module, 1]
       corval <- rv$moduleTraitCor[module, 1]
@@ -1041,16 +1144,18 @@ server_wgcna <- function(input, output, session, rv) {
         if (corval < -cor_threshold) n_neg <- n_neg + 1
       }
     }
-    
+
     tags$div(
       class = "alert alert-info",
       tags$p(tags$b("Significant Modules Total:"), n_pos + n_neg),
-      tags$p(icon("arrow-up", class = "text-success"), " Positive: ", n_pos,
-             " | ",
-             icon("arrow-down", class = "text-danger"), " Negative: ", n_neg)
+      tags$p(
+        icon("arrow-up", class = "text-success"), " Positive: ", n_pos,
+        " | ",
+        icon("arrow-down", class = "text-danger"), " Negative: ", n_neg
+      )
     )
   })
-  
+
   wgcna_module_trait_to_file <- function(file, dev_fun) {
     req(rv$moduleTraitCor)
     if (!requireNamespace("WGCNA", quietly = TRUE)) stop("WGCNA package required")
@@ -1139,50 +1244,60 @@ server_wgcna <- function(input, output, session, rv) {
       dev.off()
     }
   )
-  
+
   # ========== STEP 5: ME RELATIONSHIPS ==========
   observeEvent(input$calculate_me_relationships, {
     req(rv$MEs)
-    
+
     shinyjs::disable("calculate_me_relationships")
-    shinyjs::html("calculate_me_relationships", 
-                  HTML('<i class="fa fa-spinner fa-spin"></i> Calculating...'))
-    
-    tryCatch({
-      add_wgcna_log("Calculating module eigengene relationships...")
-      
-      # ME correlation
-      ME_cor <- cor(rv$MEs, use = "pairwise.complete.obs")
-      rv$ME_correlation <- ME_cor
-      
-      # ME dendrogram (handle NA from constant eigengenes)
-      ME_cor[is.na(ME_cor)] <- 0
-      ME_dist <- as.dist(1 - ME_cor)
-      ME_tree <- hclust(ME_dist, method = "average")
-      rv$ME_tree <- ME_tree
-      
-      add_wgcna_log("Module eigengene relationships calculated")
-      
-      shinyjs::enable("calculate_me_relationships")
-      shinyjs::html("calculate_me_relationships", 
-                    HTML('<i class="fa fa-link"></i> Calculate Module Relationships'))
-      
-      showNotification("Module eigengene relationships calculated", type = "message", duration = 5)
-      
-    }, error = function(e) {
-      shinyjs::enable("calculate_me_relationships")
-      shinyjs::html("calculate_me_relationships", 
-                    HTML('<i class="fa fa-link"></i> Calculate Module Relationships'))
-      showNotification(paste("Error:", e$message), type = "error", duration = 10)
-      add_wgcna_log(paste("ERROR:", e$message))
-    })
+    shinyjs::html(
+      "calculate_me_relationships",
+      HTML('<i class="fa fa-spinner fa-spin"></i> Calculating...')
+    )
+
+    tryCatch(
+      {
+        add_wgcna_log("Calculating module eigengene relationships...")
+
+        # ME correlation
+        ME_cor <- cor(rv$MEs, use = "pairwise.complete.obs")
+        rv$ME_correlation <- ME_cor
+
+        # ME dendrogram (handle NA from constant eigengenes)
+        ME_cor[is.na(ME_cor)] <- 0
+        ME_dist <- as.dist(1 - ME_cor)
+        ME_tree <- hclust(ME_dist, method = "average")
+        rv$ME_tree <- ME_tree
+
+        add_wgcna_log("Module eigengene relationships calculated")
+
+        shinyjs::enable("calculate_me_relationships")
+        shinyjs::html(
+          "calculate_me_relationships",
+          HTML('<i class="fa fa-link"></i> Calculate Module Relationships')
+        )
+
+        showNotification("Module eigengene relationships calculated", type = "message", duration = 5)
+      },
+      error = function(e) {
+        shinyjs::enable("calculate_me_relationships")
+        shinyjs::html(
+          "calculate_me_relationships",
+          HTML('<i class="fa fa-link"></i> Calculate Module Relationships')
+        )
+        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+        add_wgcna_log(paste("ERROR:", e$message))
+      }
+    )
   })
-  
+
   output$me_correlation_heatmap <- renderPlot({
     req(rv$ME_correlation)
-    
+
     if (!requireNamespace("WGCNA", quietly = TRUE)) {
-      par(bg = "white"); plot.new(); text(0.5, 0.5, "WGCNA package required", cex = 1.2)
+      par(bg = "white")
+      plot.new()
+      text(0.5, 0.5, "WGCNA package required", cex = 1.2)
       return()
     }
     op <- par(bg = "white", fg = "#2c3e50")
@@ -1198,13 +1313,15 @@ server_wgcna <- function(input, output, session, rv) {
       main = "Module Eigengene Correlation"
     )
   })
-  
+
   output$me_dendrogram_plot <- renderPlot({
     req(rv$ME_tree)
     ht <- rv$ME_tree
     d <- as.dendrogram(ht)
     set_edge_par <- function(node) {
-      if (is.leaf(node)) return(node)
+      if (is.leaf(node)) {
+        return(node)
+      }
       attr(node, "edgePar") <- list(col = "#8e44ad", lwd = 1.4)
       node
     }
@@ -1215,22 +1332,24 @@ server_wgcna <- function(input, output, session, rv) {
     axis(2, col = "#5d6d7e", col.axis = "#2c3e50", cex.axis = 0.9, las = 1)
     box(col = "gray85", lwd = 1)
   })
-  
+
   output$me_scatter_plot <- renderPlot({
     make_me_scatter_plot()
   })
-  
+
   output$eigengene_distance_heatmap <- renderPlot({
     req(rv$ME_correlation)
-    
+
     if (!requireNamespace("pheatmap", quietly = TRUE)) {
-      par(bg = "white"); plot.new(); text(0.5, 0.5, "pheatmap package required", cex = 1.2)
+      par(bg = "white")
+      plot.new()
+      text(0.5, 0.5, "pheatmap package required", cex = 1.2)
       return()
     }
     op <- par(bg = "white")
     on.exit(par(op), add = TRUE)
     dist_matrix <- as.matrix(as.dist(1 - rv$ME_correlation))
-    
+
     pheatmap::pheatmap(
       dist_matrix,
       color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
@@ -1284,7 +1403,9 @@ server_wgcna <- function(input, output, session, rv) {
     ht <- rv$ME_tree
     d <- as.dendrogram(ht)
     set_edge_par <- function(node) {
-      if (is.leaf(node)) return(node)
+      if (is.leaf(node)) {
+        return(node)
+      }
       attr(node, "edgePar") <- list(col = "#8e44ad", lwd = 1.4)
       node
     }
@@ -1351,7 +1472,9 @@ server_wgcna <- function(input, output, session, rv) {
 
   make_eigengene_distance_heatmap <- function() {
     req(rv$ME_correlation)
-    if (!requireNamespace("pheatmap", quietly = TRUE)) return(NULL)
+    if (!requireNamespace("pheatmap", quietly = TRUE)) {
+      return(NULL)
+    }
     dist_matrix <- as.matrix(as.dist(1 - rv$ME_correlation))
     pheatmap::pheatmap(
       dist_matrix,
@@ -1379,70 +1502,80 @@ server_wgcna <- function(input, output, session, rv) {
       dev.off()
     }
   )
-  
+
   # ========== STEP 6: SIGNIFICANT MODULE ANALYSIS ==========
   observeEvent(input$identify_significant_modules, {
     req(rv$moduleTraitCor, rv$moduleTraitPvalue)
-    
+
     shinyjs::disable("identify_significant_modules")
-    shinyjs::html("identify_significant_modules", 
-                  HTML('<i class="fa fa-spinner fa-spin"></i> Identifying...'))
-    
-    tryCatch({
-      p_threshold <- input$sig_module_pval_threshold
-      cor_threshold <- input$sig_module_cor_threshold
-      
-      add_wgcna_log(paste("Identifying significant modules with p <", p_threshold, 
-                        "and |cor| >", cor_threshold))
-      
-      sig_modules <- data.frame(
-        Module = character(),
-        Correlation = numeric(),
-        Pvalue = numeric(),
-        Size = integer(),
-        stringsAsFactors = FALSE
-      )
-      
-      for (module in rownames(rv$moduleTraitPvalue)) {
-        pval <- rv$moduleTraitPvalue[module, 1]
-        corval <- rv$moduleTraitCor[module, 1]
-        # Row names are ME names (e.g. MEblue); moduleColors are colors (e.g. blue)
-        module_color <- if (grepl("^ME", module)) substring(module, 3) else module
-        if (!is.na(pval) && !is.na(corval) && 
+    shinyjs::html(
+      "identify_significant_modules",
+      HTML('<i class="fa fa-spinner fa-spin"></i> Identifying...')
+    )
+
+    tryCatch(
+      {
+        p_threshold <- input$sig_module_pval_threshold
+        cor_threshold <- input$sig_module_cor_threshold
+
+        add_wgcna_log(paste(
+          "Identifying significant modules with p <", p_threshold,
+          "and |cor| >", cor_threshold
+        ))
+
+        sig_modules <- data.frame(
+          Module = character(),
+          Correlation = numeric(),
+          Pvalue = numeric(),
+          Size = integer(),
+          stringsAsFactors = FALSE
+        )
+
+        for (module in rownames(rv$moduleTraitPvalue)) {
+          pval <- rv$moduleTraitPvalue[module, 1]
+          corval <- rv$moduleTraitCor[module, 1]
+          # Row names are ME names (e.g. MEblue); moduleColors are colors (e.g. blue)
+          module_color <- if (grepl("^ME", module)) substring(module, 3) else module
+          if (!is.na(pval) && !is.na(corval) &&
             pval < p_threshold && abs(corval) > cor_threshold) {
-          module_size <- sum(rv$moduleColors == module_color, na.rm = TRUE)
-          sig_modules <- rbind(sig_modules, data.frame(
-            Module = module,
-            Correlation = corval,
-            Pvalue = pval,
-            Size = module_size,
-            stringsAsFactors = FALSE
-          ))
+            module_size <- sum(rv$moduleColors == module_color, na.rm = TRUE)
+            sig_modules <- rbind(sig_modules, data.frame(
+              Module = module,
+              Correlation = corval,
+              Pvalue = pval,
+              Size = module_size,
+              stringsAsFactors = FALSE
+            ))
+          }
         }
+
+        rv$significant_modules <- sig_modules
+
+        add_wgcna_log(paste("Found", nrow(sig_modules), "significant modules"))
+
+        shinyjs::enable("identify_significant_modules")
+        shinyjs::html(
+          "identify_significant_modules",
+          HTML('<i class="fa fa-search"></i> Identify Significant Modules')
+        )
+
+        showNotification(
+          paste("Identified", nrow(sig_modules), "significant modules"),
+          type = "message", duration = 5
+        )
+      },
+      error = function(e) {
+        shinyjs::enable("identify_significant_modules")
+        shinyjs::html(
+          "identify_significant_modules",
+          HTML('<i class="fa fa-search"></i> Identify Significant Modules')
+        )
+        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+        add_wgcna_log(paste("ERROR:", e$message))
       }
-      
-      rv$significant_modules <- sig_modules
-      
-      add_wgcna_log(paste("Found", nrow(sig_modules), "significant modules"))
-      
-      shinyjs::enable("identify_significant_modules")
-      shinyjs::html("identify_significant_modules", 
-                    HTML('<i class="fa fa-search"></i> Identify Significant Modules'))
-      
-      showNotification(
-        paste("Identified", nrow(sig_modules), "significant modules"),
-        type = "message", duration = 5
-      )
-      
-    }, error = function(e) {
-      shinyjs::enable("identify_significant_modules")
-      shinyjs::html("identify_significant_modules", 
-                    HTML('<i class="fa fa-search"></i> Identify Significant Modules'))
-      showNotification(paste("Error:", e$message), type = "error", duration = 10)
-      add_wgcna_log(paste("ERROR:", e$message))
-    })
+    )
   })
-  
+
   output$wgcna_process_summary_ui <- renderUI({
     if (is.null(rv$significant_modules) || nrow(rv$significant_modules) == 0) {
       return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Complete WGCNA (soft threshold, blockwise modules, module-trait, identify significant modules) to see process summary."))
@@ -1451,30 +1584,34 @@ server_wgcna <- function(input, output, session, rv) {
     n_genes <- if (!is.null(rv$gene_metrics)) nrow(rv$gene_metrics) else 0
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 7 complete."), " Significant modules: ", n_mods, ". Gene metrics: ", format(n_genes, big.mark = ","), " genes. Use these for Common Genes (Step 8)."))
+      tags$p(tags$strong("Step 7 complete."), " Significant modules: ", n_mods, ". Gene metrics: ", format(n_genes, big.mark = ","), " genes. Use these for Common Genes (Step 8).")
+    )
   })
 
   output$significant_modules_summary_ui <- renderUI({
     req(rv$significant_modules)
-    
+
     sig_mods <- rv$significant_modules
     n_pos <- sum(sig_mods$Correlation > 0)
     n_neg <- sum(sig_mods$Correlation < 0)
-    
+
     tags$div(
       class = "alert alert-info",
       tags$p(tags$b("Significant Modules Found: "), nrow(sig_mods)),
-      tags$p(icon("arrow-up", class = "text-success"), " Positive: ", n_pos,
-             " | ",
-             icon("arrow-down", class = "text-danger"), " Negative: ", n_neg)
+      tags$p(
+        icon("arrow-up", class = "text-success"), " Positive: ", n_pos,
+        " | ",
+        icon("arrow-down", class = "text-danger"), " Negative: ", n_neg
+      )
     )
   })
-  
+
   make_module_significance_barplot <- function() {
     req(rv$significant_modules)
     sig_mods <- rv$significant_modules
     sig_mods$Module <- factor(sig_mods$Module,
-                             levels = sig_mods$Module[order(abs(sig_mods$Correlation), decreasing = TRUE)])
+      levels = sig_mods$Module[order(abs(sig_mods$Correlation), decreasing = TRUE)]
+    )
     sig_mods$orig_color <- sapply(as.character(sig_mods$Module), function(m) {
       x <- sub("^ME", "", m)
       if (x %in% colors()) x else "gray50"
@@ -1497,8 +1634,10 @@ server_wgcna <- function(input, output, session, rv) {
     )
     rect_df <- rbind(bar_df, strip_df)
     ggplot(rect_df, aes(x = Module)) +
-      geom_rect(aes(xmin = as.numeric(Module) - 0.45, xmax = as.numeric(Module) + 0.45,
-                    ymin = ymin, ymax = ymax, fill = fill_val)) +
+      geom_rect(aes(
+        xmin = as.numeric(Module) - 0.45, xmax = as.numeric(Module) + 0.45,
+        ymin = ymin, ymax = ymax, fill = fill_val
+      )) +
       scale_fill_identity() +
       geom_hline(yintercept = 0, linewidth = 0.5, color = "gray30") +
       theme_bw(base_size = 14) +
@@ -1576,51 +1715,52 @@ server_wgcna <- function(input, output, session, rv) {
       ggplot2::ggsave(file, plot = p, width = 8, height = 5, device = "pdf", bg = "white")
     }
   )
-  
+
   output$significant_modules_table <- DT::renderDataTable({
     req(rv$significant_modules)
-    
+
     sig_mods <- rv$significant_modules
     sig_mods$Correlation <- round(sig_mods$Correlation, 3)
     sig_mods$Pvalue <- format(sig_mods$Pvalue, scientific = TRUE, digits = 3)
-    
+
     DT::datatable(
       sig_mods,
       options = list(
         pageLength = 10,
         scrollX = TRUE,
-        dom = 'Bfrtip',
-        buttons = c('copy', 'csv', 'excel')
+        dom = "Bfrtip",
+        buttons = c("copy", "csv", "excel")
       ),
       rownames = FALSE,
       filter = "top"
     )
   })
-  
+
   # ========== MODULE GENES TABLE ==========
   observe({
     req(rv$moduleColors)
-    
+
     unique_modules <- sort(unique(rv$moduleColors))
     updateSelectInput(session, "select_module",
-                     choices = unique_modules,
-                     selected = unique_modules[1])
+      choices = unique_modules,
+      selected = unique_modules[1]
+    )
   })
-  
+
   output$module_gene_stats <- renderUI({
     req(input$select_module, rv$gene_metrics)
-    
+
     module_genes <- rv$gene_metrics[rv$gene_metrics$Module == input$select_module, ]
     n_total <- nrow(module_genes)
-    
+
     if (input$filter_sig_genes == "sig_only") {
-      sig_genes <- module_genes[module_genes$GS.pvalue < input$gs_pval_threshold & 
-                               abs(module_genes$MM) > input$mm_cor_threshold, ]
+      sig_genes <- module_genes[module_genes$GS.pvalue < input$gs_pval_threshold &
+        abs(module_genes$MM) > input$mm_cor_threshold, ]
       n_sig <- nrow(sig_genes)
     } else {
       n_sig <- n_total
     }
-    
+
     tags$div(
       style = "margin-top: 25px; padding: 12px 14px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; font-size: 13px; color: #212529;",
       tags$p(tags$strong("Module:"), " ", input$select_module, style = "margin: 0 0 4px 0;"),
@@ -1630,9 +1770,11 @@ server_wgcna <- function(input, output, session, rv) {
       }
     )
   })
-  
+
   output$wgcna_gs_mm_trait_ui <- renderUI({
-    if (is.null(rv$trait_data) || ncol(rv$trait_data) < 1) return(NULL)
+    if (is.null(rv$trait_data) || ncol(rv$trait_data) < 1) {
+      return(NULL)
+    }
     trait_choices <- colnames(rv$trait_data)
     # Prefer combined "Disease vs Normal" (or "A vs B") as default so both show on one line
     default <- trait_choices[1]
@@ -1645,35 +1787,45 @@ server_wgcna <- function(input, output, session, rv) {
         tags$span(paste(trait_choices, collapse = "  |  "))
       ),
       selectInput("wgcna_gs_mm_trait",
-                  label = tags$strong("Trait for gene significance (GS vs MM):"),
-                  choices = trait_choices,
-                  selected = default,
-                  width = "100%")
+        label = tags$strong("Trait for gene significance (GS vs MM):"),
+        choices = trait_choices,
+        selected = default,
+        width = "100%"
+      )
     )
   })
 
   wgcna_gs_mm_trait_selected <- reactive({
-    if (is.null(rv$trait_data) || ncol(rv$trait_data) < 1) return(NULL)
+    if (is.null(rv$trait_data) || ncol(rv$trait_data) < 1) {
+      return(NULL)
+    }
     tr <- input$wgcna_gs_mm_trait
-    if (is.null(tr) || !tr %in% colnames(rv$trait_data)) return(colnames(rv$trait_data)[1])
+    if (is.null(tr) || !tr %in% colnames(rv$trait_data)) {
+      return(colnames(rv$trait_data)[1])
+    }
     tr
   })
 
   make_gs_mm_plot <- function(module_color, trait_col, gene_metrics_df, datExpr, trait_data,
                               gs_pval = 0.05, mm_cor = 0.5) {
     module_genes <- gene_metrics_df[gene_metrics_df$Module == module_color, ]
-    if (nrow(module_genes) == 0) return(NULL)
+    if (nrow(module_genes) == 0) {
+      return(NULL)
+    }
     module_genes <- as.data.frame(module_genes)
     vec <- trait_data[[trait_col]]
     gs_trait <- as.numeric(cor(datExpr, vec, use = "pairwise.complete.obs"))
     names(gs_trait) <- colnames(datExpr)
     module_genes$GS_trait <- gs_trait[match(module_genes$Gene, colnames(datExpr))]
     n_samp <- nrow(datExpr)
-    pval_trait <- if (requireNamespace("WGCNA", quietly = TRUE))
-      WGCNA::corPvalueStudent(abs(module_genes$GS_trait), n_samp) else rep(1, nrow(module_genes))
+    pval_trait <- if (requireNamespace("WGCNA", quietly = TRUE)) {
+      WGCNA::corPvalueStudent(abs(module_genes$GS_trait), n_samp)
+    } else {
+      rep(1, nrow(module_genes))
+    }
     module_genes$Significant <- (pval_trait < gs_pval & abs(module_genes$MM) >= mm_cor)
     # Publication-ready: colorblind-friendly palette, classic theme, clear axes
-    col_sig <- "#D55E00"   # orange (colorblind-safe)
+    col_sig <- "#D55E00" # orange (colorblind-safe)
     col_nonsig <- "#999999"
     p <- ggplot2::ggplot(module_genes, ggplot2::aes(x = MM, y = GS_trait)) +
       ggplot2::geom_hline(yintercept = 0, linewidth = 0.35, colour = "grey40", linetype = "solid") +
@@ -1705,27 +1857,35 @@ server_wgcna <- function(input, output, session, rv) {
     p
   }
 
-  output$gs_mm_plot <- renderPlot({
-    req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
-    trait_col <- wgcna_gs_mm_trait_selected()
-    if (is.null(trait_col)) return(invisible(NULL))
-    gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
-    mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
-    p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
-    if (is.null(p)) {
-      plot.new()
-      title(main = paste("No genes in module", input$select_module))
-      return(invisible(NULL))
-    }
-    print(p)
-  }, height = 420, res = 96)
+  output$gs_mm_plot <- renderPlot(
+    {
+      req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
+      trait_col <- wgcna_gs_mm_trait_selected()
+      if (is.null(trait_col)) {
+        return(invisible(NULL))
+      }
+      gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
+      mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
+      p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
+      if (is.null(p)) {
+        plot.new()
+        title(main = paste("No genes in module", input$select_module))
+        return(invisible(NULL))
+      }
+      print(p)
+    },
+    height = 420,
+    res = 96
+  )
 
   output$download_gs_mm_plot_png <- downloadHandler(
     filename = function() paste0("wgcna_gs_vs_mm_", input$select_module, ".png"),
     content = function(file) {
       req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
       trait_col <- wgcna_gs_mm_trait_selected()
-      if (is.null(trait_col)) return()
+      if (is.null(trait_col)) {
+        return()
+      }
       gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
       mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
       p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
@@ -1737,7 +1897,9 @@ server_wgcna <- function(input, output, session, rv) {
     content = function(file) {
       req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
       trait_col <- wgcna_gs_mm_trait_selected()
-      if (is.null(trait_col)) return()
+      if (is.null(trait_col)) {
+        return()
+      }
       gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
       mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
       p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
@@ -1746,7 +1908,9 @@ server_wgcna <- function(input, output, session, rv) {
   )
 
   output$wgcna_gs_mm_all_download_ui <- renderUI({
-    if (is.null(rv$gene_metrics) || is.null(rv$trait_data) || is.null(rv$datExpr)) return(NULL)
+    if (is.null(rv$gene_metrics) || is.null(rv$trait_data) || is.null(rv$datExpr)) {
+      return(NULL)
+    }
     tags$div(
       style = "margin-top: 10px;",
       tags$p(tags$strong("GS vs MM for all signed modules (one plot per module):"), style = "margin-bottom: 8px;"),
@@ -1773,7 +1937,9 @@ server_wgcna <- function(input, output, session, rv) {
     content = function(file) {
       req(rv$gene_metrics, rv$trait_data, rv$datExpr)
       trait_col <- wgcna_gs_mm_trait_selected()
-      if (is.null(trait_col)) return()
+      if (is.null(trait_col)) {
+        return()
+      }
       gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
       mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
       modules <- sort(unique(rv$gene_metrics$Module))
@@ -1796,7 +1962,9 @@ server_wgcna <- function(input, output, session, rv) {
     content = function(file) {
       req(rv$gene_metrics, rv$trait_data, rv$datExpr)
       trait_col <- wgcna_gs_mm_trait_selected()
-      if (is.null(trait_col)) return()
+      if (is.null(trait_col)) {
+        return()
+      }
       gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
       mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
       modules <- sort(unique(rv$gene_metrics$Module))
@@ -1816,25 +1984,25 @@ server_wgcna <- function(input, output, session, rv) {
       zip(file, list.files(tmp_dir, full.names = TRUE), flags = "-j")
     }
   )
-  
+
   output$module_genes_table <- DT::renderDataTable({
     req(input$select_module, rv$gene_metrics)
-    
+
     module_genes <- rv$gene_metrics[rv$gene_metrics$Module == input$select_module, ]
-    
+
     if (input$filter_sig_genes == "sig_only") {
       module_genes <- module_genes[
-        module_genes$GS.pvalue < input$gs_pval_threshold & 
-        abs(module_genes$MM) > input$mm_cor_threshold, 
+        module_genes$GS.pvalue < input$gs_pval_threshold &
+          abs(module_genes$MM) > input$mm_cor_threshold,
       ]
     }
-    
+
     # Format columns
     module_genes$GS <- round(module_genes$GS, 4)
     module_genes$GS.pvalue <- format(module_genes$GS.pvalue, scientific = TRUE, digits = 3)
     module_genes$MM <- round(module_genes$MM, 4)
     module_genes$MM.pvalue <- format(module_genes$MM.pvalue, scientific = TRUE, digits = 3)
-    
+
     DT::datatable(
       module_genes,
       options = list(
@@ -1846,7 +2014,7 @@ server_wgcna <- function(input, output, session, rv) {
       filter = "top"
     )
   })
-  
+
   # ========== DOWNLOAD HANDLERS ==========
   output$download_all_sig_genes <- downloadHandler(
     filename = function() "wgcna_significant_genes.csv",
@@ -1854,13 +2022,13 @@ server_wgcna <- function(input, output, session, rv) {
       req(rv$gene_metrics)
       sig_genes <- rv$gene_metrics[
         rv$gene_metrics$GS.pvalue < input$gs_pval_threshold &
-        abs(rv$gene_metrics$MM) > input$mm_cor_threshold,
+          abs(rv$gene_metrics$MM) > input$mm_cor_threshold,
       ]
       write.csv(sig_genes, file, row.names = FALSE)
       write.csv(sig_genes, file.path(CSV_EXPORT_DIR(), "wgcna_significant_genes.csv"), row.names = FALSE)
     }
   )
-  
+
   output$download_sig_modules_table <- downloadHandler(
     filename = function() "wgcna_significant_modules.csv",
     content = function(file) {
@@ -1869,7 +2037,7 @@ server_wgcna <- function(input, output, session, rv) {
       write.csv(rv$significant_modules, file.path(CSV_EXPORT_DIR(), "wgcna_significant_modules.csv"), row.names = FALSE)
     }
   )
-  
+
   output$download_sig_modules_genes <- downloadHandler(
     filename = function() "wgcna_module_genes.zip",
     content = function(file) {
@@ -1887,35 +2055,38 @@ server_wgcna <- function(input, output, session, rv) {
       if (length(out_files) > 0) zip(file, files = out_files)
     }
   )
-  
+
   output$download_module_analysis_plots <- downloadHandler(
     filename = function() "wgcna_analysis_plots.pdf",
     content = function(file) {
       req(rv$geneTree, rv$moduleColors)
-      
+
       pdf(file, width = 12, height = 10, bg = "white")
       par(bg = "white", fg = "#2c3e50")
-      
+
       # Dendrogram
       if (requireNamespace("WGCNA", quietly = TRUE)) {
         WGCNA::plotDendroAndColors(rv$geneTree, rv$moduleColors, "Module Colors",
-                                   dendroLabels = FALSE, hang = 0.03)
+          dendroLabels = FALSE, hang = 0.03
+        )
       }
-      
+
       # Module-trait heatmap
       if (!is.null(rv$moduleTraitCor)) {
         par(bg = "white")
-        WGCNA::labeledHeatmap(Matrix = rv$moduleTraitCor,
-                              xLabels = colnames(rv$trait_data),
-                              yLabels = rownames(rv$moduleTraitCor),
-                              colors = WGCNA::blueWhiteRed(50),
-                              main = "Module-Trait Relationships")
+        WGCNA::labeledHeatmap(
+          Matrix = rv$moduleTraitCor,
+          xLabels = colnames(rv$trait_data),
+          yLabels = rownames(rv$moduleTraitCor),
+          colors = WGCNA::blueWhiteRed(50),
+          main = "Module-Trait Relationships"
+        )
       }
-      
+
       dev.off()
     }
   )
-  
+
   output$download_module_genes <- downloadHandler(
     filename = function() {
       paste0("module_", input$select_module, "_genes.csv")
@@ -1928,7 +2099,7 @@ server_wgcna <- function(input, output, session, rv) {
       write.csv(module_genes, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
     }
   )
-  
+
   output$download_all_modules <- downloadHandler(
     filename = function() "wgcna_all_module_assignments.csv",
     content = function(file) {
@@ -1937,7 +2108,7 @@ server_wgcna <- function(input, output, session, rv) {
       write.csv(rv$gene_metrics, file.path(CSV_EXPORT_DIR(), "wgcna_all_module_assignments.csv"), row.names = FALSE)
     }
   )
-  
+
   output$download_module_eigengenes <- downloadHandler(
     filename = function() "wgcna_module_eigengenes.csv",
     content = function(file) {
@@ -1946,13 +2117,15 @@ server_wgcna <- function(input, output, session, rv) {
       write.csv(rv$MEs, file.path(CSV_EXPORT_DIR(), "wgcna_module_eigengenes.csv"))
     }
   )
-  
+
   # WGCNA Processing Log
   output$wgcna_log <- renderText({
     if (!is.null(rv$wgcna_log_messages) && length(rv$wgcna_log_messages) > 0) {
       if (length(rv$wgcna_log_messages) > 300) {
-        paste(c("... (showing last 300 lines) ...", 
-                tail(rv$wgcna_log_messages, 300)), collapse = "\n")
+        paste(c(
+          "... (showing last 300 lines) ...",
+          tail(rv$wgcna_log_messages, 300)
+        ), collapse = "\n")
       } else {
         paste(rv$wgcna_log_messages, collapse = "\n")
       }
@@ -1960,9 +2133,8 @@ server_wgcna <- function(input, output, session, rv) {
       "No WGCNA logs yet. Run WGCNA analysis steps to see logs."
     }
   })
-  
+
   observeEvent(input$clear_wgcna_log_btn, {
     showNotification("Log display refreshed.", type = "message", duration = 3)
   })
 }
-

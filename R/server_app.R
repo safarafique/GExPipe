@@ -1,30 +1,36 @@
 gexp_app_server <- function(input, output, session) {
   missing_pkgs <- getOption("omniVerse.missingPkgs", character(0))
   if (length(missing_pkgs) > 0L) {
-    tryCatch({
-      shiny::showNotification(
-        paste0(
-          "Some packages could not be loaded: ", paste(utils::head(missing_pkgs, 5), collapse = ", "),
-          if (length(missing_pkgs) > 5) paste0(" and ", length(missing_pkgs) - 5, " more") else "", "."
-        ),
-        type = "warning",
-        duration = 12,
-        session = session
-      )
-    }, error = function(e) NULL)
+    tryCatch(
+      {
+        shiny::showNotification(
+          paste0(
+            "Some packages could not be loaded: ", paste(utils::head(missing_pkgs, 5), collapse = ", "),
+            if (length(missing_pkgs) > 5) paste0(" and ", length(missing_pkgs) - 5, " more") else "", "."
+          ),
+          type = "warning",
+          duration = 12,
+          session = session
+        )
+      },
+      error = function(e) NULL
+    )
   }
 
-  guide <- tryCatch({
-    if (requireNamespace("cicerone", quietly = TRUE)) {
-      cicerone::Cicerone$
-        new()$
-        step(el = "sidebar_menu", title = "Navigation", description = "Use this sidebar to navigate through the 15-step pipeline.")$
-        step(el = "analysis_type", title = "Platform", description = "Choose your data type: RNA-seq, Microarray, or Merged.")$
-        step(el = "start_processing", title = "Start", description = "Click here to begin downloading and processing your datasets.")
-    } else {
-      NULL
-    }
-  }, error = function(e) NULL)
+  guide <- tryCatch(
+    {
+      if (requireNamespace("cicerone", quietly = TRUE)) {
+        cicerone::Cicerone$
+          new()$
+          step(el = "sidebar_menu", title = "Navigation", description = "Use this sidebar to navigate through the 15-step pipeline.")$
+          step(el = "analysis_type", title = "Platform", description = "Choose your data type: RNA-seq, Microarray, or Merged.")$
+          step(el = "start_processing", title = "Start", description = "Click here to begin downloading and processing your datasets.")
+      } else {
+        NULL
+      }
+    },
+    error = function(e) NULL
+  )
 
   rv <- shiny::reactiveValues(
     show_analysis = FALSE,
@@ -196,8 +202,8 @@ gexp_app_server <- function(input, output, session) {
 
   shiny::observeEvent(input$analysis_type, {
     if (identical(input$analysis_type, "microarray") &&
-        !is.null(input$de_method) &&
-        input$de_method %in% c("deseq2", "edger", "limma_voom")) {
+      !is.null(input$de_method) &&
+      input$de_method %in% c("deseq2", "edger", "limma_voom")) {
       shiny::updateRadioButtons(session, "de_method", selected = "limma")
       shiny::showNotification(
         shiny::tags$div(
@@ -248,4 +254,3 @@ gexp_app_server <- function(input, output, session) {
     })
   }, once = TRUE)
 }
-
