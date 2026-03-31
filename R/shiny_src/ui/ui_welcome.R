@@ -153,7 +153,7 @@ ui_welcome <- fluidPage(
         tags$div(class = "pipeline-item", tags$strong("6. Differential Expression"), " — limma / DESeq2 / edgeR"),
         tags$div(class = "pipeline-item", tags$strong("7–8. WGCNA & Common Genes"), " — Co-expression modules and enrichment"),
         tags$div(class = "pipeline-item", tags$strong("9–10. PPI & ML"), " — Protein interaction networks and predictive modeling"),
-        tags$div(class = "pipeline-item", tags$strong("11–16. Validation, ROC, Nomogram, GSEA, Immune, Summary"), " — Validation and report")
+        tags$div(class = "pipeline-item", tags$strong("11–15. Validation, ROC, Nomogram, GSEA, Summary"), " — Validation and report")
       ),
       tags$h3(
         style = "color: #1e293b; font-size: 20px; font-weight: 700; margin: 26px 0 14px 0; text-align: left;

@@ -1116,7 +1116,7 @@ server_roc <- function(input, output, session, rv) {
     if (is.null(sel) || length(sel) == 0) {
       showNotification(
         tags$div(icon("exclamation-triangle"), tags$strong(" Select at least one gene."),
-                 " Your selected genes will be used for Nomogram, GSEA, and Immune analysis."),
+                 " Your selected genes will be used for Nomogram and GSEA analysis."),
         type = "warning", duration = 5)
       return()
     }
@@ -1125,7 +1125,7 @@ server_roc <- function(input, output, session, rv) {
       tags$div(icon("check-circle"), tags$strong(paste0(" ", length(sel), " gene(s) confirmed: ")),
                tags$span(paste(sel, collapse = ", "), style = "font-weight: normal;"),
                tags$br(),
-               tags$span("These genes will be used for Nomogram, GSEA, and Immune Cell analysis.",
+              tags$span("These genes will be used for Nomogram and GSEA analysis.",
                          style = "font-size: 12px; color: #6c757d;")),
       type = "message", duration = 8)
   })
@@ -1141,7 +1141,7 @@ server_roc <- function(input, output, session, rv) {
       tags$br(),
       tags$small(
         icon("arrow-right", style = "margin-right: 4px;"),
-        "Nomogram, GSEA, and Immune Cell Correlation will use these genes.",
+        "Nomogram and GSEA will use these genes.",
         style = "color: #1e8449;"
       )
     )

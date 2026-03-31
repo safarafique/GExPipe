@@ -1023,6 +1023,18 @@ ui_analysis <- dashboardPage(
     
     # Click-to-navigate: clicking a step chip jumps to that sidebar tab
     tags$script(HTML("
+      function gexpHideImmuneChip() {
+        $('.pipeline-step').each(function() {
+          var tab = (($(this).data('tab') || '') + '').toLowerCase();
+          var txt = ($(this).text() || '').toLowerCase();
+          if (tab === 'immune' || txt.indexOf('immune') !== -1) {
+            $(this).remove();
+          }
+        });
+      }
+      $(document).on('shiny:connected', gexpHideImmuneChip);
+      $(document).on('shiny:value', gexpHideImmuneChip);
+      setInterval(gexpHideImmuneChip, 1000);
       $(document).on('click', '.pipeline-step[data-tab]', function() {
         var tab = $(this).data('tab');
         if (tab) {
