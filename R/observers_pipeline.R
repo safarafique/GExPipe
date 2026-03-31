@@ -61,6 +61,12 @@ gexp_register_pipeline_observers <- function(input, output, session, rv) {
       list(id = "nomogram", label = "Nomogram", icon = "calculator", tab = "nomogram", done = isTRUE(rv$nomogram_complete), running = FALSE),
       list(id = "gsea", label = "GSEA", icon = "project-diagram", tab = "gsea", done = isTRUE(rv$gsea_complete), running = FALSE)
     ))
+    # Defensive cleanup for legacy state/code paths where an Immune chip may still be present.
+    steps <- Filter(function(s) {
+      sid <- tolower(if (is.null(s$id)) "" else as.character(s$id))
+      lab <- tolower(if (is.null(s$label)) "" else as.character(s$label))
+      !(sid == "immune" || grepl("immune", lab, fixed = TRUE))
+    }, steps)
 
     n_done <- sum(vapply(steps, function(s) isTRUE(s$done), logical(1)))
     n_total <- length(steps)

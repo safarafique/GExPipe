@@ -516,7 +516,8 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   gse_dir <- file.path(rna_dir, gse_id)
   dir.create(gse_dir, showWarnings = FALSE, recursive = TRUE)
 
-  supp_err <- NULL
+  supp_state <- new.env(parent = emptyenv())
+  supp_state$err <- NULL
   count_file <- NULL
   tryCatch({
     suppressMessages(invisible(capture.output(
@@ -555,12 +556,12 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
         }, error = function(e) {
           msg <- conditionMessage(e)
           if (grepl("truncated|corrupt|error|invalid", msg, ignore.case = TRUE)) {
-            supp_err <<- paste0("Truncated or corrupted tar archive (", basename(tar_file), "). Re-download or try another GSE.")
+            supp_state$err <- paste0("Truncated or corrupted tar archive (", basename(tar_file), "). Re-download or try another GSE.")
           } else {
-            supp_err <<- paste0("Untar failed: ", substr(msg, 1L, 120L))
+            supp_state$err <- paste0("Untar failed: ", substr(msg, 1L, 120L))
           }
         }, warning = function(w) {
-          supp_err <<- paste0("Tar archive problem (", basename(tar_file), "). File may be truncated or corrupted.")
+          supp_state$err <- paste0("Tar archive problem (", basename(tar_file), "). File may be truncated or corrupted.")
         })
       }
       files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
@@ -585,7 +586,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
       }
     }
   }, error = function(e) {
-    supp_err <<- conditionMessage(e)
+    supp_state$err <- conditionMessage(e)
     NULL
   })
 
@@ -601,13 +602,13 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   if (is.null(count_file) && !is.null(ncbi_best)) count_file <- ncbi_best
   if (is.null(count_file)) {
     out$reason <- "no count file (check internet or GSE may not have GEO supp or NCBI counts)"
-    if (!is.null(supp_err) && nzchar(supp_err)) {
-      out$reason <- if (grepl("connection|timeout|hostname|resolve|HTTP|ssl", supp_err, ignore.case = TRUE)) {
+    if (!is.null(supp_state$err) && nzchar(supp_state$err)) {
+      out$reason <- if (grepl("connection|timeout|hostname|resolve|HTTP|ssl", supp_state$err, ignore.case = TRUE)) {
         "network/HTTP - check internet connection"
-      } else if (grepl("truncated|corrupt|tar archive", supp_err, ignore.case = TRUE)) {
+      } else if (grepl("truncated|corrupt|tar archive", supp_state$err, ignore.case = TRUE)) {
         "truncated/corrupted supplementary tar - try re-download or remove this GSE"
       } else {
-        supp_err
+        supp_state$err
       }
     }
     return(out)

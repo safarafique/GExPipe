@@ -7,6 +7,7 @@
 - `runGExPipe()` man-page examples now include a non-interactive check-friendly construction line.
 - Added `tests/testthat/test-runGExPipe.R`; `tests/testthat.R` trimmed to standard `test_check("GExPipe")`.
 - Suggests: `chromote`, `pkgload` (for shinytest2 smoke test and source-based checks).
+- PPI/STRINGdb: extended download **timeout** only; do not set `download.file.method = "curl"` (avoids **`curl` nonzero exit status** on some Windows setups). Initialization tries STRING data versions **11.5**, then **11**, then **12** (override via `options(gexpipe.stringdb_try_versions = ...)`).
 - Main vignette `GExPipe.Rmd`: expanded post–WGCNA sections (common genes, UpSet, GO BP/MF/CC, KEGG ORA + plots, STRING PPI, ML + importance, ROC, D1/D2 validation holdout, GSEA GO + KEGG, MsigDB).
 
 ## Version 0.99.0
