@@ -18,10 +18,12 @@ Description: Shiny application (GExPipe) for high-throughput genomic analysis of
     limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
     normalization, batch correction, differential expression, WGCNA, pathway enrichment,
     PPI, and machine learning. Uses common data structures
-    (ExpressionSet, DGEList) for interoperability. Install with BiocManager::install("GExPipe") once available.
+    (ExpressionSet, DGEList) for interoperability. For a full dependency tree (including
+    STRINGdb + PPI helpers), use BiocManager::install("GExPipe", dependencies = TRUE).
+    STRING data are downloaded on first PPI use (internet required); they cannot be bundled in the package.
 License: MIT + file LICENSE
 Encoding: UTF-8
-Depends: R (>= 4.5.0)
+Depends: R (>= 4.6.0)
 biocViews: Software, ShinyApps, GeneExpression, RNASeq, Microarray,
     DifferentialExpression, Pathways, Network, Visualization
 URL: https://github.com/safarafique/GExPipe
@@ -32,7 +34,6 @@ Imports:
     caret (>= 7.0.0),
     circlize (>= 0.4.17),
     clusterProfiler (>= 4.18.0),
-    corrplot (>= 0.95),
     data.table (>= 1.18.0),
     DESeq2 (>= 1.50.0),
     dplyr (>= 1.2.0),
@@ -81,6 +82,7 @@ Suggests:
     Boruta (>= 8.0.0),
     chromote (>= 0.1.0),
     cicerone (>= 0.1.0),
+    corrplot (>= 0.95),
     knitr (>= 1.45.0),
     mixOmics (>= 6.0.0),
     oligo (>= 1.62.0),
