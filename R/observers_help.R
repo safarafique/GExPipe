@@ -71,6 +71,10 @@ gexp_user_guideline_modal_ui <- function() {
     shiny::tags$p(
       shiny::tags$a(href = "mailto:safa.res.sbb@pu.edu.pk", "safa.res.sbb@pu.edu.pk", style = "font-weight: bold; color: #6366f1;"),
       style = "margin-bottom: 0;"
+    ),
+    shiny::tags$p(
+      shiny::tags$a(href = "mailto:safa.sandhu@gmail.com", "safa.sandhu@gmail.com", style = "font-weight: bold; color: #6366f1;"),
+      style = "margin-bottom: 0;"
     )
   )
 }

@@ -59,7 +59,8 @@ gexp_register_pipeline_observers <- function(input, output, session, rv) {
       ),
       list(id = "roc", label = "ROC", icon = "chart-line", tab = "roc", done = !is.null(rv$ml_common_genes) && length(rv$ml_common_genes) > 0, running = FALSE),
       list(id = "nomogram", label = "Nomogram", icon = "calculator", tab = "nomogram", done = isTRUE(rv$nomogram_complete), running = FALSE),
-      list(id = "gsea", label = "GSEA", icon = "project-diagram", tab = "gsea", done = isTRUE(rv$gsea_complete), running = FALSE)
+      list(id = "gsea", label = "GSEA", icon = "project-diagram", tab = "gsea", done = isTRUE(rv$gsea_complete), running = FALSE),
+      list(id = "summary", label = "Summary", icon = "file-alt", tab = "results_summary", done = isTRUE(rv$gsea_complete), running = FALSE)
     ))
     # Defensive cleanup for legacy state/code paths where an Immune chip may still be present.
     steps <- Filter(function(s) {
