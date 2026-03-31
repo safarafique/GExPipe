@@ -27,15 +27,15 @@ gexp_ui_download <- function() {
     tags$style(HTML(
       "#rnaseq_gses, #microarray_gses { background-color: #f8f9fa; color: #212529; }"
     )),
-
     fluidRow(
       box(
         title = tags$span(icon("heartbeat"), " Analysis Context (optional)"),
         width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$p("Specify the disease or condition you are analyzing. This helps keep your analysis organized and can be used in reports and filenames.", style = "margin-bottom: 12px;"),
         textInput("disease_name", "Disease / Condition (optional):",
-                  placeholder = "e.g. Myocardial infarction, Breast cancer, COVID-19",
-                  width = "100%")
+          placeholder = "e.g. Myocardial infarction, Breast cancer, COVID-19",
+          width = "100%"
+        )
       )
     ),
     fluidRow(
@@ -54,31 +54,41 @@ gexp_ui_download <- function() {
         width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$p("Upload a saved workspace (.rds) to continue where you left off, or skip and start a new analysis below.", style = "margin-bottom: 10px;"),
         fluidRow(
-          column(12, tags$div(style = "margin-bottom: 12px;",
-            actionButton("skip_load_btn", tagList(icon("arrow-down"), " Continue without loading \u2014 start new analysis below"), class = "btn-success btn-sm")))
+          column(12, tags$div(
+            style = "margin-bottom: 12px;",
+            actionButton("skip_load_btn", tagList(icon("arrow-down"), " Continue without loading \u2014 start new analysis below"), class = "btn-success btn-sm")
+          ))
         ),
         fluidRow(
-          column(6, tags$p(tags$strong("Upload a .rds file:"), style = "margin-bottom: 4px;"),
-            fileInput("upload_workspace_file", NULL, accept = c(".rds"), buttonLabel = "Choose file", placeholder = "No file chosen")),
-          column(4, tags$div(style = "margin-top: 25px;",
-                   actionButton("load_uploaded_btn", tagList(icon("upload"), " Load uploaded file"), class = "btn-info btn-block")))
+          column(
+            6, tags$p(tags$strong("Upload a .rds file:"), style = "margin-bottom: 4px;"),
+            fileInput("upload_workspace_file", NULL, accept = c(".rds"), buttonLabel = "Choose file", placeholder = "No file chosen")
+          ),
+          column(4, tags$div(
+            style = "margin-top: 25px;",
+            actionButton("load_uploaded_btn", tagList(icon("upload"), " Load uploaded file"), class = "btn-info btn-block")
+          ))
         )
       )
     ),
-
     fluidRow(
       box(
         title = tags$span(icon("laptop-code"), " Select Analysis Platform"),
         width = 12, status = "primary", solidHeader = TRUE,
         fluidRow(
-          column(6,
+          column(
+            6,
             radioButtons("analysis_type", "Choose Platform:",
-                         choices = c("RNA-seq" = "rnaseq",
-                                     "Microarray" = "microarray",
-                                     "Merged (Both)" = "merged"),
-                         selected = "rnaseq", inline = TRUE)
+              choices = c(
+                "RNA-seq" = "rnaseq",
+                "Microarray" = "microarray",
+                "Merged (Both)" = "merged"
+              ),
+              selected = "rnaseq", inline = TRUE
+            )
           ),
-          column(6,
+          column(
+            6,
             radioButtons(
               "dataset_mode",
               "Datasets:",
@@ -90,19 +100,25 @@ gexp_ui_download <- function() {
               inline = TRUE
             )
           ),
-          column(12,
+          column(
+            12,
             radioButtons("de_method",
-              tags$span("DE Method:",
-              tags$i(class = "fa fa-question-circle param-help",
-                     `data-toggle` = "tooltip", `data-placement` = "right",
-                     title = "Choose the statistical method for differential expression analysis in Step 6.<br><br><b>limma (empirical Bayes):</b> Gold standard for microarray and works well with any normalized data. Uses moderated t-statistics on batch-corrected log-expression.<br><br><b>limma-voom (mean\u2013variance weights):</b> Recommended when you want limma-style models on RNA-seq <i>counts</i>. voom converts counts to logCPM and estimates precision weights before limma.<br><br><b>DESeq2 (negative binomial):</b> Gold standard for RNA-seq count data. Uses its own internal normalization (median-of-ratios) \u2014 raw counts are preserved and passed directly to DESeq2.<br><br><b>edgeR (quasi-likelihood):</b> Robust alternative for RNA-seq count data. Uses TMM normalization and quasi-likelihood F-tests for DE \u2014 well-suited for small sample sizes.<br><br><em>Tip:</em> For pure RNA-seq counts, DESeq2, edgeR, or limma-voom are appropriate. For microarray or merged platforms, limma is recommended.")),
+              tags$span(
+                "DE Method:",
+                tags$i(
+                  class = "fa fa-question-circle param-help",
+                  `data-toggle` = "tooltip", `data-placement` = "right",
+                  title = "Choose the statistical method for differential expression analysis in Step 6.<br><br><b>limma (empirical Bayes):</b> Gold standard for microarray and works well with any normalized data. Uses moderated t-statistics on batch-corrected log-expression.<br><br><b>limma-voom (mean\u2013variance weights):</b> Recommended when you want limma-style models on RNA-seq <i>counts</i>. voom converts counts to logCPM and estimates precision weights before limma.<br><br><b>DESeq2 (negative binomial):</b> Gold standard for RNA-seq count data. Uses its own internal normalization (median-of-ratios) \u2014 raw counts are preserved and passed directly to DESeq2.<br><br><b>edgeR (quasi-likelihood):</b> Robust alternative for RNA-seq count data. Uses TMM normalization and quasi-likelihood F-tests for DE \u2014 well-suited for small sample sizes.<br><br><em>Tip:</em> For pure RNA-seq counts, DESeq2, edgeR, or limma-voom are appropriate. For microarray or merged platforms, limma is recommended."
+                )
+              ),
               choices = c(
                 "limma \u2014 empirical Bayes (recommended for microarray/mixed)" = "limma",
                 "limma-voom \u2014 voom + limma (RNA-seq counts)" = "limma_voom",
                 "DESeq2 \u2014 negative binomial (RNA-seq counts)" = "deseq2",
                 "edgeR \u2014 quasi-likelihood (RNA-seq counts)" = "edger"
               ),
-              selected = "limma")
+              selected = "limma"
+            )
           )
         ),
         conditionalPanel(
@@ -118,46 +134,57 @@ gexp_ui_download <- function() {
         )
       )
     ),
-
     fluidRow(
       conditionalPanel(
         condition = "input.analysis_type == 'rnaseq' || input.analysis_type == 'merged'",
-        box(title = tags$span(icon("dna"), " RNA-seq Datasets"),
-            width = 6, status = "info", solidHeader = TRUE,
-            textAreaInput("rnaseq_gses", "GSE IDs (comma separated):",
-                          value = "", placeholder = "e.g. GSE50760, GSE104836",
-                          rows = 3),
-            tags$p(style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."))
+        box(
+          title = tags$span(icon("dna"), " RNA-seq Datasets"),
+          width = 6, status = "info", solidHeader = TRUE,
+          textAreaInput("rnaseq_gses", "GSE IDs (comma separated):",
+            value = "", placeholder = "e.g. GSE50760, GSE104836",
+            rows = 3
+          ),
+          tags$p(
+            style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
+            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."
+          )
+        )
       ),
       conditionalPanel(
         condition = "input.analysis_type == 'microarray' || input.analysis_type == 'merged'",
-        box(title = tags$span(icon("microchip"), " Microarray Datasets"),
-            width = 6, status = "warning", solidHeader = TRUE,
-            textAreaInput("microarray_gses", "GSE IDs (comma separated):",
-                          value = "", placeholder = "e.g. GSE89076, GSE44076",
-                          rows = 3),
-            tags$p(style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."))
+        box(
+          title = tags$span(icon("microchip"), " Microarray Datasets"),
+          width = 6, status = "warning", solidHeader = TRUE,
+          textAreaInput("microarray_gses", "GSE IDs (comma separated):",
+            value = "", placeholder = "e.g. GSE89076, GSE44076",
+            rows = 3
+          ),
+          tags$p(
+            style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
+            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."
+          )
+        )
       )
     ),
-
-    fluidRow(
-      column(12, align = "center",
-        actionButton("start_processing", tagList(icon("play-circle"), " Start Processing"),
-                     class = "btn btn-primary btn-lg",
-                     style = "margin-top: 20px; margin-bottom: 10px; width: 250px;")
-      )
-    ),
-
     fluidRow(
       column(12,
-        tags$div(style = "text-align: center; color: #868e96; font-size: 12px;",
-                 icon("info-circle"),
-                 " Save your workspace (sidebar) to resume your analysis later.")
+        align = "center",
+        actionButton("start_processing", tagList(icon("play-circle"), " Start Processing"),
+          class = "btn btn-primary btn-lg",
+          style = "margin-top: 20px; margin-bottom: 10px; width: 250px;"
+        )
       )
     ),
-
+    fluidRow(
+      column(
+        12,
+        tags$div(
+          style = "text-align: center; color: #868e96; font-size: 12px;",
+          icon("info-circle"),
+          " Save your workspace (sidebar) to resume your analysis later."
+        )
+      )
+    ),
     fluidRow(
       box(
         title = tags$span(icon("file-alt"), " Process Summary"),
@@ -165,7 +192,6 @@ gexp_ui_download <- function() {
         uiOutput("download_process_summary_ui")
       )
     ),
-
     fluidRow(
       box(
         title = tags$span(icon("terminal"), " Download log"),
@@ -178,14 +204,14 @@ gexp_ui_download <- function() {
         tags$pre(style = "white-space: pre-wrap;", textOutput("download_log"))
       )
     ),
-
     fluidRow(
-      column(12, class = "next-btn",
+      column(12,
+        class = "next-btn",
         actionButton("next_page_download", tagList(icon("arrow-right"), " Next: QC & Visualization"),
-                     class = "btn btn-success btn-lg",
-                     style = "margin-top: 20px;")
+          class = "btn btn-success btn-lg",
+          style = "margin-top: 20px;"
+        )
       )
     )
   )
 }
-

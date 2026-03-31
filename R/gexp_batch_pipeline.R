@@ -86,7 +86,7 @@ gexp_batch_correct <- function(
   )
 
   # ---- Design matrix for Condition ----
-  design <- stats::model.matrix(~ Condition, data = metadata)
+  design <- stats::model.matrix(~Condition, data = metadata)
 
   # ---- Apply batch method ----
   batch_corrected <- expr_filtered
@@ -98,7 +98,6 @@ gexp_batch_correct <- function(
       design = design
     )
     log_text <- paste0(log_text, "Batch method: limma removeBatchEffect\n")
-
   } else if (method == "combat") {
     batch_corrected <- sva::ComBat(
       expr_filtered,
@@ -108,7 +107,6 @@ gexp_batch_correct <- function(
       prior.plots = FALSE
     )
     log_text <- paste0(log_text, "Batch method: ComBat (mod = NULL)\n")
-
   } else if (method == "quantile_limma") {
     expr_q <- limma::normalizeBetweenArrays(expr_filtered, method = "quantile")
     batch_corrected <- limma::removeBatchEffect(
@@ -117,7 +115,6 @@ gexp_batch_correct <- function(
       design = design
     )
     log_text <- paste0(log_text, "Batch method: Quantile + limma removeBatchEffect\n")
-
   } else if (method == "hybrid") {
     expr_q <- limma::normalizeBetweenArrays(expr_filtered, method = "quantile")
     batch_corrected <- sva::ComBat(
@@ -128,7 +125,6 @@ gexp_batch_correct <- function(
       prior.plots = FALSE
     )
     log_text <- paste0(log_text, "Batch method: Hybrid (Quantile + ComBat, mod = NULL)\n")
-
   } else if (method == "combat_ref") {
     sizes <- table(metadata$Dataset)
     ref <- names(sizes)[which.max(sizes)]
@@ -144,11 +140,10 @@ gexp_batch_correct <- function(
       log_text,
       "Batch method: ComBat-ref (ref.batch = ", ref, ", mod = NULL)\n"
     )
-
   } else if (method == "sva") {
     # Surrogate variable analysis: estimate hidden confounders, then ComBat with mod = design + SVs
-    mod <- stats::model.matrix(~ Condition, data = metadata)
-    mod0 <- stats::model.matrix(~ 1, data = metadata)
+    mod <- stats::model.matrix(~Condition, data = metadata)
+    mod0 <- stats::model.matrix(~1, data = metadata)
     n_sv <- tryCatch(
       sva::num.sv(expr_filtered, mod, method = "be"),
       error = function(e) 0L
@@ -209,4 +204,3 @@ gexp_batch_correct <- function(
     log_text = log_text
   )
 }
-

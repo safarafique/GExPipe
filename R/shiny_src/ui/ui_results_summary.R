@@ -65,7 +65,8 @@ ui_results_summary <- tabItem(
   # ----- 2. Normalization & batch -----
   step_arrow(),
   fluidRow(
-    column(6,
+    column(
+      6,
       box(
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         title = tags$span(icon("balance-scale"), " Step 3: Normalization"),
@@ -73,7 +74,8 @@ ui_results_summary <- tabItem(
         uiOutput("results_summary_norm_batch")
       )
     ),
-    column(6,
+    column(
+      6,
       box(
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         title = tags$span(icon("layer-group"), " Step 5: Batch correction"),
@@ -97,7 +99,8 @@ ui_results_summary <- tabItem(
     "DEGs identified (e.g. limma). Volcano: log2 FC vs adjusted P-value. Heatmap: top genes across samples.",
     "success",
     uiOutput("results_summary_de"),
-    tags$div(style = "margin-top: 12px;",
+    tags$div(
+      style = "margin-top: 12px;",
       fluidRow(
         column(6, plotOutput("results_summary_volcano", height = RESULTS_PLOT_HEIGHT)),
         column(6, plotOutput("results_summary_de_heatmap", height = RESULTS_PLOT_HEIGHT))
@@ -128,7 +131,6 @@ ui_results_summary <- tabItem(
     "success",
     uiOutput("results_summary_common_genes")
   ),
-
   step_card(
     "8", "sitemap", "GO & KEGG enrichment",
     "Pathway enrichment of common genes. GO dotplot and KEGG bar plot.",
@@ -157,7 +159,6 @@ ui_results_summary <- tabItem(
     uiOutput("results_summary_ml"),
     plotOutput("results_summary_ml_venn", height = RESULTS_PLOT_HEIGHT)
   ),
-
   step_card(
     "12", "chart-line", "ROC curve",
     "ROC/AUC for mean signature of ML common genes (training data).",
@@ -193,7 +194,8 @@ ui_results_summary <- tabItem(
 
   # ----- Cite (collapsible at bottom) -----
   fluidRow(
-    column(12,
+    column(
+      12,
       box(
         title = tags$span(icon("quote-right"), " Cite this analysis"),
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,

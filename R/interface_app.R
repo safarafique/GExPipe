@@ -39,8 +39,8 @@ gexp_app_analysis_dashboard_ui <- function() {
           shiny::tagList(shiny::icon("book-open"), " User Guideline"),
           class = "btn-info",
           style =
-            "margin: 10px; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); 
-             border: none; color: white; font-weight: bold; padding: 8px 15px; 
+            "margin: 10px; background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+             border: none; color: white; font-weight: bold; padding: 8px 15px;
              border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);"
         )
       )
@@ -207,4 +207,3 @@ gexp_app_ui <- function() {
     shiny::uiOutput("analysis_dashboard")
   )
 }
-

@@ -3,50 +3,49 @@
 # ==============================================================================
 
 server_qc <- function(input, output, session, rv) {
-  
   # ==============================================================================
   # INFO BOXES
   # ==============================================================================
-  
+
   output$datasets_box <- renderInfoBox({
     infoBox(
-      "Datasets", 
-      length(rv$all_genes_list), 
-      icon = icon("database", class = "fa-2x"), 
-      color = "blue", 
+      "Datasets",
+      length(rv$all_genes_list),
+      icon = icon("database", class = "fa-2x"),
+      color = "blue",
       fill = TRUE
     )
   })
-  
+
   output$samples_box <- renderInfoBox({
     n <- if (!is.null(rv$combined_expr_raw)) ncol(rv$combined_expr_raw) else 0
     infoBox(
-      "Samples", 
-      n, 
-      icon = icon("vial", class = "fa-2x"), 
-      color = "green", 
+      "Samples",
+      n,
+      icon = icon("vial", class = "fa-2x"),
+      color = "green",
       fill = TRUE
     )
   })
-  
+
   output$genes_box <- renderInfoBox({
     n <- if (!is.null(rv$common_genes)) length(rv$common_genes) else 0
     infoBox(
-      "Genes", 
-      n, 
-      icon = icon("dna", class = "fa-2x"), 
-      color = "purple", 
+      "Genes",
+      n,
+      icon = icon("dna", class = "fa-2x"),
+      color = "purple",
       fill = TRUE
     )
   })
-  
+
   output$gene_overlap_summary <- renderUI({
     req(rv$all_genes_list, rv$common_genes)
     # These are per-dataset gene counts from Step 1 (Download). Expect ~37,673 for full NCBI RNA-seq.
     overlap_df <- gexp_qc_gene_overlap_summary(rv$all_genes_list, rv$common_genes)
     total_genes_per_dataset <- overlap_df$Total_Genes
     common_count <- length(rv$common_genes)
-    
+
     tags$div(
       style = "padding: 15px;",
       tags$h4(icon("info-circle"), " Gene Overlap Analysis", style = "color: #00a65a;"),
@@ -70,8 +69,10 @@ server_qc <- function(input, output, session, rv) {
               tags$td(format(total, big.mark = ","), style = "text-align: center;"),
               tags$td(
                 paste0(pct, "%"),
-                style = paste0("text-align: center; font-weight: bold; color: ",
-                               ifelse(pct > 80, "#00a65a", ifelse(pct > 60, "#f39c12", "#dd4b39")), ";")
+                style = paste0(
+                  "text-align: center; font-weight: bold; color: ",
+                  ifelse(pct > 80, "#00a65a", ifelse(pct > 60, "#f39c12", "#dd4b39")), ";"
+                )
               )
             )
           })
@@ -79,9 +80,10 @@ server_qc <- function(input, output, session, rv) {
       ),
       tags$div(
         style = "margin-top: 15px; padding: 10px; background-color: #d4edda; border-radius: 5px;",
-        tags$h5(icon("check-circle"), 
-                tags$b(paste0(" Common Genes: ", format(common_count, big.mark = ","))),
-                style = "color: #155724; margin: 0;")
+        tags$h5(icon("check-circle"),
+          tags$b(paste0(" Common Genes: ", format(common_count, big.mark = ","))),
+          style = "color: #155724; margin: 0;"
+        )
       ),
       if (common_count == 0 || (length(total_genes_per_dataset) >= 3 && common_count < 10)) {
         tags$div(
@@ -97,7 +99,7 @@ server_qc <- function(input, output, session, rv) {
       }
     )
   })
-  
+
   # ==============================================================================
   # VENN & UPSET (shared draw-to-dev helpers for display + download)
   # ==============================================================================
@@ -111,162 +113,176 @@ server_qc <- function(input, output, session, rv) {
     }
     sets <- venn_prep$sets
     if (length(sets) == 2) {
-      tryCatch({
-        # Category names with totals displayed clearly
-        cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
+      tryCatch(
+        {
+          # Category names with totals displayed clearly
+          cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
 
-        venn.plot <- VennDiagram::venn.diagram(
-          x = sets,
-          category.names = cat_names,
-          filename = NULL,
-          output = TRUE,
-          disable.logging = TRUE,
-          fill = c("#f39c12", "#3498db"),
-          alpha = 0.6,
-          cex = 0.9,
-          cat.cex = 1.0,
-          cat.fontface = "bold",
-          cat.pos = c(-20, 20),
-          cat.dist = c(0.15, 0.15),
-          cat.col = c("#f39c12", "#3498db"),
-          margin = 0.2,
-          print.mode = "raw",
-          fontfamily = "sans",
-          lwd = 2,
-          force.unique = TRUE,
-          na = "remove"
-        )
-        grid::grid.newpage()
-        grid::grid.draw(venn.plot)
-      }, error = function(e) {
-        plot.new()
-        text(0.5, 0.5, paste("Error creating Venn diagram:", e$message), cex = 1.2, col = "red")
-      })
+          venn.plot <- VennDiagram::venn.diagram(
+            x = sets,
+            category.names = cat_names,
+            filename = NULL,
+            output = TRUE,
+            disable.logging = TRUE,
+            fill = c("#f39c12", "#3498db"),
+            alpha = 0.6,
+            cex = 0.9,
+            cat.cex = 1.0,
+            cat.fontface = "bold",
+            cat.pos = c(-20, 20),
+            cat.dist = c(0.15, 0.15),
+            cat.col = c("#f39c12", "#3498db"),
+            margin = 0.2,
+            print.mode = "raw",
+            fontfamily = "sans",
+            lwd = 2,
+            force.unique = TRUE,
+            na = "remove"
+          )
+          grid::grid.newpage()
+          grid::grid.draw(venn.plot)
+        },
+        error = function(e) {
+          plot.new()
+          text(0.5, 0.5, paste("Error creating Venn diagram:", e$message), cex = 1.2, col = "red")
+        }
+      )
     } else if (length(sets) == 3) {
-      tryCatch({
-        # Check if all sets are identical
-        all_intersect <- Reduce(intersect, sets)
-        all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
-        
-        if (all_same) {
+      tryCatch(
+        {
+          # Check if all sets are identical
+          all_intersect <- Reduce(intersect, sets)
+          all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
+
+          if (all_same) {
+            plot.new()
+            text(0.5, 0.5,
+              paste0("All datasets have identical genes\n(", format(length(all_intersect), big.mark = ","), " genes)"),
+              cex = 1.8, col = "gray40"
+            )
+            return()
+          }
+
+          # Create category names with totals (like "Q = 16")
+          cat_names <- paste0(names(sets), " = ", format(sapply(sets, length), big.mark = ","))
+
+          # Create category names with totals
+          cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
+
+          venn.plot <- venn.diagram(
+            x = sets,
+            category.names = cat_names,
+            filename = NULL,
+            output = TRUE,
+            disable.logging = TRUE,
+            fill = c("#f1c40f", "#3498db", "#e74c3c"),
+            alpha = 0.6,
+            cex = 0.8,
+            cat.cex = 0.9,
+            cat.fontface = "bold",
+            cat.pos = c(-40, 40, 180),
+            cat.dist = c(0.15, 0.15, 0.10),
+            cat.col = c("#f1c40f", "#3498db", "#e74c3c"),
+            margin = 0.2,
+            print.mode = "raw",
+            fontfamily = "sans",
+            lwd = 2,
+            force.unique = TRUE,
+            na = "remove"
+          )
+          grid.draw(venn.plot)
+        },
+        error = function(e) {
           plot.new()
-          text(0.5, 0.5, 
-               paste0("All datasets have identical genes\n(", format(length(all_intersect), big.mark = ","), " genes)"),
-               cex = 1.8, col = "gray40")
-          return()
+          text(0.5, 0.5, paste("Error creating Venn diagram:", e$message), cex = 1.2, col = "red")
         }
-        
-        # Create category names with totals (like "Q = 16")
-        cat_names <- paste0(names(sets), " = ", format(sapply(sets, length), big.mark = ","))
-        
-        # Create category names with totals
-        cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
-        
-        venn.plot <- venn.diagram(
-          x = sets,
-          category.names = cat_names,
-          filename = NULL,
-          output = TRUE,
-          disable.logging = TRUE,
-          fill = c("#f1c40f", "#3498db", "#e74c3c"),
-          alpha = 0.6,
-          cex = 0.8,
-          cat.cex = 0.9,
-          cat.fontface = "bold",
-          cat.pos = c(-40, 40, 180),
-          cat.dist = c(0.15, 0.15, 0.10),
-          cat.col = c("#f1c40f", "#3498db", "#e74c3c"),
-          margin = 0.2,
-          print.mode = "raw",
-          fontfamily = "sans",
-          lwd = 2,
-          force.unique = TRUE,
-          na = "remove"
-        )
-        grid.draw(venn.plot)
-      }, error = function(e) {
-        plot.new()
-        text(0.5, 0.5, paste("Error creating Venn diagram:", e$message), cex = 1.2, col = "red")
-      })
+      )
     } else if (length(sets) == 4) {
-      tryCatch({
-        # Check if all sets are identical
-        all_intersect <- Reduce(intersect, sets)
-        all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
-        
-        if (all_same) {
+      tryCatch(
+        {
+          # Check if all sets are identical
+          all_intersect <- Reduce(intersect, sets)
+          all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
+
+          if (all_same) {
+            plot.new()
+            text(0.5, 0.5,
+              paste0("All datasets have identical genes\n(", format(length(all_intersect), big.mark = ","), " genes)"),
+              cex = 1.8, col = "gray40"
+            )
+            return()
+          }
+
+          # Ensure all genes are unique within each set
+          sets <- lapply(sets, unique)
+
+          # Create category names with totals
+          cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
+
+          # Create a more detailed Venn diagram with better visibility
+          # Calculate all intersections manually first to ensure they exist
+          all_intersect_4 <- Reduce(intersect, sets)
+          intersect_123 <- Reduce(intersect, sets[1:3])
+          intersect_124 <- Reduce(intersect, sets[c(1, 2, 4)])
+          intersect_134 <- Reduce(intersect, sets[c(1, 3, 4)])
+          intersect_234 <- Reduce(intersect, sets[2:4])
+
+          venn.plot <- venn.diagram(
+            x = sets,
+            category.names = cat_names,
+            filename = NULL,
+            output = TRUE,
+            disable.logging = TRUE,
+            fill = c("#f1c40f", "#3498db", "#e74c3c", "#2ecc71"),
+            alpha = 0.65,
+            cex = 0.7,
+            cat.cex = 0.85,
+            cat.fontface = "bold",
+            cat.col = c("#f1c40f", "#3498db", "#e74c3c", "#2ecc71"),
+            margin = 0.12,
+            print.mode = "raw",
+            fontfamily = "sans",
+            lwd = 2,
+            force.unique = TRUE,
+            na = "remove",
+            scaled = TRUE,
+            euler.d = FALSE,
+            rotation.degree = 0,
+            ext.text = FALSE,
+            ext.percent = 0,
+            ext.pos = 0,
+            ext.dist = 0,
+            ext.line.lwd = 0,
+            ext.line.lty = 0
+          )
+          grid.draw(venn.plot)
+        },
+        error = function(e) {
           plot.new()
-          text(0.5, 0.5, 
-               paste0("All datasets have identical genes\n(", format(length(all_intersect), big.mark = ","), " genes)"),
-               cex = 1.8, col = "gray40")
-          return()
+          text(0.5, 0.5, paste("Error creating Venn diagram:", e$message), cex = 1.2, col = "red")
         }
-        
-        # Ensure all genes are unique within each set
-        sets <- lapply(sets, unique)
-        
-        # Create category names with totals
-        cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
-        
-        # Create a more detailed Venn diagram with better visibility
-        # Calculate all intersections manually first to ensure they exist
-        all_intersect_4 <- Reduce(intersect, sets)
-        intersect_123 <- Reduce(intersect, sets[1:3])
-        intersect_124 <- Reduce(intersect, sets[c(1,2,4)])
-        intersect_134 <- Reduce(intersect, sets[c(1,3,4)])
-        intersect_234 <- Reduce(intersect, sets[2:4])
-        
-        venn.plot <- venn.diagram(
-          x = sets,
-          category.names = cat_names,
-          filename = NULL,
-          output = TRUE,
-          disable.logging = TRUE,
-          fill = c("#f1c40f", "#3498db", "#e74c3c", "#2ecc71"),
-          alpha = 0.65,
-          cex = 0.7,
-          cat.cex = 0.85,
-          cat.fontface = "bold",
-          cat.col = c("#f1c40f", "#3498db", "#e74c3c", "#2ecc71"),
-          margin = 0.12,
-          print.mode = "raw",
-          fontfamily = "sans",
-          lwd = 2,
-          force.unique = TRUE,
-          na = "remove",
-          scaled = TRUE,
-          euler.d = FALSE,
-          rotation.degree = 0,
-          ext.text = FALSE,
-          ext.percent = 0,
-          ext.pos = 0,
-          ext.dist = 0,
-          ext.line.lwd = 0,
-          ext.line.lty = 0
-        )
-        grid.draw(venn.plot)
-      }, error = function(e) {
-        plot.new()
-        text(0.5, 0.5, paste("Error creating Venn diagram:", e$message), cex = 1.2, col = "red")
-      })
+      )
     } else {
       # For 5+ datasets, check if all identical
       all_intersect <- Reduce(intersect, sets)
       all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
-      
+
       if (all_same) {
         plot.new()
-        text(0.5, 0.5, 
-             paste0("All datasets have identical genes\n(", format(length(all_intersect), big.mark = ","), " genes)"),
-             cex = 1.8, col = "gray40")
+        text(0.5, 0.5,
+          paste0("All datasets have identical genes\n(", format(length(all_intersect), big.mark = ","), " genes)"),
+          cex = 1.8, col = "gray40"
+        )
       } else {
         # Show summary
         plot.new()
         text(0.5, 0.7, paste("Total Datasets:", length(sets)), cex = 2, font = 2)
-        text(0.5, 0.5, paste("Common Genes:", format(length(rv$common_genes), big.mark = ",")), 
-             cex = 3, col = "#2ecc71", font = 2)
-        text(0.5, 0.3, "See UpSet plot for detailed intersections →", 
-             cex = 1.3, col = "gray40")
+        text(0.5, 0.5, paste("Common Genes:", format(length(rv$common_genes), big.mark = ",")),
+          cex = 3, col = "#2ecc71", font = 2
+        )
+        text(0.5, 0.3, "See UpSet plot for detailed intersections →",
+          cex = 1.3, col = "gray40"
+        )
       }
     }
   }
@@ -275,7 +291,7 @@ server_qc <- function(input, output, session, rv) {
     req(rv$all_genes_list)
     draw_qc_venn_to_dev()
   })
-  
+
   draw_qc_upset_to_dev <- function() {
     upset_prep <- gexp_qc_prepare_upset_data(rv$all_genes_list)
     if (!isTRUE(upset_prep$ok)) {
@@ -285,37 +301,40 @@ server_qc <- function(input, output, session, rv) {
     }
     upset_df <- upset_prep$upset_df
     max_set_size <- upset_prep$max_set_size
-    tryCatch({
-      UpSetR::upset(
-        upset_df,
-        sets = colnames(upset_df),
-        keep.order = TRUE,
-        order.by = "freq",
-        main.bar.color = "#3498db",
-        sets.bar.color = "#e74c3c",
-        matrix.color = "#2ecc71",
-        point.size = 3.5,
-        line.size = 1,
-        text.scale = c(1.4, 1.1, 1.1, 1, 1.4, 1.2),
-        mb.ratio = c(0.7, 0.3),
-        set_size.show = TRUE,
-        set_size.scale_max = max_set_size * 1.1
-      )
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Error creating UpSet plot:", e$message), cex = 1.2, col = "red")
-    })
+    tryCatch(
+      {
+        UpSetR::upset(
+          upset_df,
+          sets = colnames(upset_df),
+          keep.order = TRUE,
+          order.by = "freq",
+          main.bar.color = "#3498db",
+          sets.bar.color = "#e74c3c",
+          matrix.color = "#2ecc71",
+          point.size = 3.5,
+          line.size = 1,
+          text.scale = c(1.4, 1.1, 1.1, 1, 1.4, 1.2),
+          mb.ratio = c(0.7, 0.3),
+          set_size.show = TRUE,
+          set_size.scale_max = max_set_size * 1.1
+        )
+      },
+      error = function(e) {
+        plot.new()
+        text(0.5, 0.5, paste("Error creating UpSet plot:", e$message), cex = 1.2, col = "red")
+      }
+    )
   }
 
   output$upset_plot <- renderPlot({
     req(rv$all_genes_list)
     draw_qc_upset_to_dev()
   })
-  
+
   # ==============================================================================
   # QC PLOTS
   # ==============================================================================
-  
+
   output$qc_boxplot <- renderPlot({
     req(rv$combined_expr_raw)
     df <- gexp_qc_prepare_boxplot_data(
@@ -324,28 +343,32 @@ server_qc <- function(input, output, session, rv) {
       rna_counts_list = rv$rna_counts_list,
       max_points = 500000L
     )
-    
+
     ggplot(df, aes(x = Sample, y = Expression, fill = Platform)) +
       geom_boxplot(outlier.size = 0.5) +
       theme_bw() +
       labs(title = "Expression Distribution - Raw Data", y = "Expression") +
-      theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
-            plot.title = element_text(face = "bold", size = 16))
+      theme(
+        axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        plot.title = element_text(face = "bold", size = 16)
+      )
   })
-  
+
   output$qc_density <- renderPlot({
     req(rv$combined_expr_raw)
     dd <- gexp_qc_prepare_density_data(rv$combined_expr_raw, max_samples = 50L)
-    plot(dd$first, main = "Expression Density - Raw Data",
-         xlab = "Expression", col = "#3498db", lwd = 2,
-         ylim = c(0, max(dd$first$y) * 1.2))
+    plot(dd$first,
+      main = "Expression Density - Raw Data",
+      xlab = "Expression", col = "#3498db", lwd = 2,
+      ylim = c(0, max(dd$first$y) * 1.2)
+    )
     if (length(dd$others) > 0) {
       for (i in seq_along(dd$others)) {
         lines(dd$others[[i]], col = dd$colors[i + 1L], lwd = 1)
       }
     }
   })
-  
+
   # ==============================================================================
   # SAMPLE OUTLIER DETECTION
   # ==============================================================================
@@ -353,7 +376,9 @@ server_qc <- function(input, output, session, rv) {
   # ---- Previously excluded samples banner ----
   output$qc_excluded_info_ui <- renderUI({
     excluded <- rv$qc_excluded_samples
-    if (is.null(excluded) || length(excluded) == 0) return(NULL)
+    if (is.null(excluded) || length(excluded) == 0) {
+      return(NULL)
+    }
     tags$div(
       class = "alert alert-info", style = "margin-bottom: 12px;",
       icon("info-circle"),
@@ -373,35 +398,40 @@ server_qc <- function(input, output, session, rv) {
     }
 
     withProgress(message = "Detecting sample outliers...", value = 0, {
-      tryCatch({
-        incProgress(0.2, detail = "PCA analysis...")
-        incProgress(0.4, detail = "Connectivity analysis...")
-        qc <- gexp_qc_detect_outliers(expr, top_n = 5000L)
-        incProgress(0.3, detail = "Preparing results...")
+      tryCatch(
+        {
+          incProgress(0.2, detail = "PCA analysis...")
+          incProgress(0.4, detail = "Connectivity analysis...")
+          qc <- gexp_qc_detect_outliers(expr, top_n = 5000L)
+          incProgress(0.3, detail = "Preparing results...")
 
-        # Store results
-        rv$qc_pca_scores <- qc$scores
-        rv$qc_pca_distances <- qc$distances
-        rv$qc_pca_threshold <- qc$pca_threshold
-        rv$qc_pca_outliers <- qc$pca_outliers
-        rv$qc_pca_var_explained <- qc$pca_var_explained
-        rv$qc_conn_k <- qc$connectivity
-        rv$qc_conn_threshold <- qc$conn_threshold
-        rv$qc_conn_outliers <- qc$conn_outliers
-        rv$qc_all_outliers <- qc$all_outliers
-        rv$qc_outlier_detection_complete <- TRUE
+          # Store results
+          rv$qc_pca_scores <- qc$scores
+          rv$qc_pca_distances <- qc$distances
+          rv$qc_pca_threshold <- qc$pca_threshold
+          rv$qc_pca_outliers <- qc$pca_outliers
+          rv$qc_pca_var_explained <- qc$pca_var_explained
+          rv$qc_conn_k <- qc$connectivity
+          rv$qc_conn_threshold <- qc$conn_threshold
+          rv$qc_conn_outliers <- qc$conn_outliers
+          rv$qc_all_outliers <- qc$all_outliers
+          rv$qc_outlier_detection_complete <- TRUE
 
-        incProgress(0.1, detail = "Done!")
+          incProgress(0.1, detail = "Done!")
 
-        n_flagged <- length(qc$all_outliers)
-        showNotification(
-          tags$div(icon(if (n_flagged > 0) "exclamation-triangle" else "check-circle"),
-                   tags$strong(paste0(" Outlier detection complete. ", n_flagged, " sample(s) flagged."))),
-          type = if (n_flagged > 0) "warning" else "message", duration = 6)
-
-      }, error = function(e) {
-        showNotification(paste("Outlier detection error:", e$message), type = "error", duration = 8)
-      })
+          n_flagged <- length(qc$all_outliers)
+          showNotification(
+            tags$div(
+              icon(if (n_flagged > 0) "exclamation-triangle" else "check-circle"),
+              tags$strong(paste0(" Outlier detection complete. ", n_flagged, " sample(s) flagged."))
+            ),
+            type = if (n_flagged > 0) "warning" else "message", duration = 6
+          )
+        },
+        error = function(e) {
+          showNotification(paste("Outlier detection error:", e$message), type = "error", duration = 8)
+        }
+      )
     })
   })
 
@@ -415,12 +445,15 @@ server_qc <- function(input, output, session, rv) {
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
       tags$p(tags$strong("Step 2 summary."), " ", format(n_genes, big.mark = ","), " genes, ", format(n_samp, big.mark = ","), " samples. Venn/UpSet show gene overlap; QC plots show expression distribution."),
-      if (isTRUE(rv$qc_outlier_detection_complete)) tags$p("Outlier detection: ", n_out, " sample(s) flagged (PCA and/or connectivity).") else NULL)
+      if (isTRUE(rv$qc_outlier_detection_complete)) tags$p("Outlier detection: ", n_out, " sample(s) flagged (PCA and/or connectivity).") else NULL
+    )
   })
 
   # ---- Summary badges ----
   output$qc_outlier_summary_ui <- renderUI({
-    if (!isTRUE(rv$qc_outlier_detection_complete)) return(NULL)
+    if (!isTRUE(rv$qc_outlier_detection_complete)) {
+      return(NULL)
+    }
     n_pca <- length(rv$qc_pca_outliers)
     n_conn <- length(rv$qc_conn_outliers)
     n_total <- length(rv$qc_all_outliers)
@@ -429,21 +462,27 @@ server_qc <- function(input, output, session, rv) {
     tags$div(
       style = "display: flex; gap: 12px; flex-wrap: wrap; align-items: center;",
       tags$div(
-        style = paste0("padding: 8px 14px; border-radius: 20px; font-weight: bold; font-size: 13px; ",
-                       "background: ", if (n_pca > 0) "#fce4ec" else "#e8f5e9", "; ",
-                       "color: ", if (n_pca > 0) "#c62828" else "#2e7d32", ";"),
+        style = paste0(
+          "padding: 8px 14px; border-radius: 20px; font-weight: bold; font-size: 13px; ",
+          "background: ", if (n_pca > 0) "#fce4ec" else "#e8f5e9", "; ",
+          "color: ", if (n_pca > 0) "#c62828" else "#2e7d32", ";"
+        ),
         icon("chart-area"), paste0(" PCA: ", n_pca, " outlier(s)")
       ),
       tags$div(
-        style = paste0("padding: 8px 14px; border-radius: 20px; font-weight: bold; font-size: 13px; ",
-                       "background: ", if (n_conn > 0) "#fff3e0" else "#e8f5e9", "; ",
-                       "color: ", if (n_conn > 0) "#e65100" else "#2e7d32", ";"),
+        style = paste0(
+          "padding: 8px 14px; border-radius: 20px; font-weight: bold; font-size: 13px; ",
+          "background: ", if (n_conn > 0) "#fff3e0" else "#e8f5e9", "; ",
+          "color: ", if (n_conn > 0) "#e65100" else "#2e7d32", ";"
+        ),
         icon("project-diagram"), paste0(" Connectivity: ", n_conn, " outlier(s)")
       ),
       tags$div(
-        style = paste0("padding: 8px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; ",
-                       "background: ", if (n_total > 0) "#ffebee" else "#c8e6c9", "; ",
-                       "color: ", if (n_total > 0) "#b71c1c" else "#1b5e20", ";"),
+        style = paste0(
+          "padding: 8px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; ",
+          "background: ", if (n_total > 0) "#ffebee" else "#c8e6c9", "; ",
+          "color: ", if (n_total > 0) "#b71c1c" else "#1b5e20", ";"
+        ),
         icon(if (n_total > 0) "exclamation-triangle" else "check-circle"),
         paste0(" Total: ", n_total, " / ", n_samples, " flagged")
       )
@@ -452,37 +491,49 @@ server_qc <- function(input, output, session, rv) {
 
   # ---- Results panel (plots + table + selector) ----
   output$qc_outlier_results_ui <- renderUI({
-    if (!isTRUE(rv$qc_outlier_detection_complete)) return(NULL)
+    if (!isTRUE(rv$qc_outlier_detection_complete)) {
+      return(NULL)
+    }
 
     tagList(
       tags$hr(style = "margin: 20px 0;"),
       # Row 1: PCA plot | Connectivity plot
       fluidRow(
-        column(6,
+        column(
+          6,
           tags$p(tags$strong(icon("chart-area"), " PCA Outlier Detection"), style = "margin-bottom: 6px;"),
           plotOutput("qc_pca_outlier_plot", height = "420px"),
-          tags$div(style = "margin-top: 6px;",
+          tags$div(
+            style = "margin-top: 6px;",
             downloadButton("dl_qc_pca_plot_jpg", tagList(icon("download"), " JPG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
-            downloadButton("dl_qc_pca_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs"))
+            downloadButton("dl_qc_pca_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs")
+          )
         ),
-        column(6,
+        column(
+          6,
           tags$p(tags$strong(icon("project-diagram"), " Sample Connectivity"), style = "margin-bottom: 6px;"),
           plotOutput("qc_connectivity_plot", height = "420px"),
-          tags$div(style = "margin-top: 6px;",
+          tags$div(
+            style = "margin-top: 6px;",
             downloadButton("dl_qc_conn_plot_jpg", tagList(icon("download"), " JPG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
-            downloadButton("dl_qc_conn_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs"))
+            downloadButton("dl_qc_conn_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs")
+          )
         )
       ),
       # Row 2: Outlier table + selector
       tags$hr(style = "margin: 15px 0;"),
       fluidRow(
-        column(7,
+        column(
+          7,
           tags$p(tags$strong(icon("table"), " All Samples -- Outlier Summary"), style = "margin-bottom: 6px;"),
           DT::dataTableOutput("qc_outlier_table"),
-          tags$div(style = "margin-top: 6px;",
-            downloadButton("dl_qc_outlier_csv", tagList(icon("download"), " CSV"), class = "btn-default btn-xs"))
+          tags$div(
+            style = "margin-top: 6px;",
+            downloadButton("dl_qc_outlier_csv", tagList(icon("download"), " CSV"), class = "btn-default btn-xs")
+          )
         ),
-        column(5,
+        column(
+          5,
           uiOutput("qc_outlier_selector_ui")
         )
       )
@@ -497,7 +548,7 @@ server_qc <- function(input, output, session, rv) {
     scores$IsOutlier <- scores$Distance > rv$qc_pca_threshold
 
     if (!is.null(rv$unified_metadata) && "Dataset" %in% names(rv$unified_metadata) &&
-        "SampleID" %in% names(rv$unified_metadata)) {
+      "SampleID" %in% names(rv$unified_metadata)) {
       scores$Dataset <- rv$unified_metadata$Dataset[match(scores$Sample, rv$unified_metadata$SampleID)]
       if (all(is.na(scores$Dataset))) scores$Dataset <- "Dataset"
     } else {
@@ -509,10 +560,14 @@ server_qc <- function(input, output, session, rv) {
 
     p <- ggplot2::ggplot(scores, ggplot2::aes(x = PC1, y = PC2)) +
       ggplot2::geom_point(ggplot2::aes(color = Dataset, shape = IsOutlier, size = IsOutlier), alpha = 0.8) +
-      ggplot2::scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 17),
-                                   labels = c("FALSE" = "Normal", "TRUE" = "Outlier"), name = "Status") +
-      ggplot2::scale_size_manual(values = c("FALSE" = 3, "TRUE" = 5),
-                                  labels = c("FALSE" = "Normal", "TRUE" = "Outlier"), name = "Status") +
+      ggplot2::scale_shape_manual(
+        values = c("FALSE" = 16, "TRUE" = 17),
+        labels = c("FALSE" = "Normal", "TRUE" = "Outlier"), name = "Status"
+      ) +
+      ggplot2::scale_size_manual(
+        values = c("FALSE" = 3, "TRUE" = 5),
+        labels = c("FALSE" = "Normal", "TRUE" = "Outlier"), name = "Status"
+      ) +
       ggplot2::theme_minimal(base_size = 13) +
       ggplot2::labs(
         title = "PCA-based Outlier Detection",
@@ -520,20 +575,24 @@ server_qc <- function(input, output, session, rv) {
         x = paste0("PC1 (", round(var_exp[1], 1), "%)"),
         y = if (length(var_exp) > 1) paste0("PC2 (", round(var_exp[2], 1), "%)") else "PC2"
       ) +
-      ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 14),
-                     legend.position = "right")
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(face = "bold", size = 14),
+        legend.position = "right"
+      )
 
     if (n_out > 0) {
       p <- p + ggrepel::geom_text_repel(
         data = scores[scores$IsOutlier, , drop = FALSE],
         ggplot2::aes(label = Sample), size = 3, fontface = "bold",
-        color = "#c62828", max.overlaps = 20, box.padding = 0.5)
+        color = "#c62828", max.overlaps = 20, box.padding = 0.5
+      )
     }
     if (sum(!scores$IsOutlier) >= 3) {
       p <- p + ggplot2::stat_ellipse(
         data = scores[!scores$IsOutlier, , drop = FALSE],
         ggplot2::aes(x = PC1, y = PC2), color = "gray40",
-        linetype = "dashed", level = 0.975, inherit.aes = FALSE)
+        linetype = "dashed", level = 0.975, inherit.aes = FALSE
+      )
     }
     p
   }
@@ -542,8 +601,10 @@ server_qc <- function(input, output, session, rv) {
   make_qc_conn_plot <- function() {
     k <- rv$qc_conn_k
     threshold <- rv$qc_conn_threshold
-    df <- data.frame(Sample = names(k), Connectivity = as.numeric(k),
-                     IsOutlier = k < threshold, stringsAsFactors = FALSE)
+    df <- data.frame(
+      Sample = names(k), Connectivity = as.numeric(k),
+      IsOutlier = k < threshold, stringsAsFactors = FALSE
+    )
     df <- df[order(df$Connectivity), , drop = FALSE]
     df$Sample <- factor(df$Sample, levels = df$Sample)
 
@@ -558,8 +619,10 @@ server_qc <- function(input, output, session, rv) {
 
     p <- ggplot2::ggplot(df_plot, ggplot2::aes(x = Sample, y = Connectivity, fill = IsOutlier)) +
       ggplot2::geom_bar(stat = "identity", alpha = 0.85, width = 0.7) +
-      ggplot2::scale_fill_manual(values = c("FALSE" = "#27ae60", "TRUE" = "#e74c3c"),
-                                  labels = c("FALSE" = "Normal", "TRUE" = "Low Connectivity"), name = "Status") +
+      ggplot2::scale_fill_manual(
+        values = c("FALSE" = "#27ae60", "TRUE" = "#e74c3c"),
+        labels = c("FALSE" = "Normal", "TRUE" = "Low Connectivity"), name = "Status"
+      ) +
       ggplot2::geom_hline(yintercept = threshold, linetype = "dashed", color = "#e74c3c", size = 0.8) +
       ggplot2::coord_flip() +
       ggplot2::theme_minimal(base_size = 11) +
@@ -568,21 +631,31 @@ server_qc <- function(input, output, session, rv) {
         subtitle = paste0("Signed network (power=6) | Threshold: mean-2*SD = ", round(threshold, 1)),
         x = "", y = "Connectivity (sum of adjacency)", fill = "Status"
       ) +
-      ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 13),
-                     legend.position = "top")
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(face = "bold", size = 13),
+        legend.position = "top"
+      )
     p
   }
 
   # ---- Render plots ----
-  output$qc_pca_outlier_plot <- renderPlot({
-    req(rv$qc_pca_scores)
-    print(make_qc_pca_plot())
-  }, height = 420, res = 96)
+  output$qc_pca_outlier_plot <- renderPlot(
+    {
+      req(rv$qc_pca_scores)
+      print(make_qc_pca_plot())
+    },
+    height = 420,
+    res = 96
+  )
 
-  output$qc_connectivity_plot <- renderPlot({
-    req(rv$qc_conn_k)
-    print(make_qc_conn_plot())
-  }, height = 420, res = 96)
+  output$qc_connectivity_plot <- renderPlot(
+    {
+      req(rv$qc_conn_k)
+      print(make_qc_conn_plot())
+    },
+    height = 420,
+    res = 96
+  )
 
   # ---- Download handlers for plots ----
   output$dl_qc_pca_plot_jpg <- downloadHandler(
@@ -729,18 +802,23 @@ server_qc <- function(input, output, session, rv) {
     )
     df <- df[order(-nchar(df$Flagged), -df$Mahal_Distance), , drop = FALSE]
 
-    dt <- DT::datatable(df, options = list(pageLength = 10, scrollX = TRUE, dom = "frtip"),
-                        rownames = FALSE, selection = "none")
+    dt <- DT::datatable(df,
+      options = list(pageLength = 10, scrollX = TRUE, dom = "frtip"),
+      rownames = FALSE, selection = "none"
+    )
     dt <- DT::formatStyle(dt, "Flagged",
-                          backgroundColor = DT::styleEqual("OUTLIER", "#ffebee"),
-                          color = DT::styleEqual("OUTLIER", "#c62828"),
-                          fontWeight = DT::styleEqual("OUTLIER", "bold"))
+      backgroundColor = DT::styleEqual("OUTLIER", "#ffebee"),
+      color = DT::styleEqual("OUTLIER", "#c62828"),
+      fontWeight = DT::styleEqual("OUTLIER", "bold")
+    )
     dt <- DT::formatStyle(dt, "PCA_Outlier",
-                          color = DT::styleEqual("Yes", "#e74c3c"),
-                          fontWeight = DT::styleEqual("Yes", "bold"))
+      color = DT::styleEqual("Yes", "#e74c3c"),
+      fontWeight = DT::styleEqual("Yes", "bold")
+    )
     dt <- DT::formatStyle(dt, "Conn_Outlier",
-                          color = DT::styleEqual("Yes", "#e65100"),
-                          fontWeight = DT::styleEqual("Yes", "bold"))
+      color = DT::styleEqual("Yes", "#e65100"),
+      fontWeight = DT::styleEqual("Yes", "bold")
+    )
     dt
   })
 
@@ -776,7 +854,8 @@ server_qc <- function(input, output, session, rv) {
           icon("check-circle", style = "color: #4caf50; font-size: 40px;"),
           tags$h4("No outliers detected!", style = "color: #2e7d32; margin-top: 10px;"),
           tags$p("All samples pass both PCA and connectivity checks. Proceed to normalization.",
-                 style = "color: #388e3c; font-size: 13px; margin: 0;")
+            style = "color: #388e3c; font-size: 13px; margin: 0;"
+          )
         )
       ))
     }
@@ -794,29 +873,35 @@ server_qc <- function(input, output, session, rv) {
     tags$div(
       style = "padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px;",
       tags$h4(icon("exclamation-triangle", style = "color: #e74c3c;"),
-              tags$strong(paste0(" ", length(outliers), " Outlier(s) Detected")),
-              style = "margin-top: 0; margin-bottom: 10px; color: #c62828;"),
+        tags$strong(paste0(" ", length(outliers), " Outlier(s) Detected")),
+        style = "margin-top: 0; margin-bottom: 10px; color: #c62828;"
+      ),
       tags$p("Select samples to exclude. Unchecked samples will be kept.",
-             style = "font-size: 13px; margin-bottom: 10px; color: #495057;"),
+        style = "font-size: 13px; margin-bottom: 10px; color: #495057;"
+      ),
       tags$div(
         style = "max-height: 220px; overflow-y: auto; padding: 8px; background: #fff; border-radius: 6px; border: 1px solid #ddd;",
         checkboxGroupInput("qc_outlier_checkboxes", NULL,
           choices = checkbox_choices,
           selected = outliers,
-          width = "100%")
+          width = "100%"
+        )
       ),
       tags$div(
         style = "margin-top: 8px; display: flex; gap: 6px;",
         actionButton("qc_select_all_outliers", tagList(icon("check-double"), " All"),
-          class = "btn-default btn-xs"),
+          class = "btn-default btn-xs"
+        ),
         actionButton("qc_deselect_all_outliers", tagList(icon("square"), " None"),
-          class = "btn-default btn-xs")
+          class = "btn-default btn-xs"
+        )
       ),
       tags$hr(style = "margin: 10px 0;"),
       actionButton("exclude_outliers_btn",
         tagList(icon("trash"), " Exclude Selected Outliers"),
         class = "btn-danger btn-block",
-        style = "font-weight: bold; font-size: 14px; padding: 10px;")
+        style = "font-weight: bold; font-size: 14px; padding: 10px;"
+      )
     )
   })
 
@@ -867,13 +952,17 @@ server_qc <- function(input, output, session, rv) {
     rv$qc_all_outliers <- character(0)
 
     showNotification(
-      tags$div(icon("check-circle"),
-               tags$strong(paste0(" ", length(samples_to_exclude), " sample(s) excluded: ")),
-               tags$span(paste(samples_to_exclude, collapse = ", "), style = "font-size: 12px;"),
-               tags$br(),
-               tags$span(paste0("Remaining: ", length(keep_cols), " samples. QC plots updated. You may re-run detection to verify."),
-                         style = "font-size: 12px; color: #27ae60;")),
-      type = "message", duration = 8)
+      tags$div(
+        icon("check-circle"),
+        tags$strong(paste0(" ", length(samples_to_exclude), " sample(s) excluded: ")),
+        tags$span(paste(samples_to_exclude, collapse = ", "), style = "font-size: 12px;"),
+        tags$br(),
+        tags$span(paste0("Remaining: ", length(keep_cols), " samples. QC plots updated. You may re-run detection to verify."),
+          style = "font-size: 12px; color: #27ae60;"
+        )
+      ),
+      type = "message", duration = 8
+    )
   })
 
   # Next to normalize
