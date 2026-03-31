@@ -8,7 +8,6 @@
 ui_roc <- tabItem(
   tabName = "roc",
   h2(icon("chart-line"), " Step 12: ROC Curve Analysis"),
-
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
@@ -24,7 +23,6 @@ ui_roc <- tabItem(
 
   # ---- Training vs Validation AUC comparison (shown first when validation data exists) ----
   uiOutput("roc_auc_comparison_top_ui"),
-
   fluidRow(
     box(
       title = tags$span(icon("list"), " AUC Summary -- Training Data"),
@@ -32,40 +30,50 @@ ui_roc <- tabItem(
       uiOutput("roc_placeholder_ui"),
       uiOutput("roc_filter_message_ui"),
       fluidRow(
-        column(6,
-               tags$p(tags$strong("AUC scores (biomarkers with AUC >= 0.8)"), style = "margin-bottom: 6px;"),
-               DT::dataTableOutput("roc_auc_table"),
-               tags$div(style = "margin-top: 8px;",
-                        downloadButton("download_roc_auc", tagList(icon("download"), " AUC table (CSV)"), class = "btn-success btn-sm"))),
-        column(6,
-               tags$p(tags$strong("AUC bar plot (top biomarkers)"), style = "margin-bottom: 6px;"),
-               plotOutput("roc_auc_barplot", height = "320px"),
-               tags$div(style = "margin-top: 8px;",
-                        downloadButton("download_roc_auc_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
-                        downloadButton("download_roc_auc_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-sm")))
+        column(
+          6,
+          tags$p(tags$strong("AUC scores (biomarkers with AUC >= 0.8)"), style = "margin-bottom: 6px;"),
+          DT::dataTableOutput("roc_auc_table"),
+          tags$div(
+            style = "margin-top: 8px;",
+            downloadButton("download_roc_auc", tagList(icon("download"), " AUC table (CSV)"), class = "btn-success btn-sm")
+          )
+        ),
+        column(
+          6,
+          tags$p(tags$strong("AUC bar plot (top biomarkers)"), style = "margin-bottom: 6px;"),
+          plotOutput("roc_auc_barplot", height = "320px"),
+          tags$div(
+            style = "margin-top: 8px;",
+            downloadButton("download_roc_auc_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_roc_auc_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-sm")
+          )
+        )
       )
     )
   ),
-
   fluidRow(
     box(
       title = tags$span(icon("chart-area"), " ROC Curves -- Training Data (Common Genes)"),
       width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       plotOutput("roc_curves_plot", height = "520px"),
-      tags$div(style = "margin-top: 10px;",
+      tags$div(
+        style = "margin-top: 10px;",
         downloadButton("download_roc_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_roc_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-sm"))
+        downloadButton("download_roc_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-sm")
+      )
     )
   ),
-
   fluidRow(
     box(
       title = tags$span(icon("box"), " Gene Expression -- Training Data (Normal vs Disease)"),
       width = 6, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       plotOutput("roc_boxplots_plot", height = "400px"),
-      tags$div(style = "margin-top: 10px;",
+      tags$div(
+        style = "margin-top: 10px;",
         downloadButton("download_roc_boxplots_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_roc_boxplots_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm"))
+        downloadButton("download_roc_boxplots_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm")
+      )
     ),
     uiOutput("roc_validation_boxplots_ui")
   ),
@@ -81,17 +89,21 @@ ui_roc <- tabItem(
         style = "margin-bottom: 10px; font-size: 12px;"
       ),
       fluidRow(
-        column(6,
+        column(
+          6,
           tags$p(tags$strong("Combined-panel ROC curve"), style = "margin-bottom: 6px;"),
           plotOutput("roc_combined_panel_plot", height = "360px")
         ),
-        column(6,
+        column(
+          6,
           tags$p(tags$strong("AUC comparison: single vs combined"), style = "margin-bottom: 6px;"),
           DT::dataTableOutput("roc_combined_panel_table"),
-          tags$div(style = "margin-top: 6px;",
+          tags$div(
+            style = "margin-top: 6px;",
             downloadButton("download_roc_combined_panel_csv", tagList(icon("download"), " Table (CSV)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
             downloadButton("download_roc_combined_panel_plot_jpg", tagList(icon("download"), " Plot JPG"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
-            downloadButton("download_roc_combined_panel_plot_pdf", tagList(icon("download"), " Plot PDF"), class = "btn-primary btn-sm"))
+            downloadButton("download_roc_combined_panel_plot_pdf", tagList(icon("download"), " Plot PDF"), class = "btn-primary btn-sm")
+          )
         )
       )
     )
@@ -103,9 +115,13 @@ ui_roc <- tabItem(
   # ---- Gene Selection Panel (user picks final biomarker genes for downstream) ----
   fluidRow(
     box(
-      title = tags$span(icon("hand-pointer"), " Select Final Biomarker Genes",
-                        tags$span("FOR NOMOGRAM & GSEA", class = "label label-warning",
-                                  style = "margin-left: 8px; font-size: 11px;")),
+      title = tags$span(
+        icon("hand-pointer"), " Select Final Biomarker Genes",
+        tags$span("FOR NOMOGRAM & GSEA",
+          class = "label label-warning",
+          style = "margin-left: 8px; font-size: 11px;"
+        )
+      ),
       width = 12, status = "danger", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       tags$div(
         style = "padding: 12px 14px; background: linear-gradient(135deg, #fef9e7, #fdebd0); border-radius: 8px; border-left: 4px solid #f39c12; margin-bottom: 15px;",
@@ -125,22 +141,30 @@ ui_roc <- tabItem(
     box(
       title = tags$span(icon("file-alt"), " Process Summary"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-      uiOutput("roc_process_summary_ui"))
+      uiOutput("roc_process_summary_ui")
+    )
   ),
   fluidRow(
-    box(width = 12, status = "primary", solidHeader = FALSE,
-        tags$div(style = "text-align: center; padding: 20px 0;",
-                 actionButton("next_page_roc_to_nomogram",
-                             tagList(icon("calculator"), " Continue to Diagnostic Nomogram"),
-                             class = "btn-success btn-lg",
-                             style = "font-size: 18px; padding: 12px 30px; border-radius: 25px; margin-right: 15px;"),
-                 actionButton("next_page_roc_to_gsea",
-                             tagList(icon("project-diagram"), " Continue to GSEA Analysis"),
-                             class = "btn-primary btn-lg",
-                             style = "font-size: 18px; padding: 12px 30px; border-radius: 25px; margin-right: 15px;"),
-                 actionButton("next_page_roc_to_results",
-                             tagList(icon("file-alt"), " View Results Summary"),
-                             class = "btn-primary btn-lg",
-                             style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+    box(
+      width = 12, status = "primary", solidHeader = FALSE,
+      tags$div(
+        style = "text-align: center; padding: 20px 0;",
+        actionButton("next_page_roc_to_nomogram",
+          tagList(icon("calculator"), " Continue to Diagnostic Nomogram"),
+          class = "btn-success btn-lg",
+          style = "font-size: 18px; padding: 12px 30px; border-radius: 25px; margin-right: 15px;"
+        ),
+        actionButton("next_page_roc_to_gsea",
+          tagList(icon("project-diagram"), " Continue to GSEA Analysis"),
+          class = "btn-primary btn-lg",
+          style = "font-size: 18px; padding: 12px 30px; border-radius: 25px; margin-right: 15px;"
+        ),
+        actionButton("next_page_roc_to_results",
+          tagList(icon("file-alt"), " View Results Summary"),
+          class = "btn-primary btn-lg",
+          style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
+        )
+      )
+    )
   )
 )

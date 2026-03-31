@@ -1,5 +1,11 @@
 # GExPipe NEWS
 
+## Version 0.99.5
+
+- Removed `inst/CITATION` until a publication/preprint DOI is available, resolving BiocCheck citation warning for missing DOI.
+- Added robust Shiny navigation fix for "Continue to Results Summary" button and ensured pipeline toolbar includes step 15 ("Summary").
+- Updated User Guideline contact details and applied code formatting cleanup in `R/` using `styler`.
+
 ## Version 0.99.3
 
 - Shiny UI/server orchestration consolidated under `R/` per Bioconductor Shiny guidelines; `runGExPipe()` returns the app object only (no `runApp()` in package source).

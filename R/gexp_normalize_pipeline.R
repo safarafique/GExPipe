@@ -154,7 +154,9 @@ gexp_normalize_and_intersect <- function(
       } else {
         info$final_genes
       }
-    } else 0L
+    } else {
+      0L
+    }
   }, integer(1)), na.rm = TRUE)
 
   rnaseq_removed <- sum(vapply(normalization_stats, function(info) {
@@ -220,10 +222,14 @@ gexp_normalize_and_intersect <- function(
   # ---- Unified metadata (platform + dataset per sample) ----
   micro_n <- if (length(micro_expr_list) > 0) {
     sum(vapply(micro_expr_list, ncol, integer(1)))
-  } else 0L
+  } else {
+    0L
+  }
   rna_n <- if (length(rna_counts_list) > 0) {
     sum(vapply(rna_counts_list, ncol, integer(1)))
-  } else 0L
+  } else {
+    0L
+  }
   platform_labels <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
   dataset_labels <- rep(names(all_expr_norm), times = vapply(all_expr_norm, ncol, integer(1)))
 
@@ -260,7 +266,9 @@ gexp_normalize_and_intersect <- function(
         } else {
           x$final_genes
         }
-      } else 0L
+      } else {
+        0L
+      }
     }, integer(1)),
     Final_Common_Genes = final_count,
     stringsAsFactors = FALSE
@@ -290,4 +298,3 @@ gexp_normalize_and_intersect <- function(
     log_text = log_text
   )
 }
-

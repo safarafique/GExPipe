@@ -193,13 +193,19 @@ gexp_fetch_geo_series_matrix_metadata <- function(gse_id) {
     )
     conn <- url(url_str, open = "rb")
     raw_lines <- readLines(conn, warn = FALSE, encoding = "UTF-8")
-    if (length(raw_lines) == 0) return(NULL)
+    if (length(raw_lines) == 0) {
+      return(NULL)
+    }
     idx <- grep("^!sample_", raw_lines, ignore.case = TRUE)
-    if (length(idx) == 0) return(NULL)
+    if (length(idx) == 0) {
+      return(NULL)
+    }
     lines <- strsplit(raw_lines[idx], "\t", fixed = TRUE)
     attr_names <- vapply(lines, function(x) sub("^!sample_", "", x[1], ignore.case = TRUE), character(1))
     n_samples <- max(vapply(lines, length, integer(1))) - 1L
-    if (n_samples < 1) return(NULL)
+    if (n_samples < 1) {
+      return(NULL)
+    }
     sample_ids <- lines[[1]][-1]
     sample_ids <- head(sample_ids, n_samples)
     out <- as.data.frame(
@@ -427,13 +433,16 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
     micro_eset = NULL, platform_id = NULL, cel_paths = character(0)
   )
 
-  micro_data <- tryCatch({
-    suppressMessages(invisible(capture.output(
-      md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
-      file = nullfile()
-    )))
-    md
-  }, error = function(e) structure(list(error = conditionMessage(e)), class = "geo_error"))
+  micro_data <- tryCatch(
+    {
+      suppressMessages(invisible(capture.output(
+        md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
+        file = nullfile()
+      )))
+      md
+    },
+    error = function(e) structure(list(error = conditionMessage(e)), class = "geo_error")
+  )
 
   if (inherits(micro_data, "geo_error")) {
     err_msg <- micro_data$error
@@ -468,23 +477,29 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   out$log <- paste0(out$log, "Downloaded: ", nrow(micro_expr), " genes x ", ncol(micro_expr), " samples")
 
   cel <- character(0)
-  tryCatch({
-    suppressMessages(invisible(capture.output(
-      GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE),
-      file = nullfile()
-    )))
-    supp_dir <- file.path(micro_dir, gse_id)
-    if (!dir.exists(supp_dir)) supp_dir <- micro_dir
-    files <- list.files(supp_dir, full.names = TRUE, recursive = TRUE)
-    tar_files <- files[grepl("\\.tar$|\\.zip$", files, ignore.case = TRUE)]
-    for (tf in tar_files) {
-      tryCatch({
-        if (grepl("\\.zip$", tf, ignore.case = TRUE)) utils::unzip(tf, exdir = supp_dir) else utils::untar(tf, exdir = supp_dir, tar = "internal")
-      }, error = function(e) NULL)
-    }
-    files <- list.files(supp_dir, full.names = TRUE, recursive = TRUE)
-    cel <- files[grepl("\\.cel$", files, ignore.case = TRUE)]
-  }, error = function(e) NULL)
+  tryCatch(
+    {
+      suppressMessages(invisible(capture.output(
+        GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE),
+        file = nullfile()
+      )))
+      supp_dir <- file.path(micro_dir, gse_id)
+      if (!dir.exists(supp_dir)) supp_dir <- micro_dir
+      files <- list.files(supp_dir, full.names = TRUE, recursive = TRUE)
+      tar_files <- files[grepl("\\.tar$|\\.zip$", files, ignore.case = TRUE)]
+      for (tf in tar_files) {
+        tryCatch(
+          {
+            if (grepl("\\.zip$", tf, ignore.case = TRUE)) utils::unzip(tf, exdir = supp_dir) else utils::untar(tf, exdir = supp_dir, tar = "internal")
+          },
+          error = function(e) NULL
+        )
+      }
+      files <- list.files(supp_dir, full.names = TRUE, recursive = TRUE)
+      cel <- files[grepl("\\.cel$", files, ignore.case = TRUE)]
+    },
+    error = function(e) NULL
+  )
 
   if (length(cel) > 0) {
     out$log <- paste0(out$log, ". CEL: ", length(cel), " files (RMA available)")
@@ -519,76 +534,89 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   supp_state <- new.env(parent = emptyenv())
   supp_state$err <- NULL
   count_file <- NULL
-  tryCatch({
-    suppressMessages(invisible(capture.output(
-      GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE),
-      file = nullfile()
-    )))
-    files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
-    if (length(files) == 0) {
-      files <- list.files(rna_dir, full.names = TRUE, recursive = TRUE)
-      files <- files[grepl(gse_id, basename(files), ignore.case = TRUE)]
-    }
-
-    supp_files <- files[!grepl("\\.tar$", files, ignore.case = TRUE)]
-    bulk_candidates <- supp_files[
-      grepl("bulk", basename(supp_files), ignore.case = TRUE) &
-        grepl("count", basename(supp_files), ignore.case = TRUE)
-    ]
-    if (length(bulk_candidates) > 0) {
-      best_nrow <- 0L
-      for (cand in bulk_candidates) {
-        tryCatch({
-          df <- suppressWarnings(data.table::fread(cand, data.table = FALSE, nrows = 1e6))
-          if (ncol(df) >= 2 && nrow(df) >= 10 && nrow(df) > best_nrow) {
-            best_nrow <- nrow(df)
-            count_file <- cand
-          }
-        }, error = function(e) NULL)
-      }
-    }
-
-    if (is.null(count_file)) {
-      tar_files <- files[grepl("\\.tar$", files, ignore.case = TRUE)]
-      for (tar_file in tar_files) {
-        tryCatch({
-          utils::untar(tar_file, exdir = gse_dir, tar = "internal")
-        }, error = function(e) {
-          msg <- conditionMessage(e)
-          if (grepl("truncated|corrupt|error|invalid", msg, ignore.case = TRUE)) {
-            supp_state$err <- paste0("Truncated or corrupted tar archive (", basename(tar_file), "). Re-download or try another GSE.")
-          } else {
-            supp_state$err <- paste0("Untar failed: ", substr(msg, 1L, 120L))
-          }
-        }, warning = function(w) {
-          supp_state$err <- paste0("Tar archive problem (", basename(tar_file), "). File may be truncated or corrupted.")
-        })
-      }
+  tryCatch(
+    {
+      suppressMessages(invisible(capture.output(
+        GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE),
+        file = nullfile()
+      )))
       files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
-      if (length(files) == 0) files <- list.files(rna_dir, full.names = TRUE)
-      for (pattern in c("count", "raw", "matrix")) {
-        matches <- files[grepl(pattern, basename(files), ignore.case = TRUE)]
-        matches <- matches[!grepl("series_matrix", basename(matches), ignore.case = TRUE)]
-        if (length(matches) > 0) {
-          best_nrow <- 0L
-          for (cand in matches) {
-            tryCatch({
+      if (length(files) == 0) {
+        files <- list.files(rna_dir, full.names = TRUE, recursive = TRUE)
+        files <- files[grepl(gse_id, basename(files), ignore.case = TRUE)]
+      }
+
+      supp_files <- files[!grepl("\\.tar$", files, ignore.case = TRUE)]
+      bulk_candidates <- supp_files[
+        grepl("bulk", basename(supp_files), ignore.case = TRUE) &
+          grepl("count", basename(supp_files), ignore.case = TRUE)
+      ]
+      if (length(bulk_candidates) > 0) {
+        best_nrow <- 0L
+        for (cand in bulk_candidates) {
+          tryCatch(
+            {
               df <- suppressWarnings(data.table::fread(cand, data.table = FALSE, nrows = 1e6))
               if (ncol(df) >= 2 && nrow(df) >= 10 && nrow(df) > best_nrow) {
                 best_nrow <- nrow(df)
                 count_file <- cand
               }
-            }, error = function(e) NULL)
-          }
-          if (!is.null(count_file)) break
-          break
+            },
+            error = function(e) NULL
+          )
         }
       }
+
+      if (is.null(count_file)) {
+        tar_files <- files[grepl("\\.tar$", files, ignore.case = TRUE)]
+        for (tar_file in tar_files) {
+          tryCatch(
+            {
+              utils::untar(tar_file, exdir = gse_dir, tar = "internal")
+            },
+            error = function(e) {
+              msg <- conditionMessage(e)
+              if (grepl("truncated|corrupt|error|invalid", msg, ignore.case = TRUE)) {
+                supp_state$err <- paste0("Truncated or corrupted tar archive (", basename(tar_file), "). Re-download or try another GSE.")
+              } else {
+                supp_state$err <- paste0("Untar failed: ", substr(msg, 1L, 120L))
+              }
+            },
+            warning = function(w) {
+              supp_state$err <- paste0("Tar archive problem (", basename(tar_file), "). File may be truncated or corrupted.")
+            }
+          )
+        }
+        files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
+        if (length(files) == 0) files <- list.files(rna_dir, full.names = TRUE)
+        for (pattern in c("count", "raw", "matrix")) {
+          matches <- files[grepl(pattern, basename(files), ignore.case = TRUE)]
+          matches <- matches[!grepl("series_matrix", basename(matches), ignore.case = TRUE)]
+          if (length(matches) > 0) {
+            best_nrow <- 0L
+            for (cand in matches) {
+              tryCatch(
+                {
+                  df <- suppressWarnings(data.table::fread(cand, data.table = FALSE, nrows = 1e6))
+                  if (ncol(df) >= 2 && nrow(df) >= 10 && nrow(df) > best_nrow) {
+                    best_nrow <- nrow(df)
+                    count_file <- cand
+                  }
+                },
+                error = function(e) NULL
+              )
+            }
+            if (!is.null(count_file)) break
+            break
+          }
+        }
+      }
+    },
+    error = function(e) {
+      supp_state$err <- conditionMessage(e)
+      NULL
     }
-  }, error = function(e) {
-    supp_state$err <- conditionMessage(e)
-    NULL
-  })
+  )
 
   ncbi_best <- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
   nrow_supp <- if (!is.null(count_file)) tryCatch(nrow(suppressWarnings(data.table::fread(count_file, data.table = FALSE, nrows = 500000L))), error = function(e) 0L) else 0L
@@ -625,29 +653,32 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   mode(count_matrix) <- "numeric"
   rownames(count_matrix) <- gene_ids
 
-  rna_metadata <- tryCatch({
-    suppressMessages(invisible(capture.output(
-      gse_list <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE),
-      file = nullfile()
-    )))
-    gse <- if (inherits(gse_list, "list") && length(gse_list) > 1) gse_list[[1]] else if (inherits(gse_list, "list")) gse_list[[1]] else gse_list
-    pheno <- Biobase::pData(gse)
-    if (is.null(pheno) || nrow(pheno) == 0) stop("empty pData")
-    pheno
-  }, error = function(e) {
-    sm <- gexp_fetch_geo_series_matrix_metadata(gse_id)
-    count_cols <- colnames(count_matrix)
-    if (!is.null(sm) && nrow(sm) > 0 && ncol(sm) > 0) {
-      outm <- as.data.frame(matrix(NA_character_, nrow = length(count_cols), ncol = ncol(sm)), stringsAsFactors = FALSE)
-      colnames(outm) <- colnames(sm)
-      rownames(outm) <- count_cols
-      for (sid in count_cols) {
-        if (sid %in% rownames(sm)) outm[sid, ] <- sm[sid, , drop = TRUE]
+  rna_metadata <- tryCatch(
+    {
+      suppressMessages(invisible(capture.output(
+        gse_list <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE),
+        file = nullfile()
+      )))
+      gse <- if (inherits(gse_list, "list") && length(gse_list) > 1) gse_list[[1]] else if (inherits(gse_list, "list")) gse_list[[1]] else gse_list
+      pheno <- Biobase::pData(gse)
+      if (is.null(pheno) || nrow(pheno) == 0) stop("empty pData")
+      pheno
+    },
+    error = function(e) {
+      sm <- gexp_fetch_geo_series_matrix_metadata(gse_id)
+      count_cols <- colnames(count_matrix)
+      if (!is.null(sm) && nrow(sm) > 0 && ncol(sm) > 0) {
+        outm <- as.data.frame(matrix(NA_character_, nrow = length(count_cols), ncol = ncol(sm)), stringsAsFactors = FALSE)
+        colnames(outm) <- colnames(sm)
+        rownames(outm) <- count_cols
+        for (sid in count_cols) {
+          if (sid %in% rownames(sm)) outm[sid, ] <- sm[sid, , drop = TRUE]
+        }
+        return(outm)
       }
-      return(outm)
+      data.frame(title = colnames(count_matrix), row.names = colnames(count_matrix), stringsAsFactors = FALSE)
     }
-    data.frame(title = colnames(count_matrix), row.names = colnames(count_matrix), stringsAsFactors = FALSE)
-  })
+  )
 
   if (!is.null(rna_metadata) && nrow(rna_metadata) > 0) {
     common_samples <- intersect(colnames(count_matrix), rownames(rna_metadata))
@@ -673,4 +704,3 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   out$metadata <- rna_metadata
   out
 }
-
