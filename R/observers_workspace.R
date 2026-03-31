@@ -4,32 +4,42 @@
 
 gexp_get_saved_workspaces_dir <- function() {
   d <- file.path(getwd(), "saved_workspaces")
-  if (dir.exists(d)) return(d)
+  if (dir.exists(d)) {
+    return(d)
+  }
   d <- file.path(".", "saved_workspaces")
-  if (dir.exists(d)) return(normalizePath(d, winslash = "/"))
+  if (dir.exists(d)) {
+    return(normalizePath(d, winslash = "/"))
+  }
   file.path(getwd(), "saved_workspaces")
 }
 
 gexp_make_workspace_state <- function(input, rv) {
   current_step <- input$sidebar_menu
   if (is.null(current_step) || !nzchar(current_step)) current_step <- "download"
-  tryCatch({
-    raw_list <- shiny::reactiveValuesToList(rv)
-    raw_list$saved_step <- current_step
-    drop_names <- c("download_start", "normalize_start", "batch_start", "de_start", "wgcna_start")
-    for (d in drop_names) raw_list[[d]] <- NULL
-    state <- list()
-    for (nm in names(raw_list)) {
-      tryCatch({
-        serialize(raw_list[[nm]], NULL)
-        state[[nm]] <- raw_list[[nm]]
-      }, error = function(e) NULL)
+  tryCatch(
+    {
+      raw_list <- shiny::reactiveValuesToList(rv)
+      raw_list$saved_step <- current_step
+      drop_names <- c("download_start", "normalize_start", "batch_start", "de_start", "wgcna_start")
+      for (d in drop_names) raw_list[[d]] <- NULL
+      state <- list()
+      for (nm in names(raw_list)) {
+        tryCatch(
+          {
+            serialize(raw_list[[nm]], NULL)
+            state[[nm]] <- raw_list[[nm]]
+          },
+          error = function(e) NULL
+        )
+      }
+      if (!"saved_step" %in% names(state)) state$saved_step <- current_step
+      state
+    },
+    error = function(e) {
+      list(saved_step = current_step, saved_note = "Minimal save; full state could not be read.")
     }
-    if (!"saved_step" %in% names(state)) state$saved_step <- current_step
-    state
-  }, error = function(e) {
-    list(saved_step = current_step, saved_note = "Minimal save; full state could not be read.")
-  })
+  )
 }
 
 gexp_restore_workspace_from_state <- function(state, session, rv) {
@@ -40,7 +50,12 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
   step <- state$saved_step
   if (!is.character(step) || !nzchar(step)) step <- "download"
   for (nm in setdiff(names(state), "saved_step")) {
-    tryCatch({ rv[[nm]] <- state[[nm]] }, error = function(e) NULL)
+    tryCatch(
+      {
+        rv[[nm]] <- state[[nm]]
+      },
+      error = function(e) NULL
+    )
   }
   # Deferred analysis UI: legacy .rds may omit show_analysis; infer from pipeline progress.
   if (!("show_analysis" %in% names(state)) && !isTRUE(rv$show_analysis)) {
@@ -102,68 +117,80 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
   workspace_download_handler <- function() {
     shiny::downloadHandler(
       filename = function() {
-        tryCatch({
-          custom <- trimws(input$workspace_save_filename)
-          if (is.null(custom) || !nzchar(custom)) {
-            step <- input$sidebar_menu
-            if (is.null(step) || !nzchar(step)) step <- "workspace"
-            return(paste0("app_saved_state_", step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
-          }
-          base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
-          base <- sub("_+$", "", base)
-          if (!nzchar(base)) base <- "workspace"
-          paste0(base, ".rds")
-        }, error = function(e) paste0("workspace_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
+        tryCatch(
+          {
+            custom <- trimws(input$workspace_save_filename)
+            if (is.null(custom) || !nzchar(custom)) {
+              step <- input$sidebar_menu
+              if (is.null(step) || !nzchar(step)) step <- "workspace"
+              return(paste0("app_saved_state_", step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
+            }
+            base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
+            base <- sub("_+$", "", base)
+            if (!nzchar(base)) base <- "workspace"
+            paste0(base, ".rds")
+          },
+          error = function(e) paste0("workspace_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+        )
       },
       content = function(file) {
         save_state <- new.env(parent = emptyenv())
         save_state$err_msg <- NULL
-        tryCatch({
-          state <- gexp_make_workspace_state(input, rv)
-          current_step <- state$saved_step
-          save_subdir <- "saved_workspaces"
-          save_dir <- file.path(getwd(), save_subdir)
-          if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-          custom <- trimws(input$workspace_save_filename)
-          if (nzchar(custom)) {
-            base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
-            base <- sub("_+$", "", base)
-            if (!nzchar(base)) base <- "workspace"
-            fname <- paste0(base, ".rds")
-          } else {
-            fname <- paste0("app_saved_state_", current_step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+        tryCatch(
+          {
+            state <- gexp_make_workspace_state(input, rv)
+            current_step <- state$saved_step
+            save_subdir <- "saved_workspaces"
+            save_dir <- file.path(getwd(), save_subdir)
+            if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
+            custom <- trimws(input$workspace_save_filename)
+            if (nzchar(custom)) {
+              base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
+              base <- sub("_+$", "", base)
+              if (!nzchar(base)) base <- "workspace"
+              fname <- paste0(base, ".rds")
+            } else {
+              fname <- paste0("app_saved_state_", current_step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+            }
+            app_path <- file.path(save_dir, fname)
+            saved_to_disk <- FALSE
+            if (dir.exists(save_dir)) {
+              tryCatch(
+                {
+                  saveRDS(state, app_path)
+                  saved_to_disk <- TRUE
+                },
+                error = function(e2) NULL
+              )
+            }
+            saveRDS(state, file)
+            if (saved_to_disk) {
+              shiny::showNotification(
+                paste0("Saved! File is in folder '", save_subdir, "'. Load it at Step 1 to return to this step."),
+                type = "message", duration = 8
+              )
+            } else {
+              shiny::showNotification("Saved! Use Step 1 -> Load and choose this file to return to this step.", type = "message", duration = 8)
+            }
+          },
+          error = function(e) {
+            save_state$err_msg <- conditionMessage(e)
           }
-          app_path <- file.path(save_dir, fname)
-          saved_to_disk <- FALSE
-          if (dir.exists(save_dir)) {
-            tryCatch({
-              saveRDS(state, app_path)
-              saved_to_disk <- TRUE
-            }, error = function(e2) NULL)
-          }
-          saveRDS(state, file)
-          if (saved_to_disk) {
-            shiny::showNotification(
-              paste0("Saved! File is in folder '", save_subdir, "'. Load it at Step 1 to return to this step."),
-              type = "message", duration = 8
-            )
-          } else {
-            shiny::showNotification("Saved! Use Step 1 -> Load and choose this file to return to this step.", type = "message", duration = 8)
-          }
-        }, error = function(e) {
-          save_state$err_msg <- conditionMessage(e)
-        })
+        )
         if (!is.null(save_state$err_msg)) {
           minimal <- list(
             saved_step = if (is.null(input$sidebar_menu) || !nzchar(input$sidebar_menu)) "download" else input$sidebar_menu,
             saved_note = "Minimal save; some data could not be serialized."
           )
-          tryCatch({
-            saveRDS(minimal, file)
-            shiny::showNotification("Saved minimal state (some data was skipped). Load at Step 1 to return to your step.", type = "warning", duration = 8)
-          }, error = function(e2) {
-            shiny::showNotification(paste("Save failed:", save_state$err_msg), type = "error", duration = 10)
-          })
+          tryCatch(
+            {
+              saveRDS(minimal, file)
+              shiny::showNotification("Saved minimal state (some data was skipped). Load at Step 1 to return to your step.", type = "warning", duration = 8)
+            },
+            error = function(e2) {
+              shiny::showNotification(paste("Save failed:", save_state$err_msg), type = "error", duration = 10)
+            }
+          )
         }
       }
     )
@@ -175,80 +202,96 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
     if (isTRUE(getOption("shiny.testmode"))) {
       return()
     }
-    if (!isTRUE(rv$download_complete)) return()
+    if (!isTRUE(rv$download_complete)) {
+      return()
+    }
     if (is.null(rv$download_complete_at)) rv$download_complete_at <- Sys.time()
-    if (isTRUE(rv$auto_save_after_download_done)) return()
+    if (isTRUE(rv$auto_save_after_download_done)) {
+      return()
+    }
     elapsed_sec <- as.numeric(difftime(Sys.time(), rv$download_complete_at, units = "secs"))
     if (elapsed_sec < 300) {
       shiny::invalidateLater(60000, session)
       return()
     }
     rv$auto_save_after_download_done <- TRUE
-    tryCatch({
-      state <- gexp_make_workspace_state(input, rv)
-      save_dir <- file.path(getwd(), "saved_workspaces")
-      if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-      fname <- paste0("auto_save_after_download_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
-      app_path <- file.path(save_dir, fname)
-      saveRDS(state, app_path)
-      shiny::showNotification(
-        paste0("Auto-save: data saved to saved_workspaces/", fname, ". Load at Step 1 to return to this state."),
-        type = "message",
-        duration = 8
-      )
-    }, error = function(e) {
-      tryCatch({
-        minimal <- list(
-          saved_step = if (is.null(input$sidebar_menu) || !nzchar(input$sidebar_menu)) "download" else input$sidebar_menu,
-          saved_note = "Auto-save minimal state."
-        )
+    tryCatch(
+      {
+        state <- gexp_make_workspace_state(input, rv)
         save_dir <- file.path(getwd(), "saved_workspaces")
         if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
         fname <- paste0("auto_save_after_download_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
-        saveRDS(minimal, file.path(save_dir, fname))
-        shiny::showNotification(paste0("Auto-save (minimal) to saved_workspaces/", fname, "."), type = "warning", duration = 8)
-      }, error = function(e2) NULL)
-    })
+        app_path <- file.path(save_dir, fname)
+        saveRDS(state, app_path)
+        shiny::showNotification(
+          paste0("Auto-save: data saved to saved_workspaces/", fname, ". Load at Step 1 to return to this state."),
+          type = "message",
+          duration = 8
+        )
+      },
+      error = function(e) {
+        tryCatch(
+          {
+            minimal <- list(
+              saved_step = if (is.null(input$sidebar_menu) || !nzchar(input$sidebar_menu)) "download" else input$sidebar_menu,
+              saved_note = "Auto-save minimal state."
+            )
+            save_dir <- file.path(getwd(), "saved_workspaces")
+            if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
+            fname <- paste0("auto_save_after_download_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+            saveRDS(minimal, file.path(save_dir, fname))
+            shiny::showNotification(paste0("Auto-save (minimal) to saved_workspaces/", fname, "."), type = "warning", duration = 8)
+          },
+          error = function(e2) NULL
+        )
+      }
+    )
   })
 
   shiny::observeEvent(input$save_workspace_to_folder, {
-    tryCatch({
-      state <- gexp_make_workspace_state(input, rv)
-      current_step <- state$saved_step
-      save_subdir <- "saved_workspaces"
-      save_dir <- file.path(getwd(), save_subdir)
-      if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-      custom <- trimws(input$workspace_save_filename)
-      if (is.null(custom)) custom <- ""
-      if (nzchar(custom)) {
-        base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
-        base <- sub("_+$", "", base)
-        if (!nzchar(base)) base <- "workspace"
-        fname <- paste0(base, ".rds")
-      } else {
-        fname <- paste0("app_saved_state_", current_step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
-      }
-      app_path <- file.path(save_dir, fname)
-      saveRDS(state, app_path)
-      shiny::showNotification(
-        paste0("Saved to '", save_subdir, "/", fname, "'. Load it at Step 1 (Download) to return to this step."),
-        type = "message", duration = 8
-      )
-    }, error = function(e) {
-      tryCatch({
-        minimal <- list(
-          saved_step = if (is.null(input$sidebar_menu) || !nzchar(input$sidebar_menu)) "download" else input$sidebar_menu,
-          saved_note = "Minimal save."
-        )
-        save_dir <- file.path(getwd(), "saved_workspaces")
+    tryCatch(
+      {
+        state <- gexp_make_workspace_state(input, rv)
+        current_step <- state$saved_step
+        save_subdir <- "saved_workspaces"
+        save_dir <- file.path(getwd(), save_subdir)
         if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-        fname <- paste0("workspace_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
-        saveRDS(minimal, file.path(save_dir, fname))
-        shiny::showNotification(paste0("Saved minimal state to saved_workspaces/", fname, ". Load at Step 1."), type = "warning", duration = 8)
-      }, error = function(e2) {
-        shiny::showNotification(paste("Save failed:", conditionMessage(e)), type = "error", duration = 10)
-      })
-    })
+        custom <- trimws(input$workspace_save_filename)
+        if (is.null(custom)) custom <- ""
+        if (nzchar(custom)) {
+          base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
+          base <- sub("_+$", "", base)
+          if (!nzchar(base)) base <- "workspace"
+          fname <- paste0(base, ".rds")
+        } else {
+          fname <- paste0("app_saved_state_", current_step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+        }
+        app_path <- file.path(save_dir, fname)
+        saveRDS(state, app_path)
+        shiny::showNotification(
+          paste0("Saved to '", save_subdir, "/", fname, "'. Load it at Step 1 (Download) to return to this step."),
+          type = "message", duration = 8
+        )
+      },
+      error = function(e) {
+        tryCatch(
+          {
+            minimal <- list(
+              saved_step = if (is.null(input$sidebar_menu) || !nzchar(input$sidebar_menu)) "download" else input$sidebar_menu,
+              saved_note = "Minimal save."
+            )
+            save_dir <- file.path(getwd(), "saved_workspaces")
+            if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
+            fname <- paste0("workspace_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+            saveRDS(minimal, file.path(save_dir, fname))
+            shiny::showNotification(paste0("Saved minimal state to saved_workspaces/", fname, ". Load at Step 1."), type = "warning", duration = 8)
+          },
+          error = function(e2) {
+            shiny::showNotification(paste("Save failed:", conditionMessage(e)), type = "error", duration = 10)
+          }
+        )
+      }
+    )
   })
 
   output$load_from_folder_ui <- shiny::renderUI({
@@ -282,37 +325,40 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
       return()
     }
     path <- normalizePath(path, winslash = "/", mustWork = TRUE)
-    tryCatch({
-      con <- file(path, "rb")
-      on.exit(close(con), add = TRUE)
-      state <- readRDS(con, refhook = NULL)
-      if (is.null(state)) stop("File is empty or invalid.")
-      gexp_restore_workspace_from_state(state, session, rv)
-    }, error = function(e) {
-      msg <- conditionMessage(e)
-      f <- list.files(gexp_get_saved_workspaces_dir(), pattern = "\\.rds$", full.names = FALSE)
-      choices <- if (length(f) > 0) c("\u2014 Select file \u2014" = "", stats::setNames(f, f)) else c("(No .rds files)" = "")
-      shiny::updateSelectInput(session, "load_from_folder_file", choices = choices, selected = "")
-      if (grepl("unknown input format|invalid.*format|not a serialized|error in read", msg, ignore.case = TRUE)) {
-        shiny::showNotification(
-          "Load failed: file is not a valid workspace save. Use a .rds saved by this app, select another file, or click \"Continue without loading\" to start a new analysis.",
-          type = "error",
-          duration = 12
-        )
-      } else if (grepl("connection|reading from", msg, ignore.case = TRUE)) {
-        shiny::showNotification(
-          "Load failed: file may be corrupted or in use. Select another file or click \"Continue without loading\" to proceed.",
-          type = "error",
-          duration = 12
-        )
-      } else {
-        shiny::showNotification(
-          paste0("Load failed: ", msg, " Select another file or click \"Continue without loading\" to start a new analysis."),
-          type = "error",
-          duration = 10
-        )
+    tryCatch(
+      {
+        con <- file(path, "rb")
+        on.exit(close(con), add = TRUE)
+        state <- readRDS(con, refhook = NULL)
+        if (is.null(state)) stop("File is empty or invalid.")
+        gexp_restore_workspace_from_state(state, session, rv)
+      },
+      error = function(e) {
+        msg <- conditionMessage(e)
+        f <- list.files(gexp_get_saved_workspaces_dir(), pattern = "\\.rds$", full.names = FALSE)
+        choices <- if (length(f) > 0) c("\u2014 Select file \u2014" = "", stats::setNames(f, f)) else c("(No .rds files)" = "")
+        shiny::updateSelectInput(session, "load_from_folder_file", choices = choices, selected = "")
+        if (grepl("unknown input format|invalid.*format|not a serialized|error in read", msg, ignore.case = TRUE)) {
+          shiny::showNotification(
+            "Load failed: file is not a valid workspace save. Use a .rds saved by this app, select another file, or click \"Continue without loading\" to start a new analysis.",
+            type = "error",
+            duration = 12
+          )
+        } else if (grepl("connection|reading from", msg, ignore.case = TRUE)) {
+          shiny::showNotification(
+            "Load failed: file may be corrupted or in use. Select another file or click \"Continue without loading\" to proceed.",
+            type = "error",
+            duration = 12
+          )
+        } else {
+          shiny::showNotification(
+            paste0("Load failed: ", msg, " Select another file or click \"Continue without loading\" to start a new analysis."),
+            type = "error",
+            duration = 10
+          )
+        }
       }
-    })
+    )
   })
 
   shiny::observeEvent(input$load_uploaded_btn, {
@@ -336,34 +382,37 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
       shinyjs::reset("upload_workspace_file")
       return()
     }
-    tryCatch({
-      state <- readRDS(tmpfile)
-      if (is.null(state)) stop("File is empty or invalid.")
-      gexp_restore_workspace_from_state(state, session, rv)
-      shinyjs::reset("upload_workspace_file")
-    }, error = function(e) {
-      msg <- conditionMessage(e)
-      shinyjs::reset("upload_workspace_file")
-      if (grepl("unknown input format|invalid.*format|not a serialized|error in read", msg, ignore.case = TRUE)) {
-        shiny::showNotification(
-          "Load failed: file is not a valid workspace save. Use a .rds saved by this app, upload another file, or click \"Continue without loading\" to start a new analysis.",
-          type = "error",
-          duration = 12
-        )
-      } else if (grepl("connection|reading from", msg, ignore.case = TRUE)) {
-        shiny::showNotification(
-          "Load failed: file may be corrupted or in use. Upload another file or click \"Continue without loading\" to proceed.",
-          type = "error",
-          duration = 12
-        )
-      } else {
-        shiny::showNotification(
-          paste0("Load failed: ", msg, " Upload another file or click \"Continue without loading\" to start a new analysis."),
-          type = "error",
-          duration = 10
-        )
+    tryCatch(
+      {
+        state <- readRDS(tmpfile)
+        if (is.null(state)) stop("File is empty or invalid.")
+        gexp_restore_workspace_from_state(state, session, rv)
+        shinyjs::reset("upload_workspace_file")
+      },
+      error = function(e) {
+        msg <- conditionMessage(e)
+        shinyjs::reset("upload_workspace_file")
+        if (grepl("unknown input format|invalid.*format|not a serialized|error in read", msg, ignore.case = TRUE)) {
+          shiny::showNotification(
+            "Load failed: file is not a valid workspace save. Use a .rds saved by this app, upload another file, or click \"Continue without loading\" to start a new analysis.",
+            type = "error",
+            duration = 12
+          )
+        } else if (grepl("connection|reading from", msg, ignore.case = TRUE)) {
+          shiny::showNotification(
+            "Load failed: file may be corrupted or in use. Upload another file or click \"Continue without loading\" to proceed.",
+            type = "error",
+            duration = 12
+          )
+        } else {
+          shiny::showNotification(
+            paste0("Load failed: ", msg, " Upload another file or click \"Continue without loading\" to start a new analysis."),
+            type = "error",
+            duration = 10
+          )
+        }
       }
-    })
+    )
   })
   # nocov end
 }

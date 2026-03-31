@@ -21,4 +21,3 @@ gexp_ui_welcome <- function() {
   if (is.null(ui_welcome)) .gexp_load_inst_ui_welcome()
   ui_welcome
 }
-

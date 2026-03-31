@@ -119,4 +119,3 @@ server_results_summary <- function(input, output, session, rv) {
   }
   .gexp_server_cache$results_summary(input, output, session, rv)
 }
-
