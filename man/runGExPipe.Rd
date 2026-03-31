@@ -52,6 +52,14 @@ full attach on the first tick (e.g. deep \code{shinytest2} scenarios).
 }
 }
 
+\section{PPI (STRINGdb)}{
+
+Install with full dependencies so \link[STRINGdb:STRINGdb-class]{STRINGdb::STRINGdb} support packages resolve:
+\code{BiocManager::install("GExPipe", dependencies = TRUE)}. STRINGdb is installed as a dependency.
+The first PPI run may download large STRING files (requires network). If initialization fails,
+try \code{options(gexpipe.stringdb_try_versions = c("11.5", "11", "12"))} or update \link[STRINGdb:STRINGdb-class]{STRINGdb::STRINGdb}.
+}
+
 \examples{
 # Non-interactive: build an app object (this runs during R CMD check / `example()`).
 app <- runGExPipe(launch.browser = FALSE, port = 0L)

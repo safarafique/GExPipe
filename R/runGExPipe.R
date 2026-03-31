@@ -27,6 +27,11 @@
 #'   when unset) attaches only the Shiny stack first, then the rest after the first flush, so
 #'   automated tests can connect quickly. Set `gexpipe.minimal_attach_in_testmode = FALSE` for a
 #'   full attach on the first tick (e.g. deep `shinytest2` scenarios).
+#' @section PPI (STRINGdb):
+#' Install with full dependencies so [STRINGdb] support packages resolve:
+#' `BiocManager::install("GExPipe", dependencies = TRUE)`. STRINGdb is installed as a dependency.
+#' The first PPI run may download large STRING files (requires network). If initialization fails,
+#' try `options(gexpipe.stringdb_try_versions = c("11.5", "11", "12"))` or update [STRINGdb].
 #' @return A Shiny app object. Users should run it with [shiny::runApp()], which
 #'   starts the server and **blocks** the R session until the app is stopped
 #'   (e.g. RStudio Stop button).

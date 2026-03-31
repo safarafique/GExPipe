@@ -116,7 +116,8 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
         }, error = function(e) paste0("workspace_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
       },
       content = function(file) {
-        err_msg <- NULL
+        save_state <- new.env(parent = emptyenv())
+        save_state$err_msg <- NULL
         tryCatch({
           state <- gexp_make_workspace_state(input, rv)
           current_step <- state$saved_step
@@ -150,9 +151,9 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
             shiny::showNotification("Saved! Use Step 1 -> Load and choose this file to return to this step.", type = "message", duration = 8)
           }
         }, error = function(e) {
-          err_msg <<- conditionMessage(e)
+          save_state$err_msg <- conditionMessage(e)
         })
-        if (!is.null(err_msg)) {
+        if (!is.null(save_state$err_msg)) {
           minimal <- list(
             saved_step = if (is.null(input$sidebar_menu) || !nzchar(input$sidebar_menu)) "download" else input$sidebar_menu,
             saved_note = "Minimal save; some data could not be serialized."
@@ -161,7 +162,7 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
             saveRDS(minimal, file)
             shiny::showNotification("Saved minimal state (some data was skipped). Load at Step 1 to return to your step.", type = "warning", duration = 8)
           }, error = function(e2) {
-            shiny::showNotification(paste("Save failed:", err_msg), type = "error", duration = 10)
+            shiny::showNotification(paste("Save failed:", save_state$err_msg), type = "error", duration = 10)
           })
         }
       }

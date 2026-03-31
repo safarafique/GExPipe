@@ -2,6 +2,125 @@
 # SERVER_PPI.R - PPI Network (Common Genes) + Hub Gene Identification
 # ==============================================================================
 
+gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
+  # Local copy so the PPI module never depends on package-level helper availability.
+  versions <- getOption("gexpipe.stringdb_try_versions", NULL)
+  if (!is.character(versions) || length(versions) < 1L) {
+    versions <- c("11.5", "11", "12")
+  }
+  errs <- character(0)
+  timeout_seen <- FALSE
+  for (sv in versions) {
+    db <- tryCatch(
+      STRINGdb::STRINGdb$new(
+        version = sv,
+        species = 9606L,
+        score_threshold = score_threshold,
+        input_directory = input_directory
+      ),
+      error = function(e) {
+        msg <- conditionMessage(e)
+        errs <<- c(errs, paste0("STRING v", sv, ": ", msg))
+        if (grepl("timeout", msg, ignore.case = TRUE)) timeout_seen <<- TRUE
+        NULL
+      }
+    )
+    if (!is.null(db)) {
+      return(list(db = db, version_used = sv, try_errors = errs))
+    }
+    if (isTRUE(timeout_seen)) break
+  }
+  list(db = NULL, version_used = NA_character_, try_errors = errs)
+}
+
+gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_directory = "") {
+  # Local copy so the PPI module never depends on package-level helper availability.
+  versions <- getOption("gexpipe.stringdb_try_versions", NULL)
+  if (!is.character(versions) || length(versions) < 1L) {
+    versions <- c("11.5", "11", "12")
+  }
+
+  errs <- character(0)
+  timeout_seen <- FALSE
+  for (sv in versions) {
+    string_db <- tryCatch(
+      STRINGdb::STRINGdb$new(
+        version = sv,
+        species = 9606L,
+        score_threshold = score_threshold,
+        input_directory = input_directory
+      ),
+      error = function(e) {
+        msg <- conditionMessage(e)
+        errs <<- c(errs, paste0("STRING init v", sv, ": ", msg))
+        if (grepl("timeout", msg, ignore.case = TRUE)) timeout_seen <<- TRUE
+        NULL
+      }
+    )
+    if (is.null(string_db)) {
+      if (isTRUE(timeout_seen)) break
+      next
+    }
+
+    mapped <- tryCatch(
+      string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE),
+      error = function(e) {
+        errs <<- c(errs, paste0("STRING map v", sv, ": ", conditionMessage(e)))
+        NULL
+      }
+    )
+    if (is.null(mapped) || nrow(mapped) == 0) {
+      errs <- c(errs, paste0("STRING map v", sv, ": no mapped genes"))
+      next
+    }
+
+    id_col <- if ("STRING_id" %in% colnames(mapped)) {
+      "STRING_id"
+    } else if ("string_id" %in% colnames(mapped)) {
+      "string_id"
+    } else {
+      colnames(mapped)[1]
+    }
+    valid_ids <- as.character(na.omit(mapped[[id_col]]))
+
+    interactions <- tryCatch(
+      string_db$get_interactions(valid_ids),
+      error = function(e) {
+        msg <- conditionMessage(e)
+        errs <<- c(errs, paste0("STRING interactions v", sv, ": ", msg))
+        if (grepl("timeout", msg, ignore.case = TRUE)) timeout_seen <<- TRUE
+        NULL
+      }
+    )
+
+    if (is.null(interactions)) {
+      if (isTRUE(timeout_seen)) break
+      next
+    }
+    if (!is.data.frame(interactions)) interactions <- as.data.frame(interactions, stringsAsFactors = FALSE)
+    if (nrow(interactions) == 0) {
+      errs <- c(errs, paste0("STRING interactions v", sv, ": 0 edges"))
+      next
+    }
+
+    return(list(
+      mapped = mapped,
+      interactions = interactions,
+      id_col = id_col,
+      version_used = sv,
+      try_errors = errs
+    ))
+  }
+
+  list(
+    mapped = NULL,
+    interactions = NULL,
+    id_col = NA_character_,
+    version_used = NA_character_,
+    try_errors = errs
+  )
+}
+
 server_ppi <- function(input, output, session, rv) {
 
   # Applied gene set (updated only when user clicks "Run"); graphs use this
@@ -71,28 +190,32 @@ server_ppi <- function(input, output, session, rv) {
     n_top_hubs <- max(5, min(50, if (is.na(nt)) 15 else nt))
 
     withProgress(message = "PPI analysis (STRINGdb + hub genes)...", value = 0.1, {
-      old_timeout <- getOption("timeout")
-      options(timeout = 600)
+      # STRINGdb downloads large files from stringdb-downloads.org. Do not force
+      # download.file.method = "curl" (often fails on Windows with nonzero exit status);
+      # rely on the platform default and raise timeout only.
+      ppi_timeout <- as.integer(getOption("gexpipe.stringdb_timeout", 180L))
+      if (is.na(ppi_timeout) || ppi_timeout < 30L) ppi_timeout <- 180L
+      ppi_opts <- list(timeout = ppi_timeout)
+      ppi_prev <- options(ppi_opts)
+      on.exit(options(ppi_prev), add = TRUE)
 
       tryCatch({
         incProgress(0.15, detail = "Mapping to STRING...")
-        string_db <- STRINGdb::STRINGdb$new(
-          version = "11.5",
-          species = 9606,
-          score_threshold = score_threshold,
-          input_directory = ""
-        )
-        mapped <- string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE)
-        if (nrow(mapped) == 0) stop("No genes mapped to STRING IDs.")
+        ppi_data <- gexp_stringdb_get_ppi_data_safe(score_threshold, valid_genes, "")
+        if (is.null(ppi_data$interactions) || is.null(ppi_data$mapped)) {
+          stop(
+            paste0(
+              "STRING PPI initialization failed (download/map/interactions). ",
+              paste(ppi_data$try_errors, collapse = " | "),
+              " Tip: use BiocManager::install('GExPipe', dependencies = TRUE) and ensure internet access for STRINGdb data download."
+            )
+          )
+        }
+        mapped <- ppi_data$mapped
 
         incProgress(0.3, detail = "Fetching interactions...")
-        id_col <- if ("STRING_id" %in% colnames(mapped)) "STRING_id" else if ("string_id" %in% colnames(mapped)) "string_id" else colnames(mapped)[1]
-        valid_ids <- as.character(na.omit(mapped[[id_col]]))
-        interactions <- string_db$get_interactions(valid_ids)
-        options(timeout = old_timeout)
-
-        if (is.null(interactions)) interactions <- data.frame()
-        if (!is.data.frame(interactions)) interactions <- as.data.frame(interactions, stringsAsFactors = FALSE)
+        interactions <- ppi_data$interactions
+        id_col <- ppi_data$id_col
         if (nrow(interactions) == 0) stop("No PPI interactions found. Try lowering the score threshold.")
 
         incProgress(0.5, detail = "Building network...")
@@ -213,8 +336,17 @@ server_ppi <- function(input, output, session, rv) {
           type = "message", duration = 8
         )
       }, error = function(e) {
-        options(timeout = old_timeout)
-        showNotification(paste("PPI error:", e$message), type = "error", duration = 10)
+        msg <- conditionMessage(e)
+        # Avoid dumping raw STRING URLs to users; they often change/retire over time.
+        if (grepl("protein\\.aliases\\.v\\d+", msg) || grepl("stringdb-downloads\\.org/.*/protein\\.aliases\\.v\\d+", msg)) {
+          showNotification(
+            "PPI unavailable: STRING could not download required alias files (network/retired URL). Try again later or reinstall/update STRINGdb; you can also try options(gexpipe.stringdb_try_versions = c('11.5','11','12')).",
+            type = "error",
+            duration = 12
+          )
+        } else {
+          showNotification(paste("PPI error:", msg), type = "error", duration = 10)
+        }
       })
     })
   })
