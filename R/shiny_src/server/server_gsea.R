@@ -7,6 +7,11 @@
 # ==============================================================================
 
 server_gsea <- function(input, output, session, rv) {
+  # Robust local navigation fallback: works even if shared navigation observers
+  # are not loaded (e.g., legacy app wiring paths).
+  observeEvent(input$next_page_gsea_to_results, {
+    shinydashboard::updateTabItems(session, "sidebar_menu", "results_summary")
+  })
 
   output$gsea_process_summary_ui <- renderUI({
     n_gene <- length(rv$gsea_results_by_gene)
