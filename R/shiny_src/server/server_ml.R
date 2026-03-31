@@ -5,9 +5,10 @@
 # ==============================================================================
 
 server_ml <- function(input, output, session, rv) {
-
   output$ml_placeholder_ui <- renderUI({
-    if (!is.null(rv$extracted_data_ml)) return(NULL)
+    if (!is.null(rv$extracted_data_ml)) {
+      return(NULL)
+    }
     tags$div(
       class = "alert alert-warning",
       icon("hand-point-right"),
@@ -16,7 +17,9 @@ server_ml <- function(input, output, session, rv) {
   })
 
   output$ml_status_ui <- renderUI({
-    if (!isTRUE(rv$ml_complete)) return(NULL)
+    if (!isTRUE(rv$ml_complete)) {
+      return(NULL)
+    }
     methods_run <- rv$ml_methods_run
     if (is.null(methods_run)) methods_run <- c("LASSO", "Elastic Net", "Ridge", "Random Forest", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost+SHAP")
     tags$div(
@@ -34,7 +37,8 @@ server_ml <- function(input, output, session, rv) {
     methods_run <- rv$ml_methods_run
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 10 complete."), " Common genes across selected methods: ", n_genes, ". Methods run: ", paste(methods_run, collapse = ", "), "."))
+      tags$p(tags$strong("Step 10 complete."), " Common genes across selected methods: ", n_genes, ". Methods run: ", paste(methods_run, collapse = ", "), ".")
+    )
   })
 
   # SVM-RFE helper (recursive feature elimination)
@@ -76,16 +80,22 @@ server_ml <- function(input, output, session, rv) {
   observeEvent(input$run_ml, {
     if (is.null(rv$extracted_data_ml)) {
       showNotification(
-        tags$div(icon("exclamation-triangle"), tags$strong(" Data not ready:"),
-                 " Go to Step 9 (PPI) or Step 8 (Common Genes), then click 'Extract Data for ML' before running ML."),
-        type = "error", duration = 8)
+        tags$div(
+          icon("exclamation-triangle"), tags$strong(" Data not ready:"),
+          " Go to Step 9 (PPI) or Step 8 (Common Genes), then click 'Extract Data for ML' before running ML."
+        ),
+        type = "error", duration = 8
+      )
       return()
     }
     if (is.null(rv$wgcna_sample_info)) {
       showNotification(
-        tags$div(icon("exclamation-triangle"), tags$strong(" Sample info missing:"),
-                 " Complete WGCNA (Step 7) first — sample metadata with group labels is required for ML."),
-        type = "error", duration = 8)
+        tags$div(
+          icon("exclamation-triangle"), tags$strong(" Sample info missing:"),
+          " Complete WGCNA (Step 7) first — sample metadata with group labels is required for ML."
+        ),
+        type = "error", duration = 8
+      )
       return()
     }
     methods_sel <- input$ml_methods
@@ -137,211 +147,245 @@ server_ml <- function(input, output, session, rv) {
     n_xgboost <- max(5, min(100, as.integer(input$ml_xgboost_top_genes)))
 
     # Clear results for methods not selected
-    if (!"lasso" %in% methods_sel) { rv$ml_lasso_df <- NULL; rv$ml_lasso_genes <- NULL; rv$ml_cv_fit_lasso <- NULL }
-    if (!"elastic" %in% methods_sel) { rv$ml_elastic_df <- NULL; rv$ml_elastic_top_genes <- NULL; rv$ml_cv_fit_elastic <- NULL }
-    if (!"ridge" %in% methods_sel) { rv$ml_ridge_df <- NULL; rv$ml_ridge_top_genes <- NULL; rv$ml_cv_fit_ridge <- NULL }
-    if (!"rf" %in% methods_sel) { rv$ml_rf_importance <- NULL; rv$ml_rf_top_genes <- NULL; rv$ml_rf_model <- NULL }
-    if (!"svm" %in% methods_sel) { rv$ml_svm_ranking <- NULL; rv$ml_svm_top_genes <- NULL }
-    if (!"boruta" %in% methods_sel) { rv$ml_boruta_df <- NULL; rv$ml_boruta_top_genes <- NULL }
-    if (!"splsda" %in% methods_sel) { rv$ml_splsda_df <- NULL; rv$ml_splsda_top_genes <- NULL }
-    if (!"xgboost" %in% methods_sel) { rv$ml_xgboost_df <- NULL; rv$ml_xgboost_top_genes <- NULL }
+    if (!"lasso" %in% methods_sel) {
+      rv$ml_lasso_df <- NULL
+      rv$ml_lasso_genes <- NULL
+      rv$ml_cv_fit_lasso <- NULL
+    }
+    if (!"elastic" %in% methods_sel) {
+      rv$ml_elastic_df <- NULL
+      rv$ml_elastic_top_genes <- NULL
+      rv$ml_cv_fit_elastic <- NULL
+    }
+    if (!"ridge" %in% methods_sel) {
+      rv$ml_ridge_df <- NULL
+      rv$ml_ridge_top_genes <- NULL
+      rv$ml_cv_fit_ridge <- NULL
+    }
+    if (!"rf" %in% methods_sel) {
+      rv$ml_rf_importance <- NULL
+      rv$ml_rf_top_genes <- NULL
+      rv$ml_rf_model <- NULL
+    }
+    if (!"svm" %in% methods_sel) {
+      rv$ml_svm_ranking <- NULL
+      rv$ml_svm_top_genes <- NULL
+    }
+    if (!"boruta" %in% methods_sel) {
+      rv$ml_boruta_df <- NULL
+      rv$ml_boruta_top_genes <- NULL
+    }
+    if (!"splsda" %in% methods_sel) {
+      rv$ml_splsda_df <- NULL
+      rv$ml_splsda_top_genes <- NULL
+    }
+    if (!"xgboost" %in% methods_sel) {
+      rv$ml_xgboost_df <- NULL
+      rv$ml_xgboost_top_genes <- NULL
+    }
 
     n_steps <- length(methods_sel)
     step_inc <- 0.8 / max(1, n_steps)
     prog <- 0.1
 
     withProgress(message = "Running ML analysis...", value = 0.1, {
-      tryCatch({
-        set.seed(123)
-        gene_lists <- list()
-        method_names <- character(0)
+      tryCatch(
+        {
+          set.seed(123)
+          gene_lists <- list()
+          method_names <- character(0)
 
-        if ("lasso" %in% methods_sel) {
-          incProgress(step_inc, detail = "LASSO...")
-          cv_fit <- glmnet::cv.glmnet(x, y, alpha = 1, family = "binomial")
-          coef_min <- as.matrix(coef(cv_fit, s = cv_fit$lambda.min))
-          lasso_df <- data.frame(Gene = rownames(coef_min), Coefficient = coef_min[, 1], stringsAsFactors = FALSE)
-          lasso_df <- lasso_df[lasso_df$Gene != "(Intercept)" & lasso_df$Coefficient != 0, ]
-          lasso_df$AbsCoefficient <- abs(lasso_df$Coefficient)
-          lasso_df <- lasso_df[order(-lasso_df$AbsCoefficient), ]
-          lasso_df$Rank_LASSO <- seq_len(nrow(lasso_df))
-          rv$ml_lasso_df <- lasso_df
-          rv$ml_cv_fit_lasso <- cv_fit
-          gene_lists$LASSO <- rv$ml_lasso_df$Gene
-          method_names <- c(method_names, "LASSO")
-          prog <- prog + step_inc
-        }
-        if ("elastic" %in% methods_sel) {
-          incProgress(step_inc, detail = "Elastic Net...")
-          set.seed(123)
-          cv_elastic <- glmnet::cv.glmnet(x, y, alpha = 0.5, family = "binomial")
-          coef_elastic <- as.matrix(coef(cv_elastic, s = cv_elastic$lambda.min))
-          elastic_df <- data.frame(Gene = rownames(coef_elastic), Coefficient = coef_elastic[, 1], stringsAsFactors = FALSE)
-          elastic_df <- elastic_df[elastic_df$Gene != "(Intercept)" & elastic_df$Coefficient != 0, ]
-          elastic_df$AbsCoefficient <- abs(elastic_df$Coefficient)
-          elastic_df <- elastic_df[order(-elastic_df$AbsCoefficient), ]
-          elastic_df$Rank_ElasticNet <- seq_len(nrow(elastic_df))
-          rv$ml_elastic_df <- elastic_df
-          rv$ml_cv_fit_elastic <- cv_elastic
-          gene_lists[["Elastic Net"]] <- head(rv$ml_elastic_df$Gene, n_elastic)
-          method_names <- c(method_names, "Elastic Net")
-          prog <- prog + step_inc
-        }
-        if ("ridge" %in% methods_sel) {
-          incProgress(step_inc, detail = "Ridge...")
-          set.seed(123)
-          cv_ridge <- glmnet::cv.glmnet(x, y, alpha = 0, family = "binomial")
-          coef_ridge <- as.matrix(coef(cv_ridge, s = cv_ridge$lambda.min))
-          ridge_df <- data.frame(Gene = rownames(coef_ridge), Coefficient = coef_ridge[, 1], stringsAsFactors = FALSE)
-          ridge_df <- ridge_df[ridge_df$Gene != "(Intercept)" & ridge_df$Coefficient != 0, ]
-          ridge_df$AbsCoefficient <- abs(ridge_df$Coefficient)
-          ridge_df <- ridge_df[order(-ridge_df$AbsCoefficient), ]
-          ridge_df$Rank_Ridge <- seq_len(nrow(ridge_df))
-          rv$ml_ridge_df <- ridge_df
-          rv$ml_cv_fit_ridge <- cv_ridge
-          gene_lists$Ridge <- head(rv$ml_ridge_df$Gene, n_ridge)
-          method_names <- c(method_names, "Ridge")
-          prog <- prog + step_inc
-        }
-        if ("rf" %in% methods_sel) {
-          incProgress(step_inc, detail = "Random Forest...")
-          set.seed(123)
-          rf_model <- randomForest::randomForest(x = x, y = y, ntree = 500, importance = TRUE)
-          imp <- randomForest::importance(rf_model)
-          rf_df <- data.frame(
-            Gene = rownames(imp),
-            MeanDecreaseAccuracy = imp[, "MeanDecreaseAccuracy"],
-            MeanDecreaseGini = imp[, "MeanDecreaseGini"],
-            stringsAsFactors = FALSE
-          )
-          rf_df$Rank_RF_Accuracy <- rank(-rf_df$MeanDecreaseAccuracy)
-          rf_df$Rank_RF_Gini <- rank(-rf_df$MeanDecreaseGini)
-          rv$ml_rf_importance <- rf_df
-          rv$ml_rf_model <- rf_model
-          gene_lists[["Random Forest"]] <- head(rv$ml_rf_importance[order(-rv$ml_rf_importance$MeanDecreaseAccuracy), "Gene"], n_rf)
-          method_names <- c(method_names, "Random Forest")
-          prog <- prog + step_inc
-        }
-        if ("svm" %in% methods_sel) {
-          incProgress(step_inc, detail = "SVM-RFE...")
-          set.seed(123)
-          svm_ranking <- svmRFE(x, y)
-          rv$ml_svm_ranking <- svm_ranking
-          gene_lists[["SVM-RFE"]] <- head(rv$ml_svm_ranking$Gene, n_svm)
-          method_names <- c(method_names, "SVM-RFE")
-          prog <- prog + step_inc
-        }
-        if ("boruta" %in% methods_sel) {
-          incProgress(step_inc, detail = "Boruta...")
-          set.seed(123)
-          x_df <- as.data.frame(x)
-          boruta_fit <- tryCatch(
-            Boruta::Boruta(x_df, y, maxRuns = 100, doTrace = 0),
-            error = function(e) NULL
-          )
-          if (!is.null(boruta_fit)) {
-            att <- Boruta::attStats(boruta_fit)
-            att$Gene <- rownames(att)
-            att <- att[att$decision %in% c("Confirmed", "Tentative"), ]
-            att <- att[order(-att$medianImp), ]
-            boruta_df <- data.frame(Gene = att$Gene, medianImp = att$medianImp, meanImp = att$meanImp, decision = att$decision, Rank_Boruta = seq_len(nrow(att)), stringsAsFactors = FALSE)
-            rv$ml_boruta_df <- boruta_df
-            gene_lists[["Boruta"]] <- head(boruta_df$Gene, n_boruta)
-            method_names <- c(method_names, "Boruta")
-          } else {
-            rv$ml_boruta_df <- NULL
+          if ("lasso" %in% methods_sel) {
+            incProgress(step_inc, detail = "LASSO...")
+            cv_fit <- glmnet::cv.glmnet(x, y, alpha = 1, family = "binomial")
+            coef_min <- as.matrix(coef(cv_fit, s = cv_fit$lambda.min))
+            lasso_df <- data.frame(Gene = rownames(coef_min), Coefficient = coef_min[, 1], stringsAsFactors = FALSE)
+            lasso_df <- lasso_df[lasso_df$Gene != "(Intercept)" & lasso_df$Coefficient != 0, ]
+            lasso_df$AbsCoefficient <- abs(lasso_df$Coefficient)
+            lasso_df <- lasso_df[order(-lasso_df$AbsCoefficient), ]
+            lasso_df$Rank_LASSO <- seq_len(nrow(lasso_df))
+            rv$ml_lasso_df <- lasso_df
+            rv$ml_cv_fit_lasso <- cv_fit
+            gene_lists$LASSO <- rv$ml_lasso_df$Gene
+            method_names <- c(method_names, "LASSO")
+            prog <- prog + step_inc
           }
-          prog <- prog + step_inc
-        }
-        if ("splsda" %in% methods_sel) {
-          incProgress(step_inc, detail = "sPLS-DA...")
-          set.seed(123)
-          n_keep <- min(n_splsda, ncol(x), 50)
-          splsda_fit <- tryCatch({
-            mixOmics::splsda(X = x, Y = y, ncomp = 2, keepX = c(n_keep, n_keep))
-          }, error = function(e) NULL)
-          if (!is.null(splsda_fit)) {
-            vip_scores <- tryCatch(mixOmics::vip(splsda_fit), error = function(e) NULL)
-            if (is.null(vip_scores)) {
-              ld <- splsda_fit$loadings$X
-              vip_scores <- matrix(abs(ld), nrow = nrow(ld), dimnames = list(rownames(ld), NULL))
-              if (ncol(vip_scores) > 1) vip_scores <- apply(vip_scores, 1, max) else vip_scores <- setNames(as.numeric(vip_scores), rownames(ld))
+          if ("elastic" %in% methods_sel) {
+            incProgress(step_inc, detail = "Elastic Net...")
+            set.seed(123)
+            cv_elastic <- glmnet::cv.glmnet(x, y, alpha = 0.5, family = "binomial")
+            coef_elastic <- as.matrix(coef(cv_elastic, s = cv_elastic$lambda.min))
+            elastic_df <- data.frame(Gene = rownames(coef_elastic), Coefficient = coef_elastic[, 1], stringsAsFactors = FALSE)
+            elastic_df <- elastic_df[elastic_df$Gene != "(Intercept)" & elastic_df$Coefficient != 0, ]
+            elastic_df$AbsCoefficient <- abs(elastic_df$Coefficient)
+            elastic_df <- elastic_df[order(-elastic_df$AbsCoefficient), ]
+            elastic_df$Rank_ElasticNet <- seq_len(nrow(elastic_df))
+            rv$ml_elastic_df <- elastic_df
+            rv$ml_cv_fit_elastic <- cv_elastic
+            gene_lists[["Elastic Net"]] <- head(rv$ml_elastic_df$Gene, n_elastic)
+            method_names <- c(method_names, "Elastic Net")
+            prog <- prog + step_inc
+          }
+          if ("ridge" %in% methods_sel) {
+            incProgress(step_inc, detail = "Ridge...")
+            set.seed(123)
+            cv_ridge <- glmnet::cv.glmnet(x, y, alpha = 0, family = "binomial")
+            coef_ridge <- as.matrix(coef(cv_ridge, s = cv_ridge$lambda.min))
+            ridge_df <- data.frame(Gene = rownames(coef_ridge), Coefficient = coef_ridge[, 1], stringsAsFactors = FALSE)
+            ridge_df <- ridge_df[ridge_df$Gene != "(Intercept)" & ridge_df$Coefficient != 0, ]
+            ridge_df$AbsCoefficient <- abs(ridge_df$Coefficient)
+            ridge_df <- ridge_df[order(-ridge_df$AbsCoefficient), ]
+            ridge_df$Rank_Ridge <- seq_len(nrow(ridge_df))
+            rv$ml_ridge_df <- ridge_df
+            rv$ml_cv_fit_ridge <- cv_ridge
+            gene_lists$Ridge <- head(rv$ml_ridge_df$Gene, n_ridge)
+            method_names <- c(method_names, "Ridge")
+            prog <- prog + step_inc
+          }
+          if ("rf" %in% methods_sel) {
+            incProgress(step_inc, detail = "Random Forest...")
+            set.seed(123)
+            rf_model <- randomForest::randomForest(x = x, y = y, ntree = 500, importance = TRUE)
+            imp <- randomForest::importance(rf_model)
+            rf_df <- data.frame(
+              Gene = rownames(imp),
+              MeanDecreaseAccuracy = imp[, "MeanDecreaseAccuracy"],
+              MeanDecreaseGini = imp[, "MeanDecreaseGini"],
+              stringsAsFactors = FALSE
+            )
+            rf_df$Rank_RF_Accuracy <- rank(-rf_df$MeanDecreaseAccuracy)
+            rf_df$Rank_RF_Gini <- rank(-rf_df$MeanDecreaseGini)
+            rv$ml_rf_importance <- rf_df
+            rv$ml_rf_model <- rf_model
+            gene_lists[["Random Forest"]] <- head(rv$ml_rf_importance[order(-rv$ml_rf_importance$MeanDecreaseAccuracy), "Gene"], n_rf)
+            method_names <- c(method_names, "Random Forest")
+            prog <- prog + step_inc
+          }
+          if ("svm" %in% methods_sel) {
+            incProgress(step_inc, detail = "SVM-RFE...")
+            set.seed(123)
+            svm_ranking <- svmRFE(x, y)
+            rv$ml_svm_ranking <- svm_ranking
+            gene_lists[["SVM-RFE"]] <- head(rv$ml_svm_ranking$Gene, n_svm)
+            method_names <- c(method_names, "SVM-RFE")
+            prog <- prog + step_inc
+          }
+          if ("boruta" %in% methods_sel) {
+            incProgress(step_inc, detail = "Boruta...")
+            set.seed(123)
+            x_df <- as.data.frame(x)
+            boruta_fit <- tryCatch(
+              Boruta::Boruta(x_df, y, maxRuns = 100, doTrace = 0),
+              error = function(e) NULL
+            )
+            if (!is.null(boruta_fit)) {
+              att <- Boruta::attStats(boruta_fit)
+              att$Gene <- rownames(att)
+              att <- att[att$decision %in% c("Confirmed", "Tentative"), ]
+              att <- att[order(-att$medianImp), ]
+              boruta_df <- data.frame(Gene = att$Gene, medianImp = att$medianImp, meanImp = att$meanImp, decision = att$decision, Rank_Boruta = seq_len(nrow(att)), stringsAsFactors = FALSE)
+              rv$ml_boruta_df <- boruta_df
+              gene_lists[["Boruta"]] <- head(boruta_df$Gene, n_boruta)
+              method_names <- c(method_names, "Boruta")
             } else {
-              if (NCOL(vip_scores) > 1) vip_scores <- apply(vip_scores, 1, max) else vip_scores <- setNames(as.numeric(vip_scores), rownames(vip_scores))
+              rv$ml_boruta_df <- NULL
             }
-            vip_ord <- order(-vip_scores)
-            genes_ord <- names(vip_scores)[vip_ord]
-            splsda_df <- data.frame(Gene = genes_ord, VIP = as.numeric(vip_scores[genes_ord]), Rank_sPLSDA = seq_along(genes_ord), stringsAsFactors = FALSE)
-            rv$ml_splsda_df <- splsda_df
-            gene_lists[["sPLS-DA"]] <- head(genes_ord, n_splsda)
-            method_names <- c(method_names, "sPLS-DA")
-          } else {
-            rv$ml_splsda_df <- NULL
+            prog <- prog + step_inc
           }
-          prog <- prog + step_inc
-        }
-        if ("xgboost" %in% methods_sel) {
-          incProgress(step_inc, detail = "XGBoost+SHAP...")
-          set.seed(123)
-          y_num <- as.numeric(y) - 1
-          dtrain <- xgboost::xgb.DMatrix(data = x, label = y_num)
-          xgb_fit <- tryCatch(
-            xgboost::xgb.train(params = list(objective = "binary:logistic", eval_metric = "auc"), data = dtrain, nrounds = 100, verbose = 0),
-            error = function(e) NULL
-          )
-          if (!is.null(xgb_fit)) {
-            imp_df <- NULL
-            if (requireNamespace("SHAPforxgboost", quietly = TRUE)) {
-              shap_res <- tryCatch(SHAPforxgboost::shap.values(xgb_model = xgb_fit, X_train = x), error = function(e) NULL)
-              if (!is.null(shap_res) && !is.null(shap_res$mean_shap_score)) {
-                ms <- shap_res$mean_shap_score
-                genes_ord <- names(ms)[order(-ms)]
-                imp_df <- data.frame(Gene = genes_ord, mean_abs_SHAP = as.numeric(ms[genes_ord]), Rank_XGBoostSHAP = seq_along(genes_ord), stringsAsFactors = FALSE)
+          if ("splsda" %in% methods_sel) {
+            incProgress(step_inc, detail = "sPLS-DA...")
+            set.seed(123)
+            n_keep <- min(n_splsda, ncol(x), 50)
+            splsda_fit <- tryCatch(
+              {
+                mixOmics::splsda(X = x, Y = y, ncomp = 2, keepX = c(n_keep, n_keep))
+              },
+              error = function(e) NULL
+            )
+            if (!is.null(splsda_fit)) {
+              vip_scores <- tryCatch(mixOmics::vip(splsda_fit), error = function(e) NULL)
+              if (is.null(vip_scores)) {
+                ld <- splsda_fit$loadings$X
+                vip_scores <- matrix(abs(ld), nrow = nrow(ld), dimnames = list(rownames(ld), NULL))
+                if (ncol(vip_scores) > 1) vip_scores <- apply(vip_scores, 1, max) else vip_scores <- setNames(as.numeric(vip_scores), rownames(ld))
+              } else {
+                if (NCOL(vip_scores) > 1) vip_scores <- apply(vip_scores, 1, max) else vip_scores <- setNames(as.numeric(vip_scores), rownames(vip_scores))
               }
+              vip_ord <- order(-vip_scores)
+              genes_ord <- names(vip_scores)[vip_ord]
+              splsda_df <- data.frame(Gene = genes_ord, VIP = as.numeric(vip_scores[genes_ord]), Rank_sPLSDA = seq_along(genes_ord), stringsAsFactors = FALSE)
+              rv$ml_splsda_df <- splsda_df
+              gene_lists[["sPLS-DA"]] <- head(genes_ord, n_splsda)
+              method_names <- c(method_names, "sPLS-DA")
+            } else {
+              rv$ml_splsda_df <- NULL
             }
-            if (is.null(imp_df)) {
-              imp <- tryCatch(xgboost::xgb.importance(model = xgb_fit), error = function(e) NULL)
-              if (!is.null(imp) && nrow(imp) > 0) {
-                imp_df <- data.frame(Gene = imp$Feature, Gain = imp$Gain, Rank_XGBoost = seq_len(nrow(imp)), stringsAsFactors = FALSE)
-                imp_df <- imp_df[order(-imp_df$Gain), ]
-                imp_df$Rank_XGBoost <- seq_len(nrow(imp_df))
+            prog <- prog + step_inc
+          }
+          if ("xgboost" %in% methods_sel) {
+            incProgress(step_inc, detail = "XGBoost+SHAP...")
+            set.seed(123)
+            y_num <- as.numeric(y) - 1
+            dtrain <- xgboost::xgb.DMatrix(data = x, label = y_num)
+            xgb_fit <- tryCatch(
+              xgboost::xgb.train(params = list(objective = "binary:logistic", eval_metric = "auc"), data = dtrain, nrounds = 100, verbose = 0),
+              error = function(e) NULL
+            )
+            if (!is.null(xgb_fit)) {
+              imp_df <- NULL
+              if (requireNamespace("SHAPforxgboost", quietly = TRUE)) {
+                shap_res <- tryCatch(SHAPforxgboost::shap.values(xgb_model = xgb_fit, X_train = x), error = function(e) NULL)
+                if (!is.null(shap_res) && !is.null(shap_res$mean_shap_score)) {
+                  ms <- shap_res$mean_shap_score
+                  genes_ord <- names(ms)[order(-ms)]
+                  imp_df <- data.frame(Gene = genes_ord, mean_abs_SHAP = as.numeric(ms[genes_ord]), Rank_XGBoostSHAP = seq_along(genes_ord), stringsAsFactors = FALSE)
+                }
               }
-            }
-            if (!is.null(imp_df)) {
-              rv$ml_xgboost_df <- imp_df
-              gene_lists[["XGBoost+SHAP"]] <- head(imp_df$Gene, n_xgboost)
-              method_names <- c(method_names, "XGBoost+SHAP")
+              if (is.null(imp_df)) {
+                imp <- tryCatch(xgboost::xgb.importance(model = xgb_fit), error = function(e) NULL)
+                if (!is.null(imp) && nrow(imp) > 0) {
+                  imp_df <- data.frame(Gene = imp$Feature, Gain = imp$Gain, Rank_XGBoost = seq_len(nrow(imp)), stringsAsFactors = FALSE)
+                  imp_df <- imp_df[order(-imp_df$Gain), ]
+                  imp_df$Rank_XGBoost <- seq_len(nrow(imp_df))
+                }
+              }
+              if (!is.null(imp_df)) {
+                rv$ml_xgboost_df <- imp_df
+                gene_lists[["XGBoost+SHAP"]] <- head(imp_df$Gene, n_xgboost)
+                method_names <- c(method_names, "XGBoost+SHAP")
+              } else {
+                rv$ml_xgboost_df <- NULL
+              }
             } else {
               rv$ml_xgboost_df <- NULL
             }
-          } else {
-            rv$ml_xgboost_df <- NULL
+            prog <- prog + step_inc
           }
-          prog <- prog + step_inc
-        }
 
-        # Common genes = intersection of selected methods' gene lists
-        common_all <- if (length(gene_lists) == 0) character(0) else Reduce(intersect, gene_lists)
-        rv$ml_common_genes <- common_all
-        rv$ml_venn_sets <- gene_lists
-        rv$ml_methods_run <- method_names
-        # Keep per-method top genes for combined list / display
-        rv$ml_lasso_genes <- if (!is.null(rv$ml_lasso_df)) rv$ml_lasso_df$Gene else character(0)
-        rv$ml_elastic_top_genes <- if (!is.null(rv$ml_elastic_df)) head(rv$ml_elastic_df$Gene, n_elastic) else character(0)
-        rv$ml_ridge_top_genes <- if (!is.null(rv$ml_ridge_df)) head(rv$ml_ridge_df$Gene, n_ridge) else character(0)
-        rv$ml_rf_top_genes <- if (!is.null(rv$ml_rf_importance)) head(rv$ml_rf_importance[order(-rv$ml_rf_importance$MeanDecreaseAccuracy), "Gene"], n_rf) else character(0)
-        rv$ml_svm_top_genes <- if (!is.null(rv$ml_svm_ranking)) head(rv$ml_svm_ranking$Gene, n_svm) else character(0)
-        rv$ml_boruta_top_genes <- if (!is.null(rv$ml_boruta_df)) head(rv$ml_boruta_df$Gene, n_boruta) else character(0)
-        rv$ml_splsda_top_genes <- if (!is.null(rv$ml_splsda_df)) head(rv$ml_splsda_df$Gene, n_splsda) else character(0)
-        rv$ml_xgboost_top_genes <- if (!is.null(rv$ml_xgboost_df)) head(rv$ml_xgboost_df$Gene, n_xgboost) else character(0)
-        rv$ml_x <- x
-        rv$ml_y <- y
-        rv$ml_complete <- TRUE
-        incProgress(1 - prog, detail = "Done")
-        showNotification(paste0("ML analysis complete (", paste(method_names, collapse = ", "), "). Venn and common genes use selected methods only."), type = "message", duration = 5)
-      }, error = function(e) {
-        showNotification(paste("ML error:", e$message), type = "error", duration = 10)
-      })
+          # Common genes = intersection of selected methods' gene lists
+          common_all <- if (length(gene_lists) == 0) character(0) else Reduce(intersect, gene_lists)
+          rv$ml_common_genes <- common_all
+          rv$ml_venn_sets <- gene_lists
+          rv$ml_methods_run <- method_names
+          # Keep per-method top genes for combined list / display
+          rv$ml_lasso_genes <- if (!is.null(rv$ml_lasso_df)) rv$ml_lasso_df$Gene else character(0)
+          rv$ml_elastic_top_genes <- if (!is.null(rv$ml_elastic_df)) head(rv$ml_elastic_df$Gene, n_elastic) else character(0)
+          rv$ml_ridge_top_genes <- if (!is.null(rv$ml_ridge_df)) head(rv$ml_ridge_df$Gene, n_ridge) else character(0)
+          rv$ml_rf_top_genes <- if (!is.null(rv$ml_rf_importance)) head(rv$ml_rf_importance[order(-rv$ml_rf_importance$MeanDecreaseAccuracy), "Gene"], n_rf) else character(0)
+          rv$ml_svm_top_genes <- if (!is.null(rv$ml_svm_ranking)) head(rv$ml_svm_ranking$Gene, n_svm) else character(0)
+          rv$ml_boruta_top_genes <- if (!is.null(rv$ml_boruta_df)) head(rv$ml_boruta_df$Gene, n_boruta) else character(0)
+          rv$ml_splsda_top_genes <- if (!is.null(rv$ml_splsda_df)) head(rv$ml_splsda_df$Gene, n_splsda) else character(0)
+          rv$ml_xgboost_top_genes <- if (!is.null(rv$ml_xgboost_df)) head(rv$ml_xgboost_df$Gene, n_xgboost) else character(0)
+          rv$ml_x <- x
+          rv$ml_y <- y
+          rv$ml_complete <- TRUE
+          incProgress(1 - prog, detail = "Done")
+          showNotification(paste0("ML analysis complete (", paste(method_names, collapse = ", "), "). Venn and common genes use selected methods only."), type = "message", duration = 5)
+        },
+        error = function(e) {
+          showNotification(paste("ML error:", e$message), type = "error", duration = 10)
+        }
+      )
     })
   })
 
@@ -495,80 +539,94 @@ server_ml <- function(input, output, session, rv) {
   # ---------------------------------------------------------------------------
   # Correlation & co-expression for final biomarker panel (common ML genes)
   # ---------------------------------------------------------------------------
-  output$ml_biomarker_cor_heatmap <- renderPlot({
-    req(rv$extracted_data_ml, rv$ml_common_genes)
-    expr_mat <- as.matrix(rv$extracted_data_ml)          # samples x genes
-    genes <- intersect(rv$ml_common_genes, colnames(expr_mat))
-    if (length(genes) < 2) {
-      plot.new()
-      text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40")
-      return()
-    }
-    expr_sub <- expr_mat[, genes, drop = FALSE]          # samples x final genes
-    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+  output$ml_biomarker_cor_heatmap <- renderPlot(
+    {
+      req(rv$extracted_data_ml, rv$ml_common_genes)
+      expr_mat <- as.matrix(rv$extracted_data_ml) # samples x genes
+      genes <- intersect(rv$ml_common_genes, colnames(expr_mat))
+      if (length(genes) < 2) {
+        plot.new()
+        text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40")
+        return()
+      }
+      expr_sub <- expr_mat[, genes, drop = FALSE] # samples x final genes
+      cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
 
-    tryCatch({
-      pheatmap::pheatmap(
-        cor_mat,
-        display_numbers = TRUE,
-        number_color = "black",
-        clustering_method = "complete",
-        main = "Biomarker Co-expression (Spearman)",
-        fontsize = 10
+      tryCatch(
+        {
+          pheatmap::pheatmap(
+            cor_mat,
+            display_numbers = TRUE,
+            number_color = "black",
+            clustering_method = "complete",
+            main = "Biomarker Co-expression (Spearman)",
+            fontsize = 10
+          )
+        },
+        error = function(e) {
+          plot.new()
+          text(0.5, 0.5, paste("Heatmap error:", conditionMessage(e)), cex = 0.9, col = "gray40")
+        }
       )
-    }, error = function(e) {
-      plot.new()
-      text(0.5, 0.5, paste("Heatmap error:", conditionMessage(e)), cex = 0.9, col = "gray40")
-    })
-  }, height = 380)
+    },
+    height = 380
+  )
 
-  output$ml_biomarker_coexp_network <- renderPlot({
-    req(rv$extracted_data_ml, rv$ml_common_genes)
-    expr_mat <- as.matrix(rv$extracted_data_ml)          # samples x genes
-    genes <- intersect(rv$ml_common_genes, colnames(expr_mat))
-    if (length(genes) < 2) {
-      plot.new()
-      text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40")
-      return()
-    }
-    expr_sub <- expr_mat[, genes, drop = FALSE]
-    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
-    diag(cor_mat) <- 0
+  output$ml_biomarker_coexp_network <- renderPlot(
+    {
+      req(rv$extracted_data_ml, rv$ml_common_genes)
+      expr_mat <- as.matrix(rv$extracted_data_ml) # samples x genes
+      genes <- intersect(rv$ml_common_genes, colnames(expr_mat))
+      if (length(genes) < 2) {
+        plot.new()
+        text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40")
+        return()
+      }
+      expr_sub <- expr_mat[, genes, drop = FALSE]
+      cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+      diag(cor_mat) <- 0
 
-    thr <- 0.7
-    adj <- cor_mat
-    adj[abs(adj) < thr] <- 0
-    if (all(adj == 0)) {
-      plot.new()
-      text(0.5, 0.5, paste0("No edges with |Spearman| \u2265 ", thr, "."), cex = 0.9, col = "gray40")
-      return()
-    }
+      thr <- 0.7
+      adj <- cor_mat
+      adj[abs(adj) < thr] <- 0
+      if (all(adj == 0)) {
+        plot.new()
+        text(0.5, 0.5, paste0("No edges with |Spearman| \u2265 ", thr, "."), cex = 0.9, col = "gray40")
+        return()
+      }
 
-    g <- igraph::graph_from_adjacency_matrix(adj, mode = "undirected", weighted = TRUE, diag = FALSE)
-    layout <- igraph::layout_with_fr(g)
-    edge_cols <- ifelse(igraph::E(g)$weight >= 0, "#2ECC71", "#E74C3C")
-    edge_width <- 1 + 4 * abs(igraph::E(g)$weight)
-    vertex_size <- 8 + 4 * igraph::degree(g)
+      g <- igraph::graph_from_adjacency_matrix(adj, mode = "undirected", weighted = TRUE, diag = FALSE)
+      layout <- igraph::layout_with_fr(g)
+      edge_cols <- ifelse(igraph::E(g)$weight >= 0, "#2ECC71", "#E74C3C")
+      edge_width <- 1 + 4 * abs(igraph::E(g)$weight)
+      vertex_size <- 8 + 4 * igraph::degree(g)
 
-    plot(g,
-         layout = layout,
-         vertex.label = igraph::V(g)$name,
-         vertex.label.cex = 0.8,
-         vertex.color = "#3498DB",
-         vertex.size = vertex_size,
-         edge.color = edge_cols,
-         edge.width = edge_width,
-         main = paste0("Co-expression Network (|Spearman| \u2265 ", thr, ")"))
-  }, height = 380)
+      plot(g,
+        layout = layout,
+        vertex.label = igraph::V(g)$name,
+        vertex.label.cex = 0.8,
+        vertex.color = "#3498DB",
+        vertex.size = vertex_size,
+        edge.color = edge_cols,
+        edge.width = edge_width,
+        main = paste0("Co-expression Network (|Spearman| \u2265 ", thr, ")")
+      )
+    },
+    height = 380
+  )
 
   # Combined list: all genes from selected methods with rank per method and In_common
   output$download_ml_combined_list <- downloadHandler(
     filename = function() "combined_ML_gene_list.csv",
     content = function(file) {
       sets <- rv$ml_venn_sets
-      if (is.null(sets) || length(sets) == 0) return()
+      if (is.null(sets) || length(sets) == 0) {
+        return()
+      }
       all_genes <- unique(unlist(sets, use.names = FALSE))
-      if (length(all_genes) == 0) return()
+      if (length(all_genes) == 0) {
+        return()
+      }
       common <- rv$ml_common_genes
       if (is.null(common)) common <- character(0)
       df <- data.frame(Gene = all_genes, stringsAsFactors = FALSE)
@@ -589,22 +647,32 @@ server_ml <- function(input, output, session, rv) {
 
   # Diagnostic plots UI: show only plots for methods that were run
   output$ml_diagnostic_plots_ui <- renderUI({
-    if (!isTRUE(rv$ml_complete)) return(NULL)
+    if (!isTRUE(rv$ml_complete)) {
+      return(NULL)
+    }
     out <- list()
     # Random Forest
     if (!is.null(rv$ml_rf_model) && !is.null(rv$ml_x) && !is.null(rv$ml_y)) {
       out <- c(out, list(
         fluidRow(
-          column(6, box(title = "RF: Training / Test / OOB Error", width = NULL, status = "success", solidHeader = TRUE,
-                       plotOutput("ml_plot_rf_error", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_rf_error_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_rf_error_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs")))),
-          column(6, box(title = "RF: Top 10 importance (MeanDecreaseAccuracy)", width = NULL, status = "success", solidHeader = TRUE,
-                       plotOutput("ml_plot_rf_importance", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_rf_imp_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_rf_imp_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs"))))
+          column(6, box(
+            title = "RF: Training / Test / OOB Error", width = NULL, status = "success", solidHeader = TRUE,
+            plotOutput("ml_plot_rf_error", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_rf_error_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_rf_error_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs")
+            )
+          )),
+          column(6, box(
+            title = "RF: Top 10 importance (MeanDecreaseAccuracy)", width = NULL, status = "success", solidHeader = TRUE,
+            plotOutput("ml_plot_rf_importance", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_rf_imp_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_rf_imp_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs")
+            )
+          ))
         )
       ))
     }
@@ -612,16 +680,24 @@ server_ml <- function(input, output, session, rv) {
     if (!is.null(rv$ml_cv_fit_lasso)) {
       out <- c(out, list(
         fluidRow(
-          column(6, box(title = "LASSO: Coefficient path", width = NULL, status = "danger", solidHeader = TRUE,
-                       plotOutput("ml_plot_lasso_path", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_lasso_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_lasso_path_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs")))),
-          column(6, box(title = "LASSO: Binomial deviance vs lambda", width = NULL, status = "danger", solidHeader = TRUE,
-                       plotOutput("ml_plot_lasso_deviance", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_lasso_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_lasso_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs"))))
+          column(6, box(
+            title = "LASSO: Coefficient path", width = NULL, status = "danger", solidHeader = TRUE,
+            plotOutput("ml_plot_lasso_path", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_lasso_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_lasso_path_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs")
+            )
+          )),
+          column(6, box(
+            title = "LASSO: Binomial deviance vs lambda", width = NULL, status = "danger", solidHeader = TRUE,
+            plotOutput("ml_plot_lasso_deviance", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_lasso_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_lasso_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs")
+            )
+          ))
         )
       ))
     }
@@ -629,16 +705,24 @@ server_ml <- function(input, output, session, rv) {
     if (!is.null(rv$ml_cv_fit_elastic)) {
       out <- c(out, list(
         fluidRow(
-          column(6, box(title = "Elastic Net: Coefficient path", width = NULL, status = "info", solidHeader = TRUE,
-                       plotOutput("ml_plot_elastic_path", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_elastic_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_elastic_path_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs")))),
-          column(6, box(title = "Elastic Net: Binomial deviance vs lambda", width = NULL, status = "info", solidHeader = TRUE,
-                       plotOutput("ml_plot_elastic_deviance", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_elastic_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_elastic_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs"))))
+          column(6, box(
+            title = "Elastic Net: Coefficient path", width = NULL, status = "info", solidHeader = TRUE,
+            plotOutput("ml_plot_elastic_path", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_elastic_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_elastic_path_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs")
+            )
+          )),
+          column(6, box(
+            title = "Elastic Net: Binomial deviance vs lambda", width = NULL, status = "info", solidHeader = TRUE,
+            plotOutput("ml_plot_elastic_deviance", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_elastic_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_elastic_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs")
+            )
+          ))
         )
       ))
     }
@@ -646,20 +730,30 @@ server_ml <- function(input, output, session, rv) {
     if (!is.null(rv$ml_cv_fit_ridge)) {
       out <- c(out, list(
         fluidRow(
-          column(6, box(title = "Ridge: Coefficient path", width = NULL, status = "primary", solidHeader = TRUE,
-                       plotOutput("ml_plot_ridge_path", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_ridge_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_ridge_path_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs")))),
-          column(6, box(title = "Ridge: Binomial deviance vs lambda", width = NULL, status = "primary", solidHeader = TRUE,
-                       plotOutput("ml_plot_ridge_deviance", height = "380px"),
-                       tags$div(style = "margin-top:6px;",
-                                downloadButton("dl_ml_ridge_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
-                                downloadButton("dl_ml_ridge_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs"))))
+          column(6, box(
+            title = "Ridge: Coefficient path", width = NULL, status = "primary", solidHeader = TRUE,
+            plotOutput("ml_plot_ridge_path", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_ridge_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_ridge_path_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs")
+            )
+          )),
+          column(6, box(
+            title = "Ridge: Binomial deviance vs lambda", width = NULL, status = "primary", solidHeader = TRUE,
+            plotOutput("ml_plot_ridge_deviance", height = "380px"),
+            tags$div(
+              style = "margin-top:6px;",
+              downloadButton("dl_ml_ridge_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
+              downloadButton("dl_ml_ridge_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs")
+            )
+          ))
         )
       ))
     }
-    if (length(out) == 0) return(tags$p(icon("info-circle"), " No diagnostic plots (run LASSO, Elastic Net, Ridge, or Random Forest).", style = "color: #666;"))
+    if (length(out) == 0) {
+      return(tags$p(icon("info-circle"), " No diagnostic plots (run LASSO, Elastic Net, Ridge, or Random Forest).", style = "color: #666;"))
+    }
     do.call(tagList, out)
   })
 
@@ -682,8 +776,10 @@ server_ml <- function(input, output, session, rv) {
     oob_err <- rf_train$err.rate[, 1]
     ntrees <- seq_along(oob_err)
     par(mar = c(4.5, 4.5, 3.5, 1.5), cex.main = 1.0, cex.lab = 0.9, cex.axis = 0.8, mgp = c(2.5, 0.8, 0))
-    plot(ntrees, oob_err, type = "l", col = "green", lwd = 2, xlab = "Number of Trees", ylab = "Error Rate",
-         main = "Random Forest Error Rates", ylim = c(0, max(c(oob_err, train_err, test_err)) * 1.1))
+    plot(ntrees, oob_err,
+      type = "l", col = "green", lwd = 2, xlab = "Number of Trees", ylab = "Error Rate",
+      main = "Random Forest Error Rates", ylim = c(0, max(c(oob_err, train_err, test_err)) * 1.1)
+    )
     lines(ntrees, rep(train_err, length(ntrees)), col = "black", lty = 2, lwd = 2)
     lines(ntrees, rep(test_err, length(ntrees)), col = "red", lty = 3, lwd = 2)
     legend("topright", legend = c("OOB", "Training", "Test"), col = c("green", "black", "red"), lwd = 2, lty = c(1, 2, 3), cex = 0.85)
@@ -693,8 +789,10 @@ server_ml <- function(input, output, session, rv) {
     req(rv$ml_rf_importance)
     df <- rv$ml_rf_importance[order(-rv$ml_rf_importance$MeanDecreaseAccuracy), ][seq_len(min(10L, nrow(rv$ml_rf_importance))), ]
     par(mar = c(4.5, 8, 3.5, 1.5), cex.main = 1.0, cex.lab = 0.9, cex.axis = 0.8, mgp = c(2.5, 0.8, 0))
-    barplot(rev(df$MeanDecreaseAccuracy), names.arg = rev(df$Gene), horiz = TRUE, las = 1, col = "steelblue",
-            main = "Top 10 Genes (MeanDecreaseAccuracy)", xlab = "Importance", cex.names = 0.8)
+    barplot(rev(df$MeanDecreaseAccuracy),
+      names.arg = rev(df$Gene), horiz = TRUE, las = 1, col = "steelblue",
+      main = "Top 10 Genes (MeanDecreaseAccuracy)", xlab = "Importance", cex.names = 0.8
+    )
   }
 
   plot_lasso_path <- function() {
@@ -738,28 +836,68 @@ server_ml <- function(input, output, session, rv) {
   }
 
   # ---------- Render plots ----------
-  output$ml_plot_rf_error <- renderPlot({ plot_rf_error() }, height = 380)
+  output$ml_plot_rf_error <- renderPlot(
+    {
+      plot_rf_error()
+    },
+    height = 380
+  )
 
   # RF: Top 10 importance (MeanDecreaseAccuracy)
-  output$ml_plot_rf_importance <- renderPlot({ plot_rf_importance() }, height = 380)
+  output$ml_plot_rf_importance <- renderPlot(
+    {
+      plot_rf_importance()
+    },
+    height = 380
+  )
 
   # LASSO coefficient path
-  output$ml_plot_lasso_path <- renderPlot({ plot_lasso_path() }, height = 380)
+  output$ml_plot_lasso_path <- renderPlot(
+    {
+      plot_lasso_path()
+    },
+    height = 380
+  )
 
   # LASSO deviance vs lambda
-  output$ml_plot_lasso_deviance <- renderPlot({ plot_lasso_dev() }, height = 380)
+  output$ml_plot_lasso_deviance <- renderPlot(
+    {
+      plot_lasso_dev()
+    },
+    height = 380
+  )
 
   # Elastic Net coefficient path
-  output$ml_plot_elastic_path <- renderPlot({ plot_elastic_path() }, height = 380)
+  output$ml_plot_elastic_path <- renderPlot(
+    {
+      plot_elastic_path()
+    },
+    height = 380
+  )
 
   # Elastic Net deviance vs lambda
-  output$ml_plot_elastic_deviance <- renderPlot({ plot_elastic_dev() }, height = 380)
+  output$ml_plot_elastic_deviance <- renderPlot(
+    {
+      plot_elastic_dev()
+    },
+    height = 380
+  )
 
   # Ridge coefficient path
-  output$ml_plot_ridge_path <- renderPlot({ plot_ridge_path() }, height = 380)
+  output$ml_plot_ridge_path <- renderPlot(
+    {
+      plot_ridge_path()
+    },
+    height = 380
+  )
 
   # Ridge deviance vs lambda
-  output$ml_plot_ridge_deviance <- renderPlot({ plot_ridge_dev() }, height = 380)
+  output$ml_plot_ridge_deviance <- renderPlot(
+    {
+      plot_ridge_dev()
+    },
+    height = 380
+  )
 
   # ---------- Downloads (PNG 300 DPI and PDF) ----------
   download_plot <- function(file, type = c("png", "pdf"), plotfun) {
@@ -840,7 +978,9 @@ server_ml <- function(input, output, session, rv) {
 
   output$ml_venn_message <- renderUI({
     sets <- rv$ml_venn_sets
-    if (is.null(sets)) return(NULL)
+    if (is.null(sets)) {
+      return(NULL)
+    }
     n_sets <- length(sets)
     if (n_sets == 1) {
       return(tags$p(icon("info-circle"), " Venn/UpSet needs 2 or more methods. You ran 1 method; Final List shows that method's genes.", style = "margin-bottom: 10px; font-size: 12px; color: #555;"))
@@ -855,77 +995,88 @@ server_ml <- function(input, output, session, rv) {
   ml_venn_fill <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#009688", "#795548", "#607D8B")
   ml_venn_cats <- c("LASSO", "Elastic Net", "Ridge", "Random Forest", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost+SHAP")
 
-  output$ml_venn_plot <- renderPlot({
-    req(rv$ml_venn_sets)
-    sets <- rv$ml_venn_sets
-    n_sets <- length(sets)
-    if (n_sets < 2) return()
-    if (n_sets > 5) {
-      # UpSet plot for 6+ methods (shows all selected methods)
-      all_genes <- unique(unlist(sets, use.names = FALSE))
-      if (length(all_genes) == 0) return()
-      upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
-      rownames(upset_matrix) <- all_genes
-      colnames(upset_matrix) <- names(sets)
-      for (i in seq_len(n_sets)) {
-        g <- sets[[i]]
-        upset_matrix[intersect(all_genes, g), i] <- 1L
+  output$ml_venn_plot <- renderPlot(
+    {
+      req(rv$ml_venn_sets)
+      sets <- rv$ml_venn_sets
+      n_sets <- length(sets)
+      if (n_sets < 2) {
+        return()
       }
-      upset_df <- as.data.frame(upset_matrix)
-      max_set_size <- max(sapply(sets, length))
-      tryCatch({
-        UpSetR::upset(upset_df,
-                      sets = colnames(upset_df),
-                      keep.order = TRUE,
-                      order.by = "freq",
-                      main.bar.color = "#3498db",
-                      sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                      matrix.color = "#2ecc71",
-                      point.size = 3.5,
-                      line.size = 1,
-                      text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
-                      mb.ratio = c(0.6, 0.4),
-                      set_size.show = TRUE,
-                      set_size.scale_max = max(1, max_set_size * 1.1),
-                      mainbar.y.label = "Gene set intersections",
-                      sets.x.label = "Genes per method")
-      }, error = function(e) {
-        plot.new()
-        text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
-      })
-      return(invisible(NULL))
-    }
-    grid::grid.newpage()
-    fill_colors <- if (n_sets <= 8) ml_venn_fill[seq_len(n_sets)] else rep(ml_venn_fill, length.out = n_sets)
-    cat_names <- names(sets)
-    if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
-    vp <- VennDiagram::venn.diagram(
-      x = sets,
-      category.names = cat_names,
-      filename = NULL,
-      output = TRUE,
-      disable.logging = TRUE,
-      imagetype = "png",
-      height = 2200,
-      width = 2200,
-      resolution = 200,
-      compression = "lzw",
-      lwd = 2.5,
-      lty = "blank",
-      fill = fill_colors,
-      alpha = 0.65,
-      cex = 1.4,
-      fontface = "bold",
-      cat.cex = 1.3,
-      cat.fontface = "bold",
-      cat.col = fill_colors,
-      margin = 0.08,
-      main = "Common Genes Across ML Methods",
-      main.cex = 1.4,
-      main.fontface = "bold"
-    )
-    grid::grid.draw(vp)
-  }, height = 500)
+      if (n_sets > 5) {
+        # UpSet plot for 6+ methods (shows all selected methods)
+        all_genes <- unique(unlist(sets, use.names = FALSE))
+        if (length(all_genes) == 0) {
+          return()
+        }
+        upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
+        rownames(upset_matrix) <- all_genes
+        colnames(upset_matrix) <- names(sets)
+        for (i in seq_len(n_sets)) {
+          g <- sets[[i]]
+          upset_matrix[intersect(all_genes, g), i] <- 1L
+        }
+        upset_df <- as.data.frame(upset_matrix)
+        max_set_size <- max(sapply(sets, length))
+        tryCatch(
+          {
+            UpSetR::upset(upset_df,
+              sets = colnames(upset_df),
+              keep.order = TRUE,
+              order.by = "freq",
+              main.bar.color = "#3498db",
+              sets.bar.color = ml_venn_fill[seq_len(n_sets)],
+              matrix.color = "#2ecc71",
+              point.size = 3.5,
+              line.size = 1,
+              text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
+              mb.ratio = c(0.6, 0.4),
+              set_size.show = TRUE,
+              set_size.scale_max = max(1, max_set_size * 1.1),
+              mainbar.y.label = "Gene set intersections",
+              sets.x.label = "Genes per method"
+            )
+          },
+          error = function(e) {
+            plot.new()
+            text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
+          }
+        )
+        return(invisible(NULL))
+      }
+      grid::grid.newpage()
+      fill_colors <- if (n_sets <= 8) ml_venn_fill[seq_len(n_sets)] else rep(ml_venn_fill, length.out = n_sets)
+      cat_names <- names(sets)
+      if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
+      vp <- VennDiagram::venn.diagram(
+        x = sets,
+        category.names = cat_names,
+        filename = NULL,
+        output = TRUE,
+        disable.logging = TRUE,
+        imagetype = "png",
+        height = 2200,
+        width = 2200,
+        resolution = 200,
+        compression = "lzw",
+        lwd = 2.5,
+        lty = "blank",
+        fill = fill_colors,
+        alpha = 0.65,
+        cex = 1.4,
+        fontface = "bold",
+        cat.cex = 1.3,
+        cat.fontface = "bold",
+        cat.col = fill_colors,
+        margin = 0.08,
+        main = "Common Genes Across ML Methods",
+        main.cex = 1.4,
+        main.fontface = "bold"
+      )
+      grid::grid.draw(vp)
+    },
+    height = 500
+  )
   output$download_ml_venn <- downloadHandler(
     filename = function() {
       sets <- rv$ml_venn_sets
@@ -936,10 +1087,14 @@ server_ml <- function(input, output, session, rv) {
       req(rv$ml_venn_sets)
       sets <- rv$ml_venn_sets
       n_sets <- length(sets)
-      if (n_sets < 2) return()
+      if (n_sets < 2) {
+        return()
+      }
       if (n_sets > 5) {
         all_genes <- unique(unlist(sets, use.names = FALSE))
-        if (length(all_genes) == 0) return()
+        if (length(all_genes) == 0) {
+          return()
+        }
         upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
         rownames(upset_matrix) <- all_genes
         colnames(upset_matrix) <- names(sets)
@@ -950,26 +1105,30 @@ server_ml <- function(input, output, session, rv) {
         upset_df <- as.data.frame(upset_matrix)
         max_set_size <- max(sapply(sets, length))
         png(file, width = 10 * IMAGE_DPI, height = 6.67 * IMAGE_DPI, res = IMAGE_DPI)
-        tryCatch({
-          UpSetR::upset(upset_df,
-                        sets = colnames(upset_df),
-                        keep.order = TRUE,
-                        order.by = "freq",
-                        main.bar.color = "#3498db",
-                        sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                        matrix.color = "#2ecc71",
-                        point.size = 3.5,
-                        line.size = 1,
-                        text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
-                        mb.ratio = c(0.6, 0.4),
-                        set_size.show = TRUE,
-                        set_size.scale_max = max(1, max_set_size * 1.1),
-                        mainbar.y.label = "Gene set intersections",
-                        sets.x.label = "Genes per method")
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
-        })
+        tryCatch(
+          {
+            UpSetR::upset(upset_df,
+              sets = colnames(upset_df),
+              keep.order = TRUE,
+              order.by = "freq",
+              main.bar.color = "#3498db",
+              sets.bar.color = ml_venn_fill[seq_len(n_sets)],
+              matrix.color = "#2ecc71",
+              point.size = 3.5,
+              line.size = 1,
+              text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
+              mb.ratio = c(0.6, 0.4),
+              set_size.show = TRUE,
+              set_size.scale_max = max(1, max_set_size * 1.1),
+              mainbar.y.label = "Gene set intersections",
+              sets.x.label = "Genes per method"
+            )
+          },
+          error = function(e) {
+            plot.new()
+            text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
+          }
+        )
         dev.off()
         return()
       }
@@ -1018,10 +1177,14 @@ server_ml <- function(input, output, session, rv) {
       req(rv$ml_venn_sets)
       sets <- rv$ml_venn_sets
       n_sets <- length(sets)
-      if (n_sets < 2) return()
+      if (n_sets < 2) {
+        return()
+      }
       if (n_sets > 5) {
         all_genes <- unique(unlist(sets, use.names = FALSE))
-        if (length(all_genes) == 0) return()
+        if (length(all_genes) == 0) {
+          return()
+        }
         upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
         rownames(upset_matrix) <- all_genes
         colnames(upset_matrix) <- names(sets)
@@ -1032,26 +1195,30 @@ server_ml <- function(input, output, session, rv) {
         upset_df <- as.data.frame(upset_matrix)
         max_set_size <- max(sapply(sets, length))
         pdf(file, width = 10, height = 6.67)
-        tryCatch({
-          UpSetR::upset(upset_df,
-                        sets = colnames(upset_df),
-                        keep.order = TRUE,
-                        order.by = "freq",
-                        main.bar.color = "#3498db",
-                        sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                        matrix.color = "#2ecc71",
-                        point.size = 3.5,
-                        line.size = 1,
-                        text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
-                        mb.ratio = c(0.6, 0.4),
-                        set_size.show = TRUE,
-                        set_size.scale_max = max(1, max_set_size * 1.1),
-                        mainbar.y.label = "Gene set intersections",
-                        sets.x.label = "Genes per method")
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
-        })
+        tryCatch(
+          {
+            UpSetR::upset(upset_df,
+              sets = colnames(upset_df),
+              keep.order = TRUE,
+              order.by = "freq",
+              main.bar.color = "#3498db",
+              sets.bar.color = ml_venn_fill[seq_len(n_sets)],
+              matrix.color = "#2ecc71",
+              point.size = 3.5,
+              line.size = 1,
+              text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
+              mb.ratio = c(0.6, 0.4),
+              set_size.show = TRUE,
+              set_size.scale_max = max(1, max_set_size * 1.1),
+              mainbar.y.label = "Gene set intersections",
+              sets.x.label = "Genes per method"
+            )
+          },
+          error = function(e) {
+            plot.new()
+            text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
+          }
+        )
         dev.off()
         return()
       }

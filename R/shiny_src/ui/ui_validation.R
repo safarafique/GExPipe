@@ -9,7 +9,6 @@
 ui_validation <- tabItem(
   tabName = "validation",
   h2(icon("shield-alt"), " Step 11: Validation Setup"),
-
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
@@ -28,7 +27,8 @@ ui_validation <- tabItem(
       tags$div(
         style = "padding: 15px 0;",
         fluidRow(
-          column(6,
+          column(
+            6,
             tags$div(
               id = "val_mode_ext_card",
               style = "padding: 25px; background: #fff; border: 3px solid #27ae60; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.3s ease; min-height: 200px;",
@@ -41,7 +41,8 @@ ui_validation <- tabItem(
               )
             )
           ),
-          column(6,
+          column(
+            6,
             uiOutput("validation_mode_info_ui")
           )
         )
@@ -63,20 +64,25 @@ ui_validation <- tabItem(
 
   # ---- DE Results (conditional) ----
   uiOutput("val_de_panel_ui"),
-
   fluidRow(
     box(
       title = tags$span(icon("file-alt"), " Process Summary"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-      uiOutput("validation_process_summary_ui"))
+      uiOutput("validation_process_summary_ui")
+    )
   ),
   # ---- Navigation ----
   fluidRow(
-    box(width = 12, status = "primary", solidHeader = FALSE,
-        tags$div(style = "text-align: center; padding: 20px 0;",
-                 actionButton("next_page_validation_to_roc",
-                             tagList(icon("chart-line"), " Continue to ROC Curve Analysis"),
-                             class = "btn-success btn-lg",
-                             style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+    box(
+      width = 12, status = "primary", solidHeader = FALSE,
+      tags$div(
+        style = "text-align: center; padding: 20px 0;",
+        actionButton("next_page_validation_to_roc",
+          tagList(icon("chart-line"), " Continue to ROC Curve Analysis"),
+          class = "btn-success btn-lg",
+          style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
+        )
+      )
+    )
   )
 )
