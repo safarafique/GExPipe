@@ -147,6 +147,8 @@ head(meta)
 
 The same identifiers you would type into Step 1 of the app can be parsed programmatically (comma-separated **GSE** IDs, platform mode, DE method).
 
+When you run `parse-gse-inputs`, you should see parsed GSE IDs in `parsed$rnaseq_ids` and `parsed$micro_ids`. The next chunk `parse-gse-expected` verifies that those vectors contain the inputs used in this vignette.
+
 ```{r parse-gse-inputs}
 parsed <- gexp_parse_gse_inputs(
   analysis_type = "merged",
@@ -189,6 +191,8 @@ Possible outcomes at this step are:
 # Steps 2-4: QC, normalization, and group setup
 
 For reproducible package checks, the main workflow below uses bundled example matrices from `inst/extdata` (offline-safe and deterministic).
+
+Running `normalize-intersect` creates `norm$combined_expr` (normalized expression used downstream) and `norm$common_genes` (genes retained for DE/ML/WGCNA). Running `prepare-metadata` builds `um` and derives `um$Condition` from SampleID (with deterministic label balancing for the bundled example).
 
 ```{r normalize-intersect}
 source_note <- "Using bundled example data (check-friendly)."
@@ -268,6 +272,8 @@ Optional demonstration remapping (manual, not run during checks):
 
 ## Step 2 QC checks (helper outputs)
 
+The `qc-helpers` chunk computes an outlier summary (`qc_out$all_outliers`) and a gene-overlap summary (`qc_summary`) between the DE gene universe and the WGCNA candidate universe. If these outputs look sparse, that usually reflects the small bundled example dataset used for check-safe execution.
+
 ```{r qc-helpers}
 qc_out <- gexp_qc_detect_outliers(norm$combined_expr, top_n = 100)
 length(qc_out$all_outliers)
@@ -285,6 +291,8 @@ qc_summary
 # Step 5: Batch correction
 
 After integration, batch effects (e.g. **Dataset**) can still dominate variation. **Batch correction** adjusts expression while retaining biological signal; you should verify that samples cluster more by **Condition** (or phenotype) than by batch.
+
+When you run `batch-correct`, the printed dimensions (`dim(batch_res$expr_filtered)` and `dim(batch_res$batch_corrected)`) reflect gene filtering and the corrected expression matrix that the following PCA and DE steps use.
 
 ```{r batch-correct}
 batch_res <- gexp_batch_correct(
@@ -326,6 +334,8 @@ ggplot(pca_df, aes(x = PC1, y = PC2, color = Condition, shape = Dataset)) +
 
 # Step 6: Differential expression
 
+Running `run-de` fits the limma model and populates `de_res$de_results` (including `logFC`, `adj.P.Val`, and a `Significance` label). The table and `head(...)` shown below give you a quick sense of how many genes are detected as significant in this bundled example.
+
 ```{r run-de}
 de_res <- gexp_run_de(
   expr = batch_res$batch_corrected,
@@ -341,6 +351,8 @@ head(de_df[, c("Gene", "logFC", "adj.P.Val", "Significance")], 8)
 ```
 
 # Step 7: WGCNA preparation
+
+The `wgcna-prepare` chunk converts the corrected expression into `wgcna_prep$datExpr` (samples x genes, ready for WGCNA) and computes `wgcna_prep$gene_variance_table` to support gene selection. The printed `dim(wgcna_prep$datExpr)` should align with the gene subset used later for common-genes overlap.
 
 ```{r wgcna-prepare}
 wgcna_prep <- gexp_wgcna_prepare(
@@ -358,6 +370,8 @@ head(wgcna_prep$gene_variance_table, 3)
 # Step 8: Common genes (DEG and WGCNA overlap)
 
 In the app (**Step 8**), **common genes** are the intersection of **significant DEGs** (differential expression) and genes that fall in **trait-related WGCNA modules**. This vignette uses the same idea in compact form: significant DEGs ∩ genes kept in `gexp_wgcna_prepare()` output (`wgcna_prep$datExpr`). We also summarize overlap with **`gexp_qc_gene_overlap_summary()`** (exported helper used in QC logic).
+
+After you run `common-genes`, `length(common_genes)` is the number of genes retained for downstream pathway enrichment, STRING PPI, ML, and GSEA inputs (mirroring the app flow).
 
 ```{r common-genes}
 deg_genes <- unique(de_df$Gene[de_df$Significance != "Not Significant"])
@@ -389,6 +403,8 @@ up_meta$ok ## TRUE when both lists are non-empty (data ready for UpSet in the ap
 # Step 9: Gene Ontology enrichment (BP, MF, CC)
 
 We map **gene symbols** to **Entrez IDs** with `clusterProfiler::bitr()`, then run **`enrichGO()`** separately for **Biological Process**, **Molecular Function**, and **Cellular Component**—the same ORA pattern as the app’s GO panels on the **common-genes** path.
+
+After these chunks, `go-tables` prints a small “top terms” preview (term descriptions and p-values) for each ontology when results are available.
 
 ```{r go-map-ids}
 eg <- tryCatch(
@@ -470,6 +486,8 @@ if (nrow(kegg_df) > 0L) {
 
 The **PPI** tab maps your gene list to **STRING** identifiers and retrieves **experimental / database** edges above a score threshold. Below we cap the query size for speed; increase `head(common_genes, …)` for a fuller network when online.
 
+After `ppi-string`, the vignette prints `ppi_res$msg` and `ppi_res$n_edges` so you can confirm whether STRING mappings and interaction retrieval succeeded for the current gene list.
+
 ```{r ppi-string}
 ppi_res <- tryCatch(
   {
@@ -502,7 +520,14 @@ ppi_res$n_edges
 
 # Step 10: Machine learning (supervised classification)
 
-**Step 10 (ML)** in the app trains classifiers on expression features (often **common genes**). Here we fit a **random forest** on **batch-corrected** values, **Normal vs Disease**, and show a short **importance** table when the fit succeeds.
+**Step 10 (ML)** in the app lets you choose one or more machine learning methods (LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA, and XGBoost+SHAP). The app runs the selected methods, produces a gene list per method, and uses a **Venn/UpSet** view to show the overlap of genes across methods (the final overlap drives ROC/validation downstream).
+
+Here, to keep the vignette check-safe and fast, we run a lightweight **Random Forest** proxy (`ml-rf`). We then draw a Venn diagram comparing the bundled-example gene sets:
+- DEG gene set (significant DEGs),
+- WGCNA gene set (WGCNA candidates),
+- ML (RF) feature set (`genes_ml`).
+
+When you run `ml-rf`, the object `rf_fit` is printed, and if importance scores are present we show the top genes by `MeanDecreaseGini`.
 
 ```{r ml-rf}
 genes_ml <- common_genes[seq_len(min(25L, length(common_genes)))]
@@ -539,9 +564,50 @@ if (!is.null(rf_fit) && !is.null(rf_fit$importance) && nrow(rf_fit$importance) >
 }
 ```
 
-# Step 11: Validation (external-style holdout)
+# ML gene overlap (Venn diagram)
 
-**Step 11 (Validation)** in the app supports **external cohorts**. Here we **simulate** that by treating **Dataset D1** as **training** and **Dataset D2** as **external test**—same genes (`common_genes` subset), shared **Condition** labels—so the code path is fully **runnable** on bundled data.
+```{r ml-venn-diagram, echo=FALSE, fig.cap="Venn overlap: DEG vs WGCNA vs ML (RF) feature set (bundled example)."}
+ml_venn_sets <- list(
+  DEG = unique(deg_genes),
+  WGCNA = unique(wgcna_genes),
+  ML_RF = unique(genes_ml)
+)
+
+if (all(vapply(ml_venn_sets, length, integer(1L)) == 0L)) {
+  "Venn not drawn: bundled example produced empty gene sets."
+} else {
+  venn_grob <- tryCatch(
+    VennDiagram::venn.diagram(
+      x = ml_venn_sets,
+      filename = NULL,
+      imagetype = "png",
+      output = TRUE,
+      fill = c("#4DB6AC", "#9575CD", "#90CAF9"),
+      alpha = 0.5,
+      cex = 1.1,
+      cat.cex = 1.1
+    ),
+    error = function(e) NULL
+  )
+  if (!is.null(venn_grob)) {
+    grid::grid.newpage()
+    grid::grid.draw(venn_grob)
+  } else {
+    "Venn diagram failed to render for the current bundled inputs."
+  }
+}
+```
+
+# Step 11: Validation
+
+**Step 11 (Validation)** in the app supports two validation modes:
+
+- **Internal validation (70/30 split)**: no extra dataset download. ROC is computed on the training portion, and the nomogram uses a stratified **70% training / 30% validation** split.
+- **External validation (independent cohort)**: uses an independent dataset (from Step 11 in the app). The model is trained using all available samples, and performance is evaluated on the **external** cohort (**no 70/30 split**).
+
+In this vignette (check-safe and offline-friendly), we demonstrate the **external** path by simulating it with bundled data: **Dataset D1** is treated as **training** and **Dataset D2** as the **external test**, using the same `common_genes` subset and shared **Condition** labels.
+
+Running `validation-external-style` prints `val_txt`, which is either an AUC message (when a valid model and ROC object are available) or a “Validation not run” message when the bundled example doesn’t meet the minimum data requirements.
 
 ```{r validation-external-style}
 val_auc <- NA_real_
@@ -604,6 +670,8 @@ val_txt
 
 **Step 12 (ROC)** uses predicted probabilities vs true labels. We use **training-set** probabilities from the forest model as an illustrative example. For unbiased performance, prefer cross-validation or a held-out dataset.
 
+After `roc-demo`, `roc_auc_txt` summarizes the computed AUC (or explains why it could not be computed).
+
 ```{r roc-demo}
 roc_auc_txt <- "ROC / AUC not computed."
 if (!is.null(rf_fit)) {
@@ -630,6 +698,8 @@ roc_auc_txt
 # Step 13: Nomogram-style risk model (lightweight)
 
 The app's nomogram tab is designed for clinical risk presentation. In this vignette, we provide a lightweight, fully runnable proxy using logistic regression to estimate disease risk from top genes.
+
+When you run `nomogram-proxy`, `nomo_txt` reports whether the proxy fit succeeded; if it does, `nomo_df` contains the coefficient table used for the risk-style summary.
 
 ```{r nomogram-proxy}
 nomo_txt <- "Nomogram-style model not run."
@@ -666,6 +736,8 @@ head(nomo_df, 8)
 # Step 14: GSEA (gene-set enrichment analysis)
 
 **Step 14 (GSEA)** ranks **all genes** by a differential statistic (here **limma logFC**) and tests whether curated sets are enriched at the **top or bottom** of the ranking (`clusterProfiler::gseGO()`). We show **GO BP**; the app can combine this with **MsigDB** collections.
+
+After `gsea-gsego` (and `gsea` inputs later), you should see `nrow(gse_df)` for GO and, when available, enrichment summaries for KEGG in `gse_k_df`.
 
 ```{r gsea-gsego}
 gene_list <- de_df$logFC
@@ -751,6 +823,8 @@ head(hmk[, c("gs_name", "gene_symbol", "entrez_gene")], 10)
 
 This section summarizes key downstream outputs in one place, similar to the app's final summary tab.
 
+Running `final-summary` produces `summary_tbl` (a compact checklist of what ran), and `real-run-output` shows `run_output` with dimensions and counts pulled from the objects created earlier in the vignette.
+
 ```{r final-summary}
 summary_tbl <- data.frame(
   Metric = c(
@@ -814,6 +888,8 @@ run_output
 # Interactive Shiny application
 
 `runGExPipe()` returns a **Shiny app object** (the package does not call `shiny::runApp()` for you). Pass the result to `shiny::runApp()` in an interactive session. Use a **fixed port** (e.g. `3838`) or `launch.browser = TRUE` so the browser URL is valid; the returned object is suitable for the RStudio Viewer or an external browser.
+
+The `app-object` chunk builds the app in “testmode” so the vignette check stays lightweight, while `launch-interactive` is evaluated only when you knit/run interactively.
 
 ```{r app-object}
 ## Faster vignette check: defer heavy namespace attach (same pattern as other vignettes).
