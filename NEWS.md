@@ -1,12 +1,8 @@
 # GExPipe NEWS
 
-## Version 0.99.6
-
+## Version 0.99.5
 - Vignette `GExPipe.Rmd`: GitHub install (`devtools::install_github`), Bioconductor install note for post-acceptance, bundled-data workflow fixes (WGCNA gene IDs, demo label balance, random Shiny port), and reproducibility notes for real vs bundled data.
 - Vignette `gexpipe-workflow.Rmd` removed; the main getting-started narrative is `GExPipe.Rmd`.
-
-## Version 0.99.5
-
 - Removed `inst/CITATION` until a publication/preprint DOI is available, resolving BiocCheck citation warning for missing DOI.
 - Added robust Shiny navigation fix for "Continue to Results Summary" button and ensured pipeline toolbar includes step 15 ("Summary").
 - Updated User Guideline contact details and applied code formatting cleanup in `R/` using `styler`.
