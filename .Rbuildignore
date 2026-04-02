@@ -26,7 +26,5 @@
 ^scripts/
 ^vignettes/~\$
 ^vignettes/.*\.tmp$
-^gexpipe-workflow\.R$
-^gexpipe-workflow\.html$
 ^doc$
 ^Meta$
