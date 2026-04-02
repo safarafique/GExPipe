@@ -38,7 +38,7 @@ if (requireNamespace("WGCNA", quietly = TRUE)) {
 
 Exported **R** functions mirror the app so workflows can be scripted, tested, and reproduced outside the GUI—aligned with Bioconductor expectations for Shiny software packages [@chang2024shiny]. Differential expression uses **limma** [@ritchie2015limma] and, when appropriate, **DESeq2** [@love2014moderated] and **edgeR**. WGCNA-related steps follow standard weighted correlation network practice [@langfelder2008wgcna].
 
-This vignette uses **bundled example matrices and sample metadata** through **WGCNA preparation**, then **downstream steps** matching the Shiny app’s **Common genes**, **GO/KEGG**, **PPI**, **machine learning**, **ROC**, **validation**, and **GSEA** tabs (`clusterProfiler`, `org.Hs.eg.db`, `STRINGdb`, `randomForest`, `pROC`, `msigdbr`, etc.). **STRING** and **KEGG REST** calls are wrapped in `tryCatch()` so builds succeed offline. For GEO download examples, see the optional section at the end and `gexpipe-workflow.Rmd`.
+This vignette uses **bundled example matrices and sample metadata** through **WGCNA preparation**, then **downstream steps** matching the Shiny app’s **Common genes**, **GO/KEGG**, **PPI**, **machine learning**, **ROC**, **validation**, and **GSEA** tabs (`clusterProfiler`, `org.Hs.eg.db`, `STRINGdb`, `randomForest`, `pROC`, `msigdbr`, etc.). **STRING** and **KEGG REST** calls are wrapped in `tryCatch()` so builds succeed offline. For GEO download examples, see the optional section at the end of this vignette.
 
 # Pipeline flow (all app steps)
 
@@ -837,7 +837,6 @@ if (interactive()) {
 
 # Further reading
 
-- `vignettes/gexpipe-workflow.Rmd` — full runnable pipeline narrative and testing pointers.
 - `vignettes/gexpipe-shiny-testing-ci.Rmd` — **shinytest2** smoke tests and CI notes.
 
 # Optional GEO workflow (network-dependent)
