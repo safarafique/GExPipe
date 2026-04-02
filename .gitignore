@@ -36,6 +36,10 @@ vignettes/vignette.htm
 vignettes/*.html
 vignettes/*.pdf
 vignettes/~$*
+vignettes/Vignette.file..htm
+vignettes/Vignette.file._files/
+vignettes/micro_data/
+vignettes/rna_data/
 
 inst/inst/
 

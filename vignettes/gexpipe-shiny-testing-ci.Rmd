@@ -28,14 +28,23 @@ This vignette documents how `GExPipe` is exercised in:
 
 ## App object contract
 
-The package exposes `runGExPipe()` as the Shiny entrypoint. In vignette/check context we keep this check side-effect free (no port binding).
+The package exposes `runGExPipe()` as the Shiny entrypoint. In vignette/check context we keep this check side-effect free (no port binding). Repository: [https://github.com/safarafique/GExPipe](https://github.com/safarafique/GExPipe).
+
+If **GExPipe** is not installed, run the chunk below once in R (or paste the command into the console), then re-knit so the following contract checks can run. The install step is not executed during `R CMD check` (`eval=FALSE`).
+
+```{r install-gexpipe-github, eval=FALSE}
+devtools::install_github("safarafique/GExPipe")
+```
 
 ```{r app-contract}
 library(GExPipe)
 
 exists("runGExPipe", where = asNamespace("GExPipe"), inherits = FALSE)
 "launch.browser" %in% names(formals(GExPipe::runGExPipe))
+formals(GExPipe::runGExPipe)$launch.browser
 ```
+
+If that chunk failed because the package is missing, run `devtools::install_github("safarafique/GExPipe")` (see the `install-gexpipe-github` chunk above), then knit again.
 
 Suggested testing packages (Bioconductor [Shiny testing section](https://contributions.bioconductor.org/shiny.html#testing)):
 
@@ -136,7 +145,7 @@ Run the following in a fresh R session from package root:
 
 ```{r manual-reviewer-checklist, eval=FALSE}
 pkgload::load_all(".", quiet = TRUE, export_all = FALSE)
-inherits(GExPipe::runGExPipe(FALSE), "shiny.appobj")
+inherits(GExPipe::runGExPipe(launch.browser = FALSE, port = 0L), "shiny.appobj")
 
 testthat::test_local(filter = "shiny-integration")
 testthat::test_local()
