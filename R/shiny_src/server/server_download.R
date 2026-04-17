@@ -183,9 +183,16 @@ server_download <- function(input, output, session, rv) {
                 },
                 error = function(e) NULL
               )
-              micro_eset <- if (!is.null(micro_data) && is.list(micro_data)) micro_data[[1]] else micro_data
+              micro_eset <- if (!is.null(micro_data) && is.list(micro_data) && length(micro_data) >= 1) {
+                micro_data[[1]]
+              } else {
+                micro_data
+              }
             }
-            if (is.null(micro_eset)) next
+            if (is.null(micro_eset)) {
+              log_text <- paste0(log_text, "  ", gse_id, ": skipped mapping (GEO object unavailable during remap)\n")
+              next
+            }
             fdata <- Biobase::fData(micro_eset)
             gene_symbols <- suppressMessages(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id))
             rownames(micro_expr) <- gene_symbols
