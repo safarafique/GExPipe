@@ -2,6 +2,8 @@
 
 ## Version 0.99.5
 - Vignette `GExPipe.Rmd`: GitHub install (`devtools::install_github`), Bioconductor install note for post-acceptance, bundled-data workflow fixes (WGCNA gene IDs, demo label balance, random Shiny port), and reproducibility notes for real vs bundled data.
+- Vignette `GExPipe.Rmd` restructured as a user-facing Shiny walkthrough with clearer step hierarchy, Bioconductor-style app documentation emphasis, and simplified `system.file()` access for bundled `extdata`.
+- Removed developer-focused vignette `gexpipe-shiny-testing-ci.Rmd` from package vignettes and removed generated intermediate files from `vignettes/`.
 - Vignette `gexpipe-workflow.Rmd` removed; the main getting-started narrative is `GExPipe.Rmd`.
 - Removed `inst/CITATION` until a publication/preprint DOI is available, resolving BiocCheck citation warning for missing DOI.
 - Added robust Shiny navigation fix for "Continue to Results Summary" button and ensured pipeline toolbar includes step 15 ("Summary").

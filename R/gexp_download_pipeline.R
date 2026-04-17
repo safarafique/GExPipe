@@ -659,7 +659,11 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
         gse_list <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE),
         file = nullfile()
       )))
-      gse <- if (inherits(gse_list, "list") && length(gse_list) > 1) gse_list[[1]] else if (inherits(gse_list, "list")) gse_list[[1]] else gse_list
+      gse <- if (inherits(gse_list, "list") && length(gse_list) >= 1) {
+        gse_list[[1]]
+      } else {
+        gse_list
+      }
       pheno <- Biobase::pData(gse)
       if (is.null(pheno) || nrow(pheno) == 0) stop("empty pData")
       pheno
