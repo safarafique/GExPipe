@@ -60,10 +60,16 @@ BiocManager::install("GExPipe")
 
 ## Run the app
 
+`runGExPipe()` builds and returns a **Shiny app object**; it does **not** start the server by itself (Bioconductor Shiny package convention). Call **`shiny::runApp()`** on that object. Use the **same** `port` (and `host`, if you set it) in both calls.
+
 ```r
 library(GExPipe)
-runGExPipe()
+library(shiny)
+app <- runGExPipe(launch.browser = TRUE, port = 3838L)
+shiny::runApp(app, port = 3838L)
 ```
+
+The R session **blocks** until you stop the app (RStudio **Stop** or interrupt the console). If `launch.browser = FALSE`, open the URL printed in the console (avoid `port = 0` with `launch.browser = FALSE` unless you read the real port from the log).
 
 Install GExPipe (e.g. `BiocManager::install("GExPipe")` or from source as above) so all dependencies are available; the app does not install packages at runtime.
 
@@ -79,7 +85,9 @@ In RStudio the app can open in your browser. In **Google Colab** (or any headles
 
    ```r
    library(GExPipe)
-   runGExPipe(launch.browser = FALSE, host = "0.0.0.0", port = 3838)
+   library(shiny)
+   app <- runGExPipe(launch.browser = FALSE, host = "0.0.0.0", port = 3838L)
+   shiny::runApp(app, host = "0.0.0.0", port = 3838L)
    ```
 
 3. **Get the URL:** Use Colab’s port forwarding / Preview for port **3838**, or run a tunnel (e.g. `ngrok http 3838`) and open the HTTPS URL in your browser.
