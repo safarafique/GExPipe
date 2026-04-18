@@ -113,6 +113,51 @@ gexp_app_analysis_dashboard_ui <- function() {
       ")),
       # Styles/scripts + online/offline badge wiring are in the existing UI modules.
 
+      shiny::uiOutput("pipeline_progress"),
+      shiny::tags$script(shiny::HTML("
+        function gexpHideImmuneChip() {
+          $('.pipeline-step').each(function() {
+            var tab = (($(this).data('tab') || '') + '').toLowerCase();
+            var txt = ($(this).text() || '').toLowerCase();
+            if (tab === 'immune' || txt.indexOf('immune') !== -1) {
+              $(this).remove();
+            }
+          });
+        }
+        $(document).on('shiny:connected', gexpHideImmuneChip);
+        $(document).on('shiny:value', gexpHideImmuneChip);
+        setInterval(gexpHideImmuneChip, 1000);
+        $(document).on('click', '.pipeline-step[data-tab]', function() {
+          var tab = $(this).data('tab');
+          if (tab) {
+            var link = $('a[data-value=\"' + tab + '\"]');
+            if (link.length) link.click();
+          }
+        });
+      ")),
+      shinydashboard::tabItems(
+        gexp_ui_download(),
+        gexp_ui_qc(),
+        gexp_ui_normalize(),
+        gexp_ui_groups(),
+        gexp_ui_batch(),
+        gexp_ui_results(),
+        gexp_ui_wgcna(),
+        gexp_ui_common_genes(),
+        gexp_ui_ppi(),
+        gexp_ui_ml(),
+        gexp_ui_validation(),
+        gexp_ui_roc(),
+        gexp_ui_nomogram(),
+        gexp_ui_gsea(),
+        gexp_ui_results_summary()
+      )
+    )
+  )
+}
+
+
+gexp_app_head <- function() {
       shiny::tags$head(
       # Bootstrap tooltip initializer (activates all data-toggle="tooltip" elements)
       shiny::tags$script(shiny::HTML("
@@ -1007,50 +1052,8 @@ gexp_app_analysis_dashboard_ui <- function() {
         "
           }
         ))
-      ),
-      shiny::uiOutput("pipeline_progress"),
-      shiny::tags$script(shiny::HTML("
-        function gexpHideImmuneChip() {
-          $('.pipeline-step').each(function() {
-            var tab = (($(this).data('tab') || '') + '').toLowerCase();
-            var txt = ($(this).text() || '').toLowerCase();
-            if (tab === 'immune' || txt.indexOf('immune') !== -1) {
-              $(this).remove();
-            }
-          });
-        }
-        $(document).on('shiny:connected', gexpHideImmuneChip);
-        $(document).on('shiny:value', gexpHideImmuneChip);
-        setInterval(gexpHideImmuneChip, 1000);
-        $(document).on('click', '.pipeline-step[data-tab]', function() {
-          var tab = $(this).data('tab');
-          if (tab) {
-            var link = $('a[data-value=\"' + tab + '\"]');
-            if (link.length) link.click();
-          }
-        });
-      ")),
-      shinydashboard::tabItems(
-        gexp_ui_download(),
-        gexp_ui_qc(),
-        gexp_ui_normalize(),
-        gexp_ui_groups(),
-        gexp_ui_batch(),
-        gexp_ui_results(),
-        gexp_ui_wgcna(),
-        gexp_ui_common_genes(),
-        gexp_ui_ppi(),
-        gexp_ui_ml(),
-        gexp_ui_validation(),
-        gexp_ui_roc(),
-        gexp_ui_nomogram(),
-        gexp_ui_gsea(),
-        gexp_ui_results_summary()
       )
-    )
-  )
 }
-
 gexp_app_ui <- function() {
   if (!requireNamespace("shiny", quietly = TRUE)) {
     stop("Package 'shiny' is required to run the GExPipe app.")
@@ -1059,6 +1062,7 @@ gexp_app_ui <- function() {
   gexp_app_attach_packages()
 
   shiny::fluidPage(
+    gexp_app_head(),
     shinyjs::useShinyjs(),
     shiny::conditionalPanel(condition = "!output.show_analysis", gexp_ui_welcome()),
     shiny::uiOutput("analysis_dashboard")
