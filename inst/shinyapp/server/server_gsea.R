@@ -11,6 +11,7 @@ server_gsea <- function(input, output, session, rv) {
   # are not loaded (e.g., legacy app wiring paths).
   observeEvent(input$next_page_gsea_to_results, {
     shinydashboard::updateTabItems(session, "sidebar_menu", "results_summary")
+    shinyjs::runjs("window.scrollTo(0, 0);")
   })
 
   output$gsea_process_summary_ui <- renderUI({
