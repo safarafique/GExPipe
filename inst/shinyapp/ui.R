@@ -1043,6 +1043,49 @@ ui_analysis <- dashboardPage(
           if (link.length) link.click();
         }
       });
+      function gexpClickSidebarTab(tab) {
+        if (!tab) return;
+        var link = $('a[data-value=\"' + tab + '\"]');
+        if (link.length) link.click();
+      }
+      function gexpResolveNextTab(btnId) {
+        var deMethod = (($('input[name=\"de_method\"]:checked').val() || '') + '').toLowerCase();
+        var datasetMode = (($('input[name=\"dataset_mode\"]:checked').val() || '') + '').toLowerCase();
+        var isCountBased = (deMethod === 'deseq2' || deMethod === 'edger' || deMethod === 'limma_voom');
+        var isSingle = (datasetMode === 'single');
+        if (btnId === 'next_to_normalize') return isCountBased ? 'groups' : 'normalize';
+        if (btnId === 'next_page_groups' || btnId === 'next_to_batch_btn') return isSingle ? 'results' : 'batch';
+        var staticMap = {
+          next_page_download: 'qc',
+          next_page_normalize: 'groups',
+          go_to_groups: 'groups',
+          go_to_groups_from_norm: 'groups',
+          go_to_results: 'results',
+          next_page_batch: 'results',
+          next_page_results: 'wgcna',
+          next_page_wgcna: 'common_genes',
+          next_page_common_genes_end: 'ppi',
+          next_page_common_genes_to_ml: 'ml',
+          next_page_ppi: 'ml',
+          next_page_ml: 'download',
+          next_page_ml_to_roc: 'validation',
+          next_page_ml_to_validation: 'validation',
+          next_page_roc: 'download',
+          next_page_roc_to_nomogram: 'nomogram',
+          next_page_roc_to_gsea: 'gsea',
+          next_page_roc_to_results: 'results_summary',
+          next_page_nomogram_to_gsea: 'gsea',
+          next_page_nomogram_to_results: 'results_summary',
+          next_page_gsea: 'download',
+          next_page_gsea_to_results: 'results_summary'
+        };
+        return staticMap[btnId] || null;
+      }
+      $(document).on('click', 'button[id^=\"next_\"] , #go_to_groups, #go_to_groups_from_norm, #go_to_results, #next_to_batch_btn', function() {
+        var btnId = (this && this.id) ? this.id : '';
+        var targetTab = gexpResolveNextTab(btnId);
+        if (targetTab) gexpClickSidebarTab(targetTab);
+      });
     ")),
     
     tabItems(
