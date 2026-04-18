@@ -898,5 +898,6 @@ server_validation <- function(input, output, session, rv) {
   # ---- Navigation ----
   observeEvent(input$next_page_validation_to_roc, {
     updateTabItems(session, "sidebar_menu", "roc")
+    shinyjs::runjs("window.scrollTo(0, 0);")
   })
 }
