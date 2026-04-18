@@ -23,7 +23,7 @@ Description: Shiny application (GExPipe) for high-throughput genomic analysis of
     STRING data are downloaded on first PPI use (internet required); they cannot be bundled in the package.
 License: MIT + file LICENSE
 Encoding: UTF-8
-Depends: R (>= 4.6.0)
+Depends: R (>= 4.5.0)
 biocViews: Software, ShinyApps, GeneExpression, RNASeq, Microarray,
     DifferentialExpression, Pathways, Network, Visualization
 URL: https://github.com/safarafique/GExPipe
