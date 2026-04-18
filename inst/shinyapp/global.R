@@ -157,38 +157,35 @@ core_needed <- c(
   FALSE
 }
 
-missing_core <- core_needed[!vapply(core_needed, .gexpipe_has_core_fn, logical(1))]
-if (length(missing_core) > 0) {
-  local_r_files <- c(
-    file.path(getwd(), "..", "..", "R", "gexpipe_shiny_helpers.R"),
-    file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"),
-    file.path(getwd(), "..", "..", "R", "gexp_download_pipeline.R"),
-    file.path(getwd(), "..", "..", "R", "gexp_qc_pipeline.R"),
-    file.path(getwd(), "..", "..", "R", "gexp_normalize_pipeline.R"),
-    file.path(getwd(), "..", "..", "R", "gexp_batch_pipeline.R"),
-    file.path(getwd(), "..", "..", "R", "gexp_de_pipeline.R"),
-    file.path(getwd(), "..", "..", "R", "gexp_wgcna_pipeline.R"),
-    file.path(getwd(), "..", "..", "R", "observers_pipeline.R"),
-    file.path(getwd(), "..", "..", "R", "observers_navigation.R"),
-    file.path(getwd(), "..", "..", "R", "observers_workspace.R"),
-    file.path(getwd(), "..", "..", "R", "observers_help.R"),
-    file.path(getwd(), "R", "gexpipe_shiny_helpers.R"),
-    file.path(getwd(), "R", "utils_shiny_app.R"),
-    file.path(getwd(), "R", "gexp_download_pipeline.R"),
-    file.path(getwd(), "R", "gexp_qc_pipeline.R"),
-    file.path(getwd(), "R", "gexp_normalize_pipeline.R"),
-    file.path(getwd(), "R", "gexp_batch_pipeline.R"),
-    file.path(getwd(), "R", "gexp_de_pipeline.R"),
-    file.path(getwd(), "R", "gexp_wgcna_pipeline.R"),
-    file.path(getwd(), "R", "observers_pipeline.R"),
-    file.path(getwd(), "R", "observers_navigation.R"),
-    file.path(getwd(), "R", "observers_workspace.R"),
-    file.path(getwd(), "R", "observers_help.R")
-  )
-  local_r_files <- unique(local_r_files[file.exists(local_r_files)])
-  for (rf in local_r_files) {
-    tryCatch(source(rf, local = TRUE), error = function(e) NULL)
-  }
+local_r_files <- c(
+  file.path(getwd(), "..", "..", "R", "gexpipe_shiny_helpers.R"),
+  file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"),
+  file.path(getwd(), "..", "..", "R", "gexp_download_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "gexp_qc_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "gexp_normalize_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "gexp_batch_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "gexp_de_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "gexp_wgcna_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "observers_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "observers_navigation.R"),
+  file.path(getwd(), "..", "..", "R", "observers_workspace.R"),
+  file.path(getwd(), "..", "..", "R", "observers_help.R"),
+  file.path(getwd(), "R", "gexpipe_shiny_helpers.R"),
+  file.path(getwd(), "R", "utils_shiny_app.R"),
+  file.path(getwd(), "R", "gexp_download_pipeline.R"),
+  file.path(getwd(), "R", "gexp_qc_pipeline.R"),
+  file.path(getwd(), "R", "gexp_normalize_pipeline.R"),
+  file.path(getwd(), "R", "gexp_batch_pipeline.R"),
+  file.path(getwd(), "R", "gexp_de_pipeline.R"),
+  file.path(getwd(), "R", "gexp_wgcna_pipeline.R"),
+  file.path(getwd(), "R", "observers_pipeline.R"),
+  file.path(getwd(), "R", "observers_navigation.R"),
+  file.path(getwd(), "R", "observers_workspace.R"),
+  file.path(getwd(), "R", "observers_help.R")
+)
+local_r_files <- unique(local_r_files[file.exists(local_r_files)])
+for (rf in local_r_files) {
+  tryCatch(source(rf, local = TRUE), error = function(e) NULL)
 }
 
 missing_core <- core_needed[!vapply(core_needed, .gexpipe_has_core_fn, logical(1))]
