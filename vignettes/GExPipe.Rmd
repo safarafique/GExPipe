@@ -1,17 +1,13 @@
 ---
-title: "Getting Started with GExPipe"
-author: "Safa Rafique, Naeem Mehmood Ashraf, Farooq Sabir"
+title: "GExPipe: A Pipeline for Gene Expression Analysis"
+author: "Safa Rafique"
 date: "`r Sys.Date()`"
 output:
   BiocStyle::html_document:
     toc: true
-    number_sections: true
-    toc_float: true
-    toc_depth: 3
-package: GExPipe
-bibliography: ../inst/references.bib
+    toc_depth: 2
 vignette: >
-  %\VignetteIndexEntry{GExPipe}
+  %\VignetteIndexEntry{1. Introduction to GExPipe}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -22,922 +18,177 @@ knitr::opts_chunk$set(
   comment = "#>",
   warning = FALSE,
   message = FALSE,
-  fig.width = 6,
-  fig.height = 4
+  fig.width = 7,
+  fig.height = 5
 )
-set.seed(123)
-# Cap WGCNA parallelism during vignette builds (Bioconductor / CRAN check machines).
-if (requireNamespace("WGCNA", quietly = TRUE)) {
-  WGCNA::disableWGCNAThreads()
-}
 ```
 
 # Introduction
 
-`GExPipe` is an **R** package and **Shiny** application for end-to-end analysis of **bulk RNA-seq** and **microarray** gene expression data. It targets GEO-archived studies and integrates quality control, normalization, batch correction, WGCNA, pathway analysis, and downstream machine learning in one workflow. Studies in the [Gene Expression Omnibus (GEO)](https://www.ncbi.nlm.nih.gov/geo/) [@edgar2002gene] are a primary use case. The interactive app guides users through download, QC, normalization, batch correction, differential expression, co-expression network analysis (WGCNA), pathway enrichment (e.g. **clusterProfiler** [@yu2012clusterprofiler]), protein–protein interaction mining, and machine learning–based biomarker exploration.
+`GExPipe` is a Shiny-first workflow for bulk RNA-seq and microarray analysis. The package was created to provide a single, guided pipeline that connects data retrieval, quality control, normalization, differential expression, network analysis, and downstream interpretation without requiring users to manually stitch many separate tools together.
 
-Exported **R** functions mirror the app so workflows can be scripted, tested, and reproduced outside the GUI—aligned with Bioconductor expectations for Shiny software packages [@chang2024shiny]. Differential expression uses **limma** [@ritchie2015limma] and, when appropriate, **DESeq2** [@love2014moderated] and **edgeR**. WGCNA-related steps follow standard weighted correlation network practice [@langfelder2008wgcna].
+Within Bioconductor, `GExPipe` builds on established infrastructure such as `r BiocStyle::Biocpkg("GEOquery")`, `r BiocStyle::Biocpkg("limma")`, `r BiocStyle::Biocpkg("DESeq2")`, `r BiocStyle::Biocpkg("edgeR")`, `r BiocStyle::Biocpkg("WGCNA")`, and `r BiocStyle::Biocpkg("clusterProfiler")`. Compared with piecemeal scripts, the app emphasizes usability and reproducibility through a fixed step-by-step interface and integrated summaries.
 
-This vignette uses **bundled example matrices and sample metadata** through **WGCNA preparation**, then **downstream steps** matching the Shiny app’s **Common genes**, **GO/KEGG**, **PPI**, **machine learning**, **ROC**, **validation**, and **GSEA** tabs (`clusterProfiler`, `org.Hs.eg.db`, `STRINGdb`, `randomForest`, `pROC`, `msigdbr`, etc.). **STRING** and **KEGG REST** calls are wrapped in `tryCatch()` so builds succeed offline. For GEO download examples, see the optional section at the end of this vignette.
-
-# Pipeline flow (all app steps)
-
-This vignette follows the app flow end-to-end. The downstream sections are runnable during knitting, with network-dependent steps handled safely.
-
-- **Step 1**: Parse GEO IDs and analysis settings
-- **Step 2**: Quality control
-- **Step 3**: Normalization
-- **Step 4**: Group assignment
-- **Step 5**: Batch correction
-- **Step 6**: Differential expression
-- **Step 7**: WGCNA preparation
-- **Step 8**: Common genes (DEG intersection)
-- **Step 9**: GO/KEGG enrichment and PPI
-- **Step 10**: Machine learning
-- **Step 11**: Validation
-- **Step 12**: ROC
-- **Step 13**: Nomogram-style risk modeling
-- **Step 14**: GSEA (including MsigDB inputs)
-- **Step 15**: Results summary
+This vignette is user-oriented: it explains how to install, launch, and run a minimal executable workflow using package-bundled example data.
 
 # Installation
 
-**GExPipe** depends on core Bioconductor packages (**limma**, **DESeq2**, **clusterProfiler**, and others). Use **BiocManager** so versions stay compatible with your R installation. Once **GExPipe** is available from Bioconductor, install with:
+Install `GExPipe` with `BiocManager`:
 
-```{r install-gexpipe-bioc-note, eval=FALSE}
-if (!requireNamespace("BiocManager", quietly = TRUE)) {
-  install.packages("BiocManager")
-}
-BiocManager::install("GExPipe", dependencies = TRUE)
+```{r install, eval=FALSE}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("GExPipe")
 ```
 
-For development builds, install **GExPipe** (including the Shiny app) from GitHub: [https://github.com/safarafique/GExPipe](https://github.com/safarafique/GExPipe).
+# Launch the Shiny app
 
-```{r install-gexpipe-github, eval=FALSE}
-devtools::install_github("safarafique/GExPipe")
+`runGExPipe()` returns a Shiny app object. Start it with `shiny::runApp()`.
+
+```{r launch-app, eval=FALSE}
+app <- GExPipe::runGExPipe(launch.browser = TRUE, port = 3838L)
+shiny::runApp(app, port = 3838L)
 ```
 
-# Quick Start (GEO workflow)
+# Workflow Example (evaluated)
 
-## Load packages
+This section demonstrates three core tasks with bundled data:
 
-```{r library-import, message=FALSE}
-library(BiocStyle)
-if (requireNamespace("GExPipe", quietly = TRUE)) {
-  library(GExPipe)
-} else {
-  if (!requireNamespace("pkgload", quietly = TRUE)) {
-    stop(
-      "GExPipe is not installed. Install it, or install 'pkgload' ",
-      "and run from the package root to load from source."
-    )
-  }
-  pkgload::load_all(".", quiet = TRUE, export_all = FALSE)
-}
-library(clusterProfiler)
-library(org.Hs.eg.db)
+- loading expression and metadata tables,
+- running basic processing suitable for downstream analysis,
+- visualizing results (PCA and expression heatmap).
+
+## Load package and example data
+
+```{r load-data}
+library(GExPipe)
 library(ggplot2)
-library(randomForest)
-library(pROC)
-library(msigdbr)
-library(STRINGdb)
-```
 
-# Bundled example data
+expr_path <- system.file("extdata", "vignette_expression.csv", package = "GExPipe")
+meta_path <- system.file("extdata", "vignette_sample_metadata.csv", package = "GExPipe")
 
-Expression and phenotype tables live in `inst/extdata`. The helper below resolves paths both from an installed package and from a source checkout.
+stopifnot(nzchar(expr_path), file.exists(expr_path))
+stopifnot(nzchar(meta_path), file.exists(meta_path))
 
-```{r read-extdata}
-vignette_extdata_file <- function(name) {
-  p <- system.file("extdata", name, package = "GExPipe")
-  if (nzchar(p) && file.exists(p)) {
-    return(p)
-  }
-  candidates <- c(
-    file.path(getwd(), "..", "inst", "extdata", name),
-    file.path(getwd(), "..", "..", "inst", "extdata", name),
-    file.path(getwd(), "inst", "extdata", name)
-  )
-  hits <- candidates[file.exists(candidates)]
-  if (length(hits) == 0L) {
-    stop("Could not find bundled vignette file: ", name)
-  }
-  normalizePath(hits[1], winslash = "/", mustWork = TRUE)
-}
+expr_tab <- read.csv(expr_path, check.names = FALSE, stringsAsFactors = FALSE)
+meta_tab <- read.csv(meta_path, check.names = FALSE, stringsAsFactors = FALSE)
 
-expr_path <- vignette_extdata_file("vignette_expression.csv")
-meta_path <- vignette_extdata_file("vignette_sample_metadata.csv")
-
-tab <- read.csv(expr_path, check.names = FALSE, stringsAsFactors = FALSE)
-meta <- read.csv(meta_path, check.names = FALSE, stringsAsFactors = FALSE)
-
-expr <- as.matrix(tab[, -1, drop = FALSE])
+expr <- as.matrix(expr_tab[, -1, drop = FALSE])
 storage.mode(expr) <- "numeric"
-rownames(expr) <- tab[[1]]
+rownames(expr) <- expr_tab[[1]]
 colnames(expr) <- gsub("^X", "", colnames(expr))
 
-rownames(meta) <- meta$SampleID
-meta <- meta[colnames(expr), , drop = FALSE]
+rownames(meta_tab) <- meta_tab$SampleID
+meta_tab <- meta_tab[colnames(expr), , drop = FALSE]
 
 dim(expr)
-head(meta)
+head(meta_tab)
 ```
 
-# Step 1: Parse GEO study identifiers
+## Process data with core pipeline helpers
 
-The same identifiers you would type into Step 1 of the app can be parsed programmatically (comma-separated **GSE** IDs, platform mode, DE method).
+```{r process-data}
+if (!"Dataset" %in% colnames(meta_tab)) {
+  meta_tab$Dataset <- "D1"
+}
 
-When you run `parse-gse-inputs`, you should see parsed GSE IDs in `parsed$rnaseq_ids` and `parsed$micro_ids`. The next chunk `parse-gse-expected` verifies that those vectors contain the inputs used in this vignette.
-
-```{r parse-gse-inputs}
-parsed <- gexp_parse_gse_inputs(
-  analysis_type = "merged",
-  rnaseq_gses = "GSE50760",
-  microarray_gses = "GSE89076",
-  dataset_mode = "multi"
+micro_expr_list <- split(
+  x = as.data.frame(expr, check.names = FALSE),
+  f = meta_tab$Dataset
 )
-parsed$rnaseq_ids
-parsed$micro_ids
-```
+micro_expr_list <- lapply(micro_expr_list, function(df) as.matrix(df))
 
-Example used in this vignette:
+# Rebuild per-dataset matrices with genes as rows and samples as columns.
+for (ds in names(micro_expr_list)) {
+  sample_ids <- rownames(meta_tab)[meta_tab$Dataset == ds]
+  micro_expr_list[[ds]] <- expr[, sample_ids, drop = FALSE]
+}
 
-- RNA-seq input: `"GSE50760"`
-- Microarray input: `"GSE89076"`
-
-For these inputs, the parsed result should include:
-
-```{r parse-gse-expected}
-stopifnot("GSE50760" %in% parsed$rnaseq_ids)
-stopifnot("GSE89076" %in% parsed$micro_ids)
-
-data.frame(
-  Input = c("rnaseq_gses", "microarray_gses"),
-  Entered = c("GSE50760", "GSE89076"),
-  Parsed_IDs = c(
-    paste(parsed$rnaseq_ids, collapse = ", "),
-    paste(parsed$micro_ids, collapse = ", ")
-  ),
-  stringsAsFactors = FALSE
-)
-```
-
-Possible outcomes at this step are:
-
-- valid IDs are parsed and carried forward,
-- empty inputs return empty ID vectors,
-- malformed IDs are ignored or flagged by downstream download checks.
-
-# Steps 2-4: QC, normalization, and group setup
-
-For reproducible package checks, the main workflow below uses bundled example matrices from `inst/extdata` (offline-safe and deterministic).
-
-Running `normalize-intersect` creates `norm$combined_expr` (normalized expression used downstream) and `norm$common_genes` (genes retained for DE/ML/WGCNA). Running `prepare-metadata` builds `um` and derives `um$Condition` from SampleID (with deterministic label balancing for the bundled example).
-
-```{r normalize-intersect}
-source_note <- "Using bundled example data (check-friendly)."
-cols_d1 <- rownames(meta)[meta$Dataset == "D1"]
-cols_d2 <- rownames(meta)[meta$Dataset == "D2"]
-micro_expr_list <- list(
-  D1 = expr[, cols_d1, drop = FALSE],
-  D2 = expr[, cols_d2, drop = FALSE]
-)
-rna_counts_list <- list()
-
-norm <- gexp_normalize_and_intersect(
+norm_res <- gexp_normalize_and_intersect(
   micro_expr_list = micro_expr_list,
-  rna_counts_list = rna_counts_list,
+  rna_counts_list = list(),
   micro_norm_method = "quantile",
   rnaseq_norm_method = "TMM",
   de_method = "limma"
 )
 
-source_note
-dim(norm$combined_expr)
-length(norm$common_genes)
+dim(norm_res$combined_expr)
+length(norm_res$common_genes)
 ```
 
-```{r prepare-metadata}
-um <- norm$unified_metadata
+## Visualize processed data
 
-infer_condition <- function(x) {
-  x <- tolower(as.character(x))
-  ifelse(
-    grepl("control|normal|healthy|wild.?type|wt", x),
-    "Normal",
-    ifelse(grepl("disease|tumou?r|cancer|case|patient|treated|knockout|ko", x), "Disease", NA_character_)
-  )
-}
+```{r pca-plot}
+pca <- prcomp(t(norm_res$combined_expr), center = TRUE, scale. = TRUE)
 
-cond_from_id <- infer_condition(um$SampleID)
-if (all(is.na(cond_from_id))) {
-  # Deterministic fallback to keep runnable flow when labels are absent.
-  ds <- unique(um$Dataset)
-  cond_from_id <- ifelse(um$Dataset == ds[1], "Normal", "Disease")
-}
-
-um$Condition <- cond_from_id
-ctab <- table(um$Dataset, um$Condition)
-# Auto-balance labels for demonstration if Dataset and Condition are perfectly confounded.
-if (all(rowSums(ctab > 0) <= 1) || all(colSums(ctab > 0) <= 1)) {
-  for (ds in unique(um$Dataset)) {
-    idx <- which(um$Dataset == ds)
-    if (length(idx) >= 2L) {
-      half <- floor(length(idx) / 2)
-      um$Condition[idx] <- "Disease"
-      um$Condition[idx][seq_len(half)] <- "Normal"
-    }
-  }
-  source_note <- paste0(source_note, " Auto-balanced Condition labels for demonstration outputs.")
-}
-table(um$Dataset, um$Condition)
-```
-
-In small bundled examples, `Dataset` and `Condition` can be strongly aligned (confounded). When that happens, downstream DE/ML models may return conservative or empty outputs (this is expected for check-safe data).
-
-Optional demonstration remapping (manual, not run during checks):
-
-```{r optional-remap-condition, eval=FALSE}
-# If you want richer DE/ML outputs in a local demo, remap a few samples
-# so each dataset contains both Normal and Disease labels.
-#
-# Example strategy:
-# flip_idx <- which(um$Dataset == "D1")[1:2]
-# um$Condition[flip_idx] <- "Disease"
-# flip_idx2 <- which(um$Dataset == "D2")[1:2]
-# um$Condition[flip_idx2] <- "Normal"
-#
-# table(um$Dataset, um$Condition)
-```
-
-## Step 2 QC checks (helper outputs)
-
-The `qc-helpers` chunk computes an outlier summary (`qc_out$all_outliers`) and a gene-overlap summary (`qc_summary`) between the DE gene universe and the WGCNA candidate universe. If these outputs look sparse, that usually reflects the small bundled example dataset used for check-safe execution.
-
-```{r qc-helpers}
-qc_out <- gexp_qc_detect_outliers(norm$combined_expr, top_n = 100)
-length(qc_out$all_outliers)
-
-qc_summary <- gexp_qc_gene_overlap_summary(
-  all_genes_list = list(
-    D1 = rownames(micro_expr_list$D1),
-    D2 = rownames(micro_expr_list$D2)
-  ),
-  common_genes = norm$common_genes
-)
-qc_summary
-```
-
-# Step 5: Batch correction
-
-After integration, batch effects (e.g. **Dataset**) can still dominate variation. **Batch correction** adjusts expression while retaining biological signal; you should verify that samples cluster more by **Condition** (or phenotype) than by batch.
-
-When you run `batch-correct`, the printed dimensions (`dim(batch_res$expr_filtered)` and `dim(batch_res$batch_corrected)`) reflect gene filtering and the corrected expression matrix that the following PCA and DE steps use.
-
-```{r batch-correct}
-batch_res <- gexp_batch_correct(
-  expr = norm$combined_expr,
-  metadata = um[, c("Dataset", "Condition")],
-  variance_percentile = 25,
-  method = "limma"
-)
-
-dim(batch_res$expr_filtered)
-dim(batch_res$batch_corrected)
-```
-
-## PCA visualization (post-batch correction)
-
-A quick **PCA** on batch-corrected values helps confirm that correction worked as intended (e.g. **Condition**-driven separation visible; **Dataset** less dominant than before correction in exploratory plots).
-
-```{r batch-correct-pca, fig.cap = "PCA of samples after batch correction (bundled example data)."}
-sx <- colnames(batch_res$batch_corrected)
-bc <- batch_res$batch_corrected
-pca_fit <- prcomp(t(bc), center = TRUE, scale. = TRUE)
 pca_df <- data.frame(
-  PC1 = pca_fit$x[sx, 1L],
-  PC2 = pca_fit$x[sx, 2L],
-  Dataset = um[sx, "Dataset", drop = TRUE],
-  Condition = um[sx, "Condition", drop = TRUE],
-  row.names = sx,
+  Sample = rownames(pca$x),
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  Dataset = meta_tab[rownames(pca$x), "Dataset", drop = TRUE],
   stringsAsFactors = FALSE
 )
 
-ggplot(pca_df, aes(x = PC1, y = PC2, color = Condition, shape = Dataset)) +
+ggplot(pca_df, aes(PC1, PC2, color = Dataset)) +
   geom_point(size = 3) +
   theme_minimal() +
   labs(
-    title = "PCA: post-batch correction",
-    subtitle = "Samples should cluster more by Condition than by Dataset"
+    title = "PCA of bundled example data",
+    subtitle = "After normalization and gene intersection"
   )
 ```
 
-# Step 6: Differential expression
+```{r heatmap-plot}
+top_var <- order(apply(norm_res$combined_expr, 1, var, na.rm = TRUE), decreasing = TRUE)
+top_var <- head(top_var, min(30L, length(top_var)))
 
-Running `run-de` fits the limma model and populates `de_res$de_results` (including `logFC`, `adj.P.Val`, and a `Significance` label). The table and `head(...)` shown below give you a quick sense of how many genes are detected as significant in this bundled example.
-
-```{r run-de}
-de_res <- gexp_run_de(
-  expr = batch_res$batch_corrected,
-  metadata = um[, c("Dataset", "Condition")],
-  method = "limma",
-  logfc_cutoff = 0.25,
-  padj_cutoff = 0.10
-)
-
-de_df <- de_res$de_results
-table(de_df$Significance)
-head(de_df[, c("Gene", "logFC", "adj.P.Val", "Significance")], 8)
-```
-
-# Step 7: WGCNA preparation
-
-The `wgcna-prepare` chunk converts the corrected expression into `wgcna_prep$datExpr` (samples x genes, ready for WGCNA) and computes `wgcna_prep$gene_variance_table` to support gene selection. The printed `dim(wgcna_prep$datExpr)` should align with the gene subset used later for common-genes overlap.
-
-```{r wgcna-prepare}
-wgcna_prep <- gexp_wgcna_prepare(
-  expr = batch_res$batch_corrected,
-  metadata = um,
-  gene_mode = "top_variable",
-  top_genes = min(100L, nrow(batch_res$batch_corrected)),
-  min_samples_frac = 0.5
-)
-
-dim(wgcna_prep$datExpr)
-head(wgcna_prep$gene_variance_table, 3)
-```
-
-# Step 8: Common genes (DEG and WGCNA overlap)
-
-In the app (**Step 8**), **common genes** are the intersection of **significant DEGs** (differential expression) and genes that fall in **trait-related WGCNA modules**. This vignette uses the same idea in compact form: significant DEGs ∩ genes kept in `gexp_wgcna_prepare()` output (`wgcna_prep$datExpr`). We also summarize overlap with **`gexp_qc_gene_overlap_summary()`** (exported helper used in QC logic).
-
-After you run `common-genes`, `length(common_genes)` is the number of genes retained for downstream pathway enrichment, STRING PPI, ML, and GSEA inputs (mirroring the app flow).
-
-```{r common-genes}
-deg_genes <- unique(de_df$Gene[de_df$Significance != "Not Significant"])
-# gexp_wgcna_prepare() returns datExpr as samples x genes, so gene names are columns.
-wgcna_genes <- colnames(wgcna_prep$datExpr)
-common_genes <- intersect(deg_genes, wgcna_genes)
-
-if (length(common_genes) < 5L) {
-  deg_genes <- head(de_df$Gene[order(de_df$adj.P.Val)], 40)
-  common_genes <- intersect(deg_genes, wgcna_genes)
-}
-
-length(common_genes)
-head(common_genes, 10)
-
-gexp_qc_gene_overlap_summary(
-  all_genes_list = list(DEG = deg_genes, WGCNA = wgcna_genes),
-  common_genes = common_genes
-)
-```
-
-The app also offers **Venn** and **UpSet** views for the same lists; this vignette sticks to **tables** only.
-
-```{r common-genes-upset-check}
-up_meta <- gexp_qc_prepare_upset_data(list(DEG = deg_genes, WGCNA = wgcna_genes))
-up_meta$ok ## TRUE when both lists are non-empty (data ready for UpSet in the app)
-```
-
-# Step 9: Gene Ontology enrichment (BP, MF, CC)
-
-We map **gene symbols** to **Entrez IDs** with `clusterProfiler::bitr()`, then run **`enrichGO()`** separately for **Biological Process**, **Molecular Function**, and **Cellular Component**—the same ORA pattern as the app’s GO panels on the **common-genes** path.
-
-After these chunks, `go-tables` prints a small “top terms” preview (term descriptions and p-values) for each ontology when results are available.
-
-```{r go-map-ids}
-eg <- tryCatch(
-  clusterProfiler::bitr(
-    common_genes,
-    fromType = "SYMBOL",
-    toType = "ENTREZID",
-    OrgDb = org.Hs.eg.db::org.Hs.eg.db
-  ),
-  error = function(e) data.frame(SYMBOL = character(), ENTREZID = character())
-)
-nrow(eg)
-```
-
-```{r go-enrichment-all}
-go_params <- list(
-  OrgDb = org.Hs.eg.db::org.Hs.eg.db,
-  pAdjustMethod = "BH",
-  pvalueCutoff = 0.2,
-  qvalueCutoff = 0.3,
-  readable = TRUE
-)
-
-ego_list <- if (nrow(eg) == 0L) {
-  list(BP = NULL, MF = NULL, CC = NULL)
-} else {
-  lapply(c(BP = "BP", MF = "MF", CC = "CC"), function(ont) {
-    tryCatch(
-      do.call(
-        clusterProfiler::enrichGO,
-        c(list(gene = eg$ENTREZID, ont = ont), go_params)
-      ),
-      error = function(e) NULL
-    )
-  })
-}
-
-vapply(ego_list, function(x) if (is.null(x)) 0L else nrow(as.data.frame(x)), integer(1))
-```
-
-```{r go-tables}
-for (nm in names(ego_list)) {
-  ed <- if (is.null(ego_list[[nm]])) data.frame() else as.data.frame(ego_list[[nm]])
-  cat("## ", nm, " — n terms:", nrow(ed), "\n", sep = "")
-  if (nrow(ed) > 0L) {
-    show_cols <- intersect(c("Description", "pvalue", "p.adjust", "Count"), names(ed))
-    print(head(ed[, show_cols, drop = FALSE], 3))
-  }
-}
-```
-
-# Step 9: KEGG pathway enrichment (over-representation)
-
-`enrichKEGG()` uses the **KEGG REST API** (needs **network** access for live queries). The chunk always runs; if you are offline or the service is unreachable, the result is empty.
-
-```{r kegg-enrichment}
-ekegg <- if (nrow(eg) == 0L) {
-  NULL
-} else {
-  tryCatch(
-    clusterProfiler::enrichKEGG(
-      gene = eg$ENTREZID,
-      organism = "hsa",
-      pvalueCutoff = 0.2,
-      qvalueCutoff = 0.3
-    ),
-    error = function(e) NULL
+if (length(top_var) > 1L) {
+  pheatmap::pheatmap(
+    norm_res$combined_expr[top_var, , drop = FALSE],
+    scale = "row",
+    main = "Top variable genes (bundled example)"
   )
 }
-
-kegg_df <- if (!is.null(ekegg)) as.data.frame(ekegg) else data.frame()
-nrow(kegg_df)
-if (nrow(kegg_df) > 0L) {
-  head(kegg_df[, intersect(c("ID", "Description", "p.adjust", "Count"), names(kegg_df))], 5)
-}
 ```
 
-# Step 9: Protein-protein interactions (STRING)
+# App walkthrough checklist
 
-The **PPI** tab maps your gene list to **STRING** identifiers and retrieves **experimental / database** edges above a score threshold. Below we cap the query size for speed; increase `head(common_genes, …)` for a fuller network when online.
+For real analyses in the Shiny app, use this sequence:
 
-After `ppi-string`, the vignette prints `ppi_res$msg` and `ppi_res$n_edges` so you can confirm whether STRING mappings and interaction retrieval succeeded for the current gene list.
+1. Step 1: select platform and GEO IDs, then start processing.
+2. Step 2: review QC plots and outliers.
+3. Step 3-5: normalize, define groups, and handle batch effects.
+4. Step 6-8: run DE, WGCNA, and compute common genes.
+5. Step 9-15: enrichment, PPI, ML, validation, ROC/nomogram, GSEA, and summary.
 
-```{r ppi-string}
-ppi_res <- tryCatch(
-  {
-    if (length(common_genes) < 3L) {
-      stop("Need at least three common genes for STRING.")
-    }
-    string_db <- STRINGdb$new(version = "12", species = 9606, score_threshold = 400)
-    mapped <- string_db$map(
-      data.frame(gene = head(common_genes, 120L)),
-      "gene",
-      removeUnmappedRows = TRUE
-    )
-    if (nrow(mapped) < 2L) {
-      stop("Too few STRING mappings for this gene list.")
-    }
-    hits <- string_db$get_interactions(mapped$STRING_id)
-    list(
-      n_edges = nrow(hits),
-      msg = paste0("Retrieved ", nrow(hits), " STRING interaction rows (score ≥ 400).")
-    )
-  },
-  error = function(e) {
-    list(n_edges = NA_integer_, msg = paste0("PPI skipped: ", conditionMessage(e)))
-  }
+# Optional screenshots in this vignette
+
+If screenshots are placed under `inst/extdata/vignette-screenshots/`, they are rendered below.
+
+```{r screenshots, echo=FALSE}
+shot_dir <- system.file("extdata", "vignette-screenshots", package = "GExPipe")
+shot_files <- c(
+  "step1_download.png",
+  "step2_qc.png",
+  "step6_de.png",
+  "step9_ppi.png",
+  "step15_summary.png"
 )
 
-ppi_res$msg
-ppi_res$n_edges
-```
-
-# Step 10: Machine learning (supervised classification)
-
-**Step 10 (ML)** in the app lets you choose one or more machine learning methods (LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA, and XGBoost+SHAP). The app runs the selected methods, produces a gene list per method, and uses a **Venn/UpSet** view to show the overlap of genes across methods (the final overlap drives ROC/validation downstream).
-
-Here, to keep the vignette check-safe and fast, we run a lightweight **Random Forest** proxy (`ml-rf`). We then draw a Venn diagram comparing the bundled-example gene sets:
-- DEG gene set (significant DEGs),
-- WGCNA gene set (WGCNA candidates),
-- ML (RF) feature set (`genes_ml`).
-
-When you run `ml-rf`, the object `rf_fit` is printed, and if importance scores are present we show the top genes by `MeanDecreaseGini`.
-
-```{r ml-rf}
-genes_ml <- common_genes[seq_len(min(25L, length(common_genes)))]
-sid <- colnames(batch_res$batch_corrected)
-X <- t(batch_res$batch_corrected[genes_ml, sid, drop = FALSE])
-y <- factor(um[sid, "Condition"], levels = c("Normal", "Disease"))
-
-X[!is.finite(X)] <- NA
-keep <- stats::complete.cases(X) & !is.na(y)
-X <- X[keep, , drop = FALSE]
-y <- droplevels(y[keep])
-
-if (ncol(X) > 0L) {
-  vr <- apply(X, 2L, function(z) stats::var(z, na.rm = TRUE))
-  okc <- is.finite(vr) & vr > 0
-  X <- if (any(okc)) X[, okc, drop = FALSE] else X[, integer(), drop = FALSE]
-}
-
-rf_fit <- if (isTRUE(nrow(X) >= 3L) && ncol(X) >= 1L && length(unique(y)) >= 2L) {
-  tryCatch(
-    randomForest::randomForest(x = X, y = y, ntree = 150L, importance = TRUE),
-    error = function(e) NULL
-  )
-} else {
-  NULL
-}
-rf_fit
-
-if (!is.null(rf_fit) && !is.null(rf_fit$importance) && nrow(rf_fit$importance) > 0L) {
-  imp <- as.data.frame(rf_fit$importance)
-  imp$Gene <- rownames(imp)
-  imp <- imp[order(imp$MeanDecreaseGini, decreasing = TRUE), , drop = FALSE]
-  head(imp[, c("Gene", "MeanDecreaseGini"), drop = FALSE], min(12L, nrow(imp)))
-}
-```
-
-# ML gene overlap (Venn diagram)
-
-```{r ml-venn-diagram, echo=FALSE, fig.cap="Venn overlap: DEG vs WGCNA vs ML (RF) feature set (bundled example)."}
-ml_venn_sets <- list(
-  DEG = unique(deg_genes),
-  WGCNA = unique(wgcna_genes),
-  ML_RF = unique(genes_ml)
-)
-
-if (all(vapply(ml_venn_sets, length, integer(1L)) == 0L)) {
-  "Venn not drawn: bundled example produced empty gene sets."
-} else {
-  venn_grob <- tryCatch(
-    VennDiagram::venn.diagram(
-      x = ml_venn_sets,
-      filename = NULL,
-      imagetype = "png",
-      output = TRUE,
-      fill = c("#4DB6AC", "#9575CD", "#90CAF9"),
-      alpha = 0.5,
-      cex = 1.1,
-      cat.cex = 1.1
-    ),
-    error = function(e) NULL
-  )
-  if (!is.null(venn_grob)) {
-    grid::grid.newpage()
-    grid::grid.draw(venn_grob)
-  } else {
-    "Venn diagram failed to render for the current bundled inputs."
-  }
-}
-```
-
-# Step 11: Validation
-
-**Step 11 (Validation)** in the app supports two validation modes:
-
-- **Internal validation (70/30 split)**: no extra dataset download. ROC is computed on the training portion, and the nomogram uses a stratified **70% training / 30% validation** split.
-- **External validation (independent cohort)**: uses an independent dataset (from Step 11 in the app). The model is trained using all available samples, and performance is evaluated on the **external** cohort (**no 70/30 split**).
-
-In this vignette (check-safe and offline-friendly), we demonstrate the **external** path by simulating it with bundled data: **Dataset D1** is treated as **training** and **Dataset D2** as the **external test**, using the same `common_genes` subset and shared **Condition** labels.
-
-Running `validation-external-style` prints `val_txt`, which is either an AUC message (when a valid model and ROC object are available) or a “Validation not run” message when the bundled example doesn’t meet the minimum data requirements.
-
-```{r validation-external-style}
-val_auc <- NA_real_
-val_txt <- "Validation not run."
-
-genes_val <- common_genes[seq_len(min(20L, length(common_genes)))]
-sid_tr <- intersect(rownames(um)[um$Dataset == "D1"], colnames(batch_res$batch_corrected))
-sid_te <- intersect(rownames(um)[um$Dataset == "D2"], colnames(batch_res$batch_corrected))
-
-if (length(genes_val) >= 5L && length(sid_tr) >= 3L && length(sid_te) >= 2L) {
-  Xtr <- t(batch_res$batch_corrected[genes_val, sid_tr, drop = FALSE])
-  ytr <- droplevels(factor(um[sid_tr, "Condition"]))
-  Xte <- t(batch_res$batch_corrected[genes_val, sid_te, drop = FALSE])
-  yte <- factor(um[sid_te, "Condition"], levels = levels(ytr))
-
-  keep_tr <- stats::complete.cases(Xtr) & !is.na(ytr)
-  Xtr <- Xtr[keep_tr, , drop = FALSE]
-  ytr <- droplevels(ytr[keep_tr])
-
-  if (ncol(Xtr) > 0L) {
-    vr <- apply(Xtr, 2L, function(z) stats::var(z, na.rm = TRUE))
-    ok <- is.finite(vr) & vr > 0
-    Xtr <- Xtr[, ok, drop = FALSE]
-    Xte <- Xte[, colnames(Xtr), drop = FALSE]
-  }
-
-  keep_te <- stats::complete.cases(Xte) & !is.na(yte)
-  Xte <- Xte[keep_te, , drop = FALSE]
-  yte <- droplevels(yte[keep_te])
-
-  if (ncol(Xtr) >= 1L && nrow(Xtr) >= 3L && length(unique(ytr)) >= 2L && nrow(Xte) >= 1L) {
-    fit_ext <- tryCatch(
-      randomForest::randomForest(x = Xtr, y = ytr, ntree = 150L),
-      error = function(e) NULL
-    )
-    if (!is.null(fit_ext)) {
-      pr <- tryCatch(predict(fit_ext, Xte, type = "prob"), error = function(e) NULL)
-      if (is.matrix(pr) && "Disease" %in% colnames(pr) && length(unique(yte)) >= 2L) {
-        roc_te <- tryCatch(
-          pROC::roc(yte, pr[, "Disease"], quiet = TRUE, levels = levels(ytr)),
-          error = function(e) NULL
-        )
-        if (!is.null(roc_te)) {
-          val_auc <- as.numeric(pROC::auc(roc_te))
-          val_txt <- sprintf(
-            "Held-out dataset D2: AUC = %.3f (train D1 / test D2, %d genes).",
-            val_auc,
-            ncol(Xtr)
-          )
-        }
-      }
+if (nzchar(shot_dir)) {
+  for (nm in shot_files) {
+    p <- file.path(shot_dir, nm)
+    if (file.exists(p)) {
+      cat("\n\n## ", nm, "\n\n", sep = "")
+      print(knitr::include_graphics(p))
     }
   }
 }
-
-val_txt
 ```
 
-# Step 12: ROC curve (discrimination)
+# Session Information
 
-**Step 12 (ROC)** uses predicted probabilities vs true labels. We use **training-set** probabilities from the forest model as an illustrative example. For unbiased performance, prefer cross-validation or a held-out dataset.
-
-After `roc-demo`, `roc_auc_txt` summarizes the computed AUC (or explains why it could not be computed).
-
-```{r roc-demo}
-roc_auc_txt <- "ROC / AUC not computed."
-if (!is.null(rf_fit)) {
-  oob <- tryCatch(
-    predict(rf_fit, type = "prob"),
-    error = function(e) NULL
-  )
-  if (!is.null(oob) && is.matrix(oob) && ncol(oob) >= 2L && "Disease" %in% colnames(oob)) {
-    roc_obj <- tryCatch(
-      pROC::roc(response = y, predictor = oob[, "Disease"], quiet = TRUE),
-      error = function(e) NULL
-    )
-    if (!is.null(roc_obj)) {
-      roc_auc_txt <- sprintf(
-        "AUC (training predictions, illustrative) = %.4f",
-        as.numeric(pROC::auc(roc_obj))
-      )
-    }
-  }
-}
-roc_auc_txt
-```
-
-# Step 13: Nomogram-style risk model (lightweight)
-
-The app's nomogram tab is designed for clinical risk presentation. In this vignette, we provide a lightweight, fully runnable proxy using logistic regression to estimate disease risk from top genes.
-
-When you run `nomogram-proxy`, `nomo_txt` reports whether the proxy fit succeeded; if it does, `nomo_df` contains the coefficient table used for the risk-style summary.
-
-```{r nomogram-proxy}
-nomo_txt <- "Nomogram-style model not run."
-nomo_df <- data.frame()
-
-if (exists("imp") && is.data.frame(imp) && nrow(imp) > 0L) {
-  topg <- head(imp$Gene, min(6L, nrow(imp)))
-  sx <- colnames(batch_res$batch_corrected)
-  Xn <- t(batch_res$batch_corrected[topg, sx, drop = FALSE])
-  yn <- factor(um[sx, "Condition"], levels = c("Normal", "Disease"))
-  keep_n <- stats::complete.cases(Xn) & !is.na(yn)
-  Xn <- Xn[keep_n, , drop = FALSE]
-  yn <- droplevels(yn[keep_n])
-  if (nrow(Xn) >= 10L && ncol(Xn) >= 2L && length(unique(yn)) == 2L) {
-    dfn <- data.frame(y = yn, Xn, check.names = FALSE)
-    fit_n <- tryCatch(stats::glm(y ~ ., data = dfn, family = stats::binomial()), error = function(e) NULL)
-    if (!is.null(fit_n)) {
-      pr <- tryCatch(stats::predict(fit_n, newdata = dfn, type = "response"), error = function(e) NULL)
-      if (!is.null(pr)) {
-        nomo_txt <- sprintf(
-          "Nomogram-style proxy fit succeeded on %d samples and %d genes.",
-          nrow(dfn), ncol(dfn) - 1L
-        )
-      }
-      cf <- stats::coef(fit_n)
-      nomo_df <- data.frame(Term = names(cf), Coefficient = unname(cf), row.names = NULL)
-    }
-  }
-}
-nomo_txt
-head(nomo_df, 8)
-```
-
-# Step 14: GSEA (gene-set enrichment analysis)
-
-**Step 14 (GSEA)** ranks **all genes** by a differential statistic (here **limma logFC**) and tests whether curated sets are enriched at the **top or bottom** of the ranking (`clusterProfiler::gseGO()`). We show **GO BP**; the app can combine this with **MsigDB** collections.
-
-After `gsea-gsego` (and `gsea` inputs later), you should see `nrow(gse_df)` for GO and, when available, enrichment summaries for KEGG in `gse_k_df`.
-
-```{r gsea-gsego}
-gene_list <- de_df$logFC
-names(gene_list) <- de_df$Gene
-gene_list <- sort(gene_list, decreasing = TRUE)
-
-gse_bp <- tryCatch(
-  clusterProfiler::gseGO(
-    geneList = gene_list,
-    OrgDb = org.Hs.eg.db::org.Hs.eg.db,
-    keyType = "SYMBOL",
-    ont = "BP",
-    minGSSize = 10,
-    maxGSSize = 500,
-    pvalueCutoff = 0.5,
-    eps = 0
-  ),
-  error = function(e) NULL
-)
-
-gse_df <- if (!is.null(gse_bp)) as.data.frame(gse_bp) else data.frame()
-nrow(gse_df)
-if (nrow(gse_df) > 0L) {
-  head(gse_df[, intersect(c("Description", "NES", "pvalue", "p.adjust"), names(gse_df))], 5)
-}
-```
-
-```{r gsea-kegg-optional}
-## KEGG GSEA expects Entrez-ranked scores; map symbols from the same ranked list as gseGO.
-gse_kegg <- NULL
-gse_k_df <- data.frame()
-if (length(gene_list) >= 10L) {
-  kegg_map <- tryCatch(
-    clusterProfiler::bitr(
-      names(gene_list),
-      fromType = "SYMBOL",
-      toType = "ENTREZID",
-      OrgDb = org.Hs.eg.db::org.Hs.eg.db
-    ),
-    error = function(e) data.frame()
-  )
-  if (nrow(kegg_map) > 5L) {
-    sym_scores <- gene_list[kegg_map$SYMBOL]
-    ez <- kegg_map$ENTREZID
-    okm <- !is.na(sym_scores) & !is.na(ez)
-    gl_entrez <- tapply(sym_scores[okm], ez[okm], mean, simplify = TRUE)
-    gl_entrez <- sort(gl_entrez, decreasing = TRUE)
-    gse_kegg <- tryCatch(
-      clusterProfiler::gseKEGG(
-        geneList = gl_entrez,
-        organism = "hsa",
-        minGSSize = 10,
-        maxGSSize = 500,
-        pvalueCutoff = 0.5,
-        eps = 0
-      ),
-      error = function(e) NULL
-    )
-    gse_k_df <- if (!is.null(gse_kegg)) as.data.frame(gse_kegg) else data.frame()
-  }
-}
-nrow(gse_k_df)
-if (nrow(gse_k_df) > 0L) {
-  head(
-    gse_k_df[, intersect(c("ID", "Description", "NES", "p.adjust"), names(gse_k_df))],
-    min(8L, nrow(gse_k_df))
-  )
-}
-```
-
-# Step 14: MsigDB / Hallmark gene sets (GSEA inputs)
-
-**Step 14** can also use **Molecular Signatures Database** collections. The **`msigdbr`** package supplies tidy tables (no extra registration). Below we load **Hallmark (H)** gene sets for **Homo sapiens** as a typical ranked-list GSEA input.
-
-```{r msigdbr-hallmark}
-hmk <- msigdbr(species = "Homo sapiens", category = "H")
-n_sets <- length(unique(hmk$gs_name))
-n_sets
-head(hmk[, c("gs_name", "gene_symbol", "entrez_gene")], 10)
-```
-
-# Step 15: Results summary
-
-This section summarizes key downstream outputs in one place, similar to the app's final summary tab.
-
-Running `final-summary` produces `summary_tbl` (a compact checklist of what ran), and `real-run-output` shows `run_output` with dimensions and counts pulled from the objects created earlier in the vignette.
-
-```{r final-summary}
-summary_tbl <- data.frame(
-  Metric = c(
-    "Common genes (Step 8)",
-    "PPI edges (Step 9)",
-    "Validation AUC (Step 11)",
-    "ROC AUC, illustrative (Step 12)",
-    "GO GSEA terms (Step 14)",
-    "KEGG GSEA terms (Step 14)"
-  ),
-  Value = c(
-    as.character(length(common_genes)),
-    as.character(ppi_res$n_edges),
-    ifelse(is.na(val_auc), "NA", sprintf("%.3f", val_auc)),
-    roc_auc_txt,
-    as.character(nrow(gse_df)),
-    as.character(nrow(gse_k_df))
-  ),
-  row.names = NULL
-)
-summary_tbl
-```
-
-## Real run output (auto-generated)
-
-The table below is generated from the current vignette run (not hardcoded), so values reflect your real execution environment and data availability.
-The bundled vignette example is designed for reproducible, check-safe execution.
-For biologically meaningful enrichment terms, richer networks, and publication-quality plots, run `GExPipe` on your own real datasets (GEO IDs or local expression/metadata files).
-
-```{r real-run-output}
-run_output <- data.frame(
-  Item = c(
-    "Data source",
-    "Expression matrix after normalization",
-    "Common genes retained",
-    "Detected outliers",
-    "Batch-corrected matrix",
-    "DE result rows",
-    "Validation status",
-    "GSEA GO terms",
-    "GSEA KEGG terms",
-    "PPI status"
-  ),
-  Output = c(
-    if (exists("source_note")) source_note else "Bundled example data",
-    if (exists("norm")) paste(dim(norm$combined_expr), collapse = " x ") else "NA",
-    if (exists("common_genes")) as.character(length(common_genes)) else "NA",
-    if (exists("qc_out")) as.character(length(qc_out$all_outliers)) else "NA",
-    if (exists("batch_res")) paste(dim(batch_res$batch_corrected), collapse = " x ") else "NA",
-    if (exists("de_df")) as.character(nrow(de_df)) else "NA",
-    if (exists("val_auc") && !is.na(val_auc)) sprintf("AUC = %.3f", val_auc) else "Not available",
-    if (exists("gse_df")) as.character(nrow(gse_df)) else "NA",
-    if (exists("gse_k_df")) as.character(nrow(gse_k_df)) else "NA",
-    if (exists("ppi_res")) as.character(ppi_res$msg) else "NA"
-  ),
-  stringsAsFactors = FALSE
-)
-run_output
-```
-
-# Interactive Shiny application
-
-`runGExPipe()` returns a **Shiny app object** (the package does not call `shiny::runApp()` for you). Pass the result to `shiny::runApp()` in an interactive session. Use a **fixed port** (e.g. `3838`) or `launch.browser = TRUE` so the browser URL is valid; the returned object is suitable for the RStudio Viewer or an external browser.
-
-The `app-object` chunk builds the app in “testmode” so the vignette check stays lightweight, while `launch-interactive` is evaluated only when you knit/run interactively.
-
-```{r app-object}
-## Faster vignette check: defer heavy namespace attach (same pattern as other vignettes).
-options(
-  shiny.testmode = TRUE,
-  gexpipe.minimal_attach_in_testmode = TRUE,
-  gexpipe.wgcna_threads = 0L
-)
-port_test <- httpuv::randomPort()
-app <- runGExPipe(launch.browser = FALSE, port = port_test)
-inherits(app, "shiny.appobj")
-```
-
-```{r launch-interactive, eval=FALSE}
-# Returns the app object for the browser or RStudio Viewer.
-if (interactive()) {
-  app <- GExPipe::runGExPipe(launch.browser = TRUE, port = 3838L)
-  shiny::runApp(app, port = 3838L)
-}
-```
-
-# Further reading
-
-- `vignettes/gexpipe-shiny-testing-ci.Rmd` — **shinytest2** smoke tests and CI notes.
-
-# Optional GEO workflow (network-dependent)
-
-Not evaluated during package checks; run locally when **GEOquery** access is available.
-
-```{r optional-geo, eval=FALSE}
-# Real GEO example used in app-style parsing:
-work_dir <- getwd()
-gexp_prepare_download_dirs(work_dir, has_micro = TRUE, has_rna = TRUE)
-
-micro_dir <- file.path(work_dir, "micro_data")
-rna_dir <- file.path(work_dir, "rna_data")
-
-micro_dl <- gexp_download_one_microarray_gse("GSE89076", micro_dir)
-rna_dl <- gexp_download_one_rnaseq_gse("GSE50760", rna_dir)
-
-micro_dl$ok
-rna_dl$ok
-```
-
-# Session Info
-
-```{r sessioninfo}
+```{r sessionInfo}
 sessionInfo()
 ```
-
-# References
