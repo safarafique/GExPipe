@@ -1110,6 +1110,7 @@ ui_analysis <- dashboardPage(
 
 # Root UI: show welcome landing page first, then analysis dashboard after "Go to Analysis"
 ui <- fluidPage(
+  title = "GExPipe",
   useShinyjs(),
   conditionalPanel(
     condition = "!output.show_analysis",

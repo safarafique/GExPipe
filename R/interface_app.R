@@ -1105,6 +1105,7 @@ gexp_app_ui <- function() {
   gexp_app_attach_packages()
 
   shiny::fluidPage(
+    title = "GExPipe",
     gexp_app_head(),
     shinyjs::useShinyjs(),
     shiny::conditionalPanel(condition = "!output.show_analysis", gexp_ui_welcome()),
