@@ -146,7 +146,7 @@ gexp_ui_download <- function() {
           ),
           tags$p(
             style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."
+            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE50760), comma-separated."
           )
         )
       ),
@@ -161,7 +161,7 @@ gexp_ui_download <- function() {
           ),
           tags$p(
             style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."
+            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE89076), comma-separated."
           )
         )
       )
