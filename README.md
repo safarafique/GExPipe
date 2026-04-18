@@ -60,18 +60,42 @@ BiocManager::install("GExPipe")
 
 ## Run the app
 
-`runGExPipe()` builds and returns a **Shiny app object**; it does **not** start the server by itself (Bioconductor Shiny package convention). Call **`shiny::runApp()`** on that object. Use the **same** `port` (and `host`, if you set it) in both calls.
+You can run the app in three different ways:
+
+### 1. From the installed package (Recommended)
+
+`runGExPipe()` builds and returns a **Shiny app object**; it does **not** start the server by itself (Bioconductor Shiny package convention). You must pass the object to **`shiny::runApp()`**.
 
 ```r
 library(GExPipe)
 library(shiny)
+
+# Build the app object
 app <- runGExPipe(launch.browser = TRUE, port = 3838L)
+
+# Start the server
 shiny::runApp(app, port = 3838L)
 ```
 
-The R session **blocks** until you stop the app (RStudio **Stop** or interrupt the console). If `launch.browser = FALSE`, open the URL printed in the console (avoid `port = 0` with `launch.browser = FALSE` unless you read the real port from the log).
+*(Alternatively, you can run it in one line: `shiny::runApp(GExPipe::runGExPipe(launch.browser = TRUE))`)*
 
-Install GExPipe (e.g. `BiocManager::install("GExPipe")` or from source as above) so all dependencies are available; the app does not install packages at runtime.
+### 2. From GitHub directly (without installing)
+
+If you don't want to install the package, you can run the app directly from GitHub. Use `destdir = tempfile()` to prevent R from caching older versions of the app:
+
+```r
+shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
+```
+
+### 3. From a local source folder
+
+If you have downloaded or cloned the repository locally, set your working directory to the package root and run:
+
+```r
+shiny::runApp("inst/shinyapp")
+```
+
+The R session **blocks** until you stop the app (RStudio **Stop** or interrupt the console).
 
 ---
 
