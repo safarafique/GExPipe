@@ -110,7 +110,7 @@ ui_download <- tabItem(
                           value = "", placeholder = "e.g. GSE50760, GSE104836",
                           rows = 3),
             tags$p(style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."))
+              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE50760), comma-separated."))
       ),
       conditionalPanel(
         condition = "input.analysis_type == 'microarray' || input.analysis_type == 'merged'",
@@ -120,7 +120,7 @@ ui_download <- tabItem(
                           value = "", placeholder = "e.g. GSE89076, GSE44076",
                           rows = 3),
             tags$p(style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE123456), comma-separated."))
+              icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE89076), comma-separated."))
       )
     ),
     
