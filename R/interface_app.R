@@ -112,6 +112,21 @@ gexp_app_analysis_dashboard_ui <- function() {
         })();
       ")),
       # Styles/scripts + online/offline badge wiring are in the existing UI modules.
+
+      shiny::tags$head(
+      # Bootstrap tooltip initializer (activates all data-toggle="tooltip" elements)
+      shiny::tags$script(shiny::HTML("
+        $(document).ready(function() {
+          // Initialize on page load
+          $('[data-toggle=\"tooltip\"]').tooltip({ html: true, container: 'body' });
+          // Re-initialize when Shiny re-renders dynamic UI (e.g. after tab switch)
+          $(document).on('shiny:value', function() {
+            setTimeout(function() {
+              $('[data-toggle=\"tooltip\"]').tooltip({ html: true, container: 'body' });
+            }, 300);
+          });
+        });
+      ")),
       shiny::tags$style(shiny::HTML("
         /* ===== HELP ICON / TOOLTIP STYLING ===== */
         .param-help {
@@ -931,8 +946,30 @@ gexp_app_analysis_dashboard_ui <- function() {
           }
         }
       ")),
+      shiny::tags$script(shiny::HTML("
+        (function() {
+          function setStatus(isOnline) {
+            var el = document.getElementById('net_status_badge');
+            if (!el) return;
+            el.classList.remove('online','offline');
+            el.classList.add(isOnline ? 'online' : 'offline');
+            el.innerHTML = (isOnline ? '<i class=\"fa fa-wifi\"></i><span> Online</span>' : '<i class=\"fa fa-exclamation-triangle\"></i><span> Offline</span>');
+            if (window.Shiny) Shiny.setInputValue('online_status', !!isOnline, {priority: 'event'});
+          }
 
-      shiny::tags$head(
+          // initial
+          setStatus(navigator.onLine);
+
+          window.addEventListener('online', function() { setStatus(true); });
+          window.addEventListener('offline', function() { setStatus(false); });
+
+          // Lightweight periodic check (helps with flaky wifi that doesn't trigger events)
+          setInterval(function() {
+            setStatus(navigator.onLine);
+          }, 5000);
+        })();
+      "))
+      ,
         shiny::tags$script(shiny::HTML(
           if (isTRUE(getOption("shiny.testmode"))) {
             # No setInterval: periodic setInputValue prevents shinytest2 "stable" detection.
