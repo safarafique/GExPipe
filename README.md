@@ -29,26 +29,51 @@ Dependencies are from **CRAN** and **Bioconductor** only.
 
 ---
 
-## Installation
+## Requirements
 
-GExPipe depends on Bioconductor packages (DESeq2, GEOquery, limma, etc.). Install them first, then install GExPipe from source or from Bioconductor once accepted.
+| R version | Bioconductor | Supported |
+|-----------|-------------|-----------|
+| 4.4.x | 3.19 / 3.20 | ✅ |
+| 4.5.x | 3.21 | ✅ |
+| 4.6.x | 3.22 | ✅ |
 
-### From local source (clone or download this repo)
+---
+
+## Installation & Run
+
+### Option 1 — Run directly from GitHub (simplest, no install needed)
+
+Paste **these 2 lines** into R or RStudio on any machine.
+Everything else — BiocManager, all Bioconductor + CRAN packages, libraries — installs and loads automatically.
 
 ```r
-# 1. Install BiocManager and Bioconductor dependencies
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install(c(
-  "DESeq2", "GEOquery", "limma", "edgeR", "Biobase", "AnnotationDbi",
-  "org.Hs.eg.db", "clusterProfiler", "enrichplot", "STRINGdb", "sva"
-), update = FALSE, ask = FALSE)
-
-# 2. Install GExPipe from the package root (directory containing DESCRIPTION)
-install.packages(".", repos = NULL, type = "source")
+if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
+shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
 ```
 
-If you see *dependency 'X' is not available*, run step 1 again. Do **not** use `install.packages("DESeq2")` — DESeq2 is on Bioconductor.
+> First run on a fresh machine takes **10–30 min** (downloading ~50 packages).
+> Every run after that starts in seconds.
+
+---
+
+### Option 2 — Install once, run in seconds every time (Recommended)
+
+**First time only** (installs GExPipe + all dependencies automatically):
+
+```r
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+remotes::install_github("safarafique/GExPipe")
+GExPipe::gexpipe_setup(launch = TRUE)   # installs all deps then opens the app
+```
+
+**Every session after that** — just 1 line:
+
+```r
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+```
+
+Both options work on **R 4.4, 4.5, and 4.6** — the correct Bioconductor package
+versions are selected automatically for your R version.
 
 ### From Bioconductor (when accepted)
 
@@ -58,63 +83,20 @@ BiocManager::install("GExPipe")
 
 ---
 
-## Run the app
+## Running in Google Colab (or other cloud notebooks)
 
-You can run the app in three different ways:
+In **Google Colab** (or any headless R session) there is no local browser, so you must expose the app on all interfaces and open the URL Colab provides.
 
-### 1. From the installed package (Recommended)
-
-`runGExPipe()` builds and returns a **Shiny app object**; it does **not** start the server by itself (Bioconductor Shiny package convention). You must pass the object to **`shiny::runApp()`**.
+Use Option 1 or Option 2 above to install, then start with:
 
 ```r
 library(GExPipe)
 library(shiny)
-
-# Build the app object
-app <- runGExPipe(launch.browser = TRUE, port = 3838L)
-
-# Start the server
-shiny::runApp(app, port = 3838L)
+app <- runGExPipe(launch.browser = FALSE, host = "0.0.0.0", port = 3838L)
+shiny::runApp(app, host = "0.0.0.0", port = 3838L)
 ```
 
-*(Alternatively, you can run it in one line: `shiny::runApp(GExPipe::runGExPipe(launch.browser = TRUE))`)*
-
-### 2. From GitHub directly (without installing)
-
-If you don't want to install the package, you can run the app directly from GitHub. Use `destdir = tempfile()` to prevent R from caching older versions of the app:
-
-```r
-shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
-```
-
-### 3. From a local source folder
-
-If you have downloaded or cloned the repository locally, set your working directory to the package root and run:
-
-```r
-shiny::runApp("inst/shinyapp")
-```
-
-The R session **blocks** until you stop the app (RStudio **Stop** or interrupt the console).
-
----
-
-## Running in Google Colab (or other cloud notebooks)
-
-In RStudio the app can open in your browser. In **Google Colab** (or any headless R session) there is no local browser, so you must expose the app and open the URL Colab provides.
-
-1. **Install dependencies and GExPipe** (see [Installation](#installation) above).
-
-2. **Start the app** (no browser launch, listen on all interfaces):
-
-   ```r
-   library(GExPipe)
-   library(shiny)
-   app <- runGExPipe(launch.browser = FALSE, host = "0.0.0.0", port = 3838L)
-   shiny::runApp(app, host = "0.0.0.0", port = 3838L)
-   ```
-
-3. **Get the URL:** Use Colab’s port forwarding / Preview for port **3838**, or run a tunnel (e.g. `ngrok http 3838`) and open the HTTPS URL in your browser.
+Open port **3838** via Colab’s port-forwarding panel, or run a tunnel (`ngrok http 3838`) and open the HTTPS URL.
 
 ---
 
@@ -138,7 +120,7 @@ The vignette is R Markdown and requires **Pandoc**. If Pandoc is not installed, 
 R CMD build . --no-build-vignettes
 ```
 
-The resulting `GExPipe_0.99.0.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
+The resulting `GExPipe_0.99.7.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
 
 ### Package check
 
@@ -146,10 +128,10 @@ From the package root:
 
 ```bash
 R CMD build . --no-build-vignettes
-R CMD check GExPipe_0.99.0.tar.gz --no-build-vignettes --no-manual
+R CMD check GExPipe_0.99.7.tar.gz --no-build-vignettes --no-manual
 ```
 
-Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.0.tar.gz")` and address any reported issues.
+Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.7.tar.gz")` and address any reported issues.
 
 ---
 
