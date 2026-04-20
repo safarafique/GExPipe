@@ -1,3 +1,37 @@
+## Batch-install a vector of packages via BiocManager (handles both Bioc + CRAN).
+## BiocManager selects versions matching the user's R/Bioconductor release automatically.
+.gexpipe_batch_install <- function(pkgs) {
+  if (!requireNamespace("BiocManager", quietly = TRUE))
+    utils::install.packages("BiocManager",
+                             repos = "https://cloud.r-project.org", quiet = TRUE)
+  missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
+  if (length(missing_pkgs) == 0L) return(invisible(character(0)))
+  message("GExPipe: installing ", length(missing_pkgs), " package(s): ",
+          paste(missing_pkgs, collapse = ", "))
+  tryCatch(
+    BiocManager::install(missing_pkgs, ask = FALSE, update = FALSE, quiet = FALSE),
+    error = function(e) message("  Warning: ", conditionMessage(e))
+  )
+  still_missing <- missing_pkgs[
+    !vapply(missing_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+  ]
+  if (length(still_missing) > 0L) {
+    tryCatch(
+      utils::install.packages(still_missing,
+                               repos = "https://cloud.r-project.org", quiet = TRUE),
+      error = function(e) NULL
+    )
+  }
+  invisible(still_missing)
+}
+
+## Single-package helper kept for backwards compatibility.
+.gexpipe_ensure_pkg <- function(pkg) {
+  if (requireNamespace(pkg, quietly = TRUE)) return(TRUE)
+  .gexpipe_batch_install(pkg)
+  requireNamespace(pkg, quietly = TRUE)
+}
+
 gexp_app_attach_packages <- function() {
   # Called from gexp_app_ui(), gexp_app_server(), and tab/server loaders. Attach once
   # per app; runGExPipe() clears the flags so each new app object gets a fresh attach.
@@ -53,20 +87,23 @@ gexp_app_attach_packages <- function() {
   }
 
   required <- c("shiny", "shinydashboard", "shinyjs", "DT")
-  optional <- c(
-    "cicerone",
-    "dplyr", "data.table",
-    "ggplot2", "gridExtra", "RColorBrewer", "pheatmap", "ggrepel",
-    "VennDiagram", "UpSetR",
-    "Biobase", "GEOquery", "limma", "edgeR", "sva", "DESeq2",
-    "clusterProfiler", "enrichplot", "circlize",
-    "STRINGdb", "igraph", "ggraph", "tidygraph", "tidyr",
+  core <- c(
+    "Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
+    "dplyr", "data.table", "edgeR", "sva", "ggplot2", "gridExtra",
+    "RColorBrewer", "pheatmap", "ggrepel", "VennDiagram", "UpSetR",
+    "WGCNA", "clusterProfiler", "enrichplot", "circlize", "STRINGdb",
+    "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
     "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
     "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils",
-    "dynamicTreeCut", "scales", "WGCNA"
+    "dynamicTreeCut", "scales"
   )
+  optional <- c("cicerone", "Boruta", "mixOmics", "xgboost",
+                "SHAPforxgboost", "rms", "rmda", "biomaRt")
 
-  pkgs <- unique(c(required, optional))
+  # batch-install all missing packages in one BiocManager call (fast)
+  .gexpipe_batch_install(c(required, core, optional))
+
+  pkgs <- unique(c(required, core, optional))
 
   missing <- character(0)
   for (p in pkgs) {
