@@ -1,3 +1,4 @@
+^\.claude$
 ^\.Rbuildignore$
 ^\.git$
 ^\.gitignore$
@@ -17,6 +18,8 @@
 ^inst/shinyapp/saved_workspaces
 ^inst/shinyapp/csv_exports
 ^inst/shinyapp/.*\.log$
+^vignettes/micro_data
+^vignettes/rna_data
 ^vignettes/.*\.docx$
 ^vignettes/vignette\.htm$
 ^vignettes/vignette\.Rmd$

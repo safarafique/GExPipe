@@ -1,15 +1,21 @@
 ---
 title: "GExPipe: A Pipeline for Gene Expression Analysis"
-author: "Safa Rafique"
+author:
+  - name: Safa Rafique, Dr. Naeem Mahmood Ashraf, Prof. Dr. Farooq sabir
+    affiliation: University of the Punjab
+
 date: "`r Sys.Date()`"
 output:
   BiocStyle::html_document:
     toc: true
-    toc_depth: 2
+    toc_depth: 3
 vignette: >
-  %\VignetteIndexEntry{1. Introduction to GExPipe}
-  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Introduction to GExPipe}
   %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -25,26 +31,65 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-`GExPipe` is a Shiny-first workflow for bulk RNA-seq and microarray analysis. The package was created to provide a single, guided pipeline that connects data retrieval, quality control, normalization, differential expression, network analysis, and downstream interpretation without requiring users to manually stitch many separate tools together.
+`GExPipe` is a Shiny-first workflow for bulk RNA-seq and microarray
+analysis. The package was created to provide a single, guided pipeline
+that connects data retrieval, quality control, normalization,
+differential expression, network analysis, and downstream interpretation
+without requiring users to manually stitch many separate tools together.
 
-Within Bioconductor, `GExPipe` builds on established infrastructure such as `r BiocStyle::Biocpkg("GEOquery")`, `r BiocStyle::Biocpkg("limma")`, `r BiocStyle::Biocpkg("DESeq2")`, `r BiocStyle::Biocpkg("edgeR")`, `r BiocStyle::Biocpkg("WGCNA")`, and `r BiocStyle::Biocpkg("clusterProfiler")`. Compared with piecemeal scripts, the app emphasizes usability and reproducibility through a fixed step-by-step interface and integrated summaries.
+Within Bioconductor, `GExPipe` builds on established infrastructure such
+as `r BiocStyle::Biocpkg("GEOquery")`, `r BiocStyle::Biocpkg("limma")`,
+`r BiocStyle::Biocpkg("DESeq2")`, `r BiocStyle::Biocpkg("edgeR")`,
+`r BiocStyle::Biocpkg("WGCNA")`, and
+`r BiocStyle::Biocpkg("clusterProfiler")`. For visualization it uses
+`r BiocStyle::CRANpkg("ggplot2")` and
+`r BiocStyle::CRANpkg("pheatmap")`. Compared with piecemeal scripts, the
+app emphasizes usability and reproducibility through a fixed
+step-by-step interface and integrated summaries.
 
-This vignette is user-oriented: it explains how to install, launch, and run a minimal executable workflow using package-bundled example data.
+This vignette is user-oriented: it explains how to install, launch, and
+run a minimal executable workflow using package-bundled example data.
 
 # Installation
 
-Install `GExPipe` with `BiocManager`:
+Install `GExPipe` with `BiocManager` once the package has been accepted
+on Bioconductor:
 
-```{r install, eval=FALSE}
-if (!require("BiocManager", quietly = TRUE))
+```{r install-bioc, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
 BiocManager::install("GExPipe")
 ```
 
+Until then, install directly from GitHub:
+
+```{r install-github, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+# Core Bioconductor dependencies
+BiocManager::install(c(
+    "DESeq2", "GEOquery", "limma", "edgeR", "Biobase", "AnnotationDbi",
+    "org.Hs.eg.db", "clusterProfiler", "enrichplot", "STRINGdb", "sva",
+    "WGCNA", "dynamicTreeCut", "msigdbr"
+), update = FALSE, ask = FALSE)
+
+if (!requireNamespace("remotes", quietly = TRUE))
+    install.packages("remotes")
+
+remotes::install_github("safarafique/GExPipe")
+```
+
 # Launch the Shiny app
 
-`runGExPipe()` returns a Shiny app object. Start it with `shiny::runApp()`.
+`runGExPipe()` returns a Shiny app object. Pass it to `shiny::runApp()`
+to start the server. The function does **not** launch the app by itself
+— this follows the Bioconductor convention for Shiny packages.
+
+> **Note:** The block below is not evaluated during vignette build
+> because Shiny apps require an interactive session. Copy it into an R
+> console to launch the app.
 
 ```{r launch-app, eval=FALSE}
 app <- GExPipe::runGExPipe(launch.browser = TRUE, port = 3838L)
@@ -55,9 +100,9 @@ shiny::runApp(app, port = 3838L)
 
 This section demonstrates three core tasks with bundled data:
 
-- loading expression and metadata tables,
-- running basic processing suitable for downstream analysis,
-- visualizing results (PCA and expression heatmap).
+-   loading expression and metadata tables,
+-   running basic processing suitable for downstream analysis,
+-   visualizing results (PCA and expression heatmap).
 
 ## Load package and example data
 
@@ -77,7 +122,6 @@ meta_tab <- read.csv(meta_path, check.names = FALSE, stringsAsFactors = FALSE)
 expr <- as.matrix(expr_tab[, -1, drop = FALSE])
 storage.mode(expr) <- "numeric"
 rownames(expr) <- expr_tab[[1]]
-colnames(expr) <- gsub("^X", "", colnames(expr))
 
 rownames(meta_tab) <- meta_tab$SampleID
 meta_tab <- meta_tab[colnames(expr), , drop = FALSE]
@@ -88,66 +132,89 @@ head(meta_tab)
 
 ## Process data with core pipeline helpers
 
+`gexp_normalize_and_intersect()` accepts a named list of per-dataset
+expression matrices (`micro_expr_list` for microarray / pre-normalized
+data, `rna_counts_list` for raw RNA-seq counts) and returns a list with:
+
+-   **`combined_expr`** — a single genes × samples matrix after
+    within-dataset normalization and global quantile normalization
+    across all datasets.
+-   **`common_genes`** — the character vector of genes present in every
+    dataset.
+-   **`combined_expr_before_global`** — the combined matrix before the
+    final global quantile step (useful for QC comparisons).
+
 ```{r process-data}
 if (!"Dataset" %in% colnames(meta_tab)) {
   meta_tab$Dataset <- "D1"
 }
 
-micro_expr_list <- split(
-  x = as.data.frame(expr, check.names = FALSE),
-  f = meta_tab$Dataset
+# Build a named list: one matrix per dataset (genes × samples)
+datasets <- unique(meta_tab$Dataset)
+micro_expr_list <- setNames(
+  lapply(datasets, function(ds) {
+    sample_ids <- rownames(meta_tab)[meta_tab$Dataset == ds]
+    expr[, sample_ids, drop = FALSE]
+  }),
+  datasets
 )
-micro_expr_list <- lapply(micro_expr_list, function(df) as.matrix(df))
-
-# Rebuild per-dataset matrices with genes as rows and samples as columns.
-for (ds in names(micro_expr_list)) {
-  sample_ids <- rownames(meta_tab)[meta_tab$Dataset == ds]
-  micro_expr_list[[ds]] <- expr[, sample_ids, drop = FALSE]
-}
 
 norm_res <- gexp_normalize_and_intersect(
-  micro_expr_list = micro_expr_list,
-  rna_counts_list = list(),
-  micro_norm_method = "quantile",
+  micro_expr_list    = micro_expr_list,
+  rna_counts_list    = list(),
+  micro_norm_method  = "quantile",
   rnaseq_norm_method = "TMM",
-  de_method = "limma"
+  de_method          = "limma"
 )
 
-dim(norm_res$combined_expr)
-length(norm_res$common_genes)
+cat("Combined matrix dimensions:", dim(norm_res$combined_expr), "\n")
+cat("Common genes across datasets:", length(norm_res$common_genes), "\n")
 ```
 
 ## Visualize processed data
 
+### PCA plot
+
 ```{r pca-plot}
-pca <- prcomp(t(norm_res$combined_expr), center = TRUE, scale. = TRUE)
+# Remove near-zero-variance genes before scaling to avoid NaN in prcomp
+expr_for_pca <- norm_res$combined_expr
+keep_var <- apply(expr_for_pca, 1, var, na.rm = TRUE) > 1e-8
+pca <- prcomp(t(expr_for_pca[keep_var, ]), center = TRUE, scale. = TRUE)
 
 pca_df <- data.frame(
-  Sample = rownames(pca$x),
-  PC1 = pca$x[, 1],
-  PC2 = pca$x[, 2],
+  Sample  = rownames(pca$x),
+  PC1     = pca$x[, 1],
+  PC2     = pca$x[, 2],
   Dataset = meta_tab[rownames(pca$x), "Dataset", drop = TRUE],
   stringsAsFactors = FALSE
 )
+
+var_pct <- round(summary(pca)$importance[2, 1:2] * 100, 1)
 
 ggplot(pca_df, aes(PC1, PC2, color = Dataset)) +
   geom_point(size = 3) +
   theme_minimal() +
   labs(
-    title = "PCA of bundled example data",
-    subtitle = "After normalization and gene intersection"
+    title    = "PCA of bundled example data",
+    subtitle = "After normalization and gene intersection",
+    x        = paste0("PC1 (", var_pct[1], "% variance)"),
+    y        = paste0("PC2 (", var_pct[2], "% variance)")
   )
 ```
 
+### Expression heatmap
+
 ```{r heatmap-plot}
-top_var <- order(apply(norm_res$combined_expr, 1, var, na.rm = TRUE), decreasing = TRUE)
+top_var <- order(apply(norm_res$combined_expr, 1, var, na.rm = TRUE),
+                 decreasing = TRUE)
 top_var <- head(top_var, min(30L, length(top_var)))
 
 if (length(top_var) > 1L) {
   pheatmap::pheatmap(
     norm_res$combined_expr[top_var, , drop = FALSE],
-    scale = "row",
-    main = "Top variable genes (bundled example)"
+    scale         = "row",
+    show_rownames = length(top_var) <= 30L,
+    main          = "Top variable genes (bundled example)"
   )
 }
 ```
@@ -156,31 +223,41 @@ if (length(top_var) > 1L) {
 
 For real analyses in the Shiny app, use this sequence:
 
-1. Step 1: select platform and GEO IDs, then start processing.
-2. Step 2: review QC plots and outliers.
-3. Step 3-5: normalize, define groups, and handle batch effects.
-4. Step 6-8: run DE, WGCNA, and compute common genes.
-5. Step 9-15: enrichment, PPI, ML, validation, ROC/nomogram, GSEA, and summary.
+1.  **Step 1 — Download:** select platform (RNA-seq / Microarray /
+    Merged) and GEO IDs, then click *Start Processing*.
+2.  **Step 2 — QC:** review boxplots, density plots, and outlier flags;
+    remove samples if needed.
+3.  **Steps 3–5 — Normalize / Groups / Batch:** choose normalization
+    method, annotate conditions, and apply ComBat or limma batch
+    correction.
+4.  **Steps 6–8 — DE / WGCNA / Common genes:** run differential
+    expression, build co-expression modules, and intersect DEGs with
+    WGCNA hub genes.
+5.  **Steps 9–15 — Enrichment / PPI / ML / Validation / ROC / Nomogram /
+    GSEA / Summary:** downstream interpretation, machine-learning
+    feature selection, and final PDF report generation.
 
-# Optional screenshots in this vignette
+# App screenshots
 
-If screenshots are placed under `inst/extdata/vignette-screenshots/`, they are rendered below.
+If screenshots are placed under `inst/extdata/vignette-screenshots/`,
+they are rendered below.
 
-```{r screenshots, echo=FALSE}
+```{r screenshots, echo=FALSE, results='asis'}
 shot_dir <- system.file("extdata", "vignette-screenshots", package = "GExPipe")
-shot_files <- c(
-  "step1_download.png",
-  "step2_qc.png",
-  "step6_de.png",
-  "step9_ppi.png",
-  "step15_summary.png"
+
+shot_meta <- list(
+  list(file = "step1_download.png",  label = "Step 1 — Download Data"),
+  list(file = "step2_qc.png",        label = "Step 2 — Quality Control"),
+  list(file = "step6_de.png",        label = "Step 6 — Differential Expression"),
+  list(file = "step9_ppi.png",       label = "Step 9 — PPI Network"),
+  list(file = "step15_summary.png",  label = "Step 15 — Results Summary")
 )
 
 if (nzchar(shot_dir)) {
-  for (nm in shot_files) {
-    p <- file.path(shot_dir, nm)
+  for (item in shot_meta) {
+    p <- file.path(shot_dir, item$file)
     if (file.exists(p)) {
-      cat("\n\n## ", nm, "\n\n", sep = "")
+      cat("\n\n## ", item$label, "\n\n", sep = "")
       print(knitr::include_graphics(p))
     }
   }
