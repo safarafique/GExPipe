@@ -46,43 +46,41 @@
   # ── 3. Write a self-contained install script to a temp file ───────────────
   #   Using a temp file avoids all quoting/escaping problems on Windows.
   lib_path <- .libPaths()[1L]   # install into the same library the user uses
-  pkg_vec   <- paste0('"', missing_pkgs, '"', collapse = ", ")
 
-  # The subprocess distinguishes two failure modes:
-  #   (a) Truly absent  — system.file() returns ""      → normal install
-  #   (b) On disk but broken namespace (e.g. compiled for an older R,
-  #       or a dependency like igraph is binary-incompatible)
-  #                     — system.file() returns a path   → force = TRUE reinstall
-  # Using force = TRUE for broken packages makes BiocManager wipe and
-  # re-download the binary even when the version number matches.
+  # Collect ALL parent library paths so the subprocess can see the same packages.
+  # Rscript --vanilla strips .Renviron/.Rprofile, so the user library
+  # (e.g. C:/Users/.../win-library/4.6) is NOT in the subprocess .libPaths()
+  # by default. Without this, system.file() returns "" for installed packages,
+  # and BiocManager refuses to reinstall them (version already matches).
+  parent_libs <- paste0('"', gsub("\\\\", "/", .libPaths()), '"', collapse = ", ")
+  pkg_vec     <- paste0('"', missing_pkgs, '"', collapse = ", ")
+
+  # All packages in missing_pkgs failed requireNamespace() in the PARENT session.
+  # That means they are NOT loaded there, so their DLLs are NOT Windows-locked.
+  # force = TRUE is therefore safe and necessary: it makes BiocManager wipe and
+  # re-download the binary even when the installed version number matches the
+  # current Bioconductor release (handles stale/ABI-broken binaries, e.g. igraph
+  # compiled for R 4.5 now running under R 4.6).
   script <- c(
+    paste0('.libPaths(c(', parent_libs, '))'),   # mirror parent library paths
     'options(repos = c(CRAN = "https://cloud.r-project.org"))',
-    paste0('.lib  <- "', lib_path, '"'),
+    paste0('.lib  <- "', gsub("\\\\", "/", lib_path), '"'),
     paste0('.pkgs <- c(', pkg_vec, ')'),
     '',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
     '',
-    '# Packages not on disk at all → normal install',
-    '.absent <- .pkgs[!nzchar(vapply(.pkgs, function(p)',
-    '  system.file(package = p), character(1)))]',
+    'message("GExPipe subprocess: force-reinstalling ", length(.pkgs),',
+    '        " package(s): ", paste(.pkgs, collapse = ", "))',
     '',
-    '# Packages on disk but namespace fails → force-reinstall (broken binary)',
-    '.broken <- .pkgs[nzchar(vapply(.pkgs, function(p)',
-    '  system.file(package = p), character(1))) &',
-    '  !vapply(.pkgs, requireNamespace, logical(1), quietly = TRUE)]',
-    '',
-    'if (length(.absent) > 0L) {',
-    '  message("Installing absent packages: ", paste(.absent, collapse = ", "))',
-    '  BiocManager::install(.absent, lib = .lib, ask = FALSE,',
-    '    update = FALSE, force = FALSE, quiet = FALSE)',
-    '}',
-    '',
-    'if (length(.broken) > 0L) {',
-    '  message("Force-reinstalling broken packages: ", paste(.broken, collapse = ", "))',
-    '  BiocManager::install(.broken, lib = .lib, ask = FALSE,',
-    '    update = FALSE, force = TRUE, quiet = FALSE)',
-    '}'
+    'BiocManager::install(',
+    '  .pkgs,',
+    '  lib    = .lib,',
+    '  ask    = FALSE,',
+    '  update = FALSE,',
+    '  force  = TRUE,',   # reinstall even when version matches (fixes broken binaries)
+    '  quiet  = FALSE',
+    ')'
   )
 
   tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
