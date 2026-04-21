@@ -61,24 +61,34 @@
   # re-download the binary even when the installed version number matches the
   # current Bioconductor release (handles stale/ABI-broken binaries, e.g. igraph
   # compiled for R 4.5 now running under R 4.6).
+  # On Windows always install binary packages.
+  # Binary = pre-compiled by CRAN/Bioconductor, no Rtools needed, and all
+  # C-level symbols match exactly — preventing the "secret handshake" mismatch
+  # where enrichplot looks for a procedure in igraph.dll that no longer exists
+  # after igraph was recompiled from source with a different ABI.
+  pkg_type <- if (.Platform$OS.type == "windows") '"binary"' else '"both"'
+
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),   # mirror parent library paths
     'options(repos = c(CRAN = "https://cloud.r-project.org"))',
-    paste0('.lib  <- "', gsub("\\\\", "/", lib_path), '"'),
-    paste0('.pkgs <- c(', pkg_vec, ')'),
+    paste0('.lib      <- "', gsub("\\\\", "/", lib_path), '"'),
+    paste0('.pkgs     <- c(', pkg_vec, ')'),
+    paste0('.pkg_type <- ', pkg_type),
     '',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
     '',
-    'message("GExPipe subprocess: force-reinstalling ", length(.pkgs),',
-    '        " package(s): ", paste(.pkgs, collapse = ", "))',
+    'message("GExPipe subprocess: installing ", length(.pkgs),',
+    '        " package(s) [type=", .pkg_type, "]: ",',
+    '        paste(.pkgs, collapse = ", "))',
     '',
     'BiocManager::install(',
     '  .pkgs,',
     '  lib    = .lib,',
+    '  type   = .pkg_type,',  # binary on Windows: no Rtools, no ABI mismatch
     '  ask    = FALSE,',
     '  update = FALSE,',
-    '  force  = TRUE,',   # reinstall even when version matches (fixes broken binaries)
+    '  force  = TRUE,',       # reinstall even when version matches
     '  quiet  = FALSE',
     ')'
   )
