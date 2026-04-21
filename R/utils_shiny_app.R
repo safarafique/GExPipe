@@ -28,6 +28,9 @@
 ## parent session can requireNamespace() the newly installed packages normally.
 .gexpipe_batch_install <- function(pkgs) {
 
+  # Initialise so the variable always exists even if an error occurs below.
+  still_missing <- character(0)
+
   # ── 1. Install BiocManager if needed (rarely missing) ─────────────────────
   if (!requireNamespace("BiocManager", quietly = TRUE))
     utils::install.packages("BiocManager",
