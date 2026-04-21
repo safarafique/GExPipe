@@ -131,7 +131,9 @@ gexp_register_pipeline_observers <- function(input, output, session, rv) {
     shinyjs::toggleState("run_go_enrichment", condition = length(rv$common_genes_de_wgcna) > 0)
     shinyjs::toggleState("run_kegg_enrichment", condition = length(rv$common_genes_de_wgcna) > 0)
     shinyjs::toggleState("extract_ml_data_common_genes", condition = length(rv$common_genes_de_wgcna) > 0)
-    shinyjs::toggleState("run_ppi", condition = length(rv$common_genes_de_wgcna) > 0)
+    # Keep PPI runnable even when prerequisites are incomplete; server-side handler
+    # provides user guidance (common genes / network / STRINGdb).
+    shinyjs::toggleState("run_ppi", condition = TRUE)
     shinyjs::toggleState("extract_ml_data", condition = isTRUE(rv$ppi_complete))
     shinyjs::toggleState("run_ml", condition = !is.null(rv$extracted_data_ml))
     shinyjs::toggleState(
