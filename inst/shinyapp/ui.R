@@ -164,13 +164,18 @@ ui_analysis <- dashboardPage(
       # Bootstrap tooltip initializer (activates all data-toggle="tooltip" elements)
       tags$script(HTML("
         $(document).ready(function() {
-          // Initialize on page load
-          $('[data-toggle=\"tooltip\"]').tooltip({ html: true, container: 'body' });
+          function gexpInitTooltips() {
+            var els = $('[data-toggle=\"tooltip\"]');
+            if (!els.length) return;
+            // Ensure HTML in tooltip titles (e.g., <br><b>) renders instead of showing raw tags.
+            els.attr('data-html', 'true');
+            els.tooltip('dispose');
+            els.tooltip({ html: true, sanitize: false, container: 'body', trigger: 'hover focus' });
+          }
+          gexpInitTooltips();
           // Re-initialize when Shiny re-renders dynamic UI (e.g. after tab switch)
           $(document).on('shiny:value', function() {
-            setTimeout(function() {
-              $('[data-toggle=\"tooltip\"]').tooltip({ html: true, container: 'body' });
-            }, 300);
+            setTimeout(gexpInitTooltips, 300);
           });
         });
       ")),
