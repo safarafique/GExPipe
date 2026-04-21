@@ -62,8 +62,8 @@ shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
 
 ```r
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
-remotes::install_github("safarafique/GExPipe")
-GExPipe::gexpipe_setup(launch = TRUE)   # installs all deps then opens the app
+remotes::install_github("safarafique/GExPipe", INSTALL_opts = "--no-staged-install")
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
 
 **Every session after that** — just 1 line:
