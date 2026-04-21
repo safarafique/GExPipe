@@ -173,9 +173,12 @@ server_ppi <- function(input, output, session, rv) {
   })
 
   observeEvent(input$run_ppi, {
-    req(rv$common_genes_de_wgcna)
+    if (is.null(rv$common_genes_de_wgcna)) {
+      showNotification("Run Step 8 (Common Genes) and click 'Compute Common Genes' first, then return here.", type = "warning", duration = 8)
+      return()
+    }
     if (length(rv$common_genes_de_wgcna) == 0) {
-      showNotification("No common genes. Run Step 8 and compute common genes first.", type = "warning", duration = 6)
+      showNotification("Common genes computed but empty. Adjust DE/WGCNA thresholds and recompute Step 8.", type = "warning", duration = 8)
       return()
     }
 
