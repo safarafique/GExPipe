@@ -1,7 +1,7 @@
 ---
 title: "GExPipe: A Pipeline for Gene Expression Analysis"
 author:
-  - name: Safa Rafique, Dr. Naeem Mahmood Ashraf, Prof. Dr. Farooq sabir
+  - name: Safa Rafique, Dr. Naeem Mahmood Ashraf, Prof. Dr. Farooq Sabir
     affiliation: University of the Punjab
 
 date: "`r Sys.Date()`"
@@ -47,8 +47,6 @@ as `r BiocStyle::Biocpkg("GEOquery")`, `r BiocStyle::Biocpkg("limma")`,
 app emphasizes usability and reproducibility through a fixed
 step-by-step interface and integrated summaries.
 
-This vignette is user-oriented: it explains how to install, launch, and
-run a minimal executable workflow using package-bundled example data.
 
 # Installation
 
@@ -64,22 +62,53 @@ BiocManager::install("GExPipe")
 
 Until then, install directly from GitHub:
 
+> **Network requirement:** Installing from GitHub requires an internet
+> connection that can reach `github.com`. If you are behind ann
+> institutional firewall or VPN, configure your proxy first (see
+> *Troubleshooting* below) or use the **local source** method instead.
+
 ```{r install-github, eval=FALSE}
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
-# Core Bioconductor dependencies
-BiocManager::install(c(
-    "DESeq2", "GEOquery", "limma", "edgeR", "Biobase", "AnnotationDbi",
-    "org.Hs.eg.db", "clusterProfiler", "enrichplot", "STRINGdb", "sva",
-    "WGCNA", "dynamicTreeCut", "msigdbr"
-), update = FALSE, ask = FALSE)
+# Check GitHub is reachable before attempting install
+.github_reachable <- tryCatch({
+    con <- url("https://api.github.com", open = "r")
+    close(con)
+    TRUE
+}, warning = function(w) FALSE,
+   error   = function(e) FALSE)
+
+if (!.github_reachable) {
+    stop(
+        "Cannot reach github.com.\n",
+        "Options:\n",
+        "  1. Check your internet / VPN / firewall.\n",
+        "  2. Set a proxy: Sys.setenv(https_proxy = 'http://proxy:port')\n",
+        "  3. Download the ZIP from https://github.com/safarafique/GExPipe\n",
+        "     and install locally:\n",
+        "     install.packages('path/to/GExPipe-main.zip', repos = NULL, type = 'source')"
+    )
+}
 
 if (!requireNamespace("remotes", quietly = TRUE))
     install.packages("remotes")
 
 remotes::install_github("safarafique/GExPipe")
+
+# After install, set up all dependencies and launch:
+library(GExPipe)
+gexpipe_setup(update = TRUE, optional = TRUE, launch = TRUE)
 ```
+
+### Troubleshooting: GitHub not reachable
+
+| Situation | Fix |
+|-------------------------------------------------|-----------------------|
+| Corporate firewall / proxy | `Sys.setenv(https_proxy = "http://yourproxy:port")` then retry |
+| VPN required | Connect to VPN first, then run the install block |
+| No internet at all | Download ZIP from GitHub on another machine, copy the file, then: `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
+| `remotes` install fails | Try `devtools::install_github("safarafique/GExPipe")` as an alternative |
 
 # Launch the Shiny app
 
@@ -221,21 +250,551 @@ if (length(top_var) > 1L) {
 
 # App walkthrough checklist
 
-For real analyses in the Shiny app, use this sequence:
+The Shiny app is organized as a fixed 15-step pipeline. Each step must
+be completed before the next one becomes active. The sections below
+describe what each step does, what inputs to provide, what outputs to
+expect, and what to check before moving on.
 
-1.  **Step 1 — Download:** select platform (RNA-seq / Microarray /
-    Merged) and GEO IDs, then click *Start Processing*.
-2.  **Step 2 — QC:** review boxplots, density plots, and outlier flags;
-    remove samples if needed.
-3.  **Steps 3–5 — Normalize / Groups / Batch:** choose normalization
-    method, annotate conditions, and apply ComBat or limma batch
-    correction.
-4.  **Steps 6–8 — DE / WGCNA / Common genes:** run differential
-    expression, build co-expression modules, and intersect DEGs with
-    WGCNA hub genes.
-5.  **Steps 9–15 — Enrichment / PPI / ML / Validation / ROC / Nomogram /
-    GSEA / Summary:** downstream interpretation, machine-learning
-    feature selection, and final PDF report generation.
+## Step 1 — Download Data
+
+**Purpose:** Retrieve one or more GEO datasets and build a combined
+expression matrix.
+
+**Inputs:**
+
+-   *Platform* — choose **Microarray**, **RNA-seq**, or **Merged**
+    (combine microarray and RNA-seq datasets together).
+-   *GEO Accession IDs* — enter one or more GSE IDs separated by commas
+    or newlines (e.g., `GSE89076, GSE50760`).
+
+**What the app does:**
+
+1.  Downloads the series matrix files via `GEOquery`.
+2.  Maps probe IDs or Ensembl IDs to HGNC gene symbols using the
+    platform annotation table.
+3.  Averages probes that map to the same gene.
+4.  Merges all datasets into a single genes × samples matrix keeping
+    only genes present in every dataset (intersection).
+
+**Outputs:** A status log in the sidebar confirming download success,
+sample counts per dataset, and the number of common genes retained.
+
+**Example:** Enter `GSE89076` (microarray, lung disease) and click
+*Start Processing*. The log should report \~500–20 000 samples × genes
+depending on the dataset.
+
+**Tip:** If a GSE contains both GPL platforms (e.g., GPL96 and GPL570),
+the app processes each separately and intersects them. Choose *Merged*
+only when you intentionally want to combine microarray with RNA-seq
+data.
+
+**Before continuing:** Confirm the log shows "Download complete" and the
+sample count matches the GEO record.
+
+------------------------------------------------------------------------
+
+## Step 2 — Quality Control
+
+**Purpose:** Identify and remove low-quality or outlier samples before
+normalization.
+
+**Inputs:** No additional inputs are required; the app uses the matrix
+from Step 1.
+
+**What the app does:**
+
+-   Draws **boxplots** of per-sample expression distributions (raw
+    values).
+-   Draws **density plots** to reveal bimodal or shifted distributions.
+-   Computes **Mahalanobis distance** across the first few principal
+    components to flag statistical outliers. Samples beyond a threshold
+    (default *p* \< 0.001) are highlighted in red.
+
+**Outputs:** Interactive plots and a table listing flagged outlier
+samples with their Mahalanobis distance and *p*-value.
+
+**Example:** In a 40-sample dataset you might find 2–3 samples flagged.
+Click each flag to inspect its boxplot. If the sample is clearly shifted
+relative to all others, tick its checkbox and click *Remove Selected*.
+
+**Tip:** Remove genuine outliers but do not over-prune. Aim to keep all
+samples whose distributions overlap with the majority. Batch effects (a
+cluster shifted together) should be handled in Step 5, not here.
+
+**Before continuing:** At least 3 samples per group must remain after
+removal, or downstream statistical steps will fail.
+
+------------------------------------------------------------------------
+
+## Step 3 — Normalize
+
+**Purpose:** Make expression values comparable across samples and across
+datasets.
+
+**Inputs:**
+
+-   *Mode* — **Auto** (recommended) or **Manual**.
+    -   Auto applies **quantile normalization** to microarray data and
+        **TMM** (edgeR) to RNA-seq counts.
+    -   Manual lets you choose from quantile, log2, VST, RLE, or upper
+        quantile.
+-   *Log-transform* checkbox — pre-checked for microarray; leave
+    unchecked for raw RNA-seq counts (TMM handles this internally).
+
+**What the app does:** Applies within-dataset normalization, then a
+second global quantile normalization across all datasets when more than
+one GSE is present. This two-step approach removes platform-level
+offsets while preserving within-dataset biological variation.
+
+**Outputs:** Before/after boxplots and density overlays confirming that
+all sample distributions align after normalization.
+
+**Example:** After quantile normalization of two microarray datasets
+(GSE89076 + GSE63514), all 40 boxes should align at the same median.
+
+**Before continuing:** Verify the after-normalization boxplot shows
+medians at roughly the same level across all samples.
+
+------------------------------------------------------------------------
+
+## Step 4 — Assign Groups
+
+**Purpose:** Label each sample as *Normal*, *Disease*, or *Exclude* to
+define the comparison for differential expression.
+
+**Inputs:**
+
+-   *Phenotype column* — choose the metadata column that contains
+    condition labels (e.g., `characteristics_ch1`, `title`, or
+    `source_name_ch1`). The dropdown is populated from the GEO series
+    matrix automatically.
+-   *Per-sample assignment table* — the app shows each unique metadata
+    value; map it to Normal, Disease, or Exclude using dropdown
+    selectors.
+
+**What the app does:** Stores a `group` factor (Normal / Disease) for
+every sample that is passed to the DE models in Step 6.
+
+**Example:** For a GSE with values `"healthy control"` and
+`"COPD patient"`, map `"healthy control"` → Normal and `"COPD patient"`
+→ Disease. Mark any QC-failed samples as Exclude.
+
+**Tip:** The Exclude option is useful for samples that passed QC
+numerically but are known to be mis-labeled in GEO metadata.
+
+**Before continuing:** The summary bar should show ≥ 3 Normal and ≥ 3
+Disease samples.
+
+------------------------------------------------------------------------
+
+## Step 5 — Batch Correction
+
+**Purpose:** Remove technical variation introduced by different
+experiments, labs, or sequencing runs.
+
+**Inputs:**
+
+-   *Method* — **ComBat** (parametric empirical Bayes, robust for small
+    datasets) or **limma removeBatchEffect** (linear model, slightly
+    faster).
+-   *Batch variable* — automatically set to the GSE ID column when
+    multiple datasets are present.
+
+**What the app does:** Applies the chosen method to regress out batch
+effects while preserving the Normal/Disease contrast. Produces PCA plots
+before and after correction.
+
+**Note:** When only one GSE is loaded, Step 5 is automatically skipped
+and the app proceeds directly to Step 6.
+
+**Example:** After merging GSE89076 and GSE63514, the pre-correction PCA
+shows samples clustering by dataset rather than condition. After ComBat,
+samples should cluster by Normal/Disease instead.
+
+**Tip:** If the post-correction PCA still shows dataset separation,
+increase the number of PCs displayed or switch methods. A perfect
+separation between batches that fully overlaps the biological signal
+cannot be corrected without confounding the DE results.
+
+**Before continuing:** The post-correction PCA should show Normal and
+Disease samples intermingled across datasets.
+
+------------------------------------------------------------------------
+
+## Step 6 — Differential Expression
+
+**Purpose:** Identify genes that are significantly up- or down-regulated
+between Normal and Disease groups.
+
+**Inputs:**
+
+-   *Method* — **limma** (microarray / pre-normalized), **limma-voom**
+    (RNA-seq counts), **DESeq2** (RNA-seq counts), or **edgeR** (RNA-seq
+    counts).
+-   *Adjusted p-value cutoff* — default 0.05 (Benjamini–Hochberg FDR).
+-   *\|log₂FC\| cutoff* — default 1.0 (twofold change).
+
+**What the app does:** Fits a linear model (limma/voom) or
+negative-binomial model (DESeq2/edgeR) for the Normal vs. Disease
+contrast. Applies FDR correction. Returns a ranked results table.
+
+**Outputs:**
+
+-   **Volcano plot** — x-axis log₂FC, y-axis −log₁₀(adj. *p*). Genes
+    above the horizontal line and outside the vertical lines are
+    significant DEGs.
+-   **Heatmap** — top significant DEGs clustered by sample and gene.
+-   **Results table** — downloadable CSV with gene, log₂FC, *p*-value,
+    adj. *p*-value.
+
+**Example:** With GSE89076 (COPD vs. controls, limma), expect \~200–800
+DEGs at FDR \< 0.05 and \|log₂FC\| \> 1. Genes such as *MUC5B*, *SFTPC*,
+or *AGER* commonly appear in lung-disease datasets.
+
+**Tip:** If fewer than 20 DEGs are returned, relax the FC cutoff to 0.5
+or the FDR to 0.1. If tens of thousands of genes are significant, your
+dataset may have a very strong signal or a normalization issue — review
+Step 3.
+
+**Before continuing:** Download the results table and check that log₂FC
+signs are biologically plausible (disease-up genes should have positive
+FC if Disease is the numerator).
+
+------------------------------------------------------------------------
+
+## Step 7 — WGCNA (Co-expression Network)
+
+**Purpose:** Group genes into co-expression modules and correlate each
+module with the Normal/Disease trait to find biologically coherent gene
+sets.
+
+**Inputs:**
+
+-   *Soft threshold (power β)* — WGCNA plots R² vs. β; choose the
+    smallest β where scale-free topology R² ≥ 0.80 (typically β = 6–12
+    for microarray, 4–8 for RNA-seq). The app highlights the recommended
+    value.
+-   *Minimum module size* — default 30 genes. Increase for cleaner
+    modules; decrease if no modules are found.
+-   *Merge cut height* — default 0.25. Lower values merge more modules.
+
+**What the app does:** Constructs a weighted correlation network,
+performs hierarchical clustering, uses `dynamicTreeCut` to detect
+modules (each colored), and correlates module eigengenes with the trait
+vector.
+
+**Outputs:**
+
+-   **Scale-free topology plot** — use this to pick β.
+-   **Dendrogram + module color bar** — shows which genes belong to
+    which module.
+-   **Module–trait heatmap** — Pearson r and *p*-value for each module
+    vs. Normal/Disease. Modules with \|r\| \> 0.5 and *p* \< 0.05 are
+    considered trait-associated.
+
+**Example:** In a COPD dataset you might find a "turquoise" module (r =
+0.72, *p* = 0.001) positively correlated with disease and a "blue"
+module (r = −0.65) negatively correlated.
+
+**Tip:** WGCNA requires ≥ 15 samples. With fewer samples, reduce minimum
+module size to 10 and accept that modules may be less reliable.
+
+**Before continuing:** At least one module should have a significant
+trait correlation (*p* \< 0.05).
+
+------------------------------------------------------------------------
+
+## Step 8 — Common Genes (DEG ∩ WGCNA Hub Genes)
+
+**Purpose:** Intersect DEGs from Step 6 with hub genes from the
+trait-associated WGCNA modules to produce a high-confidence candidate
+gene list.
+
+**Inputs:**
+
+-   *Module selection* — tick one or more trait-correlated modules from
+    the WGCNA output.
+-   *Hub gene criterion* — genes in the top X% of intramodular
+    connectivity (default top 10%) are considered hub genes.
+
+**What the app does:** Computes the intersection of the DEG list with
+the selected module hub genes. Runs Gene Ontology (GO BP, MF, CC) and
+KEGG pathway over-representation analysis (ORA) on the intersection
+using `clusterProfiler`.
+
+**Outputs:**
+
+-   Venn/UpSet diagram showing DEG count, hub gene count, and
+    intersection.
+-   GO and KEGG dot plots ranked by adjusted *p*-value.
+-   Downloadable table of common genes with their log₂FC, module
+    membership, and connectivity score.
+
+**Example:** 500 DEGs ∩ 150 turquoise hub genes → 42 common genes
+enriched in "cilium assembly" (<GO:0060271>) and "MAPK signaling
+pathway" (hsa04010).
+
+**Tip:** If the intersection is empty, relax the hub gene criterion
+(increase from top 10% to top 25%) or select an additional module.
+
+**Before continuing:** Keep a note of the common gene count — this list
+feeds Steps 9–15.
+
+------------------------------------------------------------------------
+
+## Step 9 — PPI Network
+
+**Purpose:** Map the common genes onto a protein–protein interaction
+network to identify the most connected (hub) proteins.
+
+**Inputs:**
+
+-   *STRINGdb confidence score cutoff* — default 400 (medium
+    confidence). Increase to 700 for high-confidence interactions only.
+-   *Network layout* — choose Fruchterman–Reingold, Kamada–Kawai, or
+    circle.
+
+**What the app does:** Queries `STRINGdb` for interactions among the
+common genes. Builds an `igraph` network. Ranks nodes by degree (number
+of interactions), betweenness centrality, and eigenvector centrality.
+The top 10 hub proteins are highlighted.
+
+**Outputs:**
+
+-   Interactive network plot — node size proportional to degree; color
+    indicates centrality.
+-   Hub gene table with degree, betweenness, and eigenvector scores
+    (downloadable CSV).
+
+**Example:** From 42 common genes in a COPD network, hub proteins such
+as *TP53*, *AKT1*, *EGFR*, or *TNF* typically emerge as highly connected
+nodes.
+
+**Tip:** A minimum of \~10 nodes with at least one edge is required to
+render a meaningful network. If the network is empty, lower the STRING
+confidence cutoff to 200.
+
+**Before continuing:** Note the top 5 hub genes by degree — these are
+the primary candidates for Steps 10–14.
+
+------------------------------------------------------------------------
+
+## Step 10 — Machine-Learning Feature Selection
+
+**Purpose:** Use multiple ML algorithms to identify the smallest set of
+genes that best distinguishes Normal from Disease samples.
+
+**Inputs:**
+
+-   *Algorithms* — select one or more: **LASSO**, **Elastic Net**,
+    **Ridge**, **Random Forest**, **SVM-RFE**, **Boruta**, **sPLS-DA**,
+    **XGBoost + SHAP**.
+-   *Cross-validation folds* — default 10-fold CV.
+-   *SHAP values* — automatically computed for XGBoost; shows which
+    genes drive each prediction.
+
+**What the app does:** Trains each selected model on the normalized
+expression of the common genes. Each algorithm returns a ranked
+importance list or a selected-feature subset. The final feature list is
+the intersection (or union) of genes selected by ≥ 2 algorithms.
+
+**Outputs:**
+
+-   Per-algorithm importance bar charts.
+-   SHAP summary plot (if XGBoost selected).
+-   Final candidate gene table — genes consistently selected across
+    algorithms.
+
+**Example:** Running LASSO + Random Forest + SVM-RFE on 42 common genes
+might converge on 6–10 genes as the most discriminative features.
+
+**Tip:** Start with LASSO and Random Forest for speed. Add SVM-RFE and
+XGBoost for robustness if computation time allows. On a standard laptop,
+42 genes × 10-fold CV finishes in under 1 minute per algorithm.
+
+**Before continuing:** Select 3–15 final candidate genes to carry
+forward. Too many genes reduce nomogram interpretability.
+
+------------------------------------------------------------------------
+
+## Step 11 — Validation
+
+**Purpose:** Confirm that the candidate genes generalize beyond the
+training data.
+
+**Inputs:**
+
+-   *Validation type*:
+    -   **External** — provide a new independent GEO GSE ID. The app
+        downloads and normalizes it automatically, then scores samples
+        using the training-set model.
+    -   **Internal** — randomly splits the current dataset 70 % training
+        / 30 % test (stratified by group).
+-   *External GSE* — if External is chosen, enter the new GSE ID (e.g.,
+    `GSE47460`).
+
+**What the app does:** Applies the model fitted in Step 10 to the
+validation set. Reports accuracy, sensitivity, specificity, and
+confusion matrix.
+
+**Example:** Training on GSE89076 (COPD) and validating on GSE47460
+(independent COPD cohort) gives external AUC that should exceed 0.75 for
+the results to be publishable.
+
+**Tip:** Always prefer external validation when an independent cohort
+exists in GEO for the same disease. Internal validation is acceptable as
+a secondary confirmation.
+
+**Before continuing:** Validation accuracy ≥ 70 % is a reasonable
+minimum before proceeding to ROC analysis.
+
+------------------------------------------------------------------------
+
+## Step 12 — ROC Analysis
+
+**Purpose:** Quantify the diagnostic accuracy of each candidate gene
+individually using Receiver Operating Characteristic curves.
+
+**Inputs:**
+
+-   *AUC filter* — default ≥ 0.80. Genes below this threshold are
+    excluded from the nomogram and GSEA steps.
+-   *Training vs. Validation* — toggle between datasets.
+
+**What the app does:** For each candidate gene, fits a simple logistic
+regression, computes the ROC curve using `pROC`, and reports AUC with 95
+% confidence interval. Overlays all curves on one plot.
+
+**Outputs:**
+
+-   Multi-curve ROC plot colored by gene.
+-   AUC table with CI (downloadable).
+
+**Example:** From 8 candidate genes, suppose 5 have AUC ≥ 0.80 in both
+training and validation. These 5 genes proceed to the nomogram.
+
+**Tip:** A gene with AUC ≥ 0.80 in training but \< 0.65 in validation is
+likely overfitted — remove it.
+
+**Before continuing:** Retain only genes with AUC ≥ 0.80 in both cohorts
+(or relax to ≥ 0.70 if the cohort is small).
+
+------------------------------------------------------------------------
+
+## Step 13 — Nomogram
+
+**Purpose:** Build a clinically interpretable scoring model that
+predicts disease probability from the final gene panel.
+
+**Inputs:**
+
+-   *Genes included* — the genes that passed ROC filtering (auto-filled
+    from Step 12).
+-   *Calibration bootstrap replications* — default 200.
+
+**What the app does:**
+
+1.  Fits a binary logistic regression with `rms::lrm()`.
+2.  Draws a **nomogram** — each gene has a scale; a clinician sums
+    points across genes to read off a predicted probability.
+3.  Draws a **calibration curve** — predicted vs. observed probability;
+    a curve close to the diagonal is well-calibrated.
+4.  Runs **Decision Curve Analysis (DCA)** via `rmda` — shows net
+    benefit across decision thresholds, comparing the model against
+    treat-all and treat-none strategies.
+
+**Outputs:** Nomogram plot, calibration curve, and DCA plot (all
+downloadable as PNG or PDF).
+
+**Example:** A 4-gene nomogram for COPD might have total points mapping
+to disease probabilities of 5–95 %. A calibration curve with mean
+absolute error \< 0.05 indicates excellent calibration.
+
+**Tip:** If calibration is poor (curve deviates \> 0.10 from diagonal),
+reduce the number of genes in the model or increase bootstrap
+replications.
+
+**Before continuing:** DCA net benefit should be positive over a
+clinically relevant threshold range (typically 10–40 % for disease
+screening).
+
+------------------------------------------------------------------------
+
+## Step 14 — GSEA
+
+**Purpose:** Determine which biological pathways are enriched in samples
+with high vs. low expression of each final candidate gene.
+
+**Inputs:**
+
+-   *Gene set collection* — **GO** (BP, MF, CC), **KEGG**, or **MsigDB**
+    (Hallmark, C2 curated, C5 ontology, etc.).
+-   *p-value cutoff* — default 0.05 (BH-adjusted).
+-   *Target gene* — run GSEA ranked by correlation with one gene at a
+    time, or use all genes in the panel together.
+
+**What the app does:** Ranks all genes in the expression matrix by their
+Pearson correlation with the target gene's expression (or by signed
+log₂FC for the DE ranking). Runs `clusterProfiler::gseGO()` or
+`gseKEGG()` on the ranked list.
+
+**Outputs:**
+
+-   **Ridge plot** — enrichment score distribution per pathway.
+-   **GSEA enrichment plot** — running enrichment score for the top
+    pathway.
+-   Results table with NES, *p*-value, and leading-edge genes
+    (downloadable).
+
+**Example:** For a hub gene such as *SFTPC* in a COPD dataset, GSEA
+(KEGG) might show "ECM-receptor interaction" (NES = −1.8, *p* = 0.002)
+as the top negatively enriched pathway.
+
+**Tip:** Use MsigDB Hallmark for a high-level mechanistic overview; use
+KEGG for pathway-specific drug target identification.
+
+**Before continuing:** Note the top 3 enriched pathways per gene — they
+contextualize the biology section of the final report.
+
+------------------------------------------------------------------------
+
+## Step 15 — Summary Report
+
+**Purpose:** Generate a structured narrative and a downloadable PDF
+summarizing the entire analysis.
+
+**Inputs:** No additional inputs. The report is assembled from results
+stored in all previous steps.
+
+**What the app does:** Writes an auto-generated paragraph covering
+dataset details (GEO IDs, sample counts), number of DEGs, WGCNA module
+findings, common gene count, PPI hub genes, ML-selected features,
+validation AUCs, and the top GSEA pathways. Renders the paragraph to PDF
+using `rmarkdown`.
+
+**Outputs:**
+
+-   Narrative text displayed in the app panel.
+-   *Download PDF* button — produces a formatted report suitable for
+    inclusion in a manuscript Methods section.
+
+**Example output paragraph:**
+
+> "Two microarray datasets (GSE89076, n = 40; GSE63514, n = 48) were
+> retrieved from GEO. After QC, normalization (quantile), and ComBat
+> batch correction, 312 DEGs (FDR \< 0.05, \|log₂FC\| \> 1) were
+> identified by limma. WGCNA detected 8 modules; the turquoise module (r
+> = 0.72, *p* \< 0.001) was most strongly associated with COPD. The
+> intersection of DEGs and turquoise hub genes yielded 42 common genes.
+> After PPI analysis and multi-algorithm ML feature selection (LASSO,
+> RF, SVM-RFE), 6 final biomarkers were identified: *SFTPC*, *MUC5B*,
+> *AGER*, *CLDN18*, *LAMP3*, *NAPSA* (validation AUC range 0.81–0.94).
+> GSEA revealed significant enrichment of ECM-receptor interaction and
+> cilium assembly pathways."
+
+**Tip:** Run Step 15 last, after all previous steps are complete.
+Re-running any earlier step does not automatically regenerate the report
+— click *Generate Report* again after any changes.
 
 # App screenshots
 
