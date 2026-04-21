@@ -1,3 +1,22 @@
+## Single source-of-truth for all GExPipe package names.
+## Used by runGExPipe() (pre-launch install) and gexp_app_attach_packages() (load).
+.gexpipe_all_pkgs <- function(include_optional = TRUE) {
+  required <- c("shiny", "shinydashboard", "shinyjs", "DT")
+  core <- c(
+    "Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
+    "dplyr", "data.table", "edgeR", "sva", "ggplot2", "gridExtra",
+    "RColorBrewer", "pheatmap", "ggrepel", "VennDiagram", "UpSetR",
+    "WGCNA", "clusterProfiler", "enrichplot", "circlize", "STRINGdb",
+    "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
+    "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
+    "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils",
+    "dynamicTreeCut", "scales"
+  )
+  optional <- c("cicerone", "Boruta", "mixOmics", "xgboost",
+                "SHAPforxgboost", "rms", "rmda", "biomaRt")
+  if (include_optional) c(required, core, optional) else c(required, core)
+}
+
 ## Batch-install a vector of packages via BiocManager (handles both Bioc + CRAN).
 ## BiocManager selects versions matching the user's R/Bioconductor release automatically.
 .gexpipe_batch_install <- function(pkgs) {
@@ -86,29 +105,18 @@ gexp_app_attach_packages <- function() {
     return(invisible(NULL))
   }
 
-  required <- c("shiny", "shinydashboard", "shinyjs", "DT")
-  core <- c(
-    "Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
-    "dplyr", "data.table", "edgeR", "sva", "ggplot2", "gridExtra",
-    "RColorBrewer", "pheatmap", "ggrepel", "VennDiagram", "UpSetR",
-    "WGCNA", "clusterProfiler", "enrichplot", "circlize", "STRINGdb",
-    "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
-    "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
-    "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils",
-    "dynamicTreeCut", "scales"
-  )
-  optional <- c("cicerone", "Boruta", "mixOmics", "xgboost",
-                "SHAPforxgboost", "rms", "rmda", "biomaRt")
-
   # batch-install all missing packages in one BiocManager call (fast)
-  .gexpipe_batch_install(c(required, core, optional))
+  # Package list is defined once in .gexpipe_all_pkgs() and shared with runGExPipe().
+  .gexpipe_batch_install(.gexpipe_all_pkgs(include_optional = TRUE))
 
-  pkgs <- unique(c(required, core, optional))
+  pkgs <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
 
+  # Packages that must be present for the app to start at all (Shiny UI stack).
+  hard_required <- c("shiny", "shinydashboard", "shinyjs", "DT")
   missing <- character(0)
   for (p in pkgs) {
     if (!requireNamespace(p, quietly = TRUE)) {
-      if (p %in% required) missing <- c(missing, p)
+      if (p %in% hard_required) missing <- c(missing, p)
       next
     }
     tryCatch(
