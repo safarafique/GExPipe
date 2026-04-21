@@ -42,32 +42,50 @@
 
   message(
     "\nGExPipe: installing ", length(missing_pkgs), " missing package(s).\n",
-    "  Running in a background R process to avoid Windows DLL locks — \n",
-    "  output appears below. Please wait...\n"
+    "  Running in a background R process to avoid Windows DLL locks.\n",
+    "  First-time install can take up to 40 minutes — please wait...\n"
   )
 
-  # ── 3. Write a self-contained install script to a temp file ───────────────
+  # ── 3. Remove stale 00LOCK directories before installing ──────────────────
+  # A previous failed install leaves a 00LOCK-<pkg> folder in the library.
+  # R refuses to install that package again until the lock is removed.
+  # This also happens when another RStudio session has the package loaded.
+  lib_path <- .libPaths()[1L]
+  lock_dirs <- list.files(lib_path, pattern = "^00LOCK-", full.names = TRUE)
+  if (length(lock_dirs) > 0L) {
+    message("GExPipe: removing ", length(lock_dirs),
+            " stale lock director(y/ies): ",
+            paste(basename(lock_dirs), collapse = ", "))
+    unlink(lock_dirs, recursive = TRUE, force = TRUE)
+  }
+
+  # ── 4. Write a self-contained install script to a temp file ───────────────
   #   Using a temp file avoids all quoting/escaping problems on Windows.
-  lib_path <- .libPaths()[1L]   # install into the same library the user uses
 
   # Collect ALL parent library paths so the subprocess can see the same packages.
   # Rscript --vanilla strips .Renviron/.Rprofile, so the user library
-  # (e.g. C:/Users/.../win-library/4.6) is NOT in the subprocess .libPaths()
-  # by default. Without this, system.file() returns "" for installed packages,
-  # and BiocManager refuses to reinstall them (version already matches).
+  # (e.g. C:/Users/.../win-library/4.5) is NOT in the subprocess .libPaths()
+  # by default. Without this, BiocManager refuses to reinstall (version matches).
   parent_libs <- paste0('"', gsub("\\\\", "/", .libPaths()), '"', collapse = ", ")
   pkg_vec     <- paste0('"', missing_pkgs, '"', collapse = ", ")
 
   # All packages in missing_pkgs failed requireNamespace() in the PARENT session.
   # They are NOT loaded, so their DLLs are NOT Windows-locked — force = TRUE is safe.
   # Let BiocManager choose the package type (its default "both" tries binary first,
-  # falls back to source only when no binary is available). Do NOT force "source"
-  # on pre-release R — source compilation of igraph/cpp11 packages fails on R alpha.
+  # falls back to source only when no binary is available).
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),   # mirror parent library paths
-    'options(repos = c(CRAN = "https://cloud.r-project.org"))',
+    'options(',
+    '  repos              = c(CRAN = "https://cloud.r-project.org"),',
+    '  timeout            = 2400L,',   # 40-minute download timeout per file
+    '  download.file.method = "libcurl"',
+    ')',
     paste0('.lib  <- "', gsub("\\\\", "/", lib_path), '"'),
     paste0('.pkgs <- c(', pkg_vec, ')'),
+    '',
+    '# Remove any stale lock dirs inside the subprocess too',
+    '.locks <- list.files(.lib, pattern = "^00LOCK-", full.names = TRUE)',
+    'if (length(.locks) > 0L) unlink(.locks, recursive = TRUE, force = TRUE)',
     '',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
@@ -89,13 +107,14 @@
   on.exit(unlink(tmp_script), add = TRUE)
   writeLines(script, tmp_script)
 
-  # ── 4. Run Rscript subprocess (inherits console — output visible to user) ──
+  # ── 5. Run Rscript subprocess — timeout = 40 min (2400 s) ─────────────────
   rscript <- file.path(R.home("bin"), "Rscript")
   exit_code <- tryCatch(
     system2(rscript,
-            args   = c("--vanilla", "--no-save", shQuote(tmp_script)),
-            stdout = "",    # print directly to user's console
-            stderr = ""),   # print errors directly to user's console
+            args    = c("--vanilla", "--no-save", shQuote(tmp_script)),
+            stdout  = "",       # print directly to user's console
+            stderr  = "",       # print errors directly to user's console
+            timeout = 2400L),   # 40 minutes — enough for a full cold install
     error = function(e) {
       message("GExPipe: could not launch Rscript subprocess: ", conditionMessage(e))
       1L
