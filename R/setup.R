@@ -85,41 +85,24 @@ gexpipe_setup <- function(update   = TRUE,
   cran_optional  <- c("Boruta", "cicerone", "rms", "rmda",
                       "SHAPforxgboost", "xgboost")
 
-  ## ── 5. Install / update via BiocManager ───────────────────────────────────
-  all_bioc <- if (optional) c(bioc_required, bioc_optional) else bioc_required
-  all_cran <- if (optional) c(cran_required, cran_optional) else cran_required
+  ## ── 5. Install via subprocess (prevents BiocManager session restarts) ───────
+  # Direct BiocManager::install() calls in the parent session can trigger an
+  # automatic R session restart when loaded packages need updating. After that
+  # restart all local variables are gone, causing "object not found" errors.
+  # Using .gexpipe_batch_install() runs BiocManager inside a fresh Rscript
+  # subprocess — no restart ever happens in the parent session.
+  all_pkgs <- unique(c(
+    if (optional) c(bioc_required, bioc_optional, cran_required, cran_optional)
+    else          c(bioc_required, cran_required)
+  ))
 
-  message("\nInstalling/updating Bioconductor packages (this may take several minutes)...")
-  tryCatch(
-    BiocManager::install(all_bioc, update = update, ask = FALSE, quiet = FALSE),
-    error = function(e) {
-      message("  Warning: some Bioconductor packages could not be installed: ",
-              conditionMessage(e))
-    }
-  )
-
-  message("\nInstalling/updating CRAN packages...")
-  to_install_cran <- all_cran[!vapply(all_cran, requireNamespace,
-                                       logical(1L), quietly = TRUE)]
-  if (length(to_install_cran) > 0L) {
-    tryCatch(
-      utils::install.packages(to_install_cran,
-                               repos = "https://cloud.r-project.org",
-                               quiet = TRUE),
-      error = function(e) {
-        message("  Warning: some CRAN packages could not be installed: ",
-                conditionMessage(e))
-      }
-    )
-  } else if (!update) {
-    message("  All CRAN packages already present.")
-  }
+  message("\nInstalling missing packages via background process...")
+  .gexpipe_batch_install(all_pkgs)
 
   ## ── 6. Verify ─────────────────────────────────────────────────────────────
-  all_pkgs <- unique(c(all_bioc, all_cran))
-  status   <- vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+  status  <- vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+  missing <- names(status)[!status]
 
-  missing  <- names(status)[!status]
   if (length(missing) > 0L) {
     message(
       "\n  Could not install: ", paste(missing, collapse = ", "),
