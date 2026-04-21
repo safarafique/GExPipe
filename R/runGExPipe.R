@@ -12,13 +12,17 @@
 #'   browser - then use `launch.browser = TRUE` or `port = 3838`.
 #' @param host The host to bind. Use "0.0.0.0" in Google Colab so port forwarding works.
 #' @section Startup time:
-#' The welcome screen loads first; the full dashboard (15 tabs) is inserted only after
-#' **Go to Analysis**, so the first response avoids sourcing every tab UI file.
-#' `runGExPipe()` still builds a lazy session UI, and attaching many analysis packages
-#' on first open can take **tens of seconds to a few minutes** on a cold session (DLL loads).
-#' Prefer `GExPipe::runGExPipe()` from an **installed** package rather than opening
-#' `inst/shinyapp/` in RStudio (that path runs `global.R`, which can auto-install
-#' packages and is slower).
+#' `runGExPipe()` checks for missing packages **before** the browser opens and
+#' installs them in a single `BiocManager::install()` call.  On a machine where
+#' all packages are already present the check takes under one second.  On a
+#' fresh machine (no Bioconductor packages) expect **10–30 minutes** for the
+#' initial download; every subsequent call takes only seconds.
+#'
+#' The welcome screen loads first; the full 15-tab dashboard is built only
+#' after the user clicks **Go to Analysis**, so the initial browser response is
+#' fast even on slow networks.  Prefer `GExPipe::runGExPipe()` from an
+#' **installed** package rather than opening `inst/shinyapp/` in RStudio
+#' directly (that path runs `global.R`, which duplicates the install logic).
 #'
 #' Optional tuning before `runGExPipe()`:
 #' * `options(gexpipe.wgcna_threads = 1L)` - fewer WGCNA threads (less parallel setup noise).
@@ -37,14 +41,15 @@
 #'   (e.g. RStudio Stop button).
 #' @export
 #' @examples
-#' # Non-interactive: build an app object (this runs during R CMD check / `example()`).
+#' # Non-interactive (R CMD check / example()): build an app object only.
+#' # Dependency auto-install is skipped when interactive() is FALSE, so this
+#' # runs quickly without touching the network.
 #' app <- runGExPipe(launch.browser = FALSE, port = 0L)
 #' stopifnot(inherits(app, "shiny.appobj"))
 #'
-#' # Interactive: launch in a browser (blocks until the app is stopped).
+#' # Interactive: one line installs all missing packages, then opens the app.
 #' if (interactive()) {
-#'   app <- runGExPipe(launch.browser = TRUE, port = 3838L)
-#'   shiny::runApp(app, port = 3838L)
+#'   shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 #' }
 runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
   # Bioconductor Shiny guidance: do not launch the app inside the package.
@@ -56,6 +61,35 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   options(gexpipe.attach.done = NULL)
   options(gexpipe.attach.shiny_stack_only_done = NULL)
   options(gexpipe.attach.allow_full_now = NULL)
+
+  # ── Auto-install all missing dependencies BEFORE the app opens ──────────────
+  # This runs only in interactive sessions (not during R CMD check or vignette
+  # build, where interactive() is FALSE). The user sees a progress log in the
+  # console; the browser only opens once everything is ready.
+  if (interactive() && !isTRUE(getOption("shiny.testmode"))) {
+    all_pkgs <- .gexpipe_all_pkgs(include_optional = TRUE)
+    missing_now <- all_pkgs[!vapply(all_pkgs, requireNamespace,
+                                    logical(1L), quietly = TRUE)]
+    if (length(missing_now) > 0L) {
+      message(
+        "\nGExPipe: installing ", length(missing_now), " missing package(s) — ",
+        "please wait before the browser opens.\n",
+        "  ", paste(missing_now, collapse = ", "), "\n"
+      )
+      .gexpipe_batch_install(all_pkgs)
+      still_missing <- all_pkgs[!vapply(all_pkgs, requireNamespace,
+                                        logical(1L), quietly = TRUE)]
+      if (length(still_missing) > 0L) {
+        message(
+          "GExPipe: could not install: ", paste(still_missing, collapse = ", "), "\n",
+          "  Run  gexpipe_setup()  for a detailed install log."
+        )
+      } else {
+        message("GExPipe: all packages ready.\n")
+      }
+    }
+  }
+  # ────────────────────────────────────────────────────────────────────────────
 
   if (interactive() && identical(port, 0L) && !isTRUE(launch.browser)) {
     message(
