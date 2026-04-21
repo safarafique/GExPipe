@@ -94,11 +94,17 @@ if (!.github_reachable) {
 if (!requireNamespace("remotes", quietly = TRUE))
     install.packages("remotes")
 
-remotes::install_github("safarafique/GExPipe")
+# --no-staged-install prevents a Windows file-locking bug where R's staged
+# installation mechanism leaves a corrupt GExPipe.rdb file, causing
+# "lazy-load database is corrupt" on the very next library(GExPipe) call.
+remotes::install_github(
+    "safarafique/GExPipe",
+    INSTALL_opts = "--no-staged-install",
+    force        = TRUE
+)
 
-# After install, set up all dependencies and launch:
-library(GExPipe)
-gexpipe_setup(update = TRUE, optional = TRUE, launch = TRUE)
+# One line launches the app — missing dependencies install automatically:
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
 
 ### Troubleshooting: GitHub not reachable
