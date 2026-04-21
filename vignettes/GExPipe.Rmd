@@ -828,3 +828,4 @@ if (nzchar(shot_dir)) {
 ```{r sessionInfo}
 sessionInfo()
 ```
+1
