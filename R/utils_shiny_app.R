@@ -18,29 +18,92 @@
 }
 
 ## Batch-install a vector of packages via BiocManager (handles both Bioc + CRAN).
-## BiocManager selects versions matching the user's R/Bioconductor release automatically.
+##
+## On Windows, R locks every package DLL that is loaded in the current session.
+## BiocManager cannot overwrite a locked DLL, producing the infamous error:
+##   "cannot remove earlier installation, is it in use?"
+##
+## Solution: run the installation in a FRESH Rscript subprocess.  That process
+## starts with zero packages loaded, so no DLL is locked.  After it exits, the
+## parent session can requireNamespace() the newly installed packages normally.
 .gexpipe_batch_install <- function(pkgs) {
+
+  # ── 1. Install BiocManager if needed (rarely missing) ─────────────────────
   if (!requireNamespace("BiocManager", quietly = TRUE))
     utils::install.packages("BiocManager",
                              repos = "https://cloud.r-project.org", quiet = TRUE)
+
+  # ── 2. Only install what is genuinely absent ───────────────────────────────
   missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
   if (length(missing_pkgs) == 0L) return(invisible(character(0)))
-  message("GExPipe: installing ", length(missing_pkgs), " package(s): ",
-          paste(missing_pkgs, collapse = ", "))
-  tryCatch(
-    BiocManager::install(missing_pkgs, ask = FALSE, update = FALSE, quiet = FALSE),
-    error = function(e) message("  Warning: ", conditionMessage(e))
+
+  message(
+    "\nGExPipe: installing ", length(missing_pkgs), " missing package(s).\n",
+    "  Running in a background R process to avoid Windows DLL locks — \n",
+    "  output appears below. Please wait...\n"
   )
+
+  # ── 3. Write a self-contained install script to a temp file ───────────────
+  #   Using a temp file avoids all quoting/escaping problems on Windows.
+  lib_path <- .libPaths()[1L]   # install into the same library the user uses
+  pkg_vec   <- paste0('"', missing_pkgs, '"', collapse = ", ")
+
+  script <- c(
+    'options(repos = c(CRAN = "https://cloud.r-project.org"))',
+    paste0('.lib <- "', lib_path, '"'),
+    'if (!requireNamespace("BiocManager", quietly = TRUE))',
+    '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
+    paste0('BiocManager::install('),
+    paste0('  c(', pkg_vec, '),'),
+    '  lib         = .lib,',
+    '  ask         = FALSE,',
+    '  update      = FALSE,',
+    '  quiet       = FALSE',
+    ')'
+  )
+
+  tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
+  on.exit(unlink(tmp_script), add = TRUE)
+  writeLines(script, tmp_script)
+
+  # ── 4. Run Rscript subprocess (inherits console — output visible to user) ──
+  rscript <- file.path(R.home("bin"), "Rscript")
+  exit_code <- tryCatch(
+    system2(rscript,
+            args   = c("--vanilla", "--no-save", shQuote(tmp_script)),
+            stdout = "",    # print directly to user's console
+            stderr = ""),   # print errors directly to user's console
+    error = function(e) {
+      message("GExPipe: could not launch Rscript subprocess: ", conditionMessage(e))
+      1L
+    }
+  )
+
+  if (!identical(exit_code, 0L)) {
+    message(
+      "GExPipe: subprocess exited with code ", exit_code,
+      " — some packages may not have installed.\n",
+      "  Run  gexpipe_setup()  for a full install log, or restart R and try again."
+    )
+  }
+
+  # ── 5. Re-check: report anything still missing ────────────────────────────
   still_missing <- missing_pkgs[
     !vapply(missing_pkgs, requireNamespace, logical(1L), quietly = TRUE)
   ]
-  if (length(still_missing) > 0L) {
-    tryCatch(
-      utils::install.packages(still_missing,
-                               repos = "https://cloud.r-project.org", quiet = TRUE),
-      error = function(e) NULL
+
+  if (length(still_missing) == 0L) {
+    message("GExPipe: all packages installed successfully.\n")
+  } else {
+    message(
+      "GExPipe: ", length(still_missing), " package(s) could not be installed: ",
+      paste(still_missing, collapse = ", "), "\n",
+      "  Try:  BiocManager::install(c(",
+      paste0('"', still_missing, '"', collapse = ", "), "))\n",
+      "  or restart R and run  shiny::runApp(GExPipe::runGExPipe())  again."
     )
   }
+
   invisible(still_missing)
 }
 
