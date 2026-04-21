@@ -56,66 +56,25 @@
   pkg_vec     <- paste0('"', missing_pkgs, '"', collapse = ", ")
 
   # All packages in missing_pkgs failed requireNamespace() in the PARENT session.
-  # That means they are NOT loaded there, so their DLLs are NOT Windows-locked.
-  # force = TRUE is therefore safe and necessary: it makes BiocManager wipe and
-  # re-download the binary even when the installed version number matches the
-  # current Bioconductor release (handles stale/ABI-broken binaries, e.g. igraph
-  # compiled for R 4.5 now running under R 4.6).
-  # Determine the correct package type for this platform and R build:
-  #
-  #   Windows + stable R (status == "")  → "binary"
-  #     Pre-built binaries from CRAN/Bioconductor are available and all
-  #     C-level symbols match — no Rtools needed, no ABI mismatch possible.
-  #
-  #   Windows + alpha / beta / RC R      → "source"
-  #     Binaries are built only for stable releases. On pre-release R the
-  #     binary for R 4.4/4.5 will fail with LoadLibrary errors because the
-  #     R.dll ABI changed. Must compile from source with Rtools.
-  #
-  #   Linux / macOS                      → "both" (R default)
-  #     Packages are almost always source on these platforms anyway.
-  #
-  r_status  <- R.version$status          # "" for stable; "alpha"/"beta"/"RC" otherwise
-  is_dev_r  <- nzchar(r_status)
-  is_windows <- .Platform$OS.type == "windows"
-
-  pkg_type <- if (is_windows && !is_dev_r) {
-    '"binary"'
-  } else if (is_windows && is_dev_r) {
-    '"source"'
-  } else {
-    '"both"'
-  }
-
-  if (is_dev_r && is_windows) {
-    message(
-      "GExPipe: R ", R.version$major, ".", R.version$minor,
-      " (", r_status, ") detected — no pre-built binaries exist for ",
-      "pre-release R.\n",
-      "  Packages will be compiled from source using Rtools.\n",
-      "  Make sure Rtools is installed: https://cran.r-project.org/bin/windows/Rtools/\n",
-      "  Source compilation takes longer than binary install (10-40 min first time).\n"
-    )
-  }
-
+  # They are NOT loaded, so their DLLs are NOT Windows-locked — force = TRUE is safe.
+  # Let BiocManager choose the package type (its default "both" tries binary first,
+  # falls back to source only when no binary is available). Do NOT force "source"
+  # on pre-release R — source compilation of igraph/cpp11 packages fails on R alpha.
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),   # mirror parent library paths
     'options(repos = c(CRAN = "https://cloud.r-project.org"))',
-    paste0('.lib      <- "', gsub("\\\\", "/", lib_path), '"'),
-    paste0('.pkgs     <- c(', pkg_vec, ')'),
-    paste0('.pkg_type <- ', pkg_type),
+    paste0('.lib  <- "', gsub("\\\\", "/", lib_path), '"'),
+    paste0('.pkgs <- c(', pkg_vec, ')'),
     '',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
     '',
     'message("GExPipe subprocess: installing ", length(.pkgs),',
-    '        " package(s) [type=", .pkg_type, "]: ",',
-    '        paste(.pkgs, collapse = ", "))',
+    '        " package(s): ", paste(.pkgs, collapse = ", "))',
     '',
     'BiocManager::install(',
     '  .pkgs,',
     '  lib    = .lib,',
-    '  type   = .pkg_type,',
     '  ask    = FALSE,',
     '  update = FALSE,',
     '  force  = TRUE,',
