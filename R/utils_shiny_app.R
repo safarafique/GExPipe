@@ -48,18 +48,41 @@
   lib_path <- .libPaths()[1L]   # install into the same library the user uses
   pkg_vec   <- paste0('"', missing_pkgs, '"', collapse = ", ")
 
+  # The subprocess distinguishes two failure modes:
+  #   (a) Truly absent  — system.file() returns ""      → normal install
+  #   (b) On disk but broken namespace (e.g. compiled for an older R,
+  #       or a dependency like igraph is binary-incompatible)
+  #                     — system.file() returns a path   → force = TRUE reinstall
+  # Using force = TRUE for broken packages makes BiocManager wipe and
+  # re-download the binary even when the version number matches.
   script <- c(
     'options(repos = c(CRAN = "https://cloud.r-project.org"))',
-    paste0('.lib <- "', lib_path, '"'),
+    paste0('.lib  <- "', lib_path, '"'),
+    paste0('.pkgs <- c(', pkg_vec, ')'),
+    '',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
-    paste0('BiocManager::install('),
-    paste0('  c(', pkg_vec, '),'),
-    '  lib         = .lib,',
-    '  ask         = FALSE,',
-    '  update      = FALSE,',
-    '  quiet       = FALSE',
-    ')'
+    '',
+    '# Packages not on disk at all → normal install',
+    '.absent <- .pkgs[!nzchar(vapply(.pkgs, function(p)',
+    '  system.file(package = p), character(1)))]',
+    '',
+    '# Packages on disk but namespace fails → force-reinstall (broken binary)',
+    '.broken <- .pkgs[nzchar(vapply(.pkgs, function(p)',
+    '  system.file(package = p), character(1))) &',
+    '  !vapply(.pkgs, requireNamespace, logical(1), quietly = TRUE)]',
+    '',
+    'if (length(.absent) > 0L) {',
+    '  message("Installing absent packages: ", paste(.absent, collapse = ", "))',
+    '  BiocManager::install(.absent, lib = .lib, ask = FALSE,',
+    '    update = FALSE, force = FALSE, quiet = FALSE)',
+    '}',
+    '',
+    'if (length(.broken) > 0L) {',
+    '  message("Force-reinstalling broken packages: ", paste(.broken, collapse = ", "))',
+    '  BiocManager::install(.broken, lib = .lib, ask = FALSE,',
+    '    update = FALSE, force = TRUE, quiet = FALSE)',
+    '}'
   )
 
   tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
@@ -168,9 +191,14 @@ gexp_app_attach_packages <- function() {
     return(invisible(NULL))
   }
 
-  # batch-install all missing packages in one BiocManager call (fast)
-  # Package list is defined once in .gexpipe_all_pkgs() and shared with runGExPipe().
-  .gexpipe_batch_install(.gexpipe_all_pkgs(include_optional = TRUE))
+  # batch-install any remaining missing packages.
+  # runGExPipe() already ran .gexpipe_batch_install() before the app started,
+  # so this is normally a no-op (all packages already present). It only does
+  # real work if the user called shiny::runApp() without going through
+  # runGExPipe() first, or if the pre-launch install partially failed.
+  if (!isTRUE(getOption("gexpipe.prelaunch_install_done", FALSE))) {
+    .gexpipe_batch_install(.gexpipe_all_pkgs(include_optional = TRUE))
+  }
 
   pkgs <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
 

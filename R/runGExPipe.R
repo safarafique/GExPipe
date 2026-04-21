@@ -61,6 +61,7 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   options(gexpipe.attach.done = NULL)
   options(gexpipe.attach.shiny_stack_only_done = NULL)
   options(gexpipe.attach.allow_full_now = NULL)
+  options(gexpipe.prelaunch_install_done = NULL)
 
   # ── Auto-install all missing dependencies BEFORE the app opens ──────────────
   # This runs only in interactive sessions (not during R CMD check or vignette
@@ -89,6 +90,8 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
       }
     }
   }
+  # Signal to gexp_app_attach_packages() that install already ran — skip repeat.
+  options(gexpipe.prelaunch_install_done = TRUE)
   # ────────────────────────────────────────────────────────────────────────────
 
   if (interactive() && identical(port, 0L) && !isTRUE(launch.browser)) {
