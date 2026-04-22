@@ -119,3 +119,10 @@ server_results_summary <- function(input, output, session, rv) {
   }
   .gexp_server_cache$results_summary(input, output, session, rv)
 }
+
+server_packages <- function(input, output, session, rv) {
+  if (!exists("packages", envir = .gexp_server_cache, inherits = FALSE)) {
+    .gexp_server_cache$packages <- .gexp_load_inst_server_module("shiny_src/server/server_packages.R", "server_packages")
+  }
+  .gexp_server_cache$packages(input, output, session, rv)
+}
