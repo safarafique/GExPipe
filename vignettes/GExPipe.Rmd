@@ -149,7 +149,14 @@ automatically.
 
 ```{r launch-github, eval=FALSE}
 if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
-shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
+# ref = "main"           → always pulls the latest committed code from the main branch
+# subdir = "inst/shinyapp" → points shiny to where app.R actually lives in the repo
+shiny::runGitHub(
+  "GExPipe", "safarafique",
+  ref    = "main",
+  subdir = "inst/shinyapp",
+  destdir = tempfile()
+)
 ```
 
 > **First run on a fresh machine** takes **10–30 minutes** (downloading
@@ -158,8 +165,9 @@ shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
 
 What happens under the hood:
 
-1.  `shiny::runGitHub()` downloads the latest GExPipe source from
-    `github.com/safarafique/GExPipe` into a temporary folder.
+1.  `shiny::runGitHub()` downloads the latest commit on `main` from
+    `github.com/safarafique/GExPipe` into a temporary folder and enters
+    the `inst/shinyapp/` subdirectory (where `app.R` lives).
 2.  `global.R` runs automatically and installs every missing dependency
     via `BiocManager::install()`.
 3.  Once all packages are ready the Shiny dashboard opens in your
@@ -250,8 +258,11 @@ if (!requireNamespace("shiny", quietly = TRUE))
 
 # First run: installs ~50 packages automatically (15–30 min).
 # Every subsequent Colab session starts in seconds.
+# ref + subdir ensure the latest code is pulled from the correct app directory.
 shiny::runGitHub(
   "GExPipe", "safarafique",
+  ref            = "main",
+  subdir         = "inst/shinyapp",
   destdir        = tempfile(),
   launch.browser = FALSE,
   host           = "0.0.0.0",
@@ -306,6 +317,8 @@ if (!requireNamespace("shiny", quietly = TRUE))
                    quiet = TRUE)
 shiny::runGitHub(
   "GExPipe", "safarafique",
+  ref            = "main",
+  subdir         = "inst/shinyapp",
   destdir        = tempfile(),
   launch.browser = FALSE,
   host           = "0.0.0.0",
