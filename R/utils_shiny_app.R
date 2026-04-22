@@ -10,10 +10,11 @@
     "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
     "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
     "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils",
-    "dynamicTreeCut", "scales"
+    "dynamicTreeCut", "scales",
+    "biomaRt", "Boruta", "cicerone", "mixOmics",
+    "xgboost", "SHAPforxgboost", "rms", "rmda"
   )
-  optional <- c("cicerone", "Boruta", "mixOmics", "xgboost",
-                "SHAPforxgboost", "rms", "rmda", "biomaRt")
+  optional <- character(0)
   if (include_optional) c(required, core, optional) else c(required, core)
 }
 
