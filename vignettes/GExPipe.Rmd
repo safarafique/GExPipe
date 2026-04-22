@@ -96,14 +96,21 @@ if (!requireNamespace("remotes", quietly = TRUE))
 # --no-staged-install prevents a Windows file-locking bug where R's staged
 # installation mechanism leaves a corrupt GExPipe.rdb file, causing
 # "lazy-load database is corrupt" on the very next library(GExPipe) call.
+# force = TRUE ensures the latest GitHub code installs even when an older
+# version of GExPipe is already present in your library.
 remotes::install_github(
     "safarafique/GExPipe",
     INSTALL_opts = "--no-staged-install",
     force        = TRUE
 )
 
-# One line launches the app — missing dependencies install automatically:
+# After install, launch the app with one line (all missing dependencies
+# install automatically on first run — see "Launch the Shiny app" below
+# for all launch options including Google Colab):
 shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+
+# Tip: open the "Packages" tab in the app sidebar to see a live green/red
+# status signal for every dependency and install any still-missing ones.
 ```
 
 ### Troubleshooting: GitHub not reachable
@@ -166,9 +173,12 @@ What happens under the hood:
 
 ```{r install-then-launch, eval=FALSE}
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+# force = TRUE ensures the latest GitHub code installs even when an older
+# version of GExPipe is already present in your library.
 remotes::install_github(
     "safarafique/GExPipe",
-    INSTALL_opts = "--no-staged-install"
+    INSTALL_opts = "--no-staged-install",
+    force        = TRUE
 )
 ```
 
