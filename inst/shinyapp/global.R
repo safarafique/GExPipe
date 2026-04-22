@@ -53,8 +53,11 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
 .gexpipe_all_optional <- character(0)
 
 # ==============================================================================
-# STEP 3  —  Install missing packages in one batch call (fast)
+# STEP 3  —  Install missing packages via a background Rscript subprocess
 # ==============================================================================
+# Running in a subprocess means zero packages are loaded in that process —
+# no Windows DLL locks — so every package can be installed regardless of
+# what is already loaded in the parent (RStudio) session.
 .gexpipe_batch_install <- function(pkgs, label) {
   missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
   if (length(missing_pkgs) == 0L) {
@@ -63,24 +66,60 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
   }
   cat("  ", label, ": installing ", length(missing_pkgs), " package(s):\n", sep = "")
   cat("    ", paste(missing_pkgs, collapse = ", "), "\n")
-  tryCatch(
-    BiocManager::install(missing_pkgs, ask = FALSE, update = FALSE,
-                         quiet = FALSE, force = FALSE),
-    error = function(e) {
-      cat("  Warning during batch install:", conditionMessage(e), "\n")
-    }
+  cat("  Running in a background R process to avoid Windows DLL locks...\n")
+
+  lib_path    <- .libPaths()[1L]
+  parent_libs <- paste0('"', gsub("\\\\", "/", .libPaths()), '"', collapse = ", ")
+  pkg_vec     <- paste0('"', missing_pkgs, '"', collapse = ", ")
+
+  # Remove stale 00LOCK dirs in parent before spawning subprocess
+  lock_dirs <- list.files(lib_path, pattern = "^00LOCK-", full.names = TRUE)
+  if (length(lock_dirs) > 0L)
+    unlink(lock_dirs, recursive = TRUE, force = TRUE)
+
+  script <- c(
+    paste0('.libPaths(c(', parent_libs, '))'),
+    'options(',
+    '  repos               = c(CRAN = "https://cloud.r-project.org"),',
+    '  timeout             = 2400L,',
+    '  download.file.method = "libcurl"',
+    ')',
+    paste0('.lib  <- "', gsub("\\\\", "/", lib_path), '"'),
+    paste0('.pkgs <- c(', pkg_vec, ')'),
+    '.locks <- list.files(.lib, pattern = "^00LOCK-", full.names = TRUE)',
+    'if (length(.locks) > 0L) unlink(.locks, recursive = TRUE, force = TRUE)',
+    'if (!requireNamespace("BiocManager", quietly = TRUE))',
+    '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
+    'cat("GExPipe subprocess: installing", length(.pkgs), "package(s)\\n")',
+    'BiocManager::install(.pkgs, lib = .lib, ask = FALSE, update = FALSE,',
+    '                     force = TRUE, quiet = FALSE)'
   )
+
+  tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
+  on.exit(unlink(tmp_script), add = TRUE)
+  writeLines(script, tmp_script)
+
+  rscript   <- file.path(R.home("bin"), "Rscript")
+  exit_code <- tryCatch(
+    system2(rscript,
+            args    = c("--vanilla", "--no-save", shQuote(tmp_script)),
+            stdout  = "", stderr  = "",
+            timeout = 2400L),
+    error = function(e) { cat("  Could not launch subprocess:", conditionMessage(e), "\n"); 1L }
+  )
+
+  if (!identical(exit_code, 0L))
+    cat("  Subprocess exited with code", exit_code,
+        "— some packages may not have installed. Try running again.\n")
+
   still_missing <- missing_pkgs[
     !vapply(missing_pkgs, requireNamespace, logical(1L), quietly = TRUE)
   ]
-  if (length(still_missing) > 0L) {
-    cat("  Retrying via install.packages():", paste(still_missing, collapse = ", "), "\n")
-    tryCatch(
-      install.packages(still_missing,
-                       repos = "https://cloud.r-project.org", quiet = TRUE),
-      error = function(e) NULL
-    )
-  }
+  if (length(still_missing) > 0L)
+    cat("  Still missing:", paste(still_missing, collapse = ", "), "\n",
+        "  Run: BiocManager::install(c(",
+        paste0('"', still_missing, '"', collapse = ", "), "))\n")
+
   invisible(still_missing)
 }
 
