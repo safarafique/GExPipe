@@ -33,9 +33,13 @@ Dependencies are from **CRAN** and **Bioconductor** only.
 
 | R version | Bioconductor | Supported |
 |-----------|-------------|-----------|
-| 4.4.x | 3.19 / 3.20 | ✅ |
-| 4.5.x | 3.21 | ✅ |
-| 4.6.x | 3.22 | ✅ |
+| 4.4.x | 3.19 / 3.20 | ❌ (below minimum) |
+| 4.5.x | 3.21 | ✅ (recommended) |
+| 4.6.x stable | 3.22 | ✅ |
+| 4.6.x alpha/beta | — | ❌ (no binaries available) |
+
+> **Use a stable R release.** Download from
+> https://cran.r-project.org/bin/windows/base/
 
 ---
 
