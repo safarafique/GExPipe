@@ -55,15 +55,15 @@ server_packages <- function(input, output, session, rv) {
     list(pkg = "reshape2",       cat = "Core", step = "Data reshaping"),
     list(pkg = "corrplot",       cat = "Core", step = "Correlation matrix plots"),
     list(pkg = "scales",         cat = "Core", step = "Plot axis scale helpers"),
-    # ── Optional packages ──────────────────────────────────────────────────
-    list(pkg = "cicerone",       cat = "Optional", step = "Guided tour (User Guideline button)"),
-    list(pkg = "biomaRt",        cat = "Optional", step = "Step 1–2 · Ensembl gene ID mapping"),
-    list(pkg = "Boruta",         cat = "Optional", step = "Step 10 · ML — Boruta feature selection"),
-    list(pkg = "mixOmics",       cat = "Optional", step = "Step 10 · ML — sPLS-DA"),
-    list(pkg = "xgboost",        cat = "Optional", step = "Step 10 · ML — XGBoost"),
-    list(pkg = "SHAPforxgboost", cat = "Optional", step = "Step 10 · XGBoost SHAP importance"),
-    list(pkg = "rms",            cat = "Optional", step = "Step 13 · Nomogram model (rms::lrm)"),
-    list(pkg = "rmda",           cat = "Optional", step = "Step 13 · Decision curve analysis")
+    # ── Feature packages (Imports — required for full functionality) ──────────
+    list(pkg = "cicerone",       cat = "Core", step = "Guided tour (User Guideline button)"),
+    list(pkg = "biomaRt",        cat = "Core", step = "Step 1–2 · Ensembl gene ID mapping"),
+    list(pkg = "Boruta",         cat = "Core", step = "Step 10 · ML — Boruta feature selection"),
+    list(pkg = "mixOmics",       cat = "Core", step = "Step 10 · ML — sPLS-DA"),
+    list(pkg = "xgboost",        cat = "Core", step = "Step 10 · ML — XGBoost"),
+    list(pkg = "SHAPforxgboost", cat = "Core", step = "Step 10 · XGBoost SHAP importance"),
+    list(pkg = "rms",            cat = "Core", step = "Step 13 · Nomogram model (rms::lrm)"),
+    list(pkg = "rmda",           cat = "Core", step = "Step 13 · Decision curve analysis")
   )
 
   # ── Helper: check one package, return a named list ─────────────────────────
