@@ -47,7 +47,6 @@ as `r BiocStyle::Biocpkg("GEOquery")`, `r BiocStyle::Biocpkg("limma")`,
 app emphasizes usability and reproducibility through a fixed
 step-by-step interface and integrated summaries.
 
-
 # Installation
 
 Install `GExPipe` with `BiocManager` once the package has been accepted
@@ -110,7 +109,7 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ### Troubleshooting: GitHub not reachable
 
 | Situation | Fix |
-|-------------------------------------------------|-----------------------|
+|----|----|
 | Corporate firewall / proxy | `Sys.setenv(https_proxy = "http://yourproxy:port")` then retry |
 | VPN required | Connect to VPN first, then run the install block |
 | No internet at all | Download ZIP from GitHub on another machine, copy the file, then: `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
@@ -119,9 +118,9 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 # Launch the Shiny app
 
 > **R version requirement:** Use a **stable R release** (4.4.x, 4.5.x,
-> or 4.6.x when released). Pre-release builds such as R 4.6.0 alpha
-> have no pre-built package binaries, so many packages fail to install
-> or load. Download the latest stable R from
+> or 4.6.x when released). Pre-release builds such as R 4.6.0 alpha have
+> no pre-built package binaries, so many packages fail to install or
+> load. Download the latest stable R from
 > <https://cran.r-project.org/bin/windows/base/>.
 
 `runGExPipe()` automatically installs every missing dependency in the
@@ -136,21 +135,21 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 
 What happens when you run it:
 
-1. `runGExPipe()` scans for missing packages. If everything is already
-   installed the scan takes under one second.
-2. Any missing package is installed in a **background Rscript process**
-   (avoids Windows DLL locks and session restarts). The console shows
-   which packages are being installed.
-3. Once all packages are ready `shiny::runApp()` starts the server and
-   opens the app in your browser.
+1.  `runGExPipe()` scans for missing packages. If everything is already
+    installed the scan takes under one second.
+2.  Any missing package is installed in a **background Rscript process**
+    (avoids Windows DLL locks and session restarts). The console shows
+    which packages are being installed.
+3.  Once all packages are ready `shiny::runApp()` starts the server and
+    opens the app in your browser.
 
 On a **fresh machine** expect **10–30 minutes** for the first download.
 Every run after that starts in seconds.
 
 > **Note:** `runGExPipe()` follows the Bioconductor convention — it
 > returns a Shiny app object rather than launching the browser directly.
-> `shiny::runApp()` starts the server and blocks the R session until
-> you stop the app (RStudio Stop button or Ctrl+C).
+> `shiny::runApp()` starts the server and blocks the R session until you
+> stop the app (RStudio Stop button or Ctrl+C).
 
 ## Headless / Google Colab
 
@@ -165,9 +164,8 @@ Open port 3838 via Colab's port-forwarding panel or an `ngrok` tunnel.
 
 ## Advanced: pre-install or update packages separately
 
-`gexpipe_setup()` installs or updates all dependencies without
-launching the app — useful after an R upgrade or to force a full
-package refresh:
+`gexpipe_setup()` installs or updates all dependencies without launching
+the app — useful after an R upgrade or to force a full package refresh:
 
 ```{r setup-advanced, eval=FALSE}
 library(GExPipe)
@@ -880,4 +878,5 @@ if (nzchar(shot_dir)) {
 ```{r sessionInfo}
 sessionInfo()
 ```
+
 1
