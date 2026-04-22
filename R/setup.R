@@ -38,11 +38,22 @@ gexpipe_setup <- function(update   = TRUE,
                            ...) {
 
   ## ── 1. R version check ────────────────────────────────────────────────────
-  r_ver <- getRversion()
-  if (r_ver < "4.4.0") {
+  r_ver    <- getRversion()
+  r_status <- R.version$status   # "" for stable; "alpha"/"beta"/"RC" for pre-release
+
+  if (r_ver < "4.5.0") {
     stop(
-      "GExPipe requires R >= 4.4.0. Your version is ", r_ver, ".\n",
-      "Please update R from https://cran.r-project.org and re-run gexpipe_setup()."
+      "GExPipe requires R >= 4.5.0. Your version is ", r_ver, ".\n",
+      "Download the latest stable R from https://cran.r-project.org and re-run."
+    )
+  }
+
+  if (nzchar(r_status)) {
+    warning(
+      "You are using a pre-release R (", r_ver, " ", r_status, ").\n",
+      "Pre-release R has no pre-built package binaries — installation may fail.\n",
+      "Use a stable R release: https://cran.r-project.org/bin/windows/base/",
+      call. = FALSE
     )
   }
 
