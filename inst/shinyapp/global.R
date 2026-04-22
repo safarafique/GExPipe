@@ -44,13 +44,13 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
   "pheatmap", "circlize", "corrplot", "scales",
   "VennDiagram", "UpSetR", "igraph",
   "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
-  "msigdbr", "R.utils", "dynamicTreeCut", "parallel"
+  "msigdbr", "R.utils", "dynamicTreeCut", "parallel",
+  # Feature packages (formerly optional — now required for full functionality)
+  "biomaRt", "Boruta", "cicerone", "mixOmics",
+  "xgboost", "SHAPforxgboost", "rms", "rmda"
 )
 
-.gexpipe_all_optional <- c(
-  "Boruta", "mixOmics", "xgboost", "SHAPforxgboost",
-  "rms", "rmda", "cicerone", "biomaRt"
-)
+.gexpipe_all_optional <- character(0)
 
 # ==============================================================================
 # STEP 3  —  Install missing packages in one batch call (fast)

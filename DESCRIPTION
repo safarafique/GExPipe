@@ -73,27 +73,27 @@ Imports:
     tidyr (>= 1.3.0),
     UpSetR (>= 1.4.0),
     VennDiagram (>= 1.7.0),
-    WGCNA (>= 1.72)
-Suggests:
-    affy (>= 1.68.0),
+    WGCNA (>= 1.72),
     biomaRt (>= 2.50.0),
-    BiocCheck (>= 1.36.0),
-    BiocManager,
-    BiocStyle,
     Boruta (>= 8.0.0),
-    chromote (>= 0.1.0),
     cicerone (>= 0.1.0),
-    knitr (>= 1.43.0),
     mixOmics (>= 6.0.0),
-    oligo (>= 1.56.0),
-    pkgload (>= 1.3.0),
-    rmarkdown (>= 2.25.0),
     rms (>= 6.7.0),
     rmda (>= 1.6.0),
     SHAPforxgboost (>= 0.1.0),
-    shinytest2 (>= 0.3.0),
-    testthat (>= 3.0.0),
     xgboost (>= 1.7.0)
+Suggests:
+    affy (>= 1.68.0),
+    BiocCheck (>= 1.36.0),
+    BiocManager,
+    BiocStyle,
+    chromote (>= 0.1.0),
+    knitr (>= 1.43.0),
+    oligo (>= 1.56.0),
+    pkgload (>= 1.3.0),
+    rmarkdown (>= 2.25.0),
+    shinytest2 (>= 0.3.0),
+    testthat (>= 3.0.0)
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 SystemRequirements: GNU make
