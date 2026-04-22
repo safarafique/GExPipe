@@ -103,6 +103,23 @@ server_download <- function(input, output, session, rv) {
         log_text <- paste0(log_text, paste0(prep_logs, collapse = "\n"), "\n")
       }
 
+      # Clear stale data from any previous run so we start completely fresh.
+      # Without this, a successful prior run leaves old matrices in rv; when a
+      # later run fails (e.g. no count file), STEP 2 re-processes the old data
+      # with newly computed (mismatched-length) gene symbol vectors, causing
+      # "length of 'dimnames' [1] not equal to array extent".
+      rv$rna_counts_list     <- list()
+      rv$micro_expr_list     <- list()
+      rv$rna_metadata_list   <- list()
+      rv$micro_metadata_list <- list()
+      rv$micro_eset_list     <- list()
+      rv$all_genes_list      <- list()
+      rv$platform_per_gse    <- list()
+      rv$common_genes        <- character(0)
+      rv$combined_expr_raw   <- NULL
+      rv$download_complete   <- FALSE
+      rv$download_complete_at <- NULL
+
       # --------------------------------------------------------------------------
       # STEP 1: AUTOMATED DATA DOWNLOAD (pipeline: store raw, no mapping yet)
       # --------------------------------------------------------------------------
@@ -155,6 +172,32 @@ server_download <- function(input, output, session, rv) {
           rv$all_genes_list[[gse_id]] <- rownames(res$count_matrix)
           log_text <- paste0(log_text, res$log, " OK (", nrow(res$count_matrix), " genes)\n")
         }
+      }
+
+      # --------------------------------------------------------------------------
+      # Guard: if every download failed there is nothing to process — stop here
+      # with a clear message rather than crashing inside the gene ID mapping code.
+      # --------------------------------------------------------------------------
+      if (length(rv$rna_counts_list) == 0 && length(rv$micro_expr_list) == 0) {
+        log_text <- paste0(
+          log_text,
+          "\nAll downloads failed — no data to process.\n",
+          "Check the per-GSE reasons above, fix the GSE ID(s) or internet connection, and try again.\n"
+        )
+        rv$download_running <- FALSE
+        output$download_log <- renderText({ log_text })
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong("All downloads failed"),
+            tags$p(
+              "No data was retrieved. See the log above for the reason per GSE.",
+              style = "font-size: 12px; margin-top: 6px;"
+            )
+          ),
+          type = "error", duration = 12
+        )
+        stop("__gexpipe_all_downloads_failed__")
       }
 
       # --------------------------------------------------------------------------
@@ -307,6 +350,9 @@ server_download <- function(input, output, session, rv) {
     }, error = function(e) {
       closeAllConnections()
       msg <- conditionMessage(e)
+      # Sentinel thrown by the "all downloads failed" guard — notification was
+      # already shown; do not overwrite the log or show a second error popup.
+      if (identical(msg, "__gexpipe_all_downloads_failed__")) return()
       err_log <- paste0(log_text, "\n\nError: ", msg, "\nConnections were reset. Please check your network and try again.")
       output$download_log <- renderText({ err_log })
       rv$download_running <- FALSE

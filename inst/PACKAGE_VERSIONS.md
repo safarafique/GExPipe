@@ -1,13 +1,16 @@
 # GExPipe Package Versions (v0.99.7)
 
-## Supported R versions: 4.4, 4.5, 4.6
+## Supported R versions: 4.5, 4.6 (stable releases only)
+
+GExPipe requires **R 4.5.0 or later (stable release)**. Pre-release
+builds such as R 4.6.0 alpha are not supported — binary packages are
+not available for alpha R, causing DLL and installation errors.
 
 The `DESCRIPTION` file uses **minimum version** constraints so that
 `BiocManager::install("GExPipe")` pulls versions compatible with your R version:
 
-- **R 4.4** → Bioconductor 3.19 / 3.20
 - **R 4.5** → Bioconductor 3.21
-- **R 4.6** → Bioconductor 3.22
+- **R 4.6** (stable, when released) → Bioconductor 3.22
 
 `BiocManager` selects the correct package versions for your R version automatically.
 

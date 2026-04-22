@@ -1,5 +1,5 @@
 # GExPipe v0.99.7 — minimum package versions (matches DESCRIPTION)
-# Supports R 4.4, 4.5, 4.6 (BiocManager selects correct Bioc release automatically)
+# Requires R 4.5.0+  |  Bioconductor 3.21+ (BiocManager selects automatically)
 # Install: BiocManager::install("GExPipe")
 # See inst/PACKAGE_VERSIONS.md for details.
 # Imports (required)
