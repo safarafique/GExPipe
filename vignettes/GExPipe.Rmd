@@ -90,16 +90,21 @@ if (!.github_reachable) {
     )
 }
 
-if (!requireNamespace("remotes", quietly = TRUE))
-    install.packages("remotes")
-
+# dependencies = TRUE installs BOTH Imports: and Suggests: packages
+# (Boruta, cicerone, mixOmics, xgboost, rms, rmda, biomaRt, etc.).
+# Without this flag those optional packages are skipped and several app
+# features (ML tab, nomogram, guided tour) load but silently do nothing.
+# BiocManager handles CRAN + Bioconductor repos automatically — no need
+# for a separate remotes call.
+#
 # --no-staged-install prevents a Windows file-locking bug where R's staged
 # installation mechanism leaves a corrupt GExPipe.rdb file, causing
 # "lazy-load database is corrupt" on the very next library(GExPipe) call.
 # force = TRUE ensures the latest GitHub code installs even when an older
 # version of GExPipe is already present in your library.
-remotes::install_github(
+BiocManager::install(
     "safarafique/GExPipe",
+    dependencies = TRUE,
     INSTALL_opts = "--no-staged-install",
     force        = TRUE
 )
@@ -120,7 +125,7 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 | Corporate firewall / proxy | `Sys.setenv(https_proxy = "http://yourproxy:port")` then retry |
 | VPN required | Connect to VPN first, then run the install block |
 | No internet at all | Download ZIP from GitHub on another machine, copy the file, then: `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
-| `remotes` install fails | Try `devtools::install_github("safarafique/GExPipe")` as an alternative |
+| `BiocManager::install` fails | Try `remotes::install_github("safarafique/GExPipe", dependencies = TRUE, INSTALL_opts = "--no-staged-install")` as a fallback |
 
 # Launch the Shiny app
 
@@ -180,11 +185,14 @@ What happens under the hood:
 **First time only** — installs GExPipe and all dependencies:
 
 ```{r install-then-launch, eval=FALSE}
-if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+# dependencies = TRUE installs Imports: AND Suggests: (Boruta, cicerone,
+# mixOmics, xgboost, rms, rmda, biomaRt, etc.) so every app feature works.
 # force = TRUE ensures the latest GitHub code installs even when an older
 # version of GExPipe is already present in your library.
-remotes::install_github(
+BiocManager::install(
     "safarafique/GExPipe",
+    dependencies = TRUE,
     INSTALL_opts = "--no-staged-install",
     force        = TRUE
 )
