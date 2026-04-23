@@ -58,6 +58,7 @@ server_packages <- function(input, output, session, rv) {
     # ── Feature packages (Imports — required for full functionality) ──────────
     list(pkg = "cicerone",       cat = "Core", step = "Guided tour (User Guideline button)"),
     list(pkg = "biomaRt",        cat = "Core", step = "Step 1–2 · Ensembl gene ID mapping"),
+    list(pkg = "car",            cat = "Core", step = "Step 13 · Nomogram VIF (multicollinearity check)"),
     list(pkg = "Boruta",         cat = "Core", step = "Step 10 · ML — Boruta feature selection"),
     list(pkg = "mixOmics",       cat = "Core", step = "Step 10 · ML — sPLS-DA"),
     list(pkg = "xgboost",        cat = "Core", step = "Step 10 · ML — XGBoost"),
