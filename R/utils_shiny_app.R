@@ -18,64 +18,115 @@
   if (include_optional) c(required, core, optional) else c(required, core)
 }
 
+## Minimum versions for packages that frequently cause version-conflict errors.
+## Any package below its floor is treated as "needs update" even when installed.
+.gexpipe_min_versions <- c(
+  rlang     = "1.1.0",
+  cli       = "3.4.0",
+  vctrs     = "0.6.0",
+  lifecycle = "1.0.3",
+  glue      = "1.6.0",
+  Matrix    = "1.5.0",
+  Rcpp      = "1.0.10"
+)
+
+## Dedicated GExPipe library (created once per R version under user home).
+## New/updated packages are installed here so they shadow old system versions
+## via .libPaths() priority — without touching the user's system library.
+.gexpipe_get_lib <- function() {
+  rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
+  d  <- file.path(path.expand("~"), ".gexpipe_packages", rv)
+  dir.create(d, recursive = TRUE, showWarnings = FALSE)
+  d
+}
+
+## Best version of pkg available across all libPaths (not just what is loaded).
+.gexpipe_best_version <- function(pkg) {
+  vers <- vapply(.libPaths(), function(lib) {
+    tryCatch(as.character(utils::packageVersion(pkg, lib.loc = lib)),
+             error = function(e) "0.0.0")
+  }, character(1L))
+  vers <- vers[vers != "0.0.0"]
+  if (length(vers) == 0L) return(package_version("0.0.0"))
+  max(lapply(vers, package_version))
+}
+
 ## Batch-install a vector of packages via BiocManager (handles both Bioc + CRAN).
 ##
-## On Windows, R locks every package DLL that is loaded in the current session.
-## BiocManager cannot overwrite a locked DLL, producing the infamous error:
-##   "cannot remove earlier installation, is it in use?"
-##
-## Solution: run the installation in a FRESH Rscript subprocess.  That process
-## starts with zero packages loaded, so no DLL is locked.  After it exits, the
-## parent session can requireNamespace() the newly installed packages normally.
+## Four layers of protection:
+##  1. Dedicated ~/.gexpipe_packages/R-x.y/ library — new versions shadow old
+##     system ones via .libPaths() priority; subprocess writes there freely.
+##  2. Missing-package detection — requireNamespace() check.
+##  3. Version-conflict detection — compares best available version against
+##     .gexpipe_min_versions; outdated packages are added to the install list.
+##  4. Force-reload attempt — after subprocess, tries to unload + reload from
+##     the dedicated lib; if still conflicted, shows a clear restart message.
 .gexpipe_batch_install <- function(pkgs) {
 
-  # Initialise so the variable always exists even if an error occurs below.
-  still_missing <- character(0)
+  # ── 0. Dedicated library ───────────────────────────────────────────────────
+  gexpipe_lib <- .gexpipe_get_lib()
+  if (!gexpipe_lib %in% .libPaths())
+    .libPaths(c(gexpipe_lib, unique(.libPaths())))
 
-  # ── 1. Install BiocManager if needed (rarely missing) ─────────────────────
+  # ── 1. BiocManager ────────────────────────────────────────────────────────
   if (!requireNamespace("BiocManager", quietly = TRUE))
     utils::install.packages("BiocManager",
-                             repos = "https://cloud.r-project.org", quiet = TRUE)
+                             lib   = gexpipe_lib,
+                             repos = "https://cloud.r-project.org",
+                             quiet = TRUE)
 
-  # ── 2. Detect missing AND outdated packages ────────────────────────────────
-  # Outdated packages cause version conflicts (e.g. rlang 1.1.x < required 1.2.0)
-  # even when they are "present". Update them via the subprocess too.
-  missing_pkgs   <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
-  installed_pkgs <- pkgs[vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
-  outdated_pkgs  <- tryCatch({
-    old <- utils::old.packages(lib.loc = .libPaths()[1L])
-    if (!is.null(old) && nrow(old) > 0L) intersect(installed_pkgs, rownames(old))
+  # ── 2. Detect missing packages ────────────────────────────────────────────
+  missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
+
+  # ── 3. Detect version-conflicted packages ─────────────────────────────────
+  version_conflict_pkgs <- names(.gexpipe_min_versions)[
+    vapply(names(.gexpipe_min_versions), function(pkg) {
+      tryCatch(
+        .gexpipe_best_version(pkg) < package_version(.gexpipe_min_versions[[pkg]]),
+        error = function(e) FALSE
+      )
+    }, logical(1L))
+  ]
+
+  # ── 3b. Detect outdated packages in dedicated lib ─────────────────────────
+  outdated_pkgs <- tryCatch({
+    old <- utils::old.packages(lib.loc = gexpipe_lib)
+    if (!is.null(old) && nrow(old) > 0L) intersect(pkgs, rownames(old))
     else character(0L)
   }, error = function(e) character(0L), warning = function(w) character(0L))
 
-  to_install <- unique(c(missing_pkgs, outdated_pkgs))
+  to_install <- unique(c(missing_pkgs, version_conflict_pkgs, outdated_pkgs))
 
-  if (length(to_install) == 0L) return(invisible(character(0)))
+  if (length(to_install) == 0L) return(invisible(character(0L)))
 
   if (length(missing_pkgs) > 0L)
     message("GExPipe: ", length(missing_pkgs), " missing package(s): ",
-            paste(missing_pkgs, collapse = ", "))
+            paste(head(missing_pkgs, 8L), collapse = ", "),
+            if (length(missing_pkgs) > 8L) " ..." else "")
+  if (length(version_conflict_pkgs) > 0L)
+    message("GExPipe: ", length(version_conflict_pkgs), " version-conflict package(s): ",
+            paste(version_conflict_pkgs, collapse = ", "))
   if (length(outdated_pkgs) > 0L)
     message("GExPipe: ", length(outdated_pkgs), " outdated package(s): ",
-            paste(outdated_pkgs, collapse = ", "))
+            paste(head(outdated_pkgs, 8L), collapse = ", "),
+            if (length(outdated_pkgs) > 8L) " ..." else "")
   message(
     "GExPipe: installing/updating ", length(to_install), " package(s).\n",
-    "  Running in a background R process to avoid Windows DLL locks.\n",
-    "  First-time install can take up to 40 minutes — please wait...\n"
+    "  Background Rscript subprocess (no DLL locks).\n",
+    "  First-time install: up to 40 min. Subsequent runs: seconds."
   )
 
-  # ── 3. Remove stale 00LOCK directories before installing ──────────────────
-  lib_path <- .libPaths()[1L]
-  lock_dirs <- list.files(lib_path, pattern = "^00LOCK-", full.names = TRUE)
+  # ── 4. Remove stale 00LOCK dirs ───────────────────────────────────────────
+  lock_dirs <- list.files(gexpipe_lib, pattern = "^00LOCK-", full.names = TRUE)
   if (length(lock_dirs) > 0L) {
-    message("GExPipe: removing ", length(lock_dirs),
-            " stale lock director(y/ies): ",
-            paste(basename(lock_dirs), collapse = ", "))
+    message("GExPipe: removing ", length(lock_dirs), " stale lock dir(s)")
     unlink(lock_dirs, recursive = TRUE, force = TRUE)
   }
 
-  # ── 4. Write a self-contained install script to a temp file ───────────────
-  parent_libs <- paste0('"', gsub("\\\\", "/", .libPaths()), '"', collapse = ", ")
+  # ── 5. Write and run install subprocess ───────────────────────────────────
+  all_libs    <- unique(c(gexpipe_lib, .libPaths()))
+  parent_libs <- paste0('"', gsub("\\\\", "/", all_libs), '"', collapse = ", ")
+  lib_fwd     <- gsub("\\\\", "/", gexpipe_lib)
   pkg_vec     <- paste0('"', to_install, '"', collapse = ", ")
 
   script <- c(
@@ -85,39 +136,24 @@
     '  timeout             = 2400L,',
     '  download.file.method = "libcurl"',
     ')',
-    paste0('.lib  <- "', gsub("\\\\", "/", lib_path), '"'),
+    paste0('.lib  <- "', lib_fwd, '"'),
     paste0('.pkgs <- c(', pkg_vec, ')'),
-    '',
     '.locks <- list.files(.lib, pattern = "^00LOCK-", full.names = TRUE)',
     'if (length(.locks) > 0L) unlink(.locks, recursive = TRUE, force = TRUE)',
-    '',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
-    '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
-    '',
-    'message("GExPipe subprocess: installing/updating ", length(.pkgs),',
-    '        " package(s): ", paste(.pkgs, collapse = ", "))',
-    '',
-    'BiocManager::install(',
-    '  .pkgs,',
-    '  lib    = .lib,',
-    '  ask    = FALSE,',
-    '  update = FALSE,',
-    '  force  = TRUE,',
-    '  quiet  = FALSE',
-    ')',
-    '',
-    '# Resolve remaining version conflicts (e.g. rlang too old for a dependency)',
+    '  install.packages("BiocManager", lib = .lib,',
+    '                   repos = "https://cloud.r-project.org", quiet = FALSE)',
+    'message("GExPipe subprocess: installing/updating ", length(.pkgs), " package(s)")',
+    'BiocManager::install(.pkgs, lib = .lib, ask = FALSE,',
+    '                     update = TRUE, force = TRUE, quiet = FALSE)',
+    # Second pass: fix transitive outdated deps
     '.old <- tryCatch(',
     '  utils::old.packages(lib.loc = .lib, repos = BiocManager::repositories()),',
     '  error = function(e) NULL, warning = function(w) NULL',
     ')',
     'if (!is.null(.old) && nrow(.old) > 0L) {',
-    '  .upd <- rownames(.old)',
-    '  message("GExPipe subprocess: updating ", length(.upd),',
-    '          " outdated dep(s) to fix version conflicts: ",',
-    '          paste(head(.upd, 8), collapse = ", "),',
-    '          if (length(.upd) > 8) " ..." else "")',
-    '  BiocManager::install(.upd, lib = .lib, ask = FALSE,',
+    '  message("GExPipe subprocess: fixing ", nrow(.old), " transitive dep(s)")',
+    '  BiocManager::install(rownames(.old), lib = .lib, ask = FALSE,',
     '                       update = TRUE, force = TRUE, quiet = FALSE)',
     '}'
   )
@@ -126,44 +162,67 @@
   on.exit(unlink(tmp_script), add = TRUE)
   writeLines(script, tmp_script)
 
-  # ── 5. Run Rscript subprocess — timeout = 40 min (2400 s) ─────────────────
-  rscript <- file.path(R.home("bin"), "Rscript")
+  rscript   <- file.path(R.home("bin"), "Rscript")
   exit_code <- tryCatch(
     system2(rscript,
             args    = c("--vanilla", "--no-save", shQuote(tmp_script)),
-            stdout  = "",       # print directly to user's console
-            stderr  = "",       # print errors directly to user's console
-            timeout = 2400L),   # 40 minutes — enough for a full cold install
+            stdout  = "", stderr  = "",
+            timeout = 2400L),
     error = function(e) {
-      message("GExPipe: could not launch Rscript subprocess: ", conditionMessage(e))
+      message("GExPipe: could not launch subprocess: ", conditionMessage(e))
       1L
     }
   )
+  if (!identical(exit_code, 0L))
+    message("GExPipe: subprocess exit code ", exit_code,
+            " — restart R and try again if packages are still missing.")
 
-  if (!identical(exit_code, 0L)) {
+  # ── 6. Version-conflict recovery for already-loaded packages ──────────────
+  # Packages updated in gexpipe_lib shadow old system versions on next load.
+  # For packages already IN MEMORY with an old version, try unload + reload.
+  .try_reload <- function(pkg, min_ver) {
+    if (!isNamespaceLoaded(pkg)) return(TRUE)
+    cur <- tryCatch(utils::packageVersion(pkg), error = function(e) package_version("0.0.0"))
+    if (cur >= package_version(min_ver)) return(TRUE)
+    new_v <- tryCatch(utils::packageVersion(pkg, lib.loc = gexpipe_lib),
+                      error = function(e) package_version("0.0.0"))
+    if (new_v < package_version(min_ver)) return(FALSE)
+    tryCatch({
+      suppressWarnings(unloadNamespace(pkg))
+      loadNamespace(pkg, lib.loc = gexpipe_lib)
+      utils::packageVersion(pkg) >= package_version(min_ver)
+    }, error = function(e) FALSE)
+  }
+  still_conflicted <- names(.gexpipe_min_versions)[
+    !mapply(.try_reload, names(.gexpipe_min_versions), .gexpipe_min_versions,
+            SIMPLIFY = TRUE)
+  ]
+  if (length(still_conflicted) > 0L) {
+    for (pkg in still_conflicted) {
+      cur <- tryCatch(as.character(utils::packageVersion(pkg)), error = function(e) "?")
+      new <- tryCatch(as.character(utils::packageVersion(pkg, lib.loc = gexpipe_lib)),
+                      error = function(e) "updated")
+      message("GExPipe: ", pkg, " loaded=", cur, " updated=", new,
+              " (requires restart to apply)")
+    }
     message(
-      "GExPipe: subprocess exited with code ", exit_code,
-      " — some packages may not have installed.\n",
-      "  Run  gexpipe_setup()  for a full install log, or restart R and try again."
+      "\nGExPipe: RESTART R to apply package updates, then run again.\n",
+      "  RStudio: Ctrl+Shift+F10, then re-run shiny::runApp(GExPipe::runGExPipe())\n",
+      "  The next run will open the app immediately (packages already updated)."
     )
   }
 
-  # ── 5. Re-check: report anything still missing ────────────────────────────
+  # ── 7. Re-check: report still-missing packages ────────────────────────────
   still_missing <- missing_pkgs[
     !vapply(missing_pkgs, requireNamespace, logical(1L), quietly = TRUE)
   ]
-
-  if (length(still_missing) == 0L) {
-    message("GExPipe: all packages installed successfully.\n")
-  } else {
-    message(
-      "GExPipe: ", length(still_missing), " package(s) could not be installed: ",
-      paste(still_missing, collapse = ", "), "\n",
-      "  Try:  BiocManager::install(c(",
-      paste0('"', still_missing, '"', collapse = ", "), "))\n",
-      "  or restart R and run  shiny::runApp(GExPipe::runGExPipe())  again."
-    )
-  }
+  if (length(still_missing) > 0L)
+    message("GExPipe: still missing after install: ",
+            paste(still_missing, collapse = ", "),
+            "\n  Try: BiocManager::install(c(",
+            paste0('"', still_missing, '"', collapse = ", "), "))")
+  else if (length(to_install) > 0L)
+    message("GExPipe: all packages installed successfully.")
 
   invisible(still_missing)
 }
