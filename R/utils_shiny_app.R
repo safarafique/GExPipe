@@ -118,7 +118,7 @@
     '          paste(head(.upd, 8), collapse = ", "),',
     '          if (length(.upd) > 8) " ..." else "")',
     '  BiocManager::install(.upd, lib = .lib, ask = FALSE,',
-    '                       update = FALSE, force = FALSE, quiet = FALSE)',
+    '                       update = TRUE, force = TRUE, quiet = FALSE)',
     '}'
   )
 
