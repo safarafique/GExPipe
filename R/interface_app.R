@@ -49,7 +49,6 @@ gexp_app_analysis_dashboard_ui <- function() {
       width = 280,
       shinydashboard::sidebarMenu(
         id = "sidebar_menu",
-        shinydashboard::menuItem("Packages", tabName = "packages", icon = shiny::icon("box-open", class = "fa-lg"), badgeLabel = "Status", badgeColor = "purple"),
         shinydashboard::menuItem("1. Download Data", tabName = "download", icon = shiny::icon("download", class = "fa-lg"), badgeLabel = "Start", badgeColor = "green"),
         shinydashboard::menuItem("2. QC & Visualization", tabName = "qc", icon = shiny::icon("chart-bar", class = "fa-lg"), badgeLabel = "View", badgeColor = "blue"),
         shinydashboard::menuItem("3. Normalize Data", tabName = "normalize", icon = shiny::icon("balance-scale", class = "fa-lg"), badgeLabel = "Process", badgeColor = "purple"),
@@ -180,7 +179,6 @@ gexp_app_analysis_dashboard_ui <- function() {
         });
       ")),
       shinydashboard::tabItems(
-        gexp_ui_packages(),
         gexp_ui_download(),
         gexp_ui_qc(),
         gexp_ui_normalize(),
