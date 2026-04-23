@@ -61,7 +61,24 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("GExPipe", dependencies = TRUE)
 ```
 
-Until then, install directly from GitHub:
+Until then, install directly from GitHub.
+
+> **Recommended installer — `pak`:** `pak` resolves the full dependency
+> graph *before* downloading, automatically updates outdated packages that
+> would cause version conflicts (e.g. `rlang` too old), and handles both
+> CRAN and Bioconductor packages. It is the most reliable option,
+> especially on Windows.
+
+```{r install-pak, eval=FALSE}
+# Option A — pak (recommended, handles version conflicts automatically)
+install.packages("pak")
+pak::pkg_install("safarafique/GExPipe")
+
+# Then launch:
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+```
+
+If you prefer `BiocManager`, use the block below instead:
 
 > **Network requirement:** Installing from GitHub requires an internet
 > connection that can reach `github.com`. If you are behind an
@@ -121,6 +138,7 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 
 | Situation | Fix |
 |----|----|
+| Version conflict (`rlang`, `cli`, `vctrs` too old) | Use `pak::pkg_install("safarafique/GExPipe")` — it upgrades conflicted deps automatically |
 | Corporate firewall / proxy | `Sys.setenv(https_proxy = "http://yourproxy:port")` then retry |
 | VPN required | Connect to VPN first, then run the install block |
 | No internet at all | Download ZIP from GitHub on another machine, copy the file, then: `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
@@ -157,14 +175,38 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 > Download the latest stable R from
 > <https://cran.r-project.org/bin/windows/base/>.
 
-GExPipe can be launched in three ways. Choose the one that best fits
+GExPipe can be launched in four ways. Choose the one that best fits
 your situation:
 
 | Method | When to use |
 |---|---|
+| **Option 0 — `pak` install (recommended)** | Best version-conflict handling; use this if you hit dependency errors |
 | **Option 1 — GitHub (no install)** | First time, classroom, quick test — nothing to install |
 | **Option 2 — Installed package** | Regular use — starts in seconds every time |
 | **Option 3 — Google Colab** | No local R, shared machine, cloud analysis |
+
+------------------------------------------------------------------------
+
+## Option 0 — `pak` install (best for version conflicts)
+
+`pak` resolves the complete dependency graph before touching your
+library, upgrades outdated packages that would cause conflicts
+(e.g. `rlang 1.1.7` when `1.2.0` is needed), and handles CRAN and
+Bioconductor packages in one call.
+
+```{r install-pak-launch, eval=FALSE}
+install.packages("pak")               # one-time; takes ~30 seconds
+pak::pkg_install("safarafique/GExPipe")
+
+# Launch:
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+```
+
+To update GExPipe and all its dependencies at any time:
+
+```{r update-pak, eval=FALSE}
+pak::pkg_install("safarafique/GExPipe")   # re-run; pak only downloads what changed
+```
 
 ------------------------------------------------------------------------
 
