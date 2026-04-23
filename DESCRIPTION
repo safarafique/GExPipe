@@ -68,7 +68,7 @@ Imports:
     pROC,
     R.utils,
     randomForest,
-    rlang (>= 1.1.0),
+    rlang (>= 1.2.0),
     RColorBrewer,
     reshape2,
     rms,
