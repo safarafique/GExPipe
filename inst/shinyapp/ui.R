@@ -13,7 +13,6 @@
 
 # Source all UI modules (local = FALSE so variables are available in this scope)
 source("ui/ui_welcome.R", local = FALSE)
-source("ui/ui_packages.R", local = FALSE)
 source("ui/ui_download.R", local = FALSE)
 source("ui/ui_qc.R", local = FALSE)
 source("ui/ui_normalize.R", local = FALSE)
@@ -65,9 +64,6 @@ ui_analysis <- dashboardPage(
     width = 280,
     sidebarMenu(
       id = "sidebar_menu",
-      menuItem("Packages", tabName = "packages",
-               icon = icon("box-open", class = "fa-lg"),
-               badgeLabel = "Status", badgeColor = "purple"),
       menuItem("1. Download Data", tabName = "download",
                icon = icon("download", class = "fa-lg"),
                badgeLabel = "Start", badgeColor = "green"),
@@ -1098,7 +1094,6 @@ ui_analysis <- dashboardPage(
     ")),
     
     tabItems(
-      ui_packages,
       ui_download,
       ui_qc,
       ui_normalize,

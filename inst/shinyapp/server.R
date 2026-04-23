@@ -215,7 +215,6 @@ server <- function(input, output, session) {
   })
 
   # Source all server modules
-  source("server/server_packages.R", local = TRUE)
   source("server/server_download.R", local = TRUE)
   source("server/server_qc.R", local = TRUE)
   source("server/server_normalize.R", local = TRUE)
@@ -231,7 +230,6 @@ server <- function(input, output, session) {
   source("server/server_gsea.R", local = TRUE)
   
   # Call module functions
-  server_packages(input, output, session, rv)
   server_download(input, output, session, rv)
   server_qc(input, output, session, rv)
   server_normalize(input, output, session, rv)
