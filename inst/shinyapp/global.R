@@ -130,24 +130,41 @@ cat("\n  [3/4] Checking and installing optional packages...\n")
 .gexpipe_batch_install(.gexpipe_all_optional, "Optional")
 
 # ==============================================================================
-# STEP 4  —  Load all libraries
+# STEP 4  —  Load all libraries with live progress bar
 # ==============================================================================
-cat("\n  [4/4] Loading libraries...\n")
-
 .gexpipe_load_quietly <- function(pkg) {
   if (!requireNamespace(pkg, quietly = TRUE)) return(FALSE)
-  if (pkg == "parallel") { library(parallel); return(TRUE) }
+  if (pkg == "parallel") {
+    suppressPackageStartupMessages(library(parallel, quietly = TRUE))
+    return(TRUE)
+  }
   tryCatch(
     { suppressPackageStartupMessages(library(pkg, character.only = TRUE, quietly = TRUE)); TRUE },
     error = function(e) FALSE
   )
 }
 
-loaded   <- character(0)
+all_pkgs    <- c(.gexpipe_all_required, .gexpipe_all_optional)
+n_total     <- length(all_pkgs)
+loaded      <- character(0)
 failed_load <- character(0)
-for (p in c(.gexpipe_all_required, .gexpipe_all_optional)) {
-  if (.gexpipe_load_quietly(p)) loaded <- c(loaded, p)
-  else                          failed_load <- c(failed_load, p)
+
+cat("\n  [4/4] Loading", n_total, "libraries...\n\n")
+
+for (i in seq_along(all_pkgs)) {
+  p     <- all_pkgs[i]
+  label <- formatC(p, width = -18L, flag = "-")          # left-pad to 18 chars
+  idx   <- sprintf("  [%2d/%2d]", i, n_total)
+  cat(idx, label, "...")
+
+  if (.gexpipe_load_quietly(p)) {
+    ver <- tryCatch(as.character(utils::packageVersion(p)), error = function(e) "?")
+    cat(" \u2713", ver, "\n")                            # ✓
+    loaded <- c(loaded, p)
+  } else {
+    cat(" \u2717 MISSING\n")                             # ✗
+    failed_load <- c(failed_load, p)
+  }
 }
 
 # ==============================================================================
@@ -168,14 +185,14 @@ if (isNamespaceLoaded("WGCNA")) {
 # Summary
 # ==============================================================================
 cat("\n----------------------------------------------------------------------\n")
-cat("  Loaded       :", length(loaded), "packages\n")
+cat("  Loaded       :", length(loaded), "/", n_total, "packages\n")
 if (length(failed_load) > 0L)
-  cat("  Not loaded   :", paste(failed_load, collapse = ", "), "\n")
+  cat("  \u2717 Not loaded  :", paste(failed_load, collapse = ", "), "\n")
 if (length(failed_required) > 0L) {
-  cat("  STILL MISSING:", paste(failed_required, collapse = ", "), "\n")
+  cat("  \u2717 STILL MISSING:", paste(failed_required, collapse = ", "), "\n")
   cat("  Some features may not work. Try running again or check your internet connection.\n")
 } else {
-  cat("  Status       : Ready\n")
+  cat("  \u2713 Status       : All packages ready — opening app...\n")
 }
 cat("======================================================================\n\n")
 

@@ -220,27 +220,52 @@ gexp_app_attach_packages <- function() {
     .gexpipe_batch_install(.gexpipe_all_pkgs(include_optional = TRUE))
   }
 
-  pkgs <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
+  pkgs    <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
+  n_total <- length(pkgs)
 
-  # Packages that must be present for the app to start at all (Shiny UI stack).
   hard_required <- c("shiny", "shinydashboard", "shinyjs", "DT")
-  missing <- character(0)
-  for (p in pkgs) {
+  missing  <- character(0)
+  loaded   <- character(0)
+  failed   <- character(0)
+
+  message("\n======================================================================")
+  message("  GExPipe \u2014 loading ", n_total, " packages...\n")
+
+  for (i in seq_along(pkgs)) {
+    p     <- pkgs[i]
+    label <- formatC(p, width = -18L, flag = "-")
+    idx   <- sprintf("  [%2d/%2d]", i, n_total)
+
     if (!requireNamespace(p, quietly = TRUE)) {
+      message(idx, " ", label, "... \u2717 MISSING")
       if (p %in% hard_required) missing <- c(missing, p)
+      failed <- c(failed, p)
       next
     }
+
     tryCatch(
       {
         pkg_search <- paste0("package:", p)
-        if (!pkg_search %in% search()) {
-          # Source-loaded Shiny modules rely on unqualified symbols; attach namespace.
+        if (!pkg_search %in% search())
           base::attachNamespace(asNamespace(p))
-        }
+        ver <- tryCatch(as.character(utils::packageVersion(p)), error = function(e) "?")
+        message(idx, " ", label, "... \u2713 ", ver)
+        loaded <- c(loaded, p)
       },
-      error = function(e) NULL
+      error = function(e) {
+        message(idx, " ", label, "... \u2717 load error")
+        failed <<- c(failed, p)
+      }
     )
   }
+
+  message("\n----------------------------------------------------------------------")
+  message("  \u2713 Loaded  : ", length(loaded), " / ", n_total, " packages")
+  if (length(failed) > 0L)
+    message("  \u2717 Missing : ", paste(failed, collapse = ", "))
+  else
+    message("  \u2713 Status  : All packages ready \u2014 opening app...")
+  message("======================================================================\n")
 
   if (length(missing) > 0L) {
     stop(
