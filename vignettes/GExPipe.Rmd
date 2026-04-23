@@ -109,13 +109,10 @@ BiocManager::install(
     force        = TRUE
 )
 
-# After install, launch the app with one line (all missing dependencies
-# install automatically on first run — see "Launch the Shiny app" below
-# for all launch options including Google Colab):
+# After install, launch the app with one line.
+# The R console shows a live package loading list before the app opens —
+# see "Launch the Shiny app" below for all options including Google Colab.
 shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
-
-# Tip: open the "Packages" tab in the app sidebar to see a live green/red
-# status signal for every dependency and install any still-missing ones.
 ```
 
 ### Troubleshooting: GitHub not reachable
@@ -174,9 +171,11 @@ What happens under the hood:
     `github.com/safarafique/GExPipe` into a temporary folder and enters
     the `inst/shinyapp/` subdirectory (where `app.R` lives).
 2.  `global.R` runs automatically and installs every missing dependency
-    via `BiocManager::install()`.
-3.  Once all packages are ready the Shiny dashboard opens in your
-    browser.
+    via a background R subprocess (avoids Windows DLL locks).
+3.  The R console shows a live per-package loading list — `✓ loaded` or
+    `✗ MISSING` for each of the 54 packages.
+4.  Once all packages are ready the app opens directly to
+    **Step 1 — Download Data**.
 
 ------------------------------------------------------------------------
 
@@ -206,13 +205,21 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 
 What happens when you run it:
 
-1.  `runGExPipe()` scans for missing packages in under one second when
-    everything is installed.
+1.  `runGExPipe()` scans all 54 dependencies — takes under one second
+    when everything is installed.
 2.  Any missing package is installed in a **background Rscript process**
-    (avoids Windows DLL locks and session restarts).
-3.  `shiny::runApp()` starts the server and opens the app in your
-    browser. The R session stays blocked until you stop the app
-    (RStudio Stop button or Ctrl+C).
+    (avoids Windows DLL locks — no session restart needed).
+3.  The R console prints a live loading list before the browser opens:
+    ```
+    [ 1/54] shiny              ... ✓ 1.8.1
+    [ 2/54] shinydashboard     ... ✓ 0.7.2
+    ...
+    [54/54] xgboost            ... ✓ 2.1.4
+    ✓ Status: All packages ready — opening app...
+    ```
+4.  `shiny::runApp()` starts the server and opens the app directly to
+    **Step 1 — Download Data**. The R session stays blocked until you
+    stop the app (RStudio Stop button or Ctrl+C).
 
 > **Note:** `runGExPipe()` follows the Bioconductor convention — it
 > returns a Shiny app object; `shiny::runApp()` starts the actual server.
