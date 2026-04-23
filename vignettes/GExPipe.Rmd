@@ -56,7 +56,9 @@ on Bioconductor:
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
-BiocManager::install("GExPipe")
+# dependencies = TRUE installs all Imports + Suggests (54 packages total)
+# so every app feature works out of the box.
+BiocManager::install("GExPipe", dependencies = TRUE)
 ```
 
 Until then, install directly from GitHub:
@@ -123,6 +125,29 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 | VPN required | Connect to VPN first, then run the install block |
 | No internet at all | Download ZIP from GitHub on another machine, copy the file, then: `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
 | `BiocManager::install` fails | Try `remotes::install_github("safarafique/GExPipe", dependencies = TRUE, INSTALL_opts = "--no-staged-install")` as a fallback |
+
+### Troubleshooting: Windows — packages "in use and will not be installed"
+
+This happens when packages are already loaded in your R session (Windows
+locks their DLL files). Run the install in a fresh subprocess instead:
+
+```{r fix-dll-lock, eval=FALSE}
+# Runs in a clean Rscript process — nothing is loaded, no DLL locks.
+system2(
+  file.path(R.home("bin"), "Rscript"),
+  args = c("--vanilla", "--no-save", "-e", paste0(
+    'options(repos = c(CRAN = "https://cloud.r-project.org"));',
+    'if (!requireNamespace("BiocManager", quietly=TRUE))',
+    '  install.packages("BiocManager");',
+    'BiocManager::install(',
+    '  c("ggplot2","xgboost","biomaRt","Matrix","rlang","cli"),',
+    '  force=TRUE, ask=FALSE, update=FALSE)'
+  )),
+  stdout = "", stderr = ""
+)
+# After it finishes, restart R (Ctrl+Shift+F10 in RStudio) then launch:
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+```
 
 # Launch the Shiny app
 
