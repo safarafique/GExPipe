@@ -46,7 +46,7 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
   "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
   "msigdbr", "R.utils", "dynamicTreeCut", "parallel",
   # Feature packages (formerly optional — now required for full functionality)
-  "biomaRt", "Boruta", "cicerone", "mixOmics",
+  "biomaRt", "Boruta", "car", "cicerone", "mixOmics",
   "xgboost", "SHAPforxgboost", "rms", "rmda"
 )
 
