@@ -231,7 +231,6 @@ gexp_app_server <- function(input, output, session) {
     gexp_register_workspace_observers(input, output, session, rv)
     gexp_register_help_observers(input, output, session, rv)
 
-    server_packages(input, output, session, rv)
     server_download(input, output, session, rv)
     server_qc(input, output, session, rv)
     server_normalize(input, output, session, rv)
