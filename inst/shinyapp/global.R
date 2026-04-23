@@ -60,19 +60,36 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
 # what is already loaded in the parent (RStudio) session.
 .gexpipe_batch_install <- function(pkgs, label) {
   missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
-  if (length(missing_pkgs) == 0L) {
-    cat("  ", label, ": all present\n", sep = "")
+
+  # Detect outdated packages among those already installed —
+  # version conflicts (e.g. rlang 1.1.x < required 1.2.0) cause load errors
+  # even when the package is "present". Update them via the subprocess too.
+  installed_pkgs <- pkgs[vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
+  outdated_pkgs  <- tryCatch({
+    old <- utils::old.packages(lib.loc = .libPaths()[1L])
+    if (!is.null(old) && nrow(old) > 0L) intersect(installed_pkgs, rownames(old))
+    else character(0L)
+  }, error = function(e) character(0L), warning = function(w) character(0L))
+
+  to_install <- unique(c(missing_pkgs, outdated_pkgs))
+
+  if (length(to_install) == 0L) {
+    cat("  ", label, ": all present and up to date\n", sep = "")
     return(invisible(character(0)))
   }
-  cat("  ", label, ": installing ", length(missing_pkgs), " package(s):\n", sep = "")
-  cat("    ", paste(missing_pkgs, collapse = ", "), "\n")
-  cat("  Running in a background R process to avoid Windows DLL locks...\n")
+  if (length(missing_pkgs) > 0L)
+    cat("  ", label, " — missing  (", length(missing_pkgs), "): ",
+        paste(missing_pkgs, collapse = ", "), "\n", sep = "")
+  if (length(outdated_pkgs) > 0L)
+    cat("  ", label, " — outdated (", length(outdated_pkgs), "): ",
+        paste(outdated_pkgs, collapse = ", "), "\n", sep = "")
+  cat("  Running background R subprocess (no DLL locks)...\n")
 
   lib_path    <- .libPaths()[1L]
   parent_libs <- paste0('"', gsub("\\\\", "/", .libPaths()), '"', collapse = ", ")
-  pkg_vec     <- paste0('"', missing_pkgs, '"', collapse = ", ")
+  pkg_vec     <- paste0('"', to_install, '"', collapse = ", ")
 
-  # Remove stale 00LOCK dirs in parent before spawning subprocess
+  # Remove stale 00LOCK dirs before spawning subprocess
   lock_dirs <- list.files(lib_path, pattern = "^00LOCK-", full.names = TRUE)
   if (length(lock_dirs) > 0L)
     unlink(lock_dirs, recursive = TRUE, force = TRUE)
@@ -90,9 +107,23 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     'if (length(.locks) > 0L) unlink(.locks, recursive = TRUE, force = TRUE)',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
-    'cat("GExPipe subprocess: installing", length(.pkgs), "package(s)\\n")',
+    'cat("GExPipe subprocess: installing/updating", length(.pkgs), "package(s)\\n")',
     'BiocManager::install(.pkgs, lib = .lib, ask = FALSE, update = FALSE,',
-    '                     force = TRUE, quiet = FALSE)'
+    '                     force = TRUE, quiet = FALSE)',
+    '# Resolve any remaining version conflicts (e.g. rlang too old for a dependency)',
+    '.old <- tryCatch(',
+    '  utils::old.packages(lib.loc = .lib, repos = BiocManager::repositories()),',
+    '  error = function(e) NULL, warning = function(w) NULL',
+    ')',
+    'if (!is.null(.old) && nrow(.old) > 0L) {',
+    '  .upd <- rownames(.old)',
+    '  cat("GExPipe subprocess: updating", length(.upd),',
+    '      "outdated dep(s) to fix version conflicts:",',
+    '      paste(head(.upd, 8), collapse=", "),',
+    '      if (length(.upd) > 8) "..." else "", "\\n")',
+    '  BiocManager::install(.upd, lib = .lib, ask = FALSE,',
+    '                       update = FALSE, force = FALSE, quiet = FALSE)',
+    '}'
   )
 
   tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")

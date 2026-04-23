@@ -37,20 +37,34 @@
     utils::install.packages("BiocManager",
                              repos = "https://cloud.r-project.org", quiet = TRUE)
 
-  # ── 2. Only install what is genuinely absent ───────────────────────────────
-  missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
-  if (length(missing_pkgs) == 0L) return(invisible(character(0)))
+  # ── 2. Detect missing AND outdated packages ────────────────────────────────
+  # Outdated packages cause version conflicts (e.g. rlang 1.1.x < required 1.2.0)
+  # even when they are "present". Update them via the subprocess too.
+  missing_pkgs   <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
+  installed_pkgs <- pkgs[vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
+  outdated_pkgs  <- tryCatch({
+    old <- utils::old.packages(lib.loc = .libPaths()[1L])
+    if (!is.null(old) && nrow(old) > 0L) intersect(installed_pkgs, rownames(old))
+    else character(0L)
+  }, error = function(e) character(0L), warning = function(w) character(0L))
 
+  to_install <- unique(c(missing_pkgs, outdated_pkgs))
+
+  if (length(to_install) == 0L) return(invisible(character(0)))
+
+  if (length(missing_pkgs) > 0L)
+    message("GExPipe: ", length(missing_pkgs), " missing package(s): ",
+            paste(missing_pkgs, collapse = ", "))
+  if (length(outdated_pkgs) > 0L)
+    message("GExPipe: ", length(outdated_pkgs), " outdated package(s): ",
+            paste(outdated_pkgs, collapse = ", "))
   message(
-    "\nGExPipe: installing ", length(missing_pkgs), " missing package(s).\n",
+    "GExPipe: installing/updating ", length(to_install), " package(s).\n",
     "  Running in a background R process to avoid Windows DLL locks.\n",
     "  First-time install can take up to 40 minutes — please wait...\n"
   )
 
   # ── 3. Remove stale 00LOCK directories before installing ──────────────────
-  # A previous failed install leaves a 00LOCK-<pkg> folder in the library.
-  # R refuses to install that package again until the lock is removed.
-  # This also happens when another RStudio session has the package loaded.
   lib_path <- .libPaths()[1L]
   lock_dirs <- list.files(lib_path, pattern = "^00LOCK-", full.names = TRUE)
   if (length(lock_dirs) > 0L) {
@@ -61,37 +75,26 @@
   }
 
   # ── 4. Write a self-contained install script to a temp file ───────────────
-  #   Using a temp file avoids all quoting/escaping problems on Windows.
-
-  # Collect ALL parent library paths so the subprocess can see the same packages.
-  # Rscript --vanilla strips .Renviron/.Rprofile, so the user library
-  # (e.g. C:/Users/.../win-library/4.5) is NOT in the subprocess .libPaths()
-  # by default. Without this, BiocManager refuses to reinstall (version matches).
   parent_libs <- paste0('"', gsub("\\\\", "/", .libPaths()), '"', collapse = ", ")
-  pkg_vec     <- paste0('"', missing_pkgs, '"', collapse = ", ")
+  pkg_vec     <- paste0('"', to_install, '"', collapse = ", ")
 
-  # All packages in missing_pkgs failed requireNamespace() in the PARENT session.
-  # They are NOT loaded, so their DLLs are NOT Windows-locked — force = TRUE is safe.
-  # Let BiocManager choose the package type (its default "both" tries binary first,
-  # falls back to source only when no binary is available).
   script <- c(
-    paste0('.libPaths(c(', parent_libs, '))'),   # mirror parent library paths
+    paste0('.libPaths(c(', parent_libs, '))'),
     'options(',
-    '  repos              = c(CRAN = "https://cloud.r-project.org"),',
-    '  timeout            = 2400L,',   # 40-minute download timeout per file
+    '  repos               = c(CRAN = "https://cloud.r-project.org"),',
+    '  timeout             = 2400L,',
     '  download.file.method = "libcurl"',
     ')',
     paste0('.lib  <- "', gsub("\\\\", "/", lib_path), '"'),
     paste0('.pkgs <- c(', pkg_vec, ')'),
     '',
-    '# Remove any stale lock dirs inside the subprocess too',
     '.locks <- list.files(.lib, pattern = "^00LOCK-", full.names = TRUE)',
     'if (length(.locks) > 0L) unlink(.locks, recursive = TRUE, force = TRUE)',
     '',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib, quiet = FALSE)',
     '',
-    'message("GExPipe subprocess: installing ", length(.pkgs),',
+    'message("GExPipe subprocess: installing/updating ", length(.pkgs),',
     '        " package(s): ", paste(.pkgs, collapse = ", "))',
     '',
     'BiocManager::install(',
@@ -101,7 +104,22 @@
     '  update = FALSE,',
     '  force  = TRUE,',
     '  quiet  = FALSE',
-    ')'
+    ')',
+    '',
+    '# Resolve remaining version conflicts (e.g. rlang too old for a dependency)',
+    '.old <- tryCatch(',
+    '  utils::old.packages(lib.loc = .lib, repos = BiocManager::repositories()),',
+    '  error = function(e) NULL, warning = function(w) NULL',
+    ')',
+    'if (!is.null(.old) && nrow(.old) > 0L) {',
+    '  .upd <- rownames(.old)',
+    '  message("GExPipe subprocess: updating ", length(.upd),',
+    '          " outdated dep(s) to fix version conflicts: ",',
+    '          paste(head(.upd, 8), collapse = ", "),',
+    '          if (length(.upd) > 8) " ..." else "")',
+    '  BiocManager::install(.upd, lib = .lib, ask = FALSE,',
+    '                       update = FALSE, force = FALSE, quiet = FALSE)',
+    '}'
   )
 
   tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
