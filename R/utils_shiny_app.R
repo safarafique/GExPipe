@@ -11,7 +11,7 @@
     "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
     "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils",
     "dynamicTreeCut", "scales",
-    "biomaRt", "Boruta", "cicerone", "mixOmics",
+    "biomaRt", "Boruta", "car", "cicerone", "mixOmics",
     "xgboost", "SHAPforxgboost", "rms", "rmda"
   )
   optional <- character(0)

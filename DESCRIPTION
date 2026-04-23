@@ -76,6 +76,7 @@ Imports:
     WGCNA (>= 1.72),
     biomaRt (>= 2.50.0),
     Boruta (>= 8.0.0),
+    car (>= 3.1.0),
     cicerone (>= 0.1.0),
     mixOmics (>= 6.0.0),
     rms (>= 6.7.0),
