@@ -105,15 +105,27 @@ shiny::runGitHub(
 
 `pak` resolves the full dependency graph before downloading and
 automatically upgrades any package below its minimum required version
-(e.g. `rlang` too old for `dplyr`):
+(e.g. `rlang` too old for `dplyr`).
+
+> **Important — `pak` also uses `libcurl` internally.**
+> `options(download.file.method = "wininet")` does **not** affect `pak`.
+> If `curl.dll` is locked in your current session, `pak` will fail with
+> the same download error. **Restart R first** (`Ctrl+Shift+F10` in
+> RStudio) to release all DLL locks, then run `pak` immediately before
+> anything else loads `curl`:
 
 ```{r install-pak, eval=FALSE}
+# Run AFTER restarting R (Ctrl+Shift+F10) — before anything loads curl.dll
 install.packages("pak")
 pak::pkg_install("safarafique/GExPipe")
 
 # Launch:
 shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
+
+If you cannot restart R (e.g. inside a running session), use the
+**3-step GitHub block above** instead — it never requires a restart
+because installation runs in a separate subprocess with nothing loaded.
 
 # Launch the Shiny App
 
@@ -225,11 +237,12 @@ shiny::runGitHub(
 
 | Error | Cause | Fix |
 |---|---|---|
-| `download from github.com failed` | `curl.dll` locked by RStudio | Run the 3-step block in **Installation → From GitHub** |
-| `packages in use and will not be installed` | DLL locked by running session | Same 3-step block; or restart R first |
-| `namespace rlang X.Y is loaded but >= Z required` | Outdated package | `pak::pkg_install("safarafique/GExPipe")` |
+| `download from github.com failed` | `curl.dll` locked | Use the **3-step GitHub block** (wininet + lock clean + runGitHub) |
+| `pak` fails to download packages | `pak` also uses `libcurl` — same lock | Restart R (`Ctrl+Shift+F10`), then run `pak` immediately |
+| `packages in use and will not be installed` | DLL locked by running session | Same **3-step block** — no restart needed |
+| `namespace rlang X.Y loaded but >= Z required` | Outdated package | Restart R, then `pak::pkg_install("safarafique/GExPipe")` |
 | `needs_compilation: TRUE` fails | No C compiler | Install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/) |
-| Corporate firewall / proxy | Network blocked | `Sys.setenv(https_proxy = "http://proxy:port")` |
+| Corporate firewall / proxy | Network blocked | `Sys.setenv(https_proxy = "http://proxy:port")` then retry |
 | No internet | Offline system | Download ZIP from GitHub, then `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
 | `lazy-load database is corrupt` | Windows staged-install bug | Reinstall with `INSTALL_opts = "--no-staged-install"` |
 
