@@ -138,34 +138,52 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 
 | Situation | Fix |
 |----|----|
-| Version conflict (`rlang`, `cli`, `vctrs` too old) | Use `pak::pkg_install("safarafique/GExPipe")` — it upgrades conflicted deps automatically |
+| `download from github.com failed` | `options(download.file.method = "wininet")` then retry — curl.dll is locked |
+| Packages "in use / will not be installed" | Same: `options(download.file.method = "wininet")` + remove `00LOCK-*` dirs (see block below) |
+| Version conflict (`rlang`, `cli`, `vctrs` too old) | Use `pak::pkg_install("safarafique/GExPipe")` — upgrades conflicted deps automatically |
+| `needs_compilation: TRUE` package fails | Install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/) — lets R compile any package from source |
 | Corporate firewall / proxy | `Sys.setenv(https_proxy = "http://yourproxy:port")` then retry |
 | VPN required | Connect to VPN first, then run the install block |
-| No internet at all | Download ZIP from GitHub on another machine, copy the file, then: `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
+| No internet at all | Download ZIP from GitHub on another machine, then: `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
 | `BiocManager::install` fails | Try `remotes::install_github("safarafique/GExPipe", dependencies = TRUE, INSTALL_opts = "--no-staged-install")` as a fallback |
 
-### Troubleshooting: Windows — packages "in use and will not be installed"
+### Troubleshooting: Windows — DLL lock / download fails
 
-This happens when packages are already loaded in your R session (Windows
-locks their DLL files). Run the install in a fresh subprocess instead:
+Two common Windows errors and their fixes:
+
+**Error A — packages "in use and will not be installed"**
+(e.g. `curl.dll`, `S7.dll`, `rlang.dll` locked by RStudio)
+
+**Error B — download from github.com failed**
+(`Error in .rs.downloadFile ... download failed`)
+
+Both are caused by `curl.dll` being locked in the current session. One
+block fixes both:
 
 ```{r fix-dll-lock, eval=FALSE}
-# Runs in a clean Rscript process — nothing is loaded, no DLL locks.
-system2(
-  file.path(R.home("bin"), "Rscript"),
-  args = c("--vanilla", "--no-save", "-e", paste0(
-    'options(repos = c(CRAN = "https://cloud.r-project.org"));',
-    'if (!requireNamespace("BiocManager", quietly=TRUE))',
-    '  install.packages("BiocManager");',
-    'BiocManager::install(',
-    '  c("ggplot2","xgboost","biomaRt","Matrix","rlang","cli"),',
-    '  force=TRUE, ask=FALSE, update=FALSE)'
-  )),
-  stdout = "", stderr = ""
+# Step 1 — switch to Windows-native HTTP (no curl.dll dependency)
+options(download.file.method = "wininet")
+
+# Step 2 — remove any 00LOCK-* dirs left by the failed install
+unlink(list.files(.libPaths()[1], pattern = "^00LOCK-", full.names = TRUE),
+       recursive = TRUE, force = TRUE)
+
+# Step 3 — launch (Rtools compiles anything that needs it automatically)
+shiny::runGitHub(
+  "GExPipe", "safarafique",
+  ref     = "main",
+  subdir  = "inst/shinyapp",
+  destdir = tempfile()
 )
-# After it finishes, restart R (Ctrl+Shift+F10 in RStudio) then launch:
-shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
+
+> **Rtools tip:** If you see `needs_compilation: TRUE` for any package,
+> install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/) once.
+> After that, R can compile any package from source automatically.
+
+If the error persists after the block above, restart R first
+(`Ctrl+Shift+F10` in RStudio) then run it again — the restart
+releases all DLL locks.
 
 # Launch the Shiny app
 
@@ -218,12 +236,20 @@ automatically.
 
 ```{r launch-github, eval=FALSE}
 if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
-# ref = "main"           → always pulls the latest committed code from the main branch
-# subdir = "inst/shinyapp" → points shiny to where app.R actually lives in the repo
+
+# Windows safety: use wininet instead of curl.dll (avoids DLL-lock download errors)
+options(download.file.method = "wininet")
+
+# Remove any 00LOCK-* dirs left by a previously failed install
+unlink(list.files(.libPaths()[1], pattern = "^00LOCK-", full.names = TRUE),
+       recursive = TRUE, force = TRUE)
+
+# ref = "main"             → always pulls the latest committed code
+# subdir = "inst/shinyapp" → where app.R lives in the repo
 shiny::runGitHub(
   "GExPipe", "safarafique",
-  ref    = "main",
-  subdir = "inst/shinyapp",
+  ref     = "main",
+  subdir  = "inst/shinyapp",
   destdir = tempfile()
 )
 ```
