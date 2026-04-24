@@ -34,8 +34,8 @@ knitr::opts_chunk$set(
 `GExPipe` is a Shiny-first workflow for bulk RNA-seq and microarray
 analysis. It provides a single guided pipeline that connects data
 retrieval, quality control, normalization, differential expression,
-network analysis, and downstream interpretation — without requiring users
-to manually stitch many separate tools together.
+network analysis, and downstream interpretation — without requiring
+users to manually stitch many separate tools together.
 
 Within Bioconductor, `GExPipe` builds on established infrastructure such
 as `r BiocStyle::Biocpkg("GEOquery")`, `r BiocStyle::Biocpkg("limma")`,
@@ -87,45 +87,32 @@ shiny::runGitHub(
 )
 ```
 
-> **Why these three steps?**
-> On Windows, R locks every DLL of a loaded package. Step 1 switches to
-> the Windows-native HTTP stack so downloads never depend on `curl.dll`.
-> Step 2 clears broken lock directories from any previous failed install.
-> Step 3 downloads and runs the app — `global.R` handles all package
-> installation automatically in a background process that starts with
-> nothing loaded and therefore has no DLL locks.
+> **Why these three steps?** On Windows, R locks every DLL of a loaded
+> package. Step 1 switches to the Windows-native HTTP stack so downloads
+> never depend on `curl.dll`. Step 2 clears broken lock directories from
+> any previous failed install. Step 3 downloads and runs the app —
+> `global.R` handles all package installation automatically in a
+> background process that starts with nothing loaded and therefore has
+> no DLL locks.
 
-> **Rtools:** If any package requires compilation (`needs_compilation:
-> TRUE`), install
-> [Rtools45](https://cran.r-project.org/bin/windows/Rtools/) once.
-> After that, R compiles source packages automatically with no extra
-> steps.
+> **Rtools:** If any package requires compilation
+> (`needs_compilation: TRUE`), install
+> [Rtools45](https://cran.r-project.org/bin/windows/Rtools/) once. After
+> that, R compiles source packages automatically with no extra steps.
 
 ## Alternative: `pak` (best for version-conflict resolution)
 
 `pak` resolves the full dependency graph before downloading and
 automatically upgrades any package below its minimum required version
-(e.g. `rlang` too old for `dplyr`).
-
-> **Important — `pak` also uses `libcurl` internally.**
-> `options(download.file.method = "wininet")` does **not** affect `pak`.
-> If `curl.dll` is locked in your current session, `pak` will fail with
-> the same download error. **Restart R first** (`Ctrl+Shift+F10` in
-> RStudio) to release all DLL locks, then run `pak` immediately before
-> anything else loads `curl`:
+(e.g. `rlang` too old for `dplyr`):
 
 ```{r install-pak, eval=FALSE}
-# Run AFTER restarting R (Ctrl+Shift+F10) — before anything loads curl.dll
 install.packages("pak")
 pak::pkg_install("safarafique/GExPipe")
 
 # Launch:
 shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
-
-If you cannot restart R (e.g. inside a running session), use the
-**3-step GitHub block above** instead — it never requires a restart
-because installation runs in a separate subprocess with nothing loaded.
 
 # Launch the Shiny App
 
@@ -135,9 +122,9 @@ because installation runs in a separate subprocess with nothing loaded.
 
 ## Option A — From GitHub (no install required)
 
-Copy the block from the **Installation → From GitHub** section above.
-It is safe for every user on every system and is the recommended
-starting point for first-time use, classroom use, and quick tests.
+Copy the block from the **Installation → From GitHub** section above. It
+is safe for every user on every system and is the recommended starting
+point for first-time use, classroom use, and quick tests.
 
 What happens after you run it:
 
@@ -236,13 +223,12 @@ shiny::runGitHub(
 # Troubleshooting
 
 | Error | Cause | Fix |
-|---|---|---|
-| `download from github.com failed` | `curl.dll` locked | Use the **3-step GitHub block** (wininet + lock clean + runGitHub) |
-| `pak` fails to download packages | `pak` also uses `libcurl` — same lock | Restart R (`Ctrl+Shift+F10`), then run `pak` immediately |
-| `packages in use and will not be installed` | DLL locked by running session | Same **3-step block** — no restart needed |
-| `namespace rlang X.Y loaded but >= Z required` | Outdated package | Restart R, then `pak::pkg_install("safarafique/GExPipe")` |
+|----|----|----|
+| `download from github.com failed` | `curl.dll` locked by RStudio | Run the 3-step block in **Installation → From GitHub** |
+| `packages in use and will not be installed` | DLL locked by running session | Same 3-step block; or restart R first |
+| `namespace rlang X.Y is loaded but >= Z required` | Outdated package | `pak::pkg_install("safarafique/GExPipe")` |
 | `needs_compilation: TRUE` fails | No C compiler | Install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/) |
-| Corporate firewall / proxy | Network blocked | `Sys.setenv(https_proxy = "http://proxy:port")` then retry |
+| Corporate firewall / proxy | Network blocked | `Sys.setenv(https_proxy = "http://proxy:port")` |
 | No internet | Offline system | Download ZIP from GitHub, then `install.packages("GExPipe-main.zip", repos = NULL, type = "source")` |
 | `lazy-load database is corrupt` | Windows staged-install bug | Reinstall with `INSTALL_opts = "--no-staged-install"` |
 
@@ -384,10 +370,11 @@ be completed before the next becomes active.
 
 ## Step 1 — Download Data
 
-**Purpose:** Retrieve GEO datasets and build a combined expression matrix.
+**Purpose:** Retrieve GEO datasets and build a combined expression
+matrix.
 
-**Inputs:** Platform (Microarray / RNA-seq / Merged) and one or more
-GSE IDs (e.g. `GSE89076, GSE50760`).
+**Inputs:** Platform (Microarray / RNA-seq / Merged) and one or more GSE
+IDs (e.g. `GSE89076, GSE50760`).
 
 **What the app does:** Downloads series matrix files via `GEOquery`,
 maps probe or Ensembl IDs to HGNC symbols, averages duplicate probes,
@@ -403,7 +390,7 @@ count matches the GEO record.
 **Purpose:** Identify and remove outlier samples before normalization.
 
 **What the app does:** Draws boxplots and density plots; flags
-statistical outliers using Mahalanobis distance (*p* < 0.001 default).
+statistical outliers using Mahalanobis distance (*p* \< 0.001 default).
 
 **Check:** At least 3 samples per group must remain after removal.
 
@@ -453,7 +440,7 @@ intermingled across datasets.
 Normal and Disease.
 
 **Methods:** limma (microarray), limma-voom / DESeq2 / edgeR (RNA-seq
-counts). Default cutoffs: FDR < 0.05, |log₂FC| > 1.
+counts). Default cutoffs: FDR \< 0.05, \|log₂FC\| \> 1.
 
 **Outputs:** Volcano plot, heatmap, downloadable results table.
 
@@ -465,11 +452,12 @@ counts). Default cutoffs: FDR < 0.05, |log₂FC| > 1.
 module with the trait.
 
 **Inputs:** Soft threshold β (choose where R² ≥ 0.80 on the topology
-plot), minimum module size (default 30), merge cut height (default 0.25).
+plot), minimum module size (default 30), merge cut height (default
+0.25).
 
 **Outputs:** Scale-free topology plot, dendrogram, module–trait heatmap.
 
-**Check:** At least one module with trait correlation *p* < 0.05.
+**Check:** At least one module with trait correlation *p* \< 0.05.
 
 ------------------------------------------------------------------------
 
@@ -491,7 +479,8 @@ table.
 **Purpose:** Map common genes onto a protein–protein interaction network
 to identify hub proteins.
 
-**Inputs:** STRINGdb confidence score cutoff (default 400), network layout.
+**Inputs:** STRINGdb confidence score cutoff (default 400), network
+layout.
 
 **Outputs:** Interactive network plot, hub gene table with degree,
 betweenness, and eigenvector centrality (downloadable).
@@ -504,7 +493,8 @@ betweenness, and eigenvector centrality (downloadable).
 Normal from Disease.
 
 **Methods:** LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta,
-sPLS-DA, XGBoost + SHAP. Final features are genes selected by ≥ 2 algorithms.
+sPLS-DA, XGBoost + SHAP. Final features are genes selected by ≥ 2
+algorithms.
 
 **Outputs:** Per-algorithm importance plots, SHAP summary, final
 candidate gene table.
@@ -513,7 +503,8 @@ candidate gene table.
 
 ## Step 11 — Validation
 
-**Purpose:** Confirm that candidate genes generalize beyond training data.
+**Purpose:** Confirm that candidate genes generalize beyond training
+data.
 
 **Types:** External (independent GEO GSE ID downloaded automatically) or
 Internal (70/30 stratified split).
@@ -541,11 +532,11 @@ final gene panel.
 
 **What the app does:**
 
-1. Fits binary logistic regression with `rms::lrm()`.
-2. Draws a nomogram (each gene has a point scale; sum gives disease
-   probability).
-3. Draws a calibration curve (predicted vs. observed).
-4. Runs Decision Curve Analysis via `rmda`.
+1.  Fits binary logistic regression with `rms::lrm()`.
+2.  Draws a nomogram (each gene has a point scale; sum gives disease
+    probability).
+3.  Draws a calibration curve (predicted vs. observed).
+4.  Runs Decision Curve Analysis via `rmda`.
 
 ------------------------------------------------------------------------
 
@@ -569,30 +560,6 @@ summarizing the entire analysis.
 **Outputs:** Auto-generated paragraph covering dataset details, DEG
 counts, WGCNA findings, common genes, PPI hubs, ML features, validation
 AUCs, and top GSEA pathways. Renders to PDF via `rmarkdown`.
-
-# App Screenshots
-
-```{r screenshots, echo=FALSE, results='asis'}
-shot_dir  <- system.file("extdata", "vignette-screenshots",
-                          package = "GExPipe")
-shot_meta <- list(
-  list(file = "step1_download.png",  label = "Step 1 — Download Data"),
-  list(file = "step2_qc.png",        label = "Step 2 — Quality Control"),
-  list(file = "step6_de.png",        label = "Step 6 — Differential Expression"),
-  list(file = "step9_ppi.png",       label = "Step 9 — PPI Network"),
-  list(file = "step15_summary.png",  label = "Step 15 — Results Summary")
-)
-
-if (nzchar(shot_dir)) {
-  for (item in shot_meta) {
-    p <- file.path(shot_dir, item$file)
-    if (file.exists(p)) {
-      cat("\n\n## ", item$label, "\n\n", sep = "")
-      print(knitr::include_graphics(p))
-    }
-  }
-}
-```
 
 # Session Information
 
