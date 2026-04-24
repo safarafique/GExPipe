@@ -69,22 +69,48 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   # console; the browser only opens once everything is ready.
   if (interactive() && !isTRUE(getOption("shiny.testmode"))) {
     all_pkgs <- .gexpipe_all_pkgs(include_optional = TRUE)
-    missing_now <- all_pkgs[!vapply(all_pkgs, requireNamespace,
-                                    logical(1L), quietly = TRUE)]
-    if (length(missing_now) > 0L) {
+
+    # ── Detect missing packages ───────────────────────────────────────────────
+    missing_now <- all_pkgs[
+      !vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+    ]
+
+    # ── Detect version-conflicted packages ────────────────────────────────────
+    # A package may be present but below its minimum required version.
+    # These cause "namespace X loaded but >= Y required" errors at runtime.
+    # The background subprocess can update them even when their DLL is locked
+    # in the current session, because it starts with nothing loaded.
+    version_conflict_now <- names(.gexpipe_min_versions)[
+      vapply(names(.gexpipe_min_versions), function(pkg) {
+        tryCatch(
+          .gexpipe_best_version(pkg) < package_version(.gexpipe_min_versions[[pkg]]),
+          error = function(e) FALSE
+        )
+      }, logical(1L))
+    ]
+
+    needs_install <- length(missing_now) > 0L || length(version_conflict_now) > 0L
+
+    if (needs_install) {
+      if (length(missing_now) > 0L)
+        message("\nGExPipe: ", length(missing_now), " missing package(s):\n",
+                "  ", paste(missing_now, collapse = ", "))
+      if (length(version_conflict_now) > 0L)
+        message("GExPipe: ", length(version_conflict_now),
+                " version-conflict(s) (below minimum required version):\n",
+                "  ", paste(version_conflict_now, collapse = ", "))
       message(
-        "\nGExPipe: installing ", length(missing_now), " missing package(s) — ",
-        "please wait before the browser opens.\n",
-        "  ", paste(missing_now, collapse = ", "), "\n"
+        "\nGExPipe: updating via background subprocess ",
+        "(bypasses DLL locks — no session restart needed).\n",
+        "  First run: up to 40 min.  Subsequent runs: seconds.\n"
       )
       .gexpipe_batch_install(all_pkgs)
-      still_missing <- all_pkgs[!vapply(all_pkgs, requireNamespace,
-                                        logical(1L), quietly = TRUE)]
+      still_missing <- all_pkgs[
+        !vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+      ]
       if (length(still_missing) > 0L) {
-        message(
-          "GExPipe: could not install: ", paste(still_missing, collapse = ", "), "\n",
-          "  Run  gexpipe_setup()  for a detailed install log."
-        )
+        message("GExPipe: could not install: ", paste(still_missing, collapse = ", "),
+                "\n  Run  gexpipe_setup()  for a detailed install log.")
       } else {
         message("GExPipe: all packages ready.\n")
       }

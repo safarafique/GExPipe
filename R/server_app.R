@@ -1,16 +1,80 @@
 gexp_app_server <- function(input, output, session) {
-  missing_pkgs <- getOption("omniVerse.missingPkgs", character(0))
+
+  # ── In-app restart notification ─────────────────────────────────────────────
+  # Shown when the pre-launch subprocess updated packages that were DLL-locked
+  # and could not be reloaded in the running session.
+  # The user sees a full-screen modal instead of just a console message.
+  if (isTRUE(getOption("gexpipe.restart_required", FALSE))) {
+    conflict_pkgs <- getOption("gexpipe.still_conflicted", character(0))
+    tryCatch({
+      shiny::showModal(shiny::modalDialog(
+        title = shiny::tags$span(
+          shiny::icon("exclamation-triangle", style = "color:#e67e22;"),
+          " Restart R to apply package updates"
+        ),
+        shiny::tags$div(
+          shiny::tags$p(
+            "GExPipe just updated ", length(conflict_pkgs),
+            " package(s) in the background, but they are still loaded at an",
+            " older version in this R session because their DLLs are in use."
+          ),
+          if (length(conflict_pkgs) > 0L)
+            shiny::tags$ul(
+              lapply(conflict_pkgs, function(pkg) {
+                cur <- tryCatch(as.character(utils::packageVersion(pkg)),
+                                error = function(e) "?")
+                shiny::tags$li(shiny::tags$code(pkg),
+                               paste0(" (loaded: ", cur, ")"))
+              })
+            ),
+          shiny::tags$hr(),
+          shiny::tags$p(shiny::tags$strong("To fix:")),
+          shiny::tags$ol(
+            shiny::tags$li("Stop the app  —  press the ", shiny::tags$strong("Stop"),
+                           " button in RStudio, or press ", shiny::tags$kbd("Ctrl+C"),
+                           " in the console."),
+            shiny::tags$li("Restart R  —  ", shiny::tags$strong("RStudio: Ctrl+Shift+F10"),
+                           "  (or Session → Restart R)."),
+            shiny::tags$li("Run again  —  ",
+                           shiny::tags$code("GExPipe::runGExPipe()"),
+                           ". The app will open immediately; no reinstall needed.")
+          ),
+          shiny::tags$p(
+            shiny::tags$em(
+              "The analysis pipeline is fully available while the app is running.",
+              " This message only means some dependency versions are mismatched.",
+              " You may continue, but restarting R is recommended before starting",
+              " a new analysis."
+            )
+          )
+        ),
+        footer = shiny::modalButton("Continue anyway"),
+        size = "m",
+        easyClose = FALSE
+      ))
+    }, error = function(e) NULL)
+  }
+
+  # ── Soft notification for packages that failed to load (non-blocking) ───────
+  missing_pkgs <- getOption("gexpipe.failed_pkgs", character(0))
   if (length(missing_pkgs) > 0L) {
     tryCatch(
       {
         shiny::showNotification(
-          paste0(
-            "Some packages could not be loaded: ", paste(utils::head(missing_pkgs, 5), collapse = ", "),
-            if (length(missing_pkgs) > 5) paste0(" and ", length(missing_pkgs) - 5, " more") else "", "."
+          shiny::tags$div(
+            shiny::icon("exclamation-circle"),
+            shiny::tags$strong(" Some packages could not be loaded: "),
+            paste(utils::head(missing_pkgs, 5L), collapse = ", "),
+            if (length(missing_pkgs) > 5L)
+              paste0(" and ", length(missing_pkgs) - 5L, " more")
+            else "",
+            ". Run ",
+            shiny::tags$code("gexpipe_setup()"),
+            " in the console to reinstall."
           ),
-          type = "warning",
-          duration = 12,
-          session = session
+          type     = "warning",
+          duration = 20,
+          session  = session
         )
       },
       error = function(e) NULL
