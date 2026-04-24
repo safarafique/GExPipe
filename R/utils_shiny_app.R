@@ -116,11 +116,15 @@
     "  First-time install: up to 40 min. Subsequent runs: seconds."
   )
 
-  # ── 4. Remove stale 00LOCK dirs ───────────────────────────────────────────
-  lock_dirs <- list.files(gexpipe_lib, pattern = "^00LOCK-", full.names = TRUE)
-  if (length(lock_dirs) > 0L) {
-    message("GExPipe: removing ", length(lock_dirs), " stale lock dir(s)")
-    unlink(lock_dirs, recursive = TRUE, force = TRUE)
+  # ── 4. Remove stale 00LOCK dirs from EVERY library path ───────────────────
+  # A failed install leaves 00LOCK-<pkg> in the user's system library and makes
+  # ALL subsequent downloads fail (e.g. curl.dll locked → no downloads possible).
+  for (.ld in unique(c(gexpipe_lib, .libPaths()))) {
+    .lk <- list.files(.ld, pattern = "^00LOCK-", full.names = TRUE)
+    if (length(.lk) > 0L) {
+      message("GExPipe: removing ", length(.lk), " stale lock dir(s) from ", .ld)
+      unlink(.lk, recursive = TRUE, force = TRUE)
+    }
   }
 
   # ── 5. Write and run install subprocess ───────────────────────────────────
@@ -131,15 +135,25 @@
 
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),
-    'options(',
-    '  repos               = c(CRAN = "https://cloud.r-project.org"),',
-    '  timeout             = 2400L,',
-    '  download.file.method = "libcurl"',
-    ')',
+    # Clean locks from all lib paths inside subprocess
+    'for (.d in .libPaths()) {',
+    '  .lk <- list.files(.d, pattern = "^00LOCK-", full.names = TRUE)',
+    '  if (length(.lk)) unlink(.lk, recursive = TRUE, force = TRUE)',
+    '}',
+    # Download method: libcurl by default; wininet fallback when curl.dll is locked
+    'options(repos = c(CRAN = "https://cloud.r-project.org"), timeout = 2400L)',
+    'if (.Platform$OS.type == "windows") {',
+    '  .ok <- tryCatch({',
+    '    utils::download.file("https://cloud.r-project.org", tempfile(),',
+    '                         quiet = TRUE, method = "libcurl"); TRUE',
+    '  }, error = function(e) FALSE, warning = function(w) FALSE)',
+    '  options(download.file.method = if (.ok) "libcurl" else "wininet")',
+    '  if (!.ok) message("GExPipe subprocess: libcurl unavailable, using wininet")',
+    '} else {',
+    '  options(download.file.method = "libcurl")',
+    '}',
     paste0('.lib  <- "', lib_fwd, '"'),
     paste0('.pkgs <- c(', pkg_vec, ')'),
-    '.locks <- list.files(.lib, pattern = "^00LOCK-", full.names = TRUE)',
-    'if (length(.locks) > 0L) unlink(.locks, recursive = TRUE, force = TRUE)',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib,',
     '                   repos = "https://cloud.r-project.org", quiet = FALSE)',
