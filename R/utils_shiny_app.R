@@ -212,18 +212,25 @@
             SIMPLIFY = TRUE)
   ]
   if (length(still_conflicted) > 0L) {
-    for (pkg in still_conflicted) {
+    conflict_detail <- vapply(still_conflicted, function(pkg) {
       cur <- tryCatch(as.character(utils::packageVersion(pkg)), error = function(e) "?")
       new <- tryCatch(as.character(utils::packageVersion(pkg, lib.loc = gexpipe_lib)),
                       error = function(e) "updated")
-      message("GExPipe: ", pkg, " loaded=", cur, " updated=", new,
-              " (requires restart to apply)")
-    }
+      paste0(pkg, " (loaded=", cur, ", updated=", new, ")")
+    }, character(1L))
+    for (d in conflict_detail) message("GExPipe: ", d, " — requires restart to apply")
     message(
       "\nGExPipe: RESTART R to apply package updates, then run again.\n",
-      "  RStudio: Ctrl+Shift+F10, then re-run shiny::runApp(GExPipe::runGExPipe())\n",
+      "  RStudio: Ctrl+Shift+F10, then re-run GExPipe::runGExPipe()\n",
       "  The next run will open the app immediately (packages already updated)."
     )
+    # Store state so the Shiny server can show an in-app restart notification.
+    options(gexpipe.restart_required  = TRUE)
+    options(gexpipe.still_conflicted  = still_conflicted)
+  } else {
+    # Clear any stale restart flag from a previous run.
+    options(gexpipe.restart_required  = NULL)
+    options(gexpipe.still_conflicted  = NULL)
   }
 
   # ── 7. Re-check: report still-missing packages ────────────────────────────
@@ -349,6 +356,9 @@ gexp_app_attach_packages <- function() {
       }
     )
   }
+
+  # Store failed packages under the option that server_app.R reads for notifications.
+  options(gexpipe.failed_pkgs = if (length(failed) > 0L) failed else NULL)
 
   message("\n----------------------------------------------------------------------")
   message("  \u2713 Loaded  : ", length(loaded), " / ", n_total, " packages")
