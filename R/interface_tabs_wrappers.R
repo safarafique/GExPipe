@@ -127,10 +127,3 @@ gexp_ui_results_summary <- function() {
   .gexp_ui_cache$results_summary <- .gexp_load_inst_ui_tab("shiny_src/ui/ui_results_summary.R", "ui_results_summary")
 }
 
-gexp_ui_packages <- function() {
-  if (exists("packages", envir = .gexp_ui_cache, inherits = FALSE)) {
-    return(.gexp_ui_cache$packages)
-  }
-  gexp_app_attach_packages()
-  .gexp_ui_cache$packages <- .gexp_load_inst_ui_tab("shiny_src/ui/ui_packages.R", "ui_packages")
-}
