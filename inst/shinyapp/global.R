@@ -160,10 +160,17 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
 
   lib_path <- .gexpipe_lib
 
-  # Remove stale 00LOCK dirs before spawning subprocess
-  lock_dirs <- list.files(lib_path, pattern = "^00LOCK-", full.names = TRUE)
-  if (length(lock_dirs) > 0L)
-    unlink(lock_dirs, recursive = TRUE, force = TRUE)
+  # Remove stale 00LOCK dirs from EVERY library path (not just gexpipe_lib).
+  # A failed install (e.g. curl.dll locked by RStudio) leaves 00LOCK-<pkg> in
+  # the user's system library and makes ALL subsequent downloads fail because
+  # R treats the lock dir as a sign the package is being written by another process.
+  for (.lib_dir in unique(c(lib_path, .libPaths()))) {
+    .lk <- list.files(.lib_dir, pattern = "^00LOCK-", full.names = TRUE)
+    if (length(.lk) > 0L) {
+      cat("  Removing", length(.lk), "stale lock dir(s) from", .lib_dir, "\n")
+      unlink(.lk, recursive = TRUE, force = TRUE)
+    }
+  }
 
   # Build the library path list for the subprocess, deduplicated and forward-slash
   all_libs    <- unique(c(lib_path, .libPaths()))
@@ -173,17 +180,33 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
 
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),
+    # Clean locks from all lib paths inside the subprocess too
+    'for (.d in .libPaths()) {',
+    '  .lk <- list.files(.d, pattern = "^00LOCK-", full.names = TRUE)',
+    '  if (length(.lk)) unlink(.lk, recursive = TRUE, force = TRUE)',
+    '}',
+    # Download method: try libcurl first; fall back to wininet on Windows
+    # (wininet avoids curl.dll dependency entirely — safe when curl.dll is locked)
     'options(',
-    '  repos               = c(CRAN = "https://cloud.r-project.org"),',
-    '  timeout             = 2400L,',
-    '  download.file.method = "libcurl"',
+    '  repos   = c(CRAN = "https://cloud.r-project.org"),',
+    '  timeout = 2400L',
     ')',
+    'if (.Platform$OS.type == "windows") {',
+    '  .ok <- tryCatch({',
+    '    utils::download.file("https://cloud.r-project.org", tempfile(),',
+    '                         quiet = TRUE, method = "libcurl"); TRUE',
+    '  }, error = function(e) FALSE, warning = function(w) FALSE)',
+    '  if (!.ok) {',
+    '    cat("GExPipe subprocess: libcurl unavailable, switching to wininet\\n")',
+    '    options(download.file.method = "wininet")',
+    '  } else {',
+    '    options(download.file.method = "libcurl")',
+    '  }',
+    '} else {',
+    '  options(download.file.method = "libcurl")',
+    '}',
     paste0('.lib  <- "', lib_fwd, '"'),
     paste0('.pkgs <- c(', pkg_vec, ')'),
-    # Remove stale locks inside subprocess too
-    '.locks <- list.files(.lib, pattern = "^00LOCK-", full.names = TRUE)',
-    'if (length(.locks) > 0L) unlink(.locks, recursive = TRUE, force = TRUE)',
-    # Ensure BiocManager
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .lib,',
     '                   repos = "https://cloud.r-project.org", quiet = FALSE)',
