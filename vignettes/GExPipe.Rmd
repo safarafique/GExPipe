@@ -70,22 +70,47 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("GExPipe")
 ```
 
-## Development Version from GitHub
+## From GitHub (Development Version)
 
-To use the latest features from the development branch:
+Use this block on **any system** — Windows, macOS, or Linux. It handles
+DLL locks, stale lock directories, and package updates automatically
+via a background subprocess, ensuring all dependencies are at their
+correct versions before the app opens:
 
 ```{r install-github, eval=FALSE}
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
+if (!requireNamespace("shiny", quietly = TRUE))
+    install.packages("shiny")
 
-BiocManager::install("safarafique/GExPipe", dependencies = TRUE)
+# 1. Use Windows-native HTTP — bypasses locked curl.dll on Windows.
+#    Harmless on macOS / Linux (wininet falls back to libcurl there).
+options(download.file.method = "wininet")
+
+# 2. Remove any 00LOCK-* directories left by a previously failed install.
+#    These cause "cannot download any files" for all subsequent installs.
+unlink(list.files(.libPaths()[1], pattern = "^00LOCK-", full.names = TRUE),
+       recursive = TRUE, force = TRUE)
+
+# 3. Download and run — global.R installs all missing/outdated packages
+#    automatically via a background subprocess (no DLL locks, no prompts).
+#    First run: ~10–30 min. Every subsequent run: seconds.
+shiny::runGitHub(
+    "GExPipe", "safarafique",
+    ref     = "main",
+    subdir  = "inst/shinyapp",
+    destdir = tempfile()
+)
 ```
 
-> **Windows users:** If you encounter errors about locked files or
-> cannot download packages, simply **restart your R session**
-> (`Ctrl+Shift+F10` in RStudio) and run the installation command again
-> before loading any other packages. See the
-> [Troubleshooting](#troubleshooting) section for additional solutions.
+> **Why this approach?** `global.R` launches a fresh background
+> Rscript subprocess that starts with **no packages loaded**, so it
+> holds no DLL locks and can update every dependency freely — including
+> packages that a live session would refuse to overwrite. This
+> guarantees all ~54 dependencies are at the correct versions before
+> the app opens.
+>
+> **Rtools (Windows only):** If any dependency requires compilation,
+> install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/)
+> once. R will then compile source packages automatically.
 
 # Quick Start
 
