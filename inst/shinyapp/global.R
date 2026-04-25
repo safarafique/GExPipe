@@ -207,199 +207,135 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
 .to_install <- unique(c(.missing_pkgs, .version_conflict_pkgs, .outdated_in_lib))
 
 # ==============================================================================
-# STEP 4  \u2014  Install / update via background subprocess (no DLL locks)
+# STEP 4  \u2014  Install / update packages with per-package visible progress
 # ==============================================================================
-# The subprocess starts with ZERO packages loaded \u2014 no DLL is locked there \u2014
-# so it can freely install or overwrite any package, including ones that are
-# currently locked in the parent RStudio session (rlang, cli, ggplot2, ...).
-# After the subprocess finishes, the new versions live in .gexpipe_lib which is
-# first in .libPaths(), so they shadow the old system versions for new loads.
+# Logic per package:
+#   NOT installed at all  → install directly (no DLL possible on a missing pkg)
+#   Installed, old version, NOT loaded → update directly
+#   Installed, old version, DLL-locked in this session → subprocess → pending lib
+#                                                          (active on NEXT startup)
+#   Installed, version OK → skip (nothing to do)
 
-.gexpipe_batch_install <- function(to_install, missing_pkgs,
-                                    version_conflict_pkgs, outdated_pkgs) {
-  if (length(to_install) == 0L) {
-    cat("  All packages present and up to date.\n\n")
-    return(invisible(NULL))
-  }
+# ── Helpers ──────────────────────────────────────────────────────────────────
+.dll_locked_in_parent <- function(pkg) {
+  # TRUE when pkg is both: (a) loaded in this R session AND
+  # (b) loaded from .gexpipe_lib (our managed library, not a system copy)
+  if (!isNamespaceLoaded(pkg)) return(FALSE)
+  pp <- tryCatch(find.package(pkg), error = function(e) "")
+  nzchar(pp) &&
+    startsWith(normalizePath(pp,            winslash = "/", mustWork = FALSE),
+               normalizePath(.gexpipe_lib,  winslash = "/", mustWork = FALSE))
+}
 
-  if (length(missing_pkgs) > 0L)
-    cat("  Missing           (", length(missing_pkgs), "): ",
-        paste(head(missing_pkgs, 8L), collapse = ", "),
-        if (length(missing_pkgs) > 8L) " ..." else "", "\n", sep = "")
-  if (length(version_conflict_pkgs) > 0L)
-    cat("  Version conflict  (", length(version_conflict_pkgs), "): ",
-        paste(version_conflict_pkgs, collapse = ", "), "\n", sep = "")
-  if (length(outdated_pkgs) > 0L)
-    cat("  Outdated          (", length(outdated_pkgs), "): ",
-        paste(head(outdated_pkgs, 8L), collapse = ", "),
-        if (length(outdated_pkgs) > 8L) " ..." else "", "\n", sep = "")
-  cat("\n  Installing/updating", length(to_install),
-      "package(s) via background subprocess...\n")
-  cat("  First run: up to 40 min.  Subsequent runs: seconds.\n\n")
+.ncpus_install <- max(1L, tryCatch(parallel::detectCores() - 1L, error = function(e) 1L))
+.inst_opts     <- c("--no-staged-install", "--no-lock")
 
-  lib_path     <- .gexpipe_lib
-  pending_path <- .gexpipe_pending_lib
+# ── Remove stale lock dirs first ─────────────────────────────────────────────
+for (.ld in unique(c(.gexpipe_lib, .libPaths()))) {
+  .lk <- list.files(.ld, pattern = "^00LOCK-", full.names = TRUE)
+  if (length(.lk) > 0L) unlink(.lk, recursive = TRUE, force = TRUE)
+}
 
-  # Remove stale 00LOCK dirs from every library path
-  for (.lib_dir in unique(c(lib_path, .libPaths()))) {
-    .lk <- list.files(.lib_dir, pattern = "^00LOCK-", full.names = TRUE)
-    if (length(.lk) > 0L) {
-      cat("  Removing", length(.lk), "stale lock dir(s) from", .lib_dir, "\n")
-      unlink(.lk, recursive = TRUE, force = TRUE)
-    }
-  }
+# ── Classify ──────────────────────────────────────────────────────────────────
+.pending_pkgs <- if (length(.to_install) > 0L)
+  .to_install[vapply(.to_install, .dll_locked_in_parent, logical(1L))]
+else character(0L)
+.direct_pkgs  <- setdiff(.to_install, .pending_pkgs)
 
-  # Classify packages:
-  #  safe_pkgs    → subprocess installs directly to main lib (immediately usable)
-  #  pending_pkgs → DLL locked in parent; subprocess installs to pending lib
-  #                 (promoted to main on NEXT startup automatically — no manual restart)
-  .dll_locked_in_parent <- function(pkg) {
-    if (!isNamespaceLoaded(pkg)) return(FALSE)
-    pkg_path <- tryCatch(find.package(pkg), error = function(e) "")
-    nzchar(pkg_path) &&
-      startsWith(normalizePath(pkg_path, winslash = "/", mustWork = FALSE),
-                 normalizePath(lib_path,  winslash = "/", mustWork = FALSE))
-  }
-  pending_pkgs <- to_install[vapply(to_install, .dll_locked_in_parent, logical(1L))]
-  safe_pkgs    <- setdiff(to_install, pending_pkgs)
+# ── Phase 1: direct installs (missing + outdated non-locked packages) ─────────
+if (length(.to_install) == 0L) {
+  cat("  \u2713 All", length(.gexpipe_all_required),
+      "required packages present and up to date \u2014 skipping install.\n\n")
 
-  if (length(pending_pkgs) > 0L)
-    cat("  DLL-locked (will be active on next startup via pending lib):",
-        paste(pending_pkgs, collapse = ", "), "\n\n")
+} else {
+  n_miss  <- length(.missing_pkgs)
+  n_upd   <- length(.version_conflict_pkgs) + length(.outdated_in_lib)
+  n_pend  <- length(.pending_pkgs)
+  n_dir   <- length(.direct_pkgs)
 
-  # Build subprocess inputs
-  all_libs        <- unique(c(lib_path, .libPaths()))
-  parent_libs     <- paste0('"', gsub("\\\\", "/", all_libs), '"', collapse = ", ")
-  lib_fwd         <- gsub("\\\\", "/", lib_path)
-  pending_fwd     <- gsub("\\\\", "/", pending_path)
-  safe_vec        <- if (length(safe_pkgs)    > 0L) paste0('"', safe_pkgs,    '"', collapse = ", ") else 'character(0)'
-  pending_vec     <- if (length(pending_pkgs) > 0L) paste0('"', pending_pkgs, '"', collapse = ", ") else 'character(0)'
-  ncpus_val       <- max(1L, tryCatch(parallel::detectCores() - 1L, error = function(e) 1L))
-  target_bioc_fwd <- .target_bioc   # pass the R-version-aware release into subprocess
+  cat("  Need to install :", n_miss, "package(s)\n")
+  cat("  Need to update  :", n_upd,  "package(s)\n")
+  if (n_pend > 0L)
+    cat("  DLL-locked      :", n_pend, "(updated via subprocess, active next startup)\n")
+  cat("\n")
 
-  # Universal install options:
-  #   --no-staged-install : write directly to final location (skips the
-  #     00LOCK-*/00new/* staging rename that fails under cloud-sync locks)
-  #   --no-lock           : skip 00LOCK-* creation (safe: only this subprocess writes here)
-  inst_opts <- 'c("--no-staged-install", "--no-lock")'
-
-  script <- c(
-    paste0('.libPaths(c(', parent_libs, '))'),
-    'for (.d in .libPaths()) {',
-    '  .lk <- list.files(.d, pattern = "^00LOCK-", full.names = TRUE)',
-    '  if (length(.lk)) unlink(.lk, recursive = TRUE, force = TRUE)',
-    '}',
-    # Detect download method: wininet on Windows when libcurl is locked
-    'options(repos = c(CRAN = "https://cloud.r-project.org"), timeout = 2400L)',
-    'if (.Platform$OS.type == "windows") {',
-    '  .ok <- tryCatch({ utils::download.file("https://cloud.r-project.org",',
-    '    tempfile(), quiet = TRUE, method = "libcurl"); TRUE },',
-    '    error = function(e) FALSE, warning = function(w) FALSE)',
-    '  options(download.file.method = if (.ok) "libcurl" else "wininet")',
-    '  if (!.ok) cat("GExPipe: libcurl unavailable, using wininet\\n")',
-    '} else { options(download.file.method = "libcurl") }',
-    paste0('.main_lib    <- "', lib_fwd,          '"'),
-    paste0('.pending_lib <- "', pending_fwd,       '"'),
-    paste0('.safe_pkgs    <- c(', safe_vec,         ')'),
-    paste0('.pending_pkgs <- c(', pending_vec,      ')'),
-    paste0('.ncpus        <- ',   ncpus_val,        'L'),
-    paste0('.bioc_ver     <- "',  target_bioc_fwd,  '"'),
-    'if (!requireNamespace("BiocManager", quietly = TRUE))',
-    '  install.packages("BiocManager", lib = .main_lib,',
-    '                   repos = "https://cloud.r-project.org")',
-    # Set the correct Bioc release for THIS R version (no forced 3.22 on R 4.5 machines)
-    'if (!identical(as.character(BiocManager::version()), .bioc_ver))',
-    '  tryCatch(BiocManager::install(version = .bioc_ver, ask = FALSE),',
-    '           error = function(e) NULL, warning = function(w) NULL)',
-    # Install non-locked packages → main lib (immediately available this run)
-    'if (length(.safe_pkgs) > 0L) {',
-    '  cat("GExPipe subprocess: installing", length(.safe_pkgs), "pkg(s) to main lib\\n")',
-    '  BiocManager::install(.safe_pkgs, lib = .main_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
-    paste0('    INSTALL_opts = ', inst_opts, ')'),
-    '  # Retry any that still failed — individually',
-    '  .failed <- .safe_pkgs[!vapply(.safe_pkgs, function(p)',
-    '    requireNamespace(p, lib.loc = .main_lib, quietly = TRUE), logical(1L))]',
-    '  for (.p in .failed) {',
-    '    cat("GExPipe subprocess: retrying", .p, "\\n")',
-    '    tryCatch(BiocManager::install(.p, lib = .main_lib, ask = FALSE,',
-    '      update = TRUE, force = TRUE, Ncpus = 1L,',
-    paste0('      INSTALL_opts = ', inst_opts, '),'),
-    '      error = function(e) cat("  retry failed:", conditionMessage(e), "\\n"))',
-    '  }',
-    '}',
-    # Install DLL-locked packages → pending lib (active on next startup)
-    'if (length(.pending_pkgs) > 0L) {',
-    '  dir.create(.pending_lib, recursive = TRUE, showWarnings = FALSE)',
-    '  cat("GExPipe subprocess: installing", length(.pending_pkgs),',
-    '      "DLL-locked pkg(s) to pending lib (active on next startup)\\n")',
-    '  BiocManager::install(.pending_pkgs, lib = .pending_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
-    paste0('    INSTALL_opts = ', inst_opts, ')'),
-    '}',
-    # Second pass: fix transitive outdated deps in main lib
-    '.old <- tryCatch(utils::old.packages(lib.loc = .main_lib,',
-    '  repos = BiocManager::repositories()), error = function(e) NULL,',
-    '  warning = function(w) NULL)',
-    'if (!is.null(.old) && nrow(.old) > 0L) {',
-    '  cat("GExPipe subprocess: fixing", nrow(.old), "transitive dep(s)\\n")',
-    '  BiocManager::install(rownames(.old), lib = .main_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
-    paste0('    INSTALL_opts = ', inst_opts, ')'),
-    '}'
-  )
-
-  tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
-  log_file   <- tempfile(pattern = "gexpipe_install_log_", fileext = ".txt")
-  on.exit({ unlink(tmp_script); unlink(log_file) }, add = TRUE)
-  writeLines(script, tmp_script)
-
-  rscript   <- file.path(R.home("bin"), "Rscript")
-  exit_code <- tryCatch(
-    system2(rscript,
-            args    = c("--vanilla", "--no-save", shQuote(tmp_script)),
-            stdout  = log_file, stderr = log_file,
-            timeout = 2400L),
-    error = function(e) { cat("  Could not launch subprocess:", conditionMessage(e), "\n"); 1L }
-  )
-  if (!identical(exit_code, 0L)) {
-    cat("  Subprocess exit code:", exit_code,
-        "\u2014 last install log lines:\n")
-    log_lines <- tryCatch(readLines(log_file, warn = FALSE), error = function(e) character(0))
-    if (length(log_lines) > 0L)
-      cat(paste(utils::tail(log_lines, 30L), collapse = "\n"), "\n\n")
-  }
-
-  # ── Direct fallback for truly-missing packages ─────────────────────────────
-  # Missing packages (never installed) have NO DLL lock — a direct parent-session
-  # install always works. This catches subprocess failures cleanly.
-  still_missing <- to_install[!vapply(to_install,
-    function(p) requireNamespace(p, quietly = TRUE), logical(1L))]
-  # Exclude DLL-locked ones (they'll appear via pending lib on next startup)
-  direct_fallback <- still_missing[!vapply(still_missing, .dll_locked_in_parent, logical(1L))]
-
-  if (length(direct_fallback) > 0L) {
-    cat("  Direct fallback install for", length(direct_fallback),
-        "still-missing package(s):\n")
-    cat("  ", paste(direct_fallback, collapse = ", "), "\n\n")
-    for (.p in direct_fallback) {
-      cat("    \u2192 ", .p, "...", sep = "")
+  if (n_dir > 0L) {
+    cat("  Installing/updating", n_dir, "package(s)...\n")
+    cat("  First run: 10-40 min depending on internet speed.\n\n")
+    n <- n_dir
+    for (i in seq_len(n)) {
+      pkg    <- .direct_pkgs[i]
+      action <- if (pkg %in% .missing_pkgs) "INSTALL" else "UPDATE "
+      cat(sprintf("  [%2d/%d] %s  %-24s", i, n, action, pkg))
       tryCatch({
-        BiocManager::install(.p, lib = lib_path, ask = FALSE, update = FALSE,
-                             force = TRUE, Ncpus = 1L,
-                             INSTALL_opts = c("--no-staged-install", "--no-lock"))
-        cat(" \u2713\n")
-      }, error   = function(e) cat(" \u2717", conditionMessage(e), "\n"),
-         warning = function(w) NULL)
+        suppressMessages(suppressWarnings(
+          BiocManager::install(pkg,
+                               lib          = .gexpipe_lib,
+                               ask          = FALSE,
+                               update       = TRUE,
+                               force        = TRUE,
+                               Ncpus        = .ncpus_install,
+                               INSTALL_opts = .inst_opts)
+        ))
+        ver <- tryCatch(
+          as.character(utils::packageVersion(pkg, lib.loc = .gexpipe_lib)),
+          error = function(e) "?")
+        cat(" \u2713", ver, "\n")
+      },
+      error   = function(e) cat(" \u2717 FAILED:", conditionMessage(e), "\n"),
+      warning = function(w) NULL)
     }
     cat("\n")
   }
-  invisible(NULL)
-}
 
-cat("  [2/4] Checking and installing required packages...\n")
-.gexpipe_batch_install(.to_install, .missing_pkgs,
-                        .version_conflict_pkgs, .outdated_in_lib)
+  # ── Phase 2: DLL-locked packages → pending lib via subprocess ─────────────
+  if (length(.pending_pkgs) > 0L) {
+    cat("  Updating DLL-locked package(s) via subprocess (active on next startup):\n")
+    cat("  ", paste(.pending_pkgs, collapse = ", "), "\n\n")
+
+    .lib_fwd  <- gsub("\\\\", "/", .gexpipe_lib)
+    .pend_fwd <- gsub("\\\\", "/", .gexpipe_pending_lib)
+    .pv       <- paste0('"', .pending_pkgs, '"', collapse = ", ")
+    .all_libs <- paste0('"', gsub("\\\\", "/", unique(c(.gexpipe_lib, .libPaths()))), '"',
+                        collapse = ", ")
+
+    .sub_script <- c(
+      paste0('.libPaths(c(', .all_libs, '))'),
+      paste0('.pend_lib <- "', .pend_fwd, '"'),
+      paste0('.pkgs     <- c(', .pv, ')'),
+      paste0('.ncpus    <- ', .ncpus_install, 'L'),
+      paste0('.bver     <- "', .target_bioc, '"'),
+      'options(repos = c(CRAN="https://cloud.r-project.org"), timeout=2400L)',
+      'if (.Platform$OS.type=="windows"){',
+      '  .ok <- tryCatch({utils::download.file("https://cloud.r-project.org",tempfile(),quiet=TRUE,method="libcurl");TRUE},error=function(e)FALSE,warning=function(w)FALSE)',
+      '  options(download.file.method=if(.ok)"libcurl" else "wininet")',
+      '} else options(download.file.method="libcurl")',
+      'if (!requireNamespace("BiocManager",quietly=TRUE))',
+      '  install.packages("BiocManager",repos="https://cloud.r-project.org")',
+      'if (!identical(as.character(BiocManager::version()),.bver))',
+      '  tryCatch(BiocManager::install(version=.bver,ask=FALSE),error=function(e)NULL,warning=function(w)NULL)',
+      'dir.create(.pend_lib, recursive=TRUE, showWarnings=FALSE)',
+      'BiocManager::install(.pkgs, lib=.pend_lib, ask=FALSE, update=TRUE, force=TRUE,',
+      '  Ncpus=.ncpus, INSTALL_opts=c("--no-staged-install","--no-lock"))',
+      'cat("Pending install done\\n")'
+    )
+    .tmp_sub  <- tempfile(pattern = "gexpipe_pending_", fileext = ".R")
+    .log_sub  <- tempfile(pattern = "gexpipe_pending_log_", fileext = ".txt")
+    on.exit({ unlink(.tmp_sub); unlink(.log_sub) }, add = TRUE)
+    writeLines(.sub_script, .tmp_sub)
+    .rscript  <- file.path(R.home("bin"), "Rscript")
+    .ec       <- tryCatch(
+      system2(.rscript, args = c("--vanilla","--no-save", shQuote(.tmp_sub)),
+              stdout = .log_sub, stderr = .log_sub, timeout = 2400L),
+      error = function(e) { cat("  Could not launch subprocess:", conditionMessage(e), "\n"); 1L })
+    if (!identical(.ec, 0L)) {
+      cat("  Subprocess exit code:", .ec, "— last log lines:\n")
+      .ll <- tryCatch(readLines(.log_sub, warn=FALSE), error=function(e) character(0))
+      if (length(.ll) > 0L) cat(paste(utils::tail(.ll, 20L), collapse="\n"), "\n")
+    }
+    cat("  Restart R and run again to apply these updates.\n\n")
+  }
+}
 
 cat("  [3/4] Checking optional packages...\n")
 if (length(.gexpipe_all_optional) == 0L) {
@@ -474,14 +410,16 @@ if (length(.still_conflicted) > 0L) {
 }
 
 # ==============================================================================
-# STEP 4b  \u2014  Re-check for still-missing packages after install
+# STEP 4b  \u2014  Re-check ALL required packages after install
 # ==============================================================================
-failed_required <- .missing_pkgs[
-  !vapply(.missing_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+# Re-check the full required list (not just .missing_pkgs) so packages that
+# were installed this run are now properly counted as available.
+failed_required <- .gexpipe_all_required[
+  !vapply(.gexpipe_all_required, requireNamespace, logical(1L), quietly = TRUE)
 ]
 
 # ==============================================================================
-# STEP 5  \u2014  Load all libraries with live progress bar
+# STEP 5  \u2014  Load all libraries and show full package status table
 # ==============================================================================
 .gexpipe_load_quietly <- function(pkg) {
   if (!requireNamespace(pkg, quietly = TRUE)) return(FALSE)
@@ -489,15 +427,12 @@ failed_required <- .missing_pkgs[
     suppressPackageStartupMessages(library(parallel, quietly = TRUE))
     return(TRUE)
   }
-  tryCatch(
-    {
-      suppressPackageStartupMessages(
-        library(pkg, character.only = TRUE, quietly = TRUE)
-      )
-      TRUE
-    },
-    error = function(e) FALSE
-  )
+  tryCatch({
+    suppressPackageStartupMessages(
+      library(pkg, character.only = TRUE, quietly = TRUE)
+    )
+    TRUE
+  }, error = function(e) FALSE)
 }
 
 all_pkgs    <- c(.gexpipe_all_required, .gexpipe_all_optional)
@@ -505,23 +440,31 @@ n_total     <- length(all_pkgs)
 loaded      <- character(0)
 failed_load <- character(0)
 
-cat("\n  [4/4] Loading", n_total, "libraries...\n\n")
+cat("\n  [4/4] Loading", n_total, "libraries...\n")
+cat("  ---------------------------------------------------------------\n")
+cat(sprintf("  %-4s  %-24s  %-10s  %s\n", "No.", "Package", "Version", "Status"))
+cat("  ---------------------------------------------------------------\n")
 
 for (i in seq_along(all_pkgs)) {
-  p     <- all_pkgs[i]
-  label <- formatC(p, width = -18L, flag = "-")
-  idx   <- sprintf("  [%2d/%2d]", i, n_total)
-  cat(idx, label, "...")
+  p <- all_pkgs[i]
+
+  # Determine what action was taken this run
+  action <- if      (p %in% .missing_pkgs)          "Installed"
+            else if (p %in% .version_conflict_pkgs)  "Updated  "
+            else if (p %in% .outdated_in_lib)         "Updated  "
+            else if (p %in% .pending_pkgs)            "Pending  "
+            else                                      "Ready    "
 
   if (.gexpipe_load_quietly(p)) {
     ver <- tryCatch(as.character(utils::packageVersion(p)), error = function(e) "?")
-    cat(" \u2713", ver, "\n")
+    cat(sprintf("  [%2d] %-24s  %-10s  \u2713 %s\n", i, p, ver, action))
     loaded <- c(loaded, p)
   } else {
-    cat(" \u2717 MISSING\n")
+    cat(sprintf("  [%2d] %-24s  %-10s  \u2717 MISSING\n", i, p, "---"))
     failed_load <- c(failed_load, p)
   }
 }
+cat("  ---------------------------------------------------------------\n")
 
 # ==============================================================================
 # Runtime options
@@ -540,24 +483,37 @@ if (isNamespaceLoaded("WGCNA")) {
 # ==============================================================================
 # Summary
 # ==============================================================================
-cat("\n----------------------------------------------------------------------\n")
+cat("\n")
+cat("  ===============================================================\n")
 cat("  Loaded       :", length(loaded), "/", n_total, "packages\n")
-if (length(failed_load) > 0L)
-  cat("  \u2717 Not loaded  :", paste(failed_load, collapse = ", "), "\n")
+
+n_installed_this_run <- length(intersect(loaded,  .missing_pkgs))
+n_updated_this_run   <- length(intersect(loaded,  c(.version_conflict_pkgs, .outdated_in_lib)))
+n_ready              <- length(loaded) - n_installed_this_run - n_updated_this_run
+
+if (n_installed_this_run > 0L)
+  cat("  \u2713 Installed    :", n_installed_this_run, "new package(s) this run\n")
+if (n_updated_this_run > 0L)
+  cat("  \u2713 Updated      :", n_updated_this_run, "package(s) this run\n")
+if (n_ready > 0L)
+  cat("  \u2713 Already OK   :", n_ready, "package(s) (skipped install)\n")
+if (length(.pending_pkgs) > 0L)
+  cat("  \u23f3 Pending      :", length(.pending_pkgs),
+      "DLL-locked (restart R to apply:", paste(.pending_pkgs, collapse=", "), ")\n")
+
 if (length(failed_required) > 0L) {
-  cat("  \u2717 STILL MISSING:", paste(failed_required, collapse = ", "), "\n")
-  cat("  Some features may not work. Try running again or check your internet\n")
-  cat("  connection, or install manually:\n\n")
-  cat('    if (!requireNamespace("BiocManager", quietly=TRUE))\n')
-  cat('      install.packages("BiocManager")\n')
+  cat("\n  \u2717 Still missing:", length(failed_required), "required package(s):\n")
+  cat("    ", paste(failed_required, collapse = ", "), "\n\n")
+  cat("  \u2192 Run again (network may have been interrupted), or paste this\n")
+  cat("    in the R console to install manually:\n\n")
   cat('    BiocManager::install(c(\n')
-  cat('      ', paste0('"', failed_required, '"', collapse = ", "), '\n')
+  cat('      ', paste0('"', failed_required, '"', collapse = ",\n      "), '\n')
   cat('    ))\n\n')
-  cat("  or need some manual changes?\n")
+  cat("  Some features may be unavailable until these are installed.\n")
 } else {
-  cat("  \u2713 Status       : All packages ready \u2014 opening app...\n")
+  cat("\n  \u2713 Status       : All packages ready \u2014 opening app...\n")
 }
-cat("======================================================================\n\n")
+cat("  ===============================================================\n\n")
 
 # ==============================================================================
 # HELPER LOADING (prefer package namespace; fallback to R/ source checkout)
