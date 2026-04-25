@@ -16,17 +16,28 @@ cat("======================================================================\n")
 options(timeout = 600)
 
 # ==============================================================================
-# STEP 0  \u2014  Dedicated GExPipe library (per R version, in user home dir)
+# STEP 0  \u2014  Dedicated GExPipe library (per R version)
 # ==============================================================================
-# Putting packages in a SEPARATE folder from the user's system library means:
-#   (a) new / updated versions shadow old system ones via .libPaths() priority
-#   (b) the background subprocess can always write there (no DLL locks from parent)
-#   (c) the user's system library is never touched or broken
-# The folder is ~/.gexpipe_packages/R-x.y/  (recreated automatically if deleted)
+# Library is placed in AppData\Local\GExPipe\<R-ver>\ on Windows.
+# CRITICAL: Do NOT use Documents (path.expand("~")) on Windows — that folder
+# is frequently synced by OneDrive, which holds background file locks that
+# cause "moving to final location failed" and "cannot remove earlier
+# installation" errors during package install, even in a subprocess.
+# AppData\Local is never synced by OneDrive.
 .gexpipe_lib <- local({
   rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
-  d  <- file.path(path.expand("~"), ".gexpipe_packages", rv)
+  base <- if (.Platform$OS.type == "windows") {
+    la <- Sys.getenv("LOCALAPPDATA", unset = "")
+    if (nzchar(la) && dir.exists(dirname(la))) la else path.expand("~")
+  } else {
+    path.expand("~")
+  }
+  d <- file.path(base, "GExPipe", rv)
   dir.create(d, recursive = TRUE, showWarnings = FALSE)
+  # Also keep the old Documents-based path in .libPaths() so previously
+  # installed packages there still load while transitioning.
+  old_d <- file.path(path.expand("~"), ".gexpipe_packages", rv)
+  if (dir.exists(old_d) && old_d != d) .libPaths(c(.libPaths(), old_d))
   d
 })
 .libPaths(c(.gexpipe_lib, unique(.libPaths())))   # highest priority
@@ -141,6 +152,9 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     return(invisible(NULL))
   }
 
+  # Skip the whole subprocess if every package to install is DLL-locked
+  # (they will all be updated after the user restarts R).
+
   if (length(missing_pkgs) > 0L)
     cat("  Missing           (", length(missing_pkgs), "): ",
         paste(head(missing_pkgs, 8L), collapse = ", "),
@@ -172,11 +186,27 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     }
   }
 
+  # Detect packages loaded from lib_path whose DLL the parent session holds.
+  # The subprocess cannot overwrite a DLL that is mapped into a running process
+  # (Windows locks it). Skip those here; they update cleanly after R restarts.
+  .dll_locked_in_parent <- function(pkg) {
+    if (!isNamespaceLoaded(pkg)) return(FALSE)
+    pkg_path <- tryCatch(find.package(pkg), error = function(e) "")
+    nzchar(pkg_path) &&
+      startsWith(normalizePath(pkg_path, winslash = "/", mustWork = FALSE),
+                 normalizePath(lib_path,  winslash = "/", mustWork = FALSE))
+  }
+  .dll_locked <- to_install[vapply(to_install, .dll_locked_in_parent, logical(1L))]
+  if (length(.dll_locked) > 0L)
+    cat("  DLL locked in parent (update deferred to next restart):",
+        paste(.dll_locked, collapse = ", "), "\n")
+  subprocess_pkgs <- setdiff(to_install, .dll_locked)
+
   # Build the library path list for the subprocess, deduplicated and forward-slash
   all_libs    <- unique(c(lib_path, .libPaths()))
   parent_libs <- paste0('"', gsub("\\\\", "/", all_libs), '"', collapse = ", ")
   lib_fwd     <- gsub("\\\\", "/", lib_path)
-  pkg_vec     <- paste0('"', to_install, '"', collapse = ", ")
+  pkg_vec     <- paste0('"', subprocess_pkgs, '"', collapse = ", ")
 
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),
@@ -211,9 +241,14 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     '  install.packages("BiocManager", lib = .lib,',
     '                   repos = "https://cloud.r-project.org", quiet = FALSE)',
     'cat("GExPipe subprocess: installing/updating", length(.pkgs), "package(s)\\n")',
-    # Main install: update=TRUE so version-conflicted packages are also upgraded
+    # --no-staged-install: installs directly to final location instead of a
+    #   tmp 00LOCK-*/00new/* staging dir, which avoids the final rename step
+    #   that fails when OneDrive or another process holds a lock on the folder.
+    # --no-lock: skips creating 00LOCK-* directories entirely — safe here
+    #   because only this subprocess is writing to .lib at this moment.
     'BiocManager::install(.pkgs, lib = .lib, ask = FALSE,',
-    '                     update = TRUE, force = TRUE, quiet = FALSE)',
+    '                     update = TRUE, force = TRUE, quiet = FALSE,',
+    '                     INSTALL_opts = c("--no-staged-install", "--no-lock"))',
     # Second pass: fix any transitive outdated deps in .lib (e.g. rlang pulled in old)
     '.old <- tryCatch(',
     '  utils::old.packages(lib.loc = .lib, repos = BiocManager::repositories()),',
@@ -222,9 +257,15 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     'if (!is.null(.old) && nrow(.old) > 0L) {',
     '  cat("GExPipe subprocess: fixing", nrow(.old), "transitive outdated dep(s)\\n")',
     '  BiocManager::install(rownames(.old), lib = .lib, ask = FALSE,',
-    '                       update = TRUE, force = TRUE, quiet = FALSE)',
+    '                       update = TRUE, force = TRUE, quiet = FALSE,',
+    '                       INSTALL_opts = c("--no-staged-install", "--no-lock"))',
     '}'
   )
+
+  if (length(subprocess_pkgs) == 0L) {
+    cat("  All remaining packages are DLL-locked — restart R to apply updates.\n\n")
+    return(invisible(NULL))
+  }
 
   tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
   on.exit(unlink(tmp_script), add = TRUE)
