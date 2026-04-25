@@ -105,6 +105,13 @@
                              lib   = gexpipe_lib,
                              repos = "https://cloud.r-project.org",
                              quiet = TRUE)
+  # Enforce Bioconductor 3.22 in the parent session too
+  .bver <- tryCatch(as.character(BiocManager::version()), error = function(e) "?")
+  if (!identical(.bver, "3.22")) {
+    message("GExPipe: upgrading Bioconductor to 3.22 (current: ", .bver, ")...")
+    tryCatch(BiocManager::install(version = "3.22", ask = FALSE),
+             error = function(e) NULL, warning = function(w) NULL)
+  }
 
   # ── 2. Detect missing packages ────────────────────────────────────────────
   missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
@@ -208,17 +215,21 @@
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .main_lib,',
     '                   repos = "https://cloud.r-project.org")',
+    # Enforce Bioconductor 3.22 inside subprocess
+    'if (!identical(as.character(BiocManager::version()), "3.22"))',
+    '  tryCatch(BiocManager::install(version = "3.22", ask = FALSE),',
+    '           error = function(e) NULL, warning = function(w) NULL)',
     'if (length(.safe_pkgs) > 0L) {',
     '  message("GExPipe subprocess: ", length(.safe_pkgs), " pkg(s) → main lib")',
     '  BiocManager::install(.safe_pkgs, lib = .main_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus, version = "3.22",',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
     '  .failed <- .safe_pkgs[!vapply(.safe_pkgs, function(p)',
     '    requireNamespace(p, lib.loc = .main_lib, quietly = TRUE), logical(1L))]',
     '  for (.p in .failed) {',
     '    message("GExPipe subprocess: retrying ", .p)',
     '    tryCatch(BiocManager::install(.p, lib = .main_lib, ask = FALSE,',
-    '      force = TRUE, Ncpus = 1L,',
+    '      force = TRUE, Ncpus = 1L, version = "3.22",',
     paste0('      INSTALL_opts = ', inst_opts, '),'),
     '      error = function(e) message("  retry failed: ", conditionMessage(e)))',
     '  }',
@@ -228,16 +239,16 @@
     '  message("GExPipe subprocess: ", length(.pending_pkgs),',
     '          " DLL-locked pkg(s) → pending lib (active next startup)")',
     '  BiocManager::install(.pending_pkgs, lib = .pending_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus, version = "3.22",',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
     '}',
     '.old <- tryCatch(utils::old.packages(lib.loc = .main_lib,',
-    '  repos = BiocManager::repositories()),',
+    '  repos = BiocManager::repositories(version = "3.22")),',
     '  error = function(e) NULL, warning = function(w) NULL)',
     'if (!is.null(.old) && nrow(.old) > 0L) {',
     '  message("GExPipe subprocess: fixing ", nrow(.old), " transitive dep(s)")',
     '  BiocManager::install(rownames(.old), lib = .main_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus, version = "3.22",',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
     '}'
   )
