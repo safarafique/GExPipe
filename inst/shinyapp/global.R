@@ -102,18 +102,29 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
                    repos = "https://cloud.r-project.org",
                    quiet = TRUE)
 }
-# Enforce Bioconductor 3.22 (matches R 4.5.x; avoids accidental 3.21 on older BiocManager)
+# Determine the correct Bioconductor release for the running R version.
+# Bioc 3.22 → R ≥ 4.6  |  Bioc 3.21 → R ≥ 4.5  |  Bioc 3.20 → R ≥ 4.4
+# Forcing a HIGHER release than R supports causes every BiocManager::install() to fail.
+.r_numeric <- tryCatch(
+  numeric_version(paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))),
+  error = function(e) numeric_version("4.4")
+)
+.target_bioc <- if      (.r_numeric >= "4.6") "3.22"
+                else if (.r_numeric >= "4.5") "3.21"
+                else if (.r_numeric >= "4.4") "3.20"
+                else                          "3.19"
+
 bioc_ver <- tryCatch(as.character(BiocManager::version()), error = function(e) "?")
-if (!identical(bioc_ver, "3.22")) {
-  cat("  Upgrading Bioconductor to 3.22 (current:", bioc_ver, ")...\n")
+if (!identical(bioc_ver, .target_bioc)) {
+  cat("  Upgrading Bioconductor to", .target_bioc, "(current:", bioc_ver, ")...\n")
   tryCatch(
-    BiocManager::install(version = "3.22", ask = FALSE, quiet = TRUE),
-    error   = function(e) cat("  BiocManager upgrade warning:", conditionMessage(e), "\n"),
-    warning = function(w) cat("  BiocManager upgrade note:",   conditionMessage(w), "\n")
+    BiocManager::install(version = .target_bioc, ask = FALSE, quiet = TRUE),
+    error   = function(e) cat("  BiocManager upgrade note:", conditionMessage(e), "\n"),
+    warning = function(w) NULL
   )
   bioc_ver <- tryCatch(as.character(BiocManager::version()), error = function(e) "?")
 }
-cat("  Bioconductor :", bioc_ver, "\n\n")
+cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
 
 # ==============================================================================
 # STEP 2  \u2014  Package lists + minimum version requirements
@@ -264,6 +275,7 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
   safe_vec        <- if (length(safe_pkgs)    > 0L) paste0('"', safe_pkgs,    '"', collapse = ", ") else 'character(0)'
   pending_vec     <- if (length(pending_pkgs) > 0L) paste0('"', pending_pkgs, '"', collapse = ", ") else 'character(0)'
   ncpus_val       <- max(1L, tryCatch(parallel::detectCores() - 1L, error = function(e) 1L))
+  target_bioc_fwd <- .target_bioc   # pass the R-version-aware release into subprocess
 
   # Universal install options:
   #   --no-staged-install : write directly to final location (skips the
@@ -286,31 +298,32 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     '  options(download.file.method = if (.ok) "libcurl" else "wininet")',
     '  if (!.ok) cat("GExPipe: libcurl unavailable, using wininet\\n")',
     '} else { options(download.file.method = "libcurl") }',
-    paste0('.main_lib    <- "', lib_fwd,     '"'),
-    paste0('.pending_lib <- "', pending_fwd, '"'),
-    paste0('.safe_pkgs    <- c(', safe_vec,    ')'),
-    paste0('.pending_pkgs <- c(', pending_vec, ')'),
-    paste0('.ncpus        <- ', ncpus_val, 'L'),
+    paste0('.main_lib    <- "', lib_fwd,          '"'),
+    paste0('.pending_lib <- "', pending_fwd,       '"'),
+    paste0('.safe_pkgs    <- c(', safe_vec,         ')'),
+    paste0('.pending_pkgs <- c(', pending_vec,      ')'),
+    paste0('.ncpus        <- ',   ncpus_val,        'L'),
+    paste0('.bioc_ver     <- "',  target_bioc_fwd,  '"'),
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
     '  install.packages("BiocManager", lib = .main_lib,',
     '                   repos = "https://cloud.r-project.org")',
-    # Enforce Bioconductor 3.22 inside subprocess
-    'if (!identical(as.character(BiocManager::version()), "3.22"))',
-    '  tryCatch(BiocManager::install(version = "3.22", ask = FALSE),',
+    # Set the correct Bioc release for THIS R version (no forced 3.22 on R 4.5 machines)
+    'if (!identical(as.character(BiocManager::version()), .bioc_ver))',
+    '  tryCatch(BiocManager::install(version = .bioc_ver, ask = FALSE),',
     '           error = function(e) NULL, warning = function(w) NULL)',
     # Install non-locked packages → main lib (immediately available this run)
     'if (length(.safe_pkgs) > 0L) {',
     '  cat("GExPipe subprocess: installing", length(.safe_pkgs), "pkg(s) to main lib\\n")',
     '  BiocManager::install(.safe_pkgs, lib = .main_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus, version = "3.22",',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
-    '  # Retry any that still failed — individually, with binary preference',
+    '  # Retry any that still failed — individually',
     '  .failed <- .safe_pkgs[!vapply(.safe_pkgs, function(p)',
     '    requireNamespace(p, lib.loc = .main_lib, quietly = TRUE), logical(1L))]',
     '  for (.p in .failed) {',
     '    cat("GExPipe subprocess: retrying", .p, "\\n")',
     '    tryCatch(BiocManager::install(.p, lib = .main_lib, ask = FALSE,',
-    '      update = TRUE, force = TRUE, Ncpus = 1L, version = "3.22",',
+    '      update = TRUE, force = TRUE, Ncpus = 1L,',
     paste0('      INSTALL_opts = ', inst_opts, '),'),
     '      error = function(e) cat("  retry failed:", conditionMessage(e), "\\n"))',
     '  }',
@@ -321,36 +334,66 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     '  cat("GExPipe subprocess: installing", length(.pending_pkgs),',
     '      "DLL-locked pkg(s) to pending lib (active on next startup)\\n")',
     '  BiocManager::install(.pending_pkgs, lib = .pending_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus, version = "3.22",',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
     '}',
     # Second pass: fix transitive outdated deps in main lib
     '.old <- tryCatch(utils::old.packages(lib.loc = .main_lib,',
-    '  repos = BiocManager::repositories(version = "3.22")), error = function(e) NULL,',
+    '  repos = BiocManager::repositories()), error = function(e) NULL,',
     '  warning = function(w) NULL)',
     'if (!is.null(.old) && nrow(.old) > 0L) {',
     '  cat("GExPipe subprocess: fixing", nrow(.old), "transitive dep(s)\\n")',
     '  BiocManager::install(rownames(.old), lib = .main_lib, ask = FALSE,',
-    '    update = TRUE, force = TRUE, Ncpus = .ncpus, version = "3.22",',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
     '}'
   )
 
   tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
-  on.exit(unlink(tmp_script), add = TRUE)
+  log_file   <- tempfile(pattern = "gexpipe_install_log_", fileext = ".txt")
+  on.exit({ unlink(tmp_script); unlink(log_file) }, add = TRUE)
   writeLines(script, tmp_script)
 
   rscript   <- file.path(R.home("bin"), "Rscript")
   exit_code <- tryCatch(
     system2(rscript,
             args    = c("--vanilla", "--no-save", shQuote(tmp_script)),
-            stdout  = "", stderr  = "",
+            stdout  = log_file, stderr = log_file,
             timeout = 2400L),
     error = function(e) { cat("  Could not launch subprocess:", conditionMessage(e), "\n"); 1L }
   )
-  if (!identical(exit_code, 0L))
+  if (!identical(exit_code, 0L)) {
     cat("  Subprocess exit code:", exit_code,
-        "\u2014 some packages may not have installed. Run again to retry.\n")
+        "\u2014 last install log lines:\n")
+    log_lines <- tryCatch(readLines(log_file, warn = FALSE), error = function(e) character(0))
+    if (length(log_lines) > 0L)
+      cat(paste(utils::tail(log_lines, 30L), collapse = "\n"), "\n\n")
+  }
+
+  # ── Direct fallback for truly-missing packages ─────────────────────────────
+  # Missing packages (never installed) have NO DLL lock — a direct parent-session
+  # install always works. This catches subprocess failures cleanly.
+  still_missing <- to_install[!vapply(to_install,
+    function(p) requireNamespace(p, quietly = TRUE), logical(1L))]
+  # Exclude DLL-locked ones (they'll appear via pending lib on next startup)
+  direct_fallback <- still_missing[!vapply(still_missing, .dll_locked_in_parent, logical(1L))]
+
+  if (length(direct_fallback) > 0L) {
+    cat("  Direct fallback install for", length(direct_fallback),
+        "still-missing package(s):\n")
+    cat("  ", paste(direct_fallback, collapse = ", "), "\n\n")
+    for (.p in direct_fallback) {
+      cat("    \u2192 ", .p, "...", sep = "")
+      tryCatch({
+        BiocManager::install(.p, lib = lib_path, ask = FALSE, update = FALSE,
+                             force = TRUE, Ncpus = 1L,
+                             INSTALL_opts = c("--no-staged-install", "--no-lock"))
+        cat(" \u2713\n")
+      }, error   = function(e) cat(" \u2717", conditionMessage(e), "\n"),
+         warning = function(w) NULL)
+    }
+    cat("\n")
+  }
   invisible(NULL)
 }
 
@@ -503,7 +546,14 @@ if (length(failed_load) > 0L)
   cat("  \u2717 Not loaded  :", paste(failed_load, collapse = ", "), "\n")
 if (length(failed_required) > 0L) {
   cat("  \u2717 STILL MISSING:", paste(failed_required, collapse = ", "), "\n")
-  cat("  Some features may not work. Try running again or check your internet.\n")
+  cat("  Some features may not work. Try running again or check your internet\n")
+  cat("  connection, or install manually:\n\n")
+  cat('    if (!requireNamespace("BiocManager", quietly=TRUE))\n')
+  cat('      install.packages("BiocManager")\n')
+  cat('    BiocManager::install(c(\n')
+  cat('      ', paste0('"', failed_required, '"', collapse = ", "), '\n')
+  cat('    ))\n\n')
+  cat("  or need some manual changes?\n")
 } else {
   cat("  \u2713 Status       : All packages ready \u2014 opening app...\n")
 }
