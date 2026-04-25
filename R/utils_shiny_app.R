@@ -30,13 +30,25 @@
   Rcpp      = "1.0.10"
 )
 
-## Dedicated GExPipe library (created once per R version under user home).
-## New/updated packages are installed here so they shadow old system versions
-## via .libPaths() priority — without touching the user's system library.
+## Dedicated GExPipe library (created once per R version).
+## Uses AppData\Local\GExPipe\ on Windows — never synced by OneDrive.
+## Using Documents (path.expand("~")) causes "moving to final location failed"
+## errors because OneDrive holds background file locks on that folder.
 .gexpipe_get_lib <- function() {
   rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
-  d  <- file.path(path.expand("~"), ".gexpipe_packages", rv)
+  base <- if (.Platform$OS.type == "windows") {
+    la <- Sys.getenv("LOCALAPPDATA", unset = "")
+    if (nzchar(la) && dir.exists(dirname(la))) la else path.expand("~")
+  } else {
+    path.expand("~")
+  }
+  d <- file.path(base, "GExPipe", rv)
   dir.create(d, recursive = TRUE, showWarnings = FALSE)
+  # Keep old Documents-based path in .libPaths() so previously installed
+  # packages there still load during the transition.
+  old_d <- file.path(path.expand("~"), ".gexpipe_packages", rv)
+  if (dir.exists(old_d) && old_d != d && !old_d %in% .libPaths())
+    .libPaths(c(.libPaths(), old_d))
   d
 }
 
@@ -128,10 +140,31 @@
   }
 
   # ── 5. Write and run install subprocess ───────────────────────────────────
+  # Detect packages loaded from gexpipe_lib whose DLL the parent holds.
+  # Windows locks loaded DLLs — the subprocess cannot overwrite them even
+  # though it starts fresh. Skip those; they update on next R restart.
+  .dll_locked_in_parent <- function(pkg) {
+    if (!isNamespaceLoaded(pkg)) return(FALSE)
+    pkg_path <- tryCatch(find.package(pkg), error = function(e) "")
+    nzchar(pkg_path) &&
+      startsWith(normalizePath(pkg_path,   winslash = "/", mustWork = FALSE),
+                 normalizePath(gexpipe_lib, winslash = "/", mustWork = FALSE))
+  }
+  dll_locked <- to_install[vapply(to_install, .dll_locked_in_parent, logical(1L))]
+  if (length(dll_locked) > 0L)
+    message("GExPipe: DLL locked in parent (deferred to next restart): ",
+            paste(dll_locked, collapse = ", "))
+  subprocess_pkgs <- setdiff(to_install, dll_locked)
+
+  if (length(subprocess_pkgs) == 0L) {
+    message("GExPipe: all remaining packages are DLL-locked — restart R to apply updates.")
+    return(invisible(dll_locked))
+  }
+
   all_libs    <- unique(c(gexpipe_lib, .libPaths()))
   parent_libs <- paste0('"', gsub("\\\\", "/", all_libs), '"', collapse = ", ")
   lib_fwd     <- gsub("\\\\", "/", gexpipe_lib)
-  pkg_vec     <- paste0('"', to_install, '"', collapse = ", ")
+  pkg_vec     <- paste0('"', subprocess_pkgs, '"', collapse = ", ")
 
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),
@@ -158,8 +191,14 @@
     '  install.packages("BiocManager", lib = .lib,',
     '                   repos = "https://cloud.r-project.org", quiet = FALSE)',
     'message("GExPipe subprocess: installing/updating ", length(.pkgs), " package(s)")',
+    # --no-staged-install: installs directly to final location, skipping the
+    #   00LOCK-*/00new/* staging dir whose rename step fails when OneDrive or
+    #   another process holds a lock on the target folder.
+    # --no-lock: skips 00LOCK-* directory creation — safe because only this
+    #   subprocess is writing to .lib at this moment.
     'BiocManager::install(.pkgs, lib = .lib, ask = FALSE,',
-    '                     update = TRUE, force = TRUE, quiet = FALSE)',
+    '                     update = TRUE, force = TRUE, quiet = FALSE,',
+    '                     INSTALL_opts = c("--no-staged-install", "--no-lock"))',
     # Second pass: fix transitive outdated deps
     '.old <- tryCatch(',
     '  utils::old.packages(lib.loc = .lib, repos = BiocManager::repositories()),',
@@ -168,7 +207,8 @@
     'if (!is.null(.old) && nrow(.old) > 0L) {',
     '  message("GExPipe subprocess: fixing ", nrow(.old), " transitive dep(s)")',
     '  BiocManager::install(rownames(.old), lib = .lib, ask = FALSE,',
-    '                       update = TRUE, force = TRUE, quiet = FALSE)',
+    '                       update = TRUE, force = TRUE, quiet = FALSE,',
+    '                       INSTALL_opts = c("--no-staged-install", "--no-lock"))',
     '}'
   )
 
