@@ -16,31 +16,80 @@ cat("======================================================================\n")
 options(timeout = 600)
 
 # ==============================================================================
-# STEP 0  \u2014  Dedicated GExPipe library (per R version)
+# STEP 0  \u2014  Universal library setup (OS-aware, cloud-safe, two-lib design)
 # ==============================================================================
-# Library is placed in AppData\Local\GExPipe\<R-ver>\ on Windows.
-# CRITICAL: Do NOT use Documents (path.expand("~")) on Windows — that folder
-# is frequently synced by OneDrive, which holds background file locks that
-# cause "moving to final location failed" and "cannot remove earlier
-# installation" errors during package install, even in a subprocess.
-# AppData\Local is never synced by OneDrive.
-.gexpipe_lib <- local({
-  rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
-  base <- if (.Platform$OS.type == "windows") {
+# Path strategy — never in a cloud-synced folder:
+#   Windows : %LOCALAPPDATA%\GExPipe\<R-ver>\        (AppData\Local, not Documents)
+#   macOS   : ~/Library/Application Support/GExPipe/ (not iCloud Drive)
+#   Linux   : $XDG_DATA_HOME/GExPipe/  (defaults to ~/.local/share/)
+#
+# Two-library design — eliminates the need for manual R restarts after updates:
+#   main_lib    : GExPipe/<ver>/          <- parent session loads from here
+#   pending_lib : GExPipe/<ver>-pending/  <- subprocess always writes here
+#
+# On each startup pending packages are promoted → main before ANY package
+# loads, so no DLL is locked and the rename always succeeds.
+# DLL-locked updates (packages already in memory) go to pending this run
+# and are active on the very next startup automatically.
+
+.gexpipe_rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
+
+.gexpipe_lib_base <- {
+  sysname <- Sys.info()[["sysname"]]
+  if (.Platform$OS.type == "windows") {
     la <- Sys.getenv("LOCALAPPDATA", unset = "")
-    if (nzchar(la) && dir.exists(dirname(la))) la else path.expand("~")
+    if (nzchar(la)) la
+    else { ap <- Sys.getenv("APPDATA", unset = ""); if (nzchar(ap)) ap else path.expand("~") }
+  } else if (sysname == "Darwin") {
+    file.path(path.expand("~"), "Library", "Application Support")
   } else {
-    path.expand("~")
+    xdg <- Sys.getenv("XDG_DATA_HOME", unset = "")
+    if (nzchar(xdg)) xdg else file.path(path.expand("~"), ".local", "share")
   }
-  d <- file.path(base, "GExPipe", rv)
-  dir.create(d, recursive = TRUE, showWarnings = FALSE)
-  # Also keep the old Documents-based path in .libPaths() so previously
-  # installed packages there still load while transitioning.
-  old_d <- file.path(path.expand("~"), ".gexpipe_packages", rv)
-  if (dir.exists(old_d) && old_d != d) .libPaths(c(.libPaths(), old_d))
-  d
+}
+
+.gexpipe_lib         <- file.path(.gexpipe_lib_base, "GExPipe", .gexpipe_rv)
+.gexpipe_pending_lib <- file.path(.gexpipe_lib_base, "GExPipe",
+                                   paste0(.gexpipe_rv, "-pending"))
+dir.create(.gexpipe_lib, recursive = TRUE, showWarnings = FALSE)
+
+# Warn if library is still inside a cloud-sync folder (edge case on some configs)
+local({
+  p <- normalizePath(.gexpipe_lib, winslash = "/", mustWork = FALSE)
+  for (pat in c("OneDrive", "Dropbox", "Google Drive", "iCloud", "Box Sync", "Mega")) {
+    if (grepl(pat, p, ignore.case = TRUE)) {
+      cat("  WARNING: library path is inside a cloud-sync folder (", pat, ").\n",
+          "  This causes 'moving to final location failed' during install.\n",
+          "  Set the LOCALAPPDATA environment variable to a non-synced path.\n", sep = "")
+      break
+    }
+  }
 })
-.libPaths(c(.gexpipe_lib, unique(.libPaths())))   # highest priority
+
+# Promote pending → main BEFORE loading anything (no DLL locks at this point).
+# file.rename is atomic on same filesystem; falls back to copy+delete otherwise.
+local({
+  if (!dir.exists(.gexpipe_pending_lib)) return(invisible(NULL))
+  items <- list.dirs(.gexpipe_pending_lib, recursive = FALSE, full.names = TRUE)
+  if (length(items) == 0L) { unlink(.gexpipe_pending_lib, recursive = TRUE); return(invisible(NULL)) }
+  n_ok <- 0L
+  for (src in items) {
+    dst <- file.path(.gexpipe_lib, basename(src))
+    tryCatch(if (dir.exists(dst)) unlink(dst, recursive = TRUE, force = TRUE), error = function(e) NULL)
+    ok <- tryCatch(isTRUE(file.rename(src, dst)), error = function(e) FALSE)
+    if (!ok) ok <- tryCatch({ file.copy(src, .gexpipe_lib, recursive = TRUE, overwrite = TRUE); unlink(src, recursive = TRUE); TRUE }, error = function(e) FALSE)
+    if (ok) n_ok <- n_ok + 1L
+  }
+  if (n_ok > 0L) cat("  Promoted", n_ok, "pending update(s) to active library.\n")
+  if (length(list.files(.gexpipe_pending_lib, all.files = TRUE, no.. = TRUE)) == 0L)
+    unlink(.gexpipe_pending_lib, recursive = TRUE)
+})
+
+.libPaths(c(.gexpipe_lib, unique(.libPaths())))
+# Backward-compat: keep old Documents-based path so packages installed before this fix load
+local({ old <- file.path(path.expand("~"), ".gexpipe_packages", .gexpipe_rv)
+        if (dir.exists(old) && !old %in% .libPaths()) .libPaths(c(.libPaths(), old)) })
+
 cat("  Library      :", .gexpipe_lib, "\n")
 
 # ==============================================================================
@@ -152,9 +201,6 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     return(invisible(NULL))
   }
 
-  # Skip the whole subprocess if every package to install is DLL-locked
-  # (they will all be updated after the user restarts R).
-
   if (length(missing_pkgs) > 0L)
     cat("  Missing           (", length(missing_pkgs), "): ",
         paste(head(missing_pkgs, 8L), collapse = ", "),
@@ -166,18 +212,14 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     cat("  Outdated          (", length(outdated_pkgs), "): ",
         paste(head(outdated_pkgs, 8L), collapse = ", "),
         if (length(outdated_pkgs) > 8L) " ..." else "", "\n", sep = "")
-
   cat("\n  Installing/updating", length(to_install),
       "package(s) via background subprocess...\n")
-  cat("  (Fresh Rscript process \u2014 zero DLL locks regardless of RStudio state)\n")
   cat("  First run: up to 40 min.  Subsequent runs: seconds.\n\n")
 
-  lib_path <- .gexpipe_lib
+  lib_path     <- .gexpipe_lib
+  pending_path <- .gexpipe_pending_lib
 
-  # Remove stale 00LOCK dirs from EVERY library path (not just gexpipe_lib).
-  # A failed install (e.g. curl.dll locked by RStudio) leaves 00LOCK-<pkg> in
-  # the user's system library and makes ALL subsequent downloads fail because
-  # R treats the lock dir as a sign the package is being written by another process.
+  # Remove stale 00LOCK dirs from every library path
   for (.lib_dir in unique(c(lib_path, .libPaths()))) {
     .lk <- list.files(.lib_dir, pattern = "^00LOCK-", full.names = TRUE)
     if (length(.lk) > 0L) {
@@ -186,9 +228,10 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
     }
   }
 
-  # Detect packages loaded from lib_path whose DLL the parent session holds.
-  # The subprocess cannot overwrite a DLL that is mapped into a running process
-  # (Windows locks it). Skip those here; they update cleanly after R restarts.
+  # Classify packages:
+  #  safe_pkgs    → subprocess installs directly to main lib (immediately usable)
+  #  pending_pkgs → DLL locked in parent; subprocess installs to pending lib
+  #                 (promoted to main on NEXT startup automatically — no manual restart)
   .dll_locked_in_parent <- function(pkg) {
     if (!isNamespaceLoaded(pkg)) return(FALSE)
     pkg_path <- tryCatch(find.package(pkg), error = function(e) "")
@@ -196,76 +239,88 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
       startsWith(normalizePath(pkg_path, winslash = "/", mustWork = FALSE),
                  normalizePath(lib_path,  winslash = "/", mustWork = FALSE))
   }
-  .dll_locked <- to_install[vapply(to_install, .dll_locked_in_parent, logical(1L))]
-  if (length(.dll_locked) > 0L)
-    cat("  DLL locked in parent (update deferred to next restart):",
-        paste(.dll_locked, collapse = ", "), "\n")
-  subprocess_pkgs <- setdiff(to_install, .dll_locked)
+  pending_pkgs <- to_install[vapply(to_install, .dll_locked_in_parent, logical(1L))]
+  safe_pkgs    <- setdiff(to_install, pending_pkgs)
 
-  # Build the library path list for the subprocess, deduplicated and forward-slash
-  all_libs    <- unique(c(lib_path, .libPaths()))
-  parent_libs <- paste0('"', gsub("\\\\", "/", all_libs), '"', collapse = ", ")
-  lib_fwd     <- gsub("\\\\", "/", lib_path)
-  pkg_vec     <- paste0('"', subprocess_pkgs, '"', collapse = ", ")
+  if (length(pending_pkgs) > 0L)
+    cat("  DLL-locked (will be active on next startup via pending lib):",
+        paste(pending_pkgs, collapse = ", "), "\n\n")
+
+  # Build subprocess inputs
+  all_libs        <- unique(c(lib_path, .libPaths()))
+  parent_libs     <- paste0('"', gsub("\\\\", "/", all_libs), '"', collapse = ", ")
+  lib_fwd         <- gsub("\\\\", "/", lib_path)
+  pending_fwd     <- gsub("\\\\", "/", pending_path)
+  safe_vec        <- if (length(safe_pkgs)    > 0L) paste0('"', safe_pkgs,    '"', collapse = ", ") else 'character(0)'
+  pending_vec     <- if (length(pending_pkgs) > 0L) paste0('"', pending_pkgs, '"', collapse = ", ") else 'character(0)'
+  ncpus_val       <- max(1L, tryCatch(parallel::detectCores() - 1L, error = function(e) 1L))
+
+  # Universal install options:
+  #   --no-staged-install : write directly to final location (skips the
+  #     00LOCK-*/00new/* staging rename that fails under cloud-sync locks)
+  #   --no-lock           : skip 00LOCK-* creation (safe: only this subprocess writes here)
+  inst_opts <- 'c("--no-staged-install", "--no-lock")'
 
   script <- c(
     paste0('.libPaths(c(', parent_libs, '))'),
-    # Clean locks from all lib paths inside the subprocess too
     'for (.d in .libPaths()) {',
     '  .lk <- list.files(.d, pattern = "^00LOCK-", full.names = TRUE)',
     '  if (length(.lk)) unlink(.lk, recursive = TRUE, force = TRUE)',
     '}',
-    # Download method: try libcurl first; fall back to wininet on Windows
-    # (wininet avoids curl.dll dependency entirely — safe when curl.dll is locked)
-    'options(',
-    '  repos   = c(CRAN = "https://cloud.r-project.org"),',
-    '  timeout = 2400L',
-    ')',
+    # Detect download method: wininet on Windows when libcurl is locked
+    'options(repos = c(CRAN = "https://cloud.r-project.org"), timeout = 2400L)',
     'if (.Platform$OS.type == "windows") {',
-    '  .ok <- tryCatch({',
-    '    utils::download.file("https://cloud.r-project.org", tempfile(),',
-    '                         quiet = TRUE, method = "libcurl"); TRUE',
-    '  }, error = function(e) FALSE, warning = function(w) FALSE)',
-    '  if (!.ok) {',
-    '    cat("GExPipe subprocess: libcurl unavailable, switching to wininet\\n")',
-    '    options(download.file.method = "wininet")',
-    '  } else {',
-    '    options(download.file.method = "libcurl")',
-    '  }',
-    '} else {',
-    '  options(download.file.method = "libcurl")',
-    '}',
-    paste0('.lib  <- "', lib_fwd, '"'),
-    paste0('.pkgs <- c(', pkg_vec, ')'),
+    '  .ok <- tryCatch({ utils::download.file("https://cloud.r-project.org",',
+    '    tempfile(), quiet = TRUE, method = "libcurl"); TRUE },',
+    '    error = function(e) FALSE, warning = function(w) FALSE)',
+    '  options(download.file.method = if (.ok) "libcurl" else "wininet")',
+    '  if (!.ok) cat("GExPipe: libcurl unavailable, using wininet\\n")',
+    '} else { options(download.file.method = "libcurl") }',
+    paste0('.main_lib    <- "', lib_fwd,     '"'),
+    paste0('.pending_lib <- "', pending_fwd, '"'),
+    paste0('.safe_pkgs    <- c(', safe_vec,    ')'),
+    paste0('.pending_pkgs <- c(', pending_vec, ')'),
+    paste0('.ncpus        <- ', ncpus_val, 'L'),
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
-    '  install.packages("BiocManager", lib = .lib,',
-    '                   repos = "https://cloud.r-project.org", quiet = FALSE)',
-    'cat("GExPipe subprocess: installing/updating", length(.pkgs), "package(s)\\n")',
-    # --no-staged-install: installs directly to final location instead of a
-    #   tmp 00LOCK-*/00new/* staging dir, which avoids the final rename step
-    #   that fails when OneDrive or another process holds a lock on the folder.
-    # --no-lock: skips creating 00LOCK-* directories entirely — safe here
-    #   because only this subprocess is writing to .lib at this moment.
-    'BiocManager::install(.pkgs, lib = .lib, ask = FALSE,',
-    '                     update = TRUE, force = TRUE, quiet = FALSE,',
-    '                     INSTALL_opts = c("--no-staged-install", "--no-lock"))',
-    # Second pass: fix any transitive outdated deps in .lib (e.g. rlang pulled in old)
-    '.old <- tryCatch(',
-    '  utils::old.packages(lib.loc = .lib, repos = BiocManager::repositories()),',
-    '  error = function(e) NULL, warning = function(w) NULL',
-    ')',
+    '  install.packages("BiocManager", lib = .main_lib,',
+    '                   repos = "https://cloud.r-project.org")',
+    # Install non-locked packages → main lib (immediately available this run)
+    'if (length(.safe_pkgs) > 0L) {',
+    '  cat("GExPipe subprocess: installing", length(.safe_pkgs), "pkg(s) to main lib\\n")',
+    '  BiocManager::install(.safe_pkgs, lib = .main_lib, ask = FALSE,',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
+    paste0('    INSTALL_opts = ', inst_opts, ')'),
+    '  # Retry any that still failed — individually, with binary preference',
+    '  .failed <- .safe_pkgs[!vapply(.safe_pkgs, function(p)',
+    '    requireNamespace(p, lib.loc = .main_lib, quietly = TRUE), logical(1L))]',
+    '  for (.p in .failed) {',
+    '    cat("GExPipe subprocess: retrying", .p, "\\n")',
+    '    tryCatch(BiocManager::install(.p, lib = .main_lib, ask = FALSE,',
+    '      update = TRUE, force = TRUE, Ncpus = 1L,',
+    paste0('      INSTALL_opts = ', inst_opts, '),'),
+    '      error = function(e) cat("  retry failed:", conditionMessage(e), "\\n"))',
+    '  }',
+    '}',
+    # Install DLL-locked packages → pending lib (active on next startup)
+    'if (length(.pending_pkgs) > 0L) {',
+    '  dir.create(.pending_lib, recursive = TRUE, showWarnings = FALSE)',
+    '  cat("GExPipe subprocess: installing", length(.pending_pkgs),',
+    '      "DLL-locked pkg(s) to pending lib (active on next startup)\\n")',
+    '  BiocManager::install(.pending_pkgs, lib = .pending_lib, ask = FALSE,',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
+    paste0('    INSTALL_opts = ', inst_opts, ')'),
+    '}',
+    # Second pass: fix transitive outdated deps in main lib
+    '.old <- tryCatch(utils::old.packages(lib.loc = .main_lib,',
+    '  repos = BiocManager::repositories()), error = function(e) NULL,',
+    '  warning = function(w) NULL)',
     'if (!is.null(.old) && nrow(.old) > 0L) {',
-    '  cat("GExPipe subprocess: fixing", nrow(.old), "transitive outdated dep(s)\\n")',
-    '  BiocManager::install(rownames(.old), lib = .lib, ask = FALSE,',
-    '                       update = TRUE, force = TRUE, quiet = FALSE,',
-    '                       INSTALL_opts = c("--no-staged-install", "--no-lock"))',
+    '  cat("GExPipe subprocess: fixing", nrow(.old), "transitive dep(s)\\n")',
+    '  BiocManager::install(rownames(.old), lib = .main_lib, ask = FALSE,',
+    '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
+    paste0('    INSTALL_opts = ', inst_opts, ')'),
     '}'
   )
-
-  if (length(subprocess_pkgs) == 0L) {
-    cat("  All remaining packages are DLL-locked — restart R to apply updates.\n\n")
-    return(invisible(NULL))
-  }
 
   tmp_script <- tempfile(pattern = "gexpipe_install_", fileext = ".R")
   on.exit(unlink(tmp_script), add = TRUE)
@@ -277,16 +332,11 @@ cat("  Bioconductor :", bioc_ver, "\n\n")
             args    = c("--vanilla", "--no-save", shQuote(tmp_script)),
             stdout  = "", stderr  = "",
             timeout = 2400L),
-    error = function(e) {
-      cat("  Could not launch subprocess:", conditionMessage(e), "\n")
-      1L
-    }
+    error = function(e) { cat("  Could not launch subprocess:", conditionMessage(e), "\n"); 1L }
   )
-
   if (!identical(exit_code, 0L))
     cat("  Subprocess exit code:", exit_code,
-        "\u2014 some packages may not have installed. Try running again.\n")
-
+        "\u2014 some packages may not have installed. Run again to retry.\n")
   invisible(NULL)
 }
 
