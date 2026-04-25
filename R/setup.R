@@ -64,6 +64,16 @@ gexpipe_setup <- function(update   = TRUE,
   }
 
   bioc_ver <- tryCatch(BiocManager::version(), error = function(e) NA)
+  # Enforce Bioconductor 3.22 (required for R 4.5.x and the full GExPipe package set)
+  if (!is.na(bioc_ver) && !identical(as.character(bioc_ver), "3.22")) {
+    message("Upgrading Bioconductor to 3.22 (current: ", bioc_ver, ")...")
+    tryCatch(
+      BiocManager::install(version = "3.22", ask = FALSE),
+      error   = function(e) message("  BiocManager upgrade warning: ", conditionMessage(e)),
+      warning = function(w) message("  BiocManager upgrade note: ",    conditionMessage(w))
+    )
+    bioc_ver <- tryCatch(BiocManager::version(), error = function(e) NA)
+  }
   message(
     "\n── GExPipe setup ──────────────────────────────────────────────────────\n",
     "  R version          : ", r_ver, "\n",
