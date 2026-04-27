@@ -21,13 +21,15 @@
 ## Minimum versions for packages that frequently cause version-conflict errors.
 ## Any package below its floor is treated as "needs update" even when installed.
 .gexpipe_min_versions <- c(
-  rlang     = "1.1.0",
-  cli       = "3.4.0",
-  vctrs     = "0.6.0",
-  lifecycle = "1.0.3",
-  glue      = "1.6.0",
-  Matrix    = "1.5.0",
-  Rcpp      = "1.0.10"
+  rlang     = "1.1.7",   # <1.1.7 causes "namespace rlang X loaded but >=1.1.7 required"
+  cli       = "3.6.0",
+  vctrs     = "0.6.5",
+  lifecycle = "1.0.4",
+  glue      = "1.7.0",
+  withr     = "2.5.0",
+  pillar    = "1.9.0",
+  Matrix    = "1.6.0",
+  Rcpp      = "1.0.12"
 )
 
 ## Universal library helpers — same OS-aware, cloud-safe, two-lib logic as global.R.
