@@ -84,12 +84,18 @@ Works on **Windows, macOS, and Linux** without any manual dependency
 management:
 
 ```{r install-github, eval=FALSE}
-if (!requireNamespace("remotes", quietly = TRUE))
-    install.packages("remotes")
-
 options(timeout = 3600)   # 1 hour — needed for slow connections
 
-remotes::install_github("safarafique/GExPipe")
+# Step 1: Install BiocManager and set repos so remotes can find
+#         Bioconductor packages (org.Hs.eg.db, DESeq2, etc.) automatically
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+options(repos = BiocManager::repositories())
+
+# Step 2: Install GExPipe from GitHub (all 54 dependencies installed automatically)
+if (!requireNamespace("remotes", quietly = TRUE))
+    install.packages("remotes")
+remotes::install_github("safarafique/GExPipe", dependencies = TRUE)
 
 GExPipe::runGExPipe()
 ```
