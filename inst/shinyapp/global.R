@@ -189,17 +189,27 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
            error = function(e) FALSE)
 }
 
-# 3a. Completely missing packages
+# 3a. Missing FROM GExPipe library specifically (even if present in main library).
+# This guarantees every package is installed into the isolated GExPipe library
+# so the app never loads from the user's main R library.
 .missing_pkgs <- .gexpipe_all_required[
-  !vapply(.gexpipe_all_required, requireNamespace, logical(1L), quietly = TRUE)
+  vapply(.gexpipe_all_required, function(pkg) {
+    if (pkg == "parallel") return(FALSE)          # base package, always available
+    tryCatch(
+      { utils::packageVersion(pkg, lib.loc = .gexpipe_lib); FALSE },
+      error = function(e) TRUE
+    )
+  }, logical(1L))
 ]
 
-# 3b. Present but below minimum required version
+# 3b. Present in GExPipe library but below minimum required version
 .version_conflict_pkgs <- names(.gexpipe_min_versions)[
-  !mapply(.gexpipe_version_ok,
-          names(.gexpipe_min_versions),
-          .gexpipe_min_versions,
-          SIMPLIFY = TRUE)
+  vapply(names(.gexpipe_min_versions), function(pkg) {
+    tryCatch({
+      ver <- utils::packageVersion(pkg, lib.loc = .gexpipe_lib)
+      ver < package_version(.gexpipe_min_versions[[pkg]])
+    }, error = function(e) FALSE)
+  }, logical(1L))
 ]
 
 # 3c. Present and above minimum but still outdated in the dedicated lib
@@ -421,7 +431,13 @@ if (length(.still_conflicted) > 0L) {
 # Re-check the full required list (not just .missing_pkgs) so packages that
 # were installed this run are now properly counted as available.
 failed_required <- .gexpipe_all_required[
-  !vapply(.gexpipe_all_required, requireNamespace, logical(1L), quietly = TRUE)
+  vapply(.gexpipe_all_required, function(pkg) {
+    if (pkg == "parallel") return(FALSE)
+    tryCatch(
+      { utils::packageVersion(pkg, lib.loc = .gexpipe_lib); FALSE },
+      error = function(e) TRUE
+    )
+  }, logical(1L))
 ]
 
 # ==============================================================================
