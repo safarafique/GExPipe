@@ -13,7 +13,7 @@ cat("  GExPipe \u2014 Gene Expression Pipeline\n")
 cat("  R", R.version.string, "\n")
 cat("======================================================================\n")
 
-options(timeout = 600)
+options(timeout = 3600)   # 1 hour — covers slow connections and large Bioc package downloads
 
 # ==============================================================================
 # STEP 0  \u2014  Universal library setup (OS-aware, cloud-safe, two-lib design)
