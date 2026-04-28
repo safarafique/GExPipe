@@ -209,7 +209,7 @@ detect_gene_id_format <- function(ids) {
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
     stop("Install org.Hs.eg.db: BiocManager::install('org.Hs.eg.db')")
   }
-  get("org.Hs.eg.db", envir = asNamespace("org.Hs.eg.db"))
+  org.Hs.eg.db::org.Hs.eg.db
 }
 
 # Map Affymetrix HuGene _st probe IDs to gene symbols using Bioconductor .db (PROBEID -> SYMBOL).
@@ -780,7 +780,7 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
     stop("Install org.Hs.eg.db: BiocManager::install('org.Hs.eg.db')")
   }
-  db <- get("org.Hs.eg.db", asNamespace("org.Hs.eg.db"))
+  db <- org.Hs.eg.db::org.Hs.eg.db
   gene_ids <- as.character(gene_ids)
   sample_ids <- head(gene_ids[!is.na(gene_ids) & gene_ids != ""], min(100, length(gene_ids)))
   if (length(sample_ids) == 0) {
