@@ -58,10 +58,11 @@ phases. Each step must be completed before the next becomes available.
 
 # Installation
 
-## From Bioconductor (Recommended)
+## From Bioconductor (Recommended — after acceptance)
 
-Once accepted into Bioconductor, install the stable release with the
-standard two-line command:
+Once accepted into Bioconductor, install the stable release with two
+commands. `BiocManager` automatically selects the correct Bioconductor
+release for your R version (3.21 for R 4.5, 3.22 for R 4.6, etc.):
 
 ```{r install-bioc, eval=FALSE}
 if (!requireNamespace("BiocManager", quietly = TRUE))
@@ -70,51 +71,65 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("GExPipe")
 ```
 
-## From GitHub (Development Version)
+Then launch the app:
 
-Use this block on **any system** — Windows, macOS, or Linux. It handles
-DLL locks, stale lock directories, and package updates automatically
-via a background subprocess, ensuring all dependencies are at their
-correct versions before the app opens:
-
-```{r install-github, eval=FALSE}
-if (!requireNamespace("shiny", quietly = TRUE))
-    install.packages("shiny")
-
-# 1. Use Windows-native HTTP — bypasses locked curl.dll on Windows.
-#    Harmless on macOS / Linux (wininet falls back to libcurl there).
-options(download.file.method = "wininet")
-
-# 2. Remove any 00LOCK-* directories left by a previously failed install.
-#    These cause "cannot download any files" for all subsequent installs.
-unlink(list.files(.libPaths()[1], pattern = "^00LOCK-", full.names = TRUE),
-       recursive = TRUE, force = TRUE)
-
-# 3. Download and run — global.R installs all missing/outdated packages
-#    automatically via a background subprocess (no DLL locks, no prompts).
-#    First run: ~10–30 min. Every subsequent run: seconds.
-shiny::runGitHub(
-    "GExPipe", "safarafique",
-    ref     = "main",
-    subdir  = "inst/shinyapp",
-    destdir = tempfile()
-)
+```{r launch-bioc, eval=FALSE}
+GExPipe::runGExPipe()
 ```
 
-> **Why this approach?** `global.R` launches a fresh background
-> Rscript subprocess that starts with **no packages loaded**, so it
-> holds no DLL locks and can update every dependency freely — including
-> packages that a live session would refuse to overwrite. This
-> guarantees all ~54 dependencies are at the correct versions before
-> the app opens.
->
+## From GitHub (Current — available now)
+
+Install the package from GitHub and launch the app with three commands.
+Works on **Windows, macOS, and Linux** without any manual dependency
+management:
+
+```{r install-github, eval=FALSE}
+if (!requireNamespace("remotes", quietly = TRUE))
+    install.packages("remotes")
+
+remotes::install_github("safarafique/GExPipe")
+
+GExPipe::runGExPipe()
+```
+
+The app handles all 54 dependencies automatically on first launch:
+
+- Creates an **isolated GExPipe library** on your system
+- Downloads and installs all required packages into it
+- Keeps your main R library untouched
+- On every subsequent run, opens in seconds
+
+### Isolated library location
+
+All GExPipe packages are installed into a dedicated folder, completely
+separate from your main R library:
+
+| Operating System | Path |
+|---|---|
+| **Windows** | `C:\Users\<name>\AppData\Local\GExPipe\<R-ver>\` |
+| **macOS** | `~/Library/Application Support/GExPipe/<R-ver>/` |
+| **Linux** | `~/.local/share/GExPipe/<R-ver>/` |
+
+To find the exact path on your system:
+
+```{r lib-path, eval=FALSE}
+rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
+file.path(Sys.getenv("LOCALAPPDATA"), "GExPipe", rv)   # Windows
+# ~/Library/Application Support/GExPipe/<rv>            # macOS
+# ~/.local/share/GExPipe/<rv>                           # Linux
+```
+
 > **Rtools (Windows only):** If any dependency requires compilation,
 > install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/)
 > once. R will then compile source packages automatically.
+>
+> **First run time:** Downloading and installing all 54 packages takes
+> approximately 10–40 minutes depending on internet speed. Every
+> subsequent run opens in seconds.
 
 # Quick Start
 
-## Launch Locally
+## Launch the App
 
 After installation, start the application with a single command:
 
@@ -123,8 +138,24 @@ GExPipe::runGExPipe()
 ```
 
 The app opens in your default browser at **Step 1 — Download Data**.
-On first launch, any missing dependencies are installed automatically
-in a background process before the browser opens.
+
+On **first launch** the startup sequence runs automatically:
+
+```
+======================================================================
+  GExPipe — loading 54 packages...
+  [ 1/54] shiny             ... ✓ 1.13.0   Ready
+  [ 2/54] shinydashboard    ... ✓ 0.7.3    Ready
+  ...
+  [54/54] xgboost           ... ✓ 3.2.1.1  Ready
+  ===============================================================
+  Loaded  : 54 / 54 packages
+  Status  : All packages ready — opening app...
+  ===============================================================
+```
+
+On **subsequent launches** all packages are already in the isolated
+library — the app opens in seconds with no install step.
 
 ## Launch in the Cloud (Google Colab)
 
