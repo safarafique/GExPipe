@@ -3,64 +3,62 @@
 # ==============================================================================
 
 gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
-  # Local copy so the PPI module never depends on package-level helper availability.
   versions <- getOption("gexpipe.stringdb_try_versions", NULL)
   if (!is.character(versions) || length(versions) < 1L) {
-    versions <- c("11.5", "11", "12")
+    versions <- c("12.0", "11.5", "11")   # latest first — most likely to succeed
   }
-  errs <- character(0)
-  timeout_seen <- FALSE
+  n_retry <- 3L
+  errs    <- character(0)
   for (sv in versions) {
-    db <- tryCatch(
-      STRINGdb::STRINGdb$new(
-        version = sv,
-        species = 9606L,
-        score_threshold = score_threshold,
-        input_directory = input_directory
-      ),
-      error = function(e) {
-        msg <- conditionMessage(e)
-        errs <<- c(errs, paste0("STRING v", sv, ": ", msg))
-        if (grepl("timeout", msg, ignore.case = TRUE)) timeout_seen <<- TRUE
-        NULL
-      }
-    )
-    if (!is.null(db)) {
-      return(list(db = db, version_used = sv, try_errors = errs))
+    for (attempt in seq_len(n_retry)) {
+      db <- tryCatch(
+        STRINGdb::STRINGdb$new(
+          version         = sv,
+          species         = 9606L,
+          score_threshold = score_threshold,
+          input_directory = input_directory
+        ),
+        error = function(e) {
+          msg <- conditionMessage(e)
+          errs <<- c(errs, paste0("STRING v", sv, " attempt ", attempt, ": ", msg))
+          NULL
+        }
+      )
+      if (!is.null(db)) return(list(db = db, version_used = sv, try_errors = errs))
+      if (attempt < n_retry) Sys.sleep(3)   # brief pause before retry
     }
-    if (isTRUE(timeout_seen)) break
   }
   list(db = NULL, version_used = NA_character_, try_errors = errs)
 }
 
 gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_directory = "") {
-  # Local copy so the PPI module never depends on package-level helper availability.
   versions <- getOption("gexpipe.stringdb_try_versions", NULL)
   if (!is.character(versions) || length(versions) < 1L) {
-    versions <- c("11.5", "11", "12")
+    versions <- c("12.0", "11.5", "11")   # latest first
   }
+  n_retry <- 3L
+  errs    <- character(0)
 
-  errs <- character(0)
-  timeout_seen <- FALSE
   for (sv in versions) {
-    string_db <- tryCatch(
-      STRINGdb::STRINGdb$new(
-        version = sv,
-        species = 9606L,
-        score_threshold = score_threshold,
-        input_directory = input_directory
-      ),
-      error = function(e) {
-        msg <- conditionMessage(e)
-        errs <<- c(errs, paste0("STRING init v", sv, ": ", msg))
-        if (grepl("timeout", msg, ignore.case = TRUE)) timeout_seen <<- TRUE
-        NULL
-      }
-    )
-    if (is.null(string_db)) {
-      if (isTRUE(timeout_seen)) break
-      next
+    string_db <- NULL
+    for (attempt in seq_len(n_retry)) {
+      string_db <- tryCatch(
+        STRINGdb::STRINGdb$new(
+          version         = sv,
+          species         = 9606L,
+          score_threshold = score_threshold,
+          input_directory = input_directory
+        ),
+        error = function(e) {
+          msg <- conditionMessage(e)
+          errs <<- c(errs, paste0("STRING init v", sv, " attempt ", attempt, ": ", msg))
+          NULL
+        }
+      )
+      if (!is.null(string_db)) break
+      if (attempt < n_retry) Sys.sleep(3)
     }
+    if (is.null(string_db)) next
 
     mapped <- tryCatch(
       string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE),
@@ -193,8 +191,8 @@ server_ppi <- function(input, output, session, rv) {
     n_top_hubs <- max(5, min(50, if (is.na(nt)) 15 else nt))
 
     withProgress(message = "PPI analysis (STRINGdb + hub genes)...", value = 0.1, {
-      ppi_timeout <- as.integer(getOption("gexpipe.stringdb_timeout", 180L))
-      if (is.na(ppi_timeout) || ppi_timeout < 30L) ppi_timeout <- 180L
+      ppi_timeout <- as.integer(getOption("gexpipe.stringdb_timeout", 3600L))
+      if (is.na(ppi_timeout) || ppi_timeout < 30L) ppi_timeout <- 3600L
       ppi_opts <- list(timeout = ppi_timeout)
       ppi_prev <- options(ppi_opts)
       on.exit(options(ppi_prev), add = TRUE)
