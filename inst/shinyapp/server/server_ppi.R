@@ -191,23 +191,43 @@ server_ppi <- function(input, output, session, rv) {
     n_top_hubs <- max(5, min(50, if (is.na(nt)) 15 else nt))
 
     withProgress(message = "PPI analysis (STRINGdb + hub genes)...", value = 0.1, {
-      ppi_timeout <- as.integer(getOption("gexpipe.stringdb_timeout", 3600L))
-      if (is.na(ppi_timeout) || ppi_timeout < 30L) ppi_timeout <- 3600L
+      ppi_timeout <- as.integer(getOption("gexpipe.stringdb_timeout", 120L))
+      if (is.na(ppi_timeout) || ppi_timeout < 30L) ppi_timeout <- 120L
       ppi_opts <- list(timeout = ppi_timeout)
       ppi_prev <- options(ppi_opts)
       on.exit(options(ppi_prev), add = TRUE)
 
       tryCatch({
-        incProgress(0.15, detail = "Mapping to STRING...")
+        incProgress(0.15, detail = "Connecting to STRING database...")
         ppi_data <- gexp_stringdb_get_ppi_data_safe(score_threshold, valid_genes, "")
+
         if (is.null(ppi_data$interactions) || is.null(ppi_data$mapped)) {
-          stop(
-            paste0(
-              "STRING PPI initialization failed (download/map/interactions). ",
-              paste(ppi_data$try_errors, collapse = " | "),
-              " Tip: use BiocManager::install('GExPipe', dependencies = TRUE) and ensure internet access for STRINGdb data download."
-            )
+          errs <- ppi_data$try_errors
+
+          reason <- if (any(grepl("timeout|timed out", errs, ignore.case = TRUE))) {
+            "Network timeout — STRING server did not respond in time."
+          } else if (any(grepl("cannot open|cannot download|404|URL", errs, ignore.case = TRUE))) {
+            "Cannot reach STRING server — check your internet connection."
+          } else if (any(grepl("alias|protein\\.aliases", errs, ignore.case = TRUE))) {
+            "STRING alias file unavailable — the version may have changed. Try again later."
+          } else if (any(grepl("no mapped", errs, ignore.case = TRUE))) {
+            "None of your genes could be mapped to STRING identifiers — check gene symbols."
+          } else {
+            paste("STRING connection failed:", paste(errs, collapse = " | "))
+          }
+
+          showNotification(
+            ui = tags$div(
+              tags$strong("PPI Step failed"),
+              tags$br(),
+              tags$span(reason),
+              tags$br(),
+              tags$small(style = "color:#aaa;",
+                "Fix: check internet, try again, or lower the score threshold.")
+            ),
+            type = "error", duration = 15
           )
+          return()
         }
         mapped <- ppi_data$mapped
 
@@ -335,16 +355,29 @@ server_ppi <- function(input, output, session, rv) {
         )
       }, error = function(e) {
         msg <- conditionMessage(e)
-        # Avoid dumping raw STRING URLs to users; they often change/retire over time.
-        if (grepl("protein\\.aliases\\.v\\d+", msg) || grepl("stringdb-downloads\\.org/.*/protein\\.aliases\\.v\\d+", msg)) {
-          showNotification(
-            "PPI unavailable: STRING could not download required alias files (network/retired URL). Try again later or reinstall/update STRINGdb; you can also try options(gexpipe.stringdb_try_versions = c('11.5','11','12')).",
-            type = "error",
-            duration = 12
-          )
+
+        reason <- if (grepl("timeout|timed out", msg, ignore.case = TRUE)) {
+          "Network timeout — STRING server did not respond. Check your internet connection and try again."
+        } else if (grepl("protein\\.aliases|alias", msg, ignore.case = TRUE)) {
+          "STRING alias file could not be downloaded. The STRING version may have changed. Try again later or update STRINGdb."
+        } else if (grepl("cannot open|cannot download|404|URL|curl", msg, ignore.case = TRUE)) {
+          "Cannot reach STRING server. Check your internet connection."
+        } else if (grepl("no valid|0 edges|No PPI", msg, ignore.case = TRUE)) {
+          "No interactions found. Try lowering the score threshold (e.g. from 400 to 200)."
+        } else if (grepl("No unique vertices|duplicates", msg, ignore.case = TRUE)) {
+          "Gene mapping produced duplicate entries. Try with a different gene set."
         } else {
-          showNotification(paste("PPI error:", msg), type = "error", duration = 10)
+          paste("Unexpected error:", msg)
         }
+
+        showNotification(
+          ui = tags$div(
+            tags$strong("PPI Step failed"),
+            tags$br(),
+            tags$span(reason)
+          ),
+          type = "error", duration = 15
+        )
       })
     })
   })
