@@ -60,17 +60,27 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     }
     if (is.null(string_db)) next
 
+    # suppressWarnings: STRINGdb prints "couldn't map X% of identifiers" to console
+    # for every call — we show this info cleanly in the app UI instead
     mapped <- tryCatch(
-      string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE),
+      suppressWarnings(
+        string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE)
+      ),
       error = function(e) {
         errs <<- c(errs, paste0("STRING map v", sv, ": ", conditionMessage(e)))
         NULL
       }
     )
     if (is.null(mapped) || nrow(mapped) == 0) {
-      errs <- c(errs, paste0("STRING map v", sv, ": no mapped genes"))
+      errs <- c(errs, paste0("STRING map v", sv, ": no genes could be mapped to STRING identifiers"))
       next
     }
+
+    n_mapped   <- nrow(mapped)
+    n_total    <- length(valid_genes)
+    pct_mapped <- round(100 * n_mapped / n_total)
+    cat(sprintf("  STRINGdb v%s: %d / %d genes mapped (%d%% mapped, %d%% unmapped — normal)\n",
+                sv, n_mapped, n_total, pct_mapped, 100L - pct_mapped))
 
     id_col <- if ("STRING_id" %in% colnames(mapped)) {
       "STRING_id"
@@ -82,7 +92,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     valid_ids <- as.character(na.omit(mapped[[id_col]]))
 
     interactions <- tryCatch(
-      string_db$get_interactions(valid_ids),
+      suppressWarnings(string_db$get_interactions(valid_ids)),
       error = function(e) {
         msg <- conditionMessage(e)
         errs <<- c(errs, paste0("STRING interactions v", sv, ": ", msg))
@@ -97,16 +107,17 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     }
     if (!is.data.frame(interactions)) interactions <- as.data.frame(interactions, stringsAsFactors = FALSE)
     if (nrow(interactions) == 0) {
-      errs <- c(errs, paste0("STRING interactions v", sv, ": 0 edges"))
+      errs <- c(errs, paste0("STRING v", sv, ": 0 interactions found — score threshold may be too high"))
       next
     }
 
     return(list(
-      mapped = mapped,
+      mapped       = mapped,
       interactions = interactions,
-      id_col = id_col,
+      id_col       = id_col,
       version_used = sv,
-      try_errors = errs
+      pct_mapped   = pct_mapped,
+      try_errors   = errs
     ))
   }
 
@@ -231,10 +242,15 @@ server_ppi <- function(input, output, session, rv) {
         }
         mapped <- ppi_data$mapped
 
-        incProgress(0.3, detail = "Fetching interactions...")
+        pct_mapped <- ppi_data$pct_mapped
+        if (!is.null(pct_mapped)) {
+          incProgress(0.3, detail = sprintf("Fetching interactions (%d%% genes mapped to STRING)...", pct_mapped))
+        } else {
+          incProgress(0.3, detail = "Fetching interactions...")
+        }
         interactions <- ppi_data$interactions
         id_col <- ppi_data$id_col
-        if (nrow(interactions) == 0) stop("No PPI interactions found. Try lowering the score threshold.")
+        if (nrow(interactions) == 0) stop("No PPI interactions found. Try lowering the score threshold (e.g. from 400 to 200).")
 
         incProgress(0.5, detail = "Building network...")
         from_col <- if ("from" %in% colnames(interactions)) "from" else if ("protein1" %in% colnames(interactions)) "protein1" else names(interactions)[1]
@@ -349,9 +365,12 @@ server_ppi <- function(input, output, session, rv) {
         incProgress(1)
         n_int <- length(interactive_genes)
         n_non <- length(non_interactive_genes)
+        map_note <- if (!is.null(pct_mapped))
+          paste0(" (", pct_mapped, "% genes mapped to STRING — ", 100L - pct_mapped, "% unmapped is normal)")
+        else ""
         showNotification(
-          paste0("PPI complete: ", n_int, " interacting, ", n_non, " non-interacting. See list below; graphs use interacting genes."),
-          type = "message", duration = 8
+          paste0("PPI complete: ", n_int, " interacting, ", n_non, " non-interacting.", map_note),
+          type = "message", duration = 10
         )
       }, error = function(e) {
         msg <- conditionMessage(e)
