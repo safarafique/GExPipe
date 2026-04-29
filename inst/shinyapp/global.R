@@ -102,6 +102,14 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
                    repos = "https://cloud.r-project.org",
                    quiet = TRUE)
 }
+# Suppress ALL interactive update prompts from BiocManager — must be set
+# before any BiocManager::install() call. Without this, RStudio's
+# interactive() = TRUE causes BiocManager to show "Enter one or more
+# numbers to skip updates" even when ask = FALSE is passed directly.
+options(
+  BiocManager.ask             = FALSE,  # never prompt for updates
+  install.packages.check.source = "no"  # skip "do you want to install from source?" prompt
+)
 # Determine the correct Bioconductor release for the running R version.
 # Bioc 3.22 → R ≥ 4.6  |  Bioc 3.21 → R ≥ 4.5  |  Bioc 3.20 → R ≥ 4.4
 # Forcing a HIGHER release than R supports causes every BiocManager::install() to fail.
@@ -321,7 +329,7 @@ if (length(.to_install) == 0L) {
       paste0('.pkgs     <- c(', .pv, ')'),
       paste0('.ncpus    <- ', .ncpus_install, 'L'),
       paste0('.bver     <- "', .target_bioc, '"'),
-      'options(repos = c(CRAN="https://cloud.r-project.org"), timeout=2400L)',
+      'options(repos = c(CRAN="https://cloud.r-project.org"), timeout=2400L, BiocManager.ask=FALSE, install.packages.check.source="no")',
       'if (.Platform$OS.type=="windows"){',
       '  .ok <- tryCatch({utils::download.file("https://cloud.r-project.org",tempfile(),quiet=TRUE,method="libcurl");TRUE},error=function(e)FALSE,warning=function(w)FALSE)',
       '  options(download.file.method=if(.ok)"libcurl" else "wininet")',
