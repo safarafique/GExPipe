@@ -207,7 +207,16 @@ detect_gene_id_format <- function(ids) {
 
 .gexpipe_hs_db <- function() {
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
-    stop("Install org.Hs.eg.db: BiocManager::install('org.Hs.eg.db')")
+    message("org.Hs.eg.db not found — attempting auto-install...")
+    tryCatch(
+      BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
+                           update = FALSE, lib = .libPaths()[1]),
+      error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
+      warning = function(w) NULL
+    )
+  }
+  if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
+    return(NULL)   # graceful fallback — caller must handle NULL
   }
   org.Hs.eg.db::org.Hs.eg.db
 }
@@ -778,7 +787,17 @@ run_gse_annotation_and_download <- function(gse_id, dest_dir = getwd(), save_ann
 # Reused here so the Shiny app and manual script give identical results.
 convert_ids_to_symbols_simple <- function(gene_ids) {
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
-    stop("Install org.Hs.eg.db: BiocManager::install('org.Hs.eg.db')")
+    message("org.Hs.eg.db not found — attempting auto-install...")
+    tryCatch(
+      BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
+                           update = FALSE, lib = .libPaths()[1]),
+      error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
+      warning = function(w) NULL
+    )
+  }
+  if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
+    warning("org.Hs.eg.db unavailable (network issue?) — gene IDs returned as-is without symbol conversion.")
+    return(gene_ids)   # graceful fallback: keep original IDs, don't crash
   }
   db <- org.Hs.eg.db::org.Hs.eg.db
   gene_ids <- as.character(gene_ids)
