@@ -524,14 +524,78 @@ if (length(.pending_pkgs) > 0L)
       "DLL-locked (restart R to apply:", paste(.pending_pkgs, collapse=", "), ")\n")
 
 if (length(failed_required) > 0L) {
-  cat("\n  \u2717 Still missing:", length(failed_required), "required package(s):\n")
-  cat("    ", paste(failed_required, collapse = ", "), "\n\n")
-  cat("  \u2192 Run again (network may have been interrupted), or paste this\n")
-  cat("    in the R console to install manually:\n\n")
-  cat('    BiocManager::install(c(\n')
-  cat('      ', paste0('"', failed_required, '"', collapse = ",\n      "), '\n')
-  cat('    ))\n\n')
-  cat("  Some features may be unavailable until these are installed.\n")
+
+  # \u2500\u2500 Retry: one more direct install attempt for failed packages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  cat("\n  \u26a0  Still missing", length(failed_required), "package(s) \u2014 retrying install...\n")
+  for (.pkg in failed_required) {
+    cat("    Retrying:", .pkg, "... ")
+    tryCatch({
+      BiocManager::install(.pkg, lib = .gexpipe_lib, ask = FALSE,
+                           update = FALSE, quiet = TRUE,
+                           Ncpus = .ncpus_install)
+      cat("\u2713\n")
+    }, error   = function(e) cat("\u2717 FAILED:", conditionMessage(e), "\n"),
+       warning = function(w) NULL)
+  }
+
+  # \u2500\u2500 Re-check after retry \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  failed_required <- .gexpipe_all_required[
+    vapply(.gexpipe_all_required, function(pkg) {
+      if (pkg == "parallel") return(FALSE)
+      tryCatch(
+        { utils::packageVersion(pkg, lib.loc = .gexpipe_lib); FALSE },
+        error = function(e) TRUE
+      )
+    }, logical(1L))
+  ]
+}
+
+if (length(failed_required) > 0L) {
+
+  cat("\n")
+  cat("  ================================================================\n")
+  cat("  \u274c  APP BLOCKED \u2014 required packages not installed\n")
+  cat("  ================================================================\n")
+  cat("  Missing (", length(failed_required), "):\n", sep = "")
+  for (.p in failed_required)
+    cat("    \u2717  ", .p, "\n", sep = "")
+  cat("\n")
+  cat("  Cause  : Network was interrupted during install.\n")
+  cat("  Fix 1  : Check your internet connection and run again:\n")
+  cat("             GExPipe::runGExPipe()\n\n")
+  cat("  Fix 2  : Install missing packages manually:\n")
+  cat("    options(timeout = 3600)\n")
+  cat("    BiocManager::install(c(\n")
+  cat("      ", paste0('"', failed_required, '"', collapse = ",\n      "), "\n")
+  cat("    ))\n")
+  cat("  ================================================================\n\n")
+
+  # \u2500\u2500 Replace the Shiny UI with a clear error page \u2014 app does NOT open \u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  ui     <- shiny::fluidPage(
+    shiny::tags$head(shiny::tags$style(
+      "body{font-family:monospace;background:#1e1e1e;color:#f8f8f8;padding:40px;}
+       h2{color:#ff6b6b;} code{background:#333;padding:2px 6px;border-radius:3px;}
+       .pkg{color:#ff9800;font-weight:bold;} .fix{color:#69db7c;}"
+    )),
+    shiny::h2("\u274c GExPipe could not start \u2014 missing packages"),
+    shiny::p("The following required packages are not installed:"),
+    shiny::tags$ul(lapply(failed_required, function(p)
+      shiny::tags$li(shiny::tags$span(class = "pkg", p))
+    )),
+    shiny::hr(),
+    shiny::p(shiny::tags$strong("Cause:"), " Network was interrupted during package download."),
+    shiny::p(shiny::tags$strong("Fix \u2014 run this in R console:")),
+    shiny::tags$pre(class = "fix",
+      paste0(
+        'options(timeout = 3600)\n',
+        'BiocManager::install(c(\n  ',
+        paste0('"', failed_required, '"', collapse = ',\n  '),
+        '\n))\nGExPipe::runGExPipe()'
+      )
+    )
+  )
+  server <- function(input, output, session) {}
+
 } else {
   cat("\n  \u2713 Status       : All packages ready \u2014 opening app...\n")
 }
