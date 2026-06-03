@@ -11,10 +11,9 @@
 #' @param update Logical. If `TRUE` (default), update already-installed
 #'   packages to the versions matching your current Bioconductor release.
 #'   Set to `FALSE` to only install missing packages without updating existing ones.
-#' @param optional Logical. If `TRUE` (default), also install optional packages
-#'   (`Boruta`, `xgboost`, `SHAPforxgboost`, `mixOmics`, `rms`, `rmda`,
-#'   `cicerone`, `biomaRt`). These unlock additional ML methods, the guided
-#'   tour, the nomogram, and Ensembl ID mapping.
+#' @param optional Logical. Reserved for future optional feature packages.
+#'   Currently all runtime dependencies are in `DESCRIPTION` Imports and are
+#'   always installed regardless of this flag.
 #' @param launch Logical. If `TRUE`, launch the GExPipe Shiny app after
 #'   setup completes. Default `FALSE`.
 #' @param port Integer. Port for the Shiny app when `launch = TRUE`.
@@ -100,24 +99,28 @@ gexpipe_setup <- function(update   = TRUE,
   # BiocManager::install() automatically selects versions matching your
   # Bioconductor release, so no hardcoded version numbers are needed here.
   bioc_required <- c(
-    "AnnotationDbi", "Biobase", "clusterProfiler", "DESeq2", "edgeR",
-    "enrichplot", "GEOquery", "limma", "msigdbr", "org.Hs.eg.db",
+    "affy", "oligo",
+    "AnnotationDbi", "Biobase", "biomaRt", "clusterProfiler", "DESeq2", "edgeR",
+    "enrichplot", "GEOquery", "limma", "mixOmics", "org.Hs.eg.db",
     "STRINGdb", "sva", "WGCNA"
   )
 
   cran_required <- c(
     "shiny", "shinydashboard", "shinyjs", "DT",
-    "caret", "circlize", "corrplot", "data.table", "dplyr", "dynamicTreeCut",
-    "e1071", "ggplot2", "ggpubr", "ggraph", "ggrepel", "glmnet",
+    "Boruta", "car", "caret", "cicerone", "circlize", "corrplot",
+    "data.table", "dplyr", "dynamicTreeCut",
+    "ggplot2", "ggpubr", "ggraph", "ggrepel", "glmnet",
     "gridExtra", "igraph", "kernlab", "parallel", "pheatmap", "pROC",
-    "R.utils", "randomForest", "RColorBrewer", "reshape2", "scales",
-    "tibble", "tidygraph", "tidyr", "UpSetR", "VennDiagram"
+    "R.utils", "randomForest", "RColorBrewer", "reshape2", "rms", "rmda",
+    "scales", "SHAPforxgboost", "tibble", "tidygraph", "tidyr",
+    "UpSetR", "VennDiagram", "xgboost",
+    "cli", "glue", "lifecycle", "rlang", "vctrs",
+    "Matrix", "Rcpp", "withr", "pillar"
   )
 
-  ## ── 4. Optional packages ──────────────────────────────────────────────────
-  bioc_optional  <- c("biomaRt", "mixOmics")
-  cran_optional  <- c("Boruta", "cicerone", "rms", "rmda",
-                      "SHAPforxgboost", "xgboost")
+  ## ── 4. Optional packages (dev / extended checks only) ─────────────────────
+  bioc_optional  <- character(0)
+  cran_optional  <- character(0)
 
   ## ── 5. Install via subprocess (prevents BiocManager session restarts) ───────
   # Direct BiocManager::install() calls in the parent session can trigger an
