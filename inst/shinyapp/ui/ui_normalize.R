@@ -6,9 +6,9 @@ ui_normalize <- tabItem(
     tabName = "normalize",
     h2(icon("balance-scale"), " Step 3: Data Normalization"),
 
-    # Auto-handled banner (visible when DESeq2 or edgeR is selected)
+    # Auto-handled banner (visible when DESeq2, edgeR, or limma-voom is selected)
     conditionalPanel(
-      condition = "input.de_method == 'deseq2' || input.de_method == 'edger'",
+      condition = "input.de_method == 'deseq2' || input.de_method == 'edger' || input.de_method == 'limma_voom'",
       fluidRow(
         box(
           width = 12, status = "success", solidHeader = TRUE,
@@ -16,13 +16,14 @@ ui_normalize <- tabItem(
           tags$div(
             style = "padding: 15px; background: linear-gradient(135deg, #d5f5e3 0%, #abebc6 100%); border-radius: 8px;",
             tags$p(
-              icon("dna"), tags$strong(" You selected a count-based DE method (DESeq2 / edgeR)."),
+              icon("dna"), tags$strong(" You selected a count-based DE method (DESeq2 / edgeR / limma-voom)."),
               style = "font-size: 15px; margin-bottom: 10px; color: #1e8449;"
             ),
             tags$ul(
               style = "font-size: 13px; color: #2c3e50; line-height: 2;",
-              tags$li(tags$strong("For DE analysis:"), " DESeq2 uses median-of-ratios normalization; edgeR uses TMM normalization. Both work directly on raw counts — no manual normalization needed."),
+              tags$li(tags$strong("For DE analysis:"), " DESeq2 uses median-of-ratios normalization; edgeR uses TMM normalization; limma-voom applies voom transformation to raw counts. All three work directly on raw counts — no manual normalization needed."),
               tags$li(tags$strong("For downstream steps:"), " Normalization was run automatically in the background (TMM + quantile) so that WGCNA, heatmaps, and other visualizations work correctly."),
+              tags$li(tags$strong("RNA-seq only:"), " These methods require integer RNA-seq counts. If your data is microarray-based, limma will be used automatically instead."),
               tags$li(tags$strong("Next step:"), " Proceed to ", tags$b("Step 4: Select Groups"), " — this step is already done for you.")
             ),
             tags$div(
@@ -35,9 +36,9 @@ ui_normalize <- tabItem(
       )
     ),
 
-    # Standard normalization content (hidden when DESeq2 or edgeR is selected)
+    # Standard normalization content (hidden when DESeq2, edgeR, or limma-voom is selected)
     conditionalPanel(
-      condition = "input.de_method != 'deseq2' && input.de_method != 'edger'",
+      condition = "input.de_method != 'deseq2' && input.de_method != 'edger' && input.de_method != 'limma_voom'",
       fluidRow(
         box(
           title = tags$span(icon("info-circle"), " About this step"),
@@ -284,5 +285,5 @@ ui_normalize <- tabItem(
                                 icon = icon("arrow-right"), class = "btn-success btn-lg",
                                 style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
     )
-    ) # end conditionalPanel for limma mode
+    ) # end conditionalPanel for limma-only mode
   )

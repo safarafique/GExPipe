@@ -292,8 +292,24 @@ gexp_download_normalize_ids_for_overlap <- function(
   micro_expr_list,
   rna_counts_list,
   platform_per_gse = NULL,
-  all_genes_list = NULL
+  all_genes_list = NULL,
+  micro_eset_list = NULL   # optional: stored ExpressionSets for fData fallback
 ) {
+  normalize_symbol_tokens <- function(ids) {
+    ids <- as.character(ids)
+    out <- vapply(ids, function(x) {
+      if (is.na(x)) return(NA_character_)
+      x <- trimws(x)
+      if (!nzchar(x)) return(NA_character_)
+      toks <- unlist(strsplit(x, "\\s*///\\s*|\\s*//\\s*|\\s*;\\s*|\\s*,\\s*"))
+      toks <- trimws(toks)
+      toks <- toks[nzchar(toks)]
+      if (length(toks) == 0) return(NA_character_)
+      toks[1]
+    }, character(1))
+    out
+  }
+
   if (is.null(all_genes_list)) {
     all_genes_list <- gexp_rebuild_all_genes_list(micro_expr_list, rna_counts_list)
   }
@@ -301,99 +317,234 @@ gexp_download_normalize_ids_for_overlap <- function(
   log_text <- "\nSTEP 2b: Normalize IDs to gene symbols for overlap...\n"
 
   for (gse in names(micro_expr_list)) {
-    micro_expr <- micro_expr_list[[gse]]
-    rn <- rownames(micro_expr)
-    sample_rn <- head(rn[!is.na(rn) & rn != ""], min(200, length(rn)))
-    looks_like_symbol <- length(sample_rn) > 0 &&
-      mean(grepl("^[A-Za-z]", sample_rn), na.rm = TRUE) > 0.6 &&
-      mean(grepl("^ENSG|_at$|_st$|^[0-9]+$", sample_rn), na.rm = TRUE) < 0.5
-    gpl <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
-    if (!looks_like_symbol) {
-      fmt <- detect_gene_id_format(rn)
-      log_text <- paste0(log_text, "  ", gse, ": format ", fmt, " -> converting to symbols...\n")
-      sym <- any_id_to_symbol(rn, gpl_id = gpl)
-      valid <- !is.na(sym) & trimws(sym) != ""
-      if (sum(valid) > 0) {
-        rownames(micro_expr) <- sym
-        micro_expr <- micro_expr[valid, , drop = FALSE]
-        if (any(duplicated(rownames(micro_expr)))) micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
-        micro_expr_list[[gse]] <- micro_expr
-        all_genes_list[[gse]] <- rownames(micro_expr)
-        log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(micro_expr), " gene symbols\n")
-      }
-    }
-  }
-
-  for (gse in names(rna_counts_list)) {
-    cnt <- rna_counts_list[[gse]]
-    rn <- rownames(cnt)
-    sample_rn <- head(rn[!is.na(rn) & rn != ""], min(200, length(rn)))
-    looks_like_symbol <- length(sample_rn) > 0 &&
-      mean(grepl("^[A-Za-z]", sample_rn), na.rm = TRUE) > 0.6 &&
-      mean(grepl("^ENSG|_at$|_st$|^[0-9]+$", sample_rn), na.rm = TRUE) < 0.5
-    if (!looks_like_symbol) {
-      sym <- any_id_to_symbol(rn, gpl_id = NULL)
-      valid <- !is.na(sym) & trimws(sym) != ""
-      if (sum(valid) > 0) {
-        rownames(cnt) <- sym
-        cnt <- cnt[valid, , drop = FALSE]
-        if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
-        rna_counts_list[[gse]] <- cnt
-        all_genes_list[[gse]] <- rownames(cnt)
-        log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(cnt), " gene symbols\n")
-      }
-    }
-  }
-
-  for (gse in names(rna_counts_list)) {
-    rn <- rownames(rna_counts_list[[gse]])
-    sample_rn <- head(rn[!is.na(rn) & nzchar(trimws(rn))], min(300, length(rn)))
-    if (length(sample_rn) > 0 && mean(grepl("^[0-9]+$", sample_rn), na.rm = TRUE) > 0.7) {
-      log_text <- paste0(log_text, "  ", gse, ": row IDs still Entrez-like -> trying biomaRt Entrez->symbol...\n")
-      sym <- entrez_to_symbol_biomart(rn)
-      if (!is.null(sym)) {
+    .gse_result <- tryCatch({
+      micro_expr <- micro_expr_list[[gse]]
+      rn <- rownames(micro_expr)
+      sample_rn <- head(rn[!is.na(rn) & rn != ""], min(200, length(rn)))
+      looks_like_symbol <- length(sample_rn) > 0 &&
+        mean(grepl("^[A-Za-z]", sample_rn), na.rm = TRUE) > 0.6 &&
+        mean(grepl("^ENSG|_at$|_st$|^[0-9]+$", sample_rn), na.rm = TRUE) < 0.5
+      gpl <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
+      if (!looks_like_symbol) {
+        fmt <- detect_gene_id_format(rn)
+        log_text <- paste0(log_text, "  ", gse, ": format ", fmt, " -> converting to symbols...\n")
+        sym <- any_id_to_symbol(rn, gpl_id = gpl)
+        converted <- FALSE
+        if (!is.null(sym) && length(sym) == length(rn)) {
+          valid <- !is.na(sym) & trimws(sym) != ""
+          if (sum(valid) > 0) {
+            changed_ratio <- mean(sym[valid] != rn[valid], na.rm = TRUE)
+            fmt_after <- detect_gene_id_format(sym[valid])
+            if (changed_ratio > 0.05 || identical(fmt_after, "Gene symbol (HGNC)")) {
+              rownames(micro_expr) <- sym
+              micro_expr <- micro_expr[valid, , drop = FALSE]
+              if (any(duplicated(rownames(micro_expr)))) micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
+              micro_expr_list[[gse]] <- micro_expr
+              all_genes_list[[gse]] <- rownames(micro_expr)
+              log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(micro_expr), " gene symbols\n")
+              converted <- TRUE
+            }
+          }
+        }
+        # Fallback: use fData from stored ExpressionSet (avoids repeat GPL download)
+        if (!converted && !is.null(micro_eset_list) && !is.null(micro_eset_list[[gse]])) {
+          fd <- tryCatch(Biobase::fData(micro_eset_list[[gse]]), error = function(e) NULL)
+          if (!is.null(fd) && is.data.frame(fd) && ncol(fd) > 0) {
+            fd_cn     <- colnames(fd)
+            fd_cn_low <- tolower(trimws(fd_cn))
+            sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
+                               "symbol", "hgnc_symbol", "hgnc symbol", "hgnc.symbol",
+                               "gene sym", "genesym", "official symbol", "official_symbol")
+            fd_sym_col <- NULL
+            for (i in seq_along(fd_cn)) {
+              if (fd_cn_low[i] %in% sym_cands_low) { fd_sym_col <- fd_cn[i]; break }
+            }
+            if (is.null(fd_sym_col)) {
+              idx <- grep("gene.*(sym|symbol)|hgnc", fd_cn_low)
+              if (length(idx) > 0) fd_sym_col <- fd_cn[idx[1]]
+            }
+            if (!is.null(fd_sym_col)) {
+              fd_sym <- tryCatch(as.character(fd[[fd_sym_col]]), error = function(e) NULL)
+              if (!is.null(fd_sym) && length(fd_sym) == length(rn)) {
+                .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na",
+                                  "null", "NULL", "none", "NONE", ".", "0",
+                                  "no match", "no symbol", "unknown", "UNKNOWN")
+                fd_sym[fd_sym %in% .geo_na_vals | is.na(fd_sym)] <- NA
+                valid_fd <- !is.na(fd_sym) & nzchar(trimws(fd_sym))
+                if (sum(valid_fd) > length(rn) * 0.05) {
+                  micro_expr_fd <- micro_expr
+                  rownames(micro_expr_fd) <- fd_sym
+                  micro_expr_fd <- micro_expr_fd[valid_fd, , drop = FALSE]
+                  if (any(duplicated(rownames(micro_expr_fd)))) {
+                    micro_expr_fd <- limma::avereps(micro_expr_fd, ID = rownames(micro_expr_fd))
+                  }
+                  micro_expr_list[[gse]] <- micro_expr_fd
+                  all_genes_list[[gse]]  <- rownames(micro_expr_fd)
+                  log_text <- paste0(log_text, "  ", gse, ": fData fallback -> ",
+                                     nrow(micro_expr_fd), " gene symbols\n")
+                  converted <- TRUE
+                }
+              }
+            }
+          }
+        }
+        if (!converted) {
+          log_text <- paste0(log_text, "  ", gse, ": conversion did not yield recognizable symbols; kept original IDs\n")
+        }
+      } else {
+        sym <- normalize_symbol_tokens(rn)
         valid <- !is.na(sym) & trimws(sym) != ""
         if (sum(valid) > 0) {
-          cnt <- rna_counts_list[[gse]]
+          rownames(micro_expr) <- sym
+          micro_expr <- micro_expr[valid, , drop = FALSE]
+          if (any(duplicated(rownames(micro_expr)))) micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
+          micro_expr_list[[gse]] <- micro_expr
+          all_genes_list[[gse]] <- rownames(micro_expr)
+        }
+      }
+      list(ok = TRUE, log_text = log_text, micro_expr_list = micro_expr_list, all_genes_list = all_genes_list)
+    }, error = function(e) {
+      list(ok = FALSE, msg = conditionMessage(e))
+    })
+    if (isTRUE(.gse_result$ok)) {
+      log_text        <- .gse_result$log_text
+      micro_expr_list <- .gse_result$micro_expr_list
+      all_genes_list  <- .gse_result$all_genes_list
+    } else {
+      log_text <- paste0(log_text, "  ", gse, ": ID conversion error (", .gse_result$msg, ") — kept original IDs\n")
+    }
+  }
+
+  for (gse in names(rna_counts_list)) {
+    .gse_result <- tryCatch({
+      cnt <- rna_counts_list[[gse]]
+      rn <- rownames(cnt)
+      sample_rn <- head(rn[!is.na(rn) & rn != ""], min(200, length(rn)))
+      looks_like_symbol <- length(sample_rn) > 0 &&
+        mean(grepl("^[A-Za-z]", sample_rn), na.rm = TRUE) > 0.6 &&
+        mean(grepl("^ENSG|_at$|_st$|^[0-9]+$", sample_rn), na.rm = TRUE) < 0.5
+      if (!looks_like_symbol) {
+        sym <- any_id_to_symbol(rn, gpl_id = NULL)
+        if (!is.null(sym) && length(sym) == length(rn)) {
+          valid <- !is.na(sym) & trimws(sym) != ""
+          if (sum(valid) > 0) {
+            changed_ratio <- mean(sym[valid] != rn[valid], na.rm = TRUE)
+            fmt_after <- detect_gene_id_format(sym[valid])
+            if (changed_ratio > 0.05 || identical(fmt_after, "Gene symbol (HGNC)")) {
+              rownames(cnt) <- sym
+              cnt <- cnt[valid, , drop = FALSE]
+              if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+              rna_counts_list[[gse]] <- cnt
+              all_genes_list[[gse]] <- rownames(cnt)
+              log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(cnt), " gene symbols\n")
+            } else {
+              log_text <- paste0(log_text, "  ", gse, ": conversion did not yield recognizable symbols; kept original IDs\n")
+            }
+          }
+        }
+      } else {
+        sym <- normalize_symbol_tokens(rn)
+        valid <- !is.na(sym) & trimws(sym) != ""
+        if (sum(valid) > 0) {
           rownames(cnt) <- sym
           cnt <- cnt[valid, , drop = FALSE]
           if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
           rna_counts_list[[gse]] <- cnt
           all_genes_list[[gse]] <- rownames(cnt)
-          log_text <- paste0(log_text, "  ", gse, ": biomaRt converted to ", nrow(cnt), " gene symbols\n")
         }
       }
+      list(ok = TRUE, log_text = log_text, rna_counts_list = rna_counts_list, all_genes_list = all_genes_list)
+    }, error = function(e) {
+      list(ok = FALSE, msg = conditionMessage(e))
+    })
+    if (isTRUE(.gse_result$ok)) {
+      log_text        <- .gse_result$log_text
+      rna_counts_list <- .gse_result$rna_counts_list
+      all_genes_list  <- .gse_result$all_genes_list
+    } else {
+      log_text <- paste0(log_text, "  ", gse, ": ID conversion error (", .gse_result$msg, ") — kept original IDs\n")
+    }
+  }
+
+  for (gse in names(rna_counts_list)) {
+    .gse_result <- tryCatch({
+      rn <- rownames(rna_counts_list[[gse]])
+      sample_rn <- head(rn[!is.na(rn) & nzchar(trimws(rn))], min(300, length(rn)))
+      if (length(sample_rn) > 0 && mean(grepl("^[0-9]+$", sample_rn), na.rm = TRUE) > 0.7) {
+        log_text <- paste0(log_text, "  ", gse, ": row IDs still Entrez-like -> trying biomaRt Entrez->symbol...\n")
+        sym <- entrez_to_symbol_biomart(rn)
+        if (!is.null(sym) && length(sym) == length(rn)) {
+          valid <- !is.na(sym) & trimws(sym) != ""
+          if (sum(valid) > 0) {
+            cnt <- rna_counts_list[[gse]]
+            rownames(cnt) <- sym
+            cnt <- cnt[valid, , drop = FALSE]
+            if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+            rna_counts_list[[gse]] <- cnt
+            all_genes_list[[gse]] <- rownames(cnt)
+            log_text <- paste0(log_text, "  ", gse, ": biomaRt converted to ", nrow(cnt), " gene symbols\n")
+          }
+        }
+      }
+      list(ok = TRUE, log_text = log_text, rna_counts_list = rna_counts_list, all_genes_list = all_genes_list)
+    }, error = function(e) {
+      list(ok = FALSE, msg = conditionMessage(e))
+    })
+    if (isTRUE(.gse_result$ok)) {
+      log_text        <- .gse_result$log_text
+      rna_counts_list <- .gse_result$rna_counts_list
+      all_genes_list  <- .gse_result$all_genes_list
+    } else {
+      log_text <- paste0(log_text, "  ", gse, ": biomaRt Entrez->symbol error (", .gse_result$msg, ") — kept original IDs\n")
     }
   }
 
   for (gse in names(all_genes_list)) {
-    rn <- all_genes_list[[gse]]
-    sample_rn <- head(rn[!is.na(rn) & nzchar(trimws(rn))], min(500, length(rn)))
-    if (length(sample_rn) > 0 && mean(grepl("^[0-9]+_st$", sample_rn), na.rm = TRUE) > 0.5) {
-      log_text <- paste0(log_text, "  ", gse, ": detected Affymetrix HuGene probe (_st) format -> converting...\n")
-      gpl <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
-      sym <- probe_ids_to_symbol_hugene_db(rn, gpl)
-      if (is.null(sym) || sum(!is.na(sym)) <= length(rn) * 0.1) sym <- probe_ids_to_symbol_gpl(rn, gpl)
-      if (is.null(sym) || sum(!is.na(sym)) <= length(rn) * 0.1) sym <- probe_ids_to_symbol_biomart(rn, gpl)
-      if (!is.null(sym) && sum(!is.na(sym)) > length(rn) * 0.1) {
-        valid <- !is.na(sym) & trimws(sym) != ""
-        if (gse %in% names(micro_expr_list)) {
-          micro_expr <- micro_expr_list[[gse]]
-          rownames(micro_expr) <- sym
-          micro_expr <- micro_expr[valid, , drop = FALSE]
-          if (any(duplicated(rownames(micro_expr)))) micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
-          micro_expr_list[[gse]] <- micro_expr
-        } else if (gse %in% names(rna_counts_list)) {
-          cnt <- rna_counts_list[[gse]]
-          rownames(cnt) <- sym
-          cnt <- cnt[valid, , drop = FALSE]
-          if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
-          rna_counts_list[[gse]] <- cnt
+    .gse_result <- tryCatch({
+      rn <- all_genes_list[[gse]]
+      sample_rn <- head(rn[!is.na(rn) & nzchar(trimws(rn))], min(500, length(rn)))
+      if (length(sample_rn) > 0 && mean(grepl("^[0-9]+_st$", sample_rn), na.rm = TRUE) > 0.5) {
+        log_text <- paste0(log_text, "  ", gse, ": detected Affymetrix HuGene probe (_st) format -> converting...\n")
+        gpl <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
+        sym <- probe_ids_to_symbol_hugene_db(rn, gpl)
+        if (is.null(sym) || length(sym) != length(rn) || sum(!is.na(sym)) <= length(rn) * 0.1) sym <- probe_ids_to_symbol_gpl(rn, gpl)
+        if (is.null(sym) || length(sym) != length(rn) || sum(!is.na(sym)) <= length(rn) * 0.1) sym <- probe_ids_to_symbol_biomart(rn, gpl)
+        if (!is.null(sym) && length(sym) == length(rn) && sum(!is.na(sym)) > length(rn) * 0.1) {
+          valid <- !is.na(sym) & trimws(sym) != ""
+          if (gse %in% names(micro_expr_list)) {
+            micro_expr <- micro_expr_list[[gse]]
+            if (nrow(micro_expr) == length(sym)) {
+              rownames(micro_expr) <- sym
+              micro_expr <- micro_expr[valid, , drop = FALSE]
+              if (any(duplicated(rownames(micro_expr)))) micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
+              micro_expr_list[[gse]] <- micro_expr
+            }
+          } else if (gse %in% names(rna_counts_list)) {
+            cnt <- rna_counts_list[[gse]]
+            if (nrow(cnt) == length(sym)) {
+              rownames(cnt) <- sym
+              cnt <- cnt[valid, , drop = FALSE]
+              if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+              rna_counts_list[[gse]] <- cnt
+            }
+          }
+          all_genes_list[[gse]] <- if (gse %in% names(micro_expr_list)) rownames(micro_expr_list[[gse]]) else rownames(rna_counts_list[[gse]])
+          n_after <- if (gse %in% names(micro_expr_list)) nrow(micro_expr_list[[gse]]) else nrow(rna_counts_list[[gse]])
+          log_text <- paste0(log_text, "  ", gse, ": _st probe IDs converted to ", n_after, " gene symbols (HuGene/GEO GPL/biomaRt)\n")
         }
-        all_genes_list[[gse]] <- if (gse %in% names(micro_expr_list)) rownames(micro_expr_list[[gse]]) else rownames(rna_counts_list[[gse]])
-        n_after <- if (gse %in% names(micro_expr_list)) nrow(micro_expr_list[[gse]]) else nrow(rna_counts_list[[gse]])
-        log_text <- paste0(log_text, "  ", gse, ": _st probe IDs converted to ", n_after, " gene symbols (HuGene/GEO GPL/biomaRt)\n")
       }
+      list(ok = TRUE, log_text = log_text, micro_expr_list = micro_expr_list,
+           rna_counts_list = rna_counts_list, all_genes_list = all_genes_list)
+    }, error = function(e) {
+      list(ok = FALSE, msg = conditionMessage(e))
+    })
+    if (isTRUE(.gse_result$ok)) {
+      log_text        <- .gse_result$log_text
+      micro_expr_list <- .gse_result$micro_expr_list
+      rna_counts_list <- .gse_result$rna_counts_list
+      all_genes_list  <- .gse_result$all_genes_list
+    } else {
+      log_text <- paste0(log_text, "  ", gse, ": _st conversion error (", .gse_result$msg, ") — kept original IDs\n")
     }
   }
 
@@ -454,26 +605,53 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
     return(out)
   }
 
-  if (is.list(micro_data) && length(micro_data) >= 1) {
-    platforms <- vapply(micro_data, function(x) Biobase::annotation(x), character(1))
-    n_feat <- vapply(micro_data, function(x) tryCatch(nrow(Biobase::exprs(x)), error = function(e) 0L), integer(1))
-    idx <- which.max(n_feat)
-    if (length(idx) == 0 || is.na(idx) || idx < 1) idx <- 1
-    micro_eset <- micro_data[[idx]]
-    platform_id <- Biobase::annotation(micro_eset)
-    out$log <- if (length(micro_data) > 1) {
-      paste0("Platforms: ", paste(unique(platforms), collapse = ", "), ". Using ", platform_id, ". ")
+  eset_parse <- tryCatch({
+    if (is.list(micro_data) && length(micro_data) >= 1) {
+      platforms <- vapply(micro_data,
+        function(x) tryCatch(Biobase::annotation(x), error = function(e) ""),
+        character(1))
+      n_feat <- vapply(micro_data,
+        function(x) tryCatch(nrow(Biobase::exprs(x)), error = function(e) 0L),
+        integer(1))
+      idx <- which.max(n_feat)
+      if (length(idx) == 0 || is.na(idx) || idx < 1) idx <- 1L
+      eset   <- micro_data[[idx]]
+      plt_id <- tryCatch(Biobase::annotation(eset), error = function(e) "")
+      log_pfx <- if (length(micro_data) > 1) {
+        paste0("Platforms: ", paste(unique(platforms), collapse = ", "), ". Using ", plt_id, ". ")
+      } else {
+        paste0("Platform ", plt_id, ". ")
+      }
+    } else if (!is.null(micro_data)) {
+      eset   <- micro_data
+      plt_id <- tryCatch(Biobase::annotation(eset), error = function(e) "")
+      log_pfx <- paste0("Platform ", plt_id, ". ")
     } else {
-      paste0("Platform ", platform_id, ". ")
+      return(structure(list(ok = FALSE, reason = "getGEO returned NULL or empty"), class = "eset_err"))
     }
-  } else {
-    micro_eset <- micro_data
-    platform_id <- Biobase::annotation(micro_eset)
-    out$log <- paste0("Platform ", platform_id, ". ")
+    expr_mat <- tryCatch(Biobase::exprs(eset),   error = function(e) NULL)
+    pd       <- tryCatch(Biobase::pData(eset),   error = function(e) NULL)
+    if (is.null(expr_mat) || nrow(expr_mat) == 0 || ncol(expr_mat) == 0) {
+      return(structure(list(ok = FALSE, reason = "ExpressionSet has empty expression matrix"), class = "eset_err"))
+    }
+    list(ok = TRUE, eset = eset, platform_id = plt_id, log_pfx = log_pfx,
+         expr_mat = expr_mat, pdata = pd)
+  }, error = function(e) {
+    list(ok = FALSE, reason = paste0("GEO object parse error: ", substr(conditionMessage(e), 1L, 120L)))
+  })
+
+  if (inherits(eset_parse, "eset_err") || !isTRUE(eset_parse$ok)) {
+    out$reason <- if (inherits(eset_parse, "eset_err")) eset_parse$reason else eset_parse$reason
+    return(out)
   }
 
-  micro_expr <- Biobase::exprs(micro_eset)
-  pdata <- Biobase::pData(micro_eset)
+  micro_eset  <- eset_parse$eset
+  platform_id <- eset_parse$platform_id
+  out$log     <- eset_parse$log_pfx
+  micro_expr  <- eset_parse$expr_mat
+  pdata       <- eset_parse$pdata
+  if (is.null(pdata)) pdata <- data.frame(row.names = colnames(micro_expr))
+
   out$log <- paste0(out$log, "Downloaded: ", nrow(micro_expr), " genes x ", ncol(micro_expr), " samples")
 
   cel <- character(0)

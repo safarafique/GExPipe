@@ -208,37 +208,53 @@ server_download <- function(input, output, session, rv) {
 
       if (length(rv$micro_expr_list) > 0) {
         for (gse_id in names(rv$micro_expr_list)) {
-          micro_expr <- rv$micro_expr_list[[gse_id]]
-          micro_eset <- rv$micro_eset_list[[gse_id]]
-          if (is.null(micro_eset)) {
-            micro_data <- tryCatch({
-              suppressMessages(invisible(capture.output(
-                md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
-                file = nullfile()
-              )))
-              md
-            }, error = function(e) NULL)
-            micro_eset <- if (!is.null(micro_data) && is.list(micro_data) && length(micro_data) >= 1) {
-              micro_data[[1]]
-            } else {
-              micro_data
+          .gse_map <- tryCatch({
+            micro_expr <- rv$micro_expr_list[[gse_id]]
+            micro_eset <- rv$micro_eset_list[[gse_id]]
+            if (is.null(micro_eset)) {
+              micro_data <- tryCatch({
+                suppressMessages(invisible(capture.output(
+                  md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
+                  file = nullfile()
+                )))
+                md
+              }, error = function(e) NULL)
+              micro_eset <- if (!is.null(micro_data) && is.list(micro_data) && length(micro_data) >= 1) {
+                micro_data[[1]]
+              } else {
+                micro_data
+              }
             }
+            if (is.null(micro_eset)) {
+              return(list(ok = "skip", msg = paste0("  ", gse_id, ": skipped mapping (GEO object unavailable during remap)\n")))
+            }
+            fdata <- tryCatch(Biobase::fData(micro_eset), error = function(e) data.frame())
+            gene_symbols <- suppressMessages(
+              tryCatch(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id),
+                       error = function(e) rownames(micro_expr)))
+            # Safety: if symbol vector length doesn't match, fall back to original rownames
+            extra_log <- ""
+            if (length(gene_symbols) != nrow(micro_expr)) {
+              extra_log <- paste0("  ", gse_id, ": symbol length mismatch (", length(gene_symbols),
+                                  " vs ", nrow(micro_expr), " rows) — keeping original row IDs\n")
+              gene_symbols <- rownames(micro_expr)
+            }
+            rownames(micro_expr) <- gene_symbols
+            valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
+            micro_expr <- micro_expr[valid, , drop = FALSE]
+            if (nrow(micro_expr) == 0) return(list(ok = "skip", msg = ""))
+            if (any(duplicated(rownames(micro_expr)))) {
+              micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
+            }
+            list(ok = TRUE, micro_expr = micro_expr,
+                 msg = paste0(extra_log, "  ", gse_id, ": ", nrow(micro_expr), " unique gene symbols\n"))
+          }, error = function(e) {
+            list(ok = FALSE, msg = paste0("  ", gse_id, ": gene ID mapping failed (", conditionMessage(e), ") — keeping raw probe IDs\n"))
+          })
+          log_text <- paste0(log_text, .gse_map$msg)
+          if (isTRUE(.gse_map$ok)) {
+            rv$micro_expr_list[[gse_id]] <- .gse_map$micro_expr
           }
-          if (is.null(micro_eset)) {
-            log_text <- paste0(log_text, "  ", gse_id, ": skipped mapping (GEO object unavailable during remap)\n")
-            next
-          }
-          fdata <- Biobase::fData(micro_eset)
-          gene_symbols <- suppressMessages(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id))
-          rownames(micro_expr) <- gene_symbols
-          valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
-          micro_expr <- micro_expr[valid, , drop = FALSE]
-          if (nrow(micro_expr) == 0) next
-          if (any(duplicated(rownames(micro_expr)))) {
-            micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
-          }
-          rv$micro_expr_list[[gse_id]] <- micro_expr
-          log_text <- paste0(log_text, "  ", gse_id, ": ", nrow(micro_expr), " unique gene symbols\n")
         }
       }
 
@@ -262,7 +278,8 @@ server_download <- function(input, output, session, rv) {
         micro_expr_list = rv$micro_expr_list,
         rna_counts_list = rv$rna_counts_list,
         platform_per_gse = rv$platform_per_gse,
-        all_genes_list = rv$all_genes_list
+        all_genes_list = rv$all_genes_list,
+        micro_eset_list = rv$micro_eset_list
       )
       rv$micro_expr_list <- normalized$micro_expr_list
       rv$rna_counts_list <- normalized$rna_counts_list
