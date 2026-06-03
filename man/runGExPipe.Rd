@@ -48,7 +48,7 @@ directly (that path runs \code{global.R}, which duplicates the install logic).
 Optional tuning before \code{runGExPipe()}:
 \itemize{
 \item \code{options(gexpipe.wgcna_threads = 1L)} - fewer WGCNA threads (less parallel setup noise).
-\item \code{options(gexpipe.wgcna_threads = 0L)} or \code{FALSE} - skip \code{\link[WGCNA:allowWGCNAThreads]{WGCNA::enableWGCNAThreads()}} at app start.
+\item \code{options(gexpipe.wgcna_threads = 0L)} or \code{FALSE} - skip \code{\link[WGCNA:enableWGCNAThreads]{WGCNA::enableWGCNAThreads()}} at app start.
 \item \code{options(shiny.testmode = TRUE)} with \code{options(gexpipe.minimal_attach_in_testmode = TRUE)} (default
 when unset) attaches only the Shiny stack first, then the rest after the first flush, so
 automated tests can connect quickly. Set \code{gexpipe.minimal_attach_in_testmode = FALSE} for a
@@ -58,10 +58,10 @@ full attach on the first tick (e.g. deep \code{shinytest2} scenarios).
 
 \section{PPI (STRINGdb)}{
 
-Install with full dependencies so \link[STRINGdb:STRINGdb-class]{STRINGdb::STRINGdb} support packages resolve:
+Install with full dependencies so \link[STRINGdb:STRINGdb]{STRINGdb} support packages resolve:
 \code{BiocManager::install("GExPipe", dependencies = TRUE)}. STRINGdb is installed as a dependency.
 The first PPI run may download large STRING files (requires network). If initialization fails,
-try \code{options(gexpipe.stringdb_try_versions = c("11.5", "11", "12"))} or update \link[STRINGdb:STRINGdb-class]{STRINGdb::STRINGdb}.
+try \code{options(gexpipe.stringdb_try_versions = c("11.5", "11", "12"))} or update \link[STRINGdb:STRINGdb]{STRINGdb}.
 }
 
 \examples{
