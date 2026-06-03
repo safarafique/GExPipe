@@ -7,6 +7,9 @@
 .RDataTmp
 .Ruserdata
 
+# Local installed-version snapshot (machine-specific; regenerate with inst/scripts/dump_installed_versions.R)
+inst/pkg_versions_installed.local.txt
+
 # Build and check artifacts
 OmniVerse.Rcheck/
 OmniVerse.BiocCheck/
