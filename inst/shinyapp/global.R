@@ -497,6 +497,83 @@ for (i in seq_along(all_pkgs)) {
 cat("  ---------------------------------------------------------------\n")
 
 # ==============================================================================
+# STEP 5b — glmnet native-code health check
+# ==============================================================================
+# The version check above only confirms the R package is installed; it does NOT
+# verify that the compiled C library (DLL / .so) is usable.  When R is updated
+# without reinstalling packages, the DLL becomes incompatible and every glmnet
+# call throws "_glmnet_glmnet_control_get not available for .Call()".
+# We call glmnet_control() (the lightest internal function that exercises the
+# DLL entry point) and force-reinstall if it fails.
+if (isNamespaceLoaded("glmnet")) {
+  .glmnet_dll_ok <- tryCatch({
+    glmnet::glmnet_control()   # calls _glmnet_glmnet_control_get internally
+    TRUE
+  }, error = function(e) FALSE)
+
+  if (!.glmnet_dll_ok) {
+    cat("\n  ⚠  glmnet DLL broken (_glmnet_glmnet_control_get not available).\n")
+    cat("      Cause: glmnet was compiled for a different R version.\n")
+
+    if (.dll_locked_in_parent("glmnet")) {
+      # DLL is already mapped into this R process — cannot overwrite it now.
+      # Install the fresh build into the pending lib; takes effect on next run.
+      cat("      DLL is locked in this session. Installing fresh build into pending lib...\n")
+      tryCatch({
+        if (!dir.exists(.pend_lib)) dir.create(.pend_lib, recursive = TRUE)
+        BiocManager::install(
+          "glmnet",
+          lib     = .pend_lib,
+          ask     = FALSE,
+          update  = TRUE,
+          force   = TRUE,
+          quiet   = FALSE,
+          Ncpus   = .ncpus_install
+        )
+        cat("      ✓ Fresh glmnet installed into pending lib.\n")
+        cat("  ╔", strrep("═", 62L), "╗\n", sep = "")
+        cat("  ║  RESTART REQUIRED  —  glmnet DLL was rebuilt            ║\n")
+        cat("  ║                                                              ║\n")
+        cat("  ║  1. Press Ctrl+C (or RStudio Stop ■)                        ║\n")
+        cat("  ║  2. Restart R  (RStudio: Ctrl+Shift+F10)                    ║\n")
+        cat("  ║  3. Run GExPipe::runGExPipe() again                         ║\n")
+        cat("  ╚", strrep("═", 62L), "╝\n\n", sep = "")
+        stop("GExPipe: restart R to apply glmnet rebuild (DLL was broken).", call. = FALSE)
+      }, error = function(e) {
+        if (grepl("restart R", conditionMessage(e), fixed = TRUE)) stop(e)
+        cat("      ✗ Failed to install fresh glmnet:", conditionMessage(e), "\n")
+      })
+    } else {
+      # Not locked — we can remove the broken copy and reinstall right now.
+      cat("      Removing broken glmnet and reinstalling...\n")
+      tryCatch(unloadNamespace("glmnet"), error = function(e) NULL)
+      tryCatch(
+        utils::remove.packages("glmnet", lib = .gexpipe_lib),
+        error = function(e) NULL
+      )
+      tryCatch({
+        BiocManager::install(
+          "glmnet",
+          lib     = .gexpipe_lib,
+          ask     = FALSE,
+          update  = TRUE,
+          force   = TRUE,
+          quiet   = FALSE,
+          Ncpus   = .ncpus_install
+        )
+        suppressPackageStartupMessages(
+          library(glmnet, lib.loc = .gexpipe_lib, character.only = TRUE)
+        )
+        cat("      ✓ glmnet reinstalled and reloaded successfully.\n")
+      }, error = function(e) {
+        cat("      ✗ Reinstall failed:", conditionMessage(e), "\n")
+        cat("         Run manually: install.packages('glmnet', type='source')\n")
+      })
+    }
+  }
+}
+
+# ==============================================================================
 # Runtime options
 # ==============================================================================
 options(shiny.maxRequestSize = 500 * 1024^2)
