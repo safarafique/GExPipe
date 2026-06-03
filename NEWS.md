@@ -1,5 +1,17 @@
 # GExPipe NEWS
 
+## Version 0.99.8
+
+### Dependencies and documentation
+- Aligned `DESCRIPTION` `Imports` with packages used in the Shiny app (63 runtime
+  dependencies); added `affy`, `oligo`, `Matrix`, `Rcpp`, `withr`, `pillar`;
+  removed unused `e1071`; relaxed minimum versions for reliable install on R 4.5+
+  / Bioconductor 3.21–3.22.
+- Added `inst/pkg_versions.txt` and alignment scripts under `inst/scripts/`.
+- Updated `README.md` and `inst/PACKAGE_VERSIONS.md` to match `DESCRIPTION`.
+- Synced install/load lists in `R/utils_shiny_app.R`, `R/setup.R`, and
+  `inst/shinyapp/global.R`.
+
 ## Version 0.99.7
 
 ### Compatibility
