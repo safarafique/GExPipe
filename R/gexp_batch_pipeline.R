@@ -64,10 +64,16 @@ gexp_batch_correct <- function(
   log_text <- ""
 
   # ---- Variance-based gene filtering ----
-  gene_vars <- apply(expr, 1, var)
+  # Remove rows that are entirely NA/NaN before variance calculation to avoid
+  # "missing values not allowed if na.rm = FALSE" errors in quantile().
+  all_na_rows <- apply(expr, 1, function(x) all(is.na(x)))
+  if (any(all_na_rows)) {
+    expr <- expr[!all_na_rows, , drop = FALSE]
+  }
+  gene_vars <- apply(expr, 1, var, na.rm = TRUE)
   percentile <- variance_percentile / 100
-  cutoff <- stats::quantile(gene_vars, percentile)
-  high_var <- gene_vars > cutoff
+  cutoff <- stats::quantile(gene_vars, percentile, na.rm = TRUE)
+  high_var <- !is.na(gene_vars) & gene_vars > cutoff
   expr_filtered <- expr[high_var, , drop = FALSE]
 
   genes_before <- nrow(expr)

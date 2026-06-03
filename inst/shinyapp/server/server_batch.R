@@ -114,36 +114,36 @@ server_batch <- function(input, output, session, rv) {
   # Reactive to calculate variance cutoff based on user input
   variance_cutoff <- reactive({
     req(rv$combined_expr, input$variance_percentile)
-    gene_vars <- apply(rv$combined_expr, 1, var)
+    gene_vars <- apply(rv$combined_expr, 1, var, na.rm = TRUE)
     percentile <- input$variance_percentile / 100
-    quantile(gene_vars, percentile)
+    quantile(gene_vars, percentile, na.rm = TRUE)
   })
-  
+
   # Calculate genes to keep and remove based on current percentile
   output$genes_to_keep <- renderText({
     req(rv$combined_expr, input$variance_percentile)
-    gene_vars <- apply(rv$combined_expr, 1, var)
+    gene_vars <- apply(rv$combined_expr, 1, var, na.rm = TRUE)
     cutoff <- variance_cutoff()
-    n_keep <- sum(gene_vars > cutoff)
+    n_keep <- sum(!is.na(gene_vars) & gene_vars > cutoff)
     format(n_keep, big.mark = ",")
   })
-  
+
   output$genes_to_remove <- renderText({
     req(rv$combined_expr, input$variance_percentile)
-    gene_vars <- apply(rv$combined_expr, 1, var)
+    gene_vars <- apply(rv$combined_expr, 1, var, na.rm = TRUE)
     cutoff <- variance_cutoff()
-    n_remove <- sum(gene_vars <= cutoff)
+    n_remove <- sum(is.na(gene_vars) | gene_vars <= cutoff)
     format(n_remove, big.mark = ",")
   })
-  
+
   output$filter_info <- renderText({
     req(rv$combined_expr, input$variance_percentile)
     total_genes <- nrow(rv$combined_expr)
-    gene_vars <- apply(rv$combined_expr, 1, var)
+    gene_vars <- apply(rv$combined_expr, 1, var, na.rm = TRUE)
     cutoff <- variance_cutoff()
-    n_remove <- sum(gene_vars <= cutoff)
+    n_remove <- sum(is.na(gene_vars) | gene_vars <= cutoff)
     percent_remove <- round(100 * n_remove / total_genes, 1)
-    paste0("Removing ", percent_remove, "% of genes (", format(n_remove, big.mark = ","), 
+    paste0("Removing ", percent_remove, "% of genes (", format(n_remove, big.mark = ","),
            " genes) with variance below ", round(cutoff, 4))
   })
   
@@ -157,7 +157,8 @@ server_batch <- function(input, output, session, rv) {
   
   batch_gene_variance_plot <- reactive({
     req(rv$combined_expr, input$variance_percentile)
-    gene_vars <- apply(rv$combined_expr, 1, var)
+    gene_vars <- apply(rv$combined_expr, 1, var, na.rm = TRUE)
+    gene_vars[is.na(gene_vars)] <- 0
     cutoff <- variance_cutoff()
     df <- data.frame(Variance = gene_vars, Kept = ifelse(gene_vars > cutoff, "Retained", "Filtered"))
     ggplot2::ggplot(df, ggplot2::aes(x = log10(Variance), fill = Kept)) +

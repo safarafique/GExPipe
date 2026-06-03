@@ -27,7 +27,7 @@ setup completes. Default \code{FALSE}.}
 
 \item{port}{Integer. Port for the Shiny app when \code{launch = TRUE}.}
 
-\item{...}{Additional arguments passed to \code{\link[shiny]{runApp}} when
+\item{...}{Additional arguments passed to \code{\link[shiny:runApp]{shiny::runApp()}} when
 \code{launch = TRUE}.}
 }
 \value{
@@ -39,7 +39,8 @@ Detects your R version, installs or updates all required packages via
 \code{BiocManager} (which automatically selects the correct Bioconductor release
 for your R version — 3.19 for R 4.4, 3.21 for R 4.5, 3.22 for R 4.6),
 and optionally installs recommended optional packages and launches the app.
-
+}
+\details{
 Run this once on a new system or after upgrading R to ensure all packages
 are at the correct versions.
 }
@@ -48,4 +49,5 @@ are at the correct versions.
 if (interactive()) {
   gexpipe_setup(update = FALSE, optional = FALSE, launch = FALSE)
 }
+
 }

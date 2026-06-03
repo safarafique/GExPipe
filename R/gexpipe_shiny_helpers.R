@@ -192,6 +192,9 @@ detect_gene_id_format <- function(ids) {
   if (mean(grepl("_at$|_x_at$", sample_ids), na.rm = TRUE) > 0.5) {
     return("Affymetrix HG-U133 probe (_at)")
   }
+  if (mean(grepl("probe[0-9]*$", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
+    return("Microarray probe-like ID")
+  }
   if (mean(grepl("^ENSG", sample_ids), na.rm = TRUE) > 0.5) {
     return("Ensembl ID")
   }
@@ -271,69 +274,189 @@ probe_ids_to_symbol_hugene_db <- function(probe_ids, gpl_id = NULL) {
 
 # Map probe IDs to gene symbols using GEO platform (GPL) annotation table.
 probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
-  if (is.null(gpl_id) || !nzchar(gpl_id)) {
-    return(NULL)
-  }
-  probe_ids <- as.character(probe_ids)
-
-  gpl <- tryCatch(
-    suppressMessages(GEOquery::getGEO(gpl_id, destdir = tempdir())),
-    error = function(e) NULL
-  )
-  if (is.null(gpl)) {
-    return(NULL)
-  }
-
-  tab <- tryCatch(if (inherits(gpl, "GPL")) GEOquery::Table(gpl) else NULL, error = function(e) NULL)
-  if (is.null(tab) || nrow(tab) == 0) {
-    return(NULL)
-  }
-
-  probe_col <- NULL
-  for (cand in c("ID", "PROBE_ID", "Probe", "probe_id", "SPOT_ID")) {
-    if (cand %in% colnames(tab)) {
-      probe_col <- cand
-      break
+  tryCatch({
+    if (is.null(gpl_id) || !nzchar(gpl_id)) {
+      return(NULL)
     }
-  }
-  if (is.null(probe_col)) {
-    return(NULL)
-  }
+    probe_ids <- as.character(probe_ids)
 
-  symbol_col <- NULL
-  for (cand in c(
-    "Gene Symbol", "GENE_SYMBOL", "Gene.symbol", "Symbol", "gene_symbol",
-    "SYMBOL", "GeneSymbol", "Gene_Symbol"
-  )) {
-    if (cand %in% colnames(tab)) {
-      symbol_col <- cand
-      break
+    # Try multiple destdir values: default (tempdir), then current working dir.
+    # This reuses any GPL file already cached during the GSE download step.
+    .fetch_gpl <- function(destdir_val) {
+      tryCatch(
+        suppressMessages(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
+        error = function(e) NULL
+      )
     }
-  }
-  if (is.null(symbol_col)) {
-    return(NULL)
-  }
+    gpl_raw <- .fetch_gpl(tempdir())
+    if (is.null(gpl_raw)) gpl_raw <- .fetch_gpl(getwd())
 
-  tab[[probe_col]] <- as.character(tab[[probe_col]])
-  tab[[symbol_col]] <- as.character(tab[[symbol_col]])
-  tab <- tab[!is.na(tab[[symbol_col]]) & nzchar(trimws(tab[[symbol_col]])), , drop = FALSE]
-  if (nrow(tab) == 0) {
-    return(NULL)
-  }
+    if (is.null(gpl_raw)) {
+      return(NULL)
+    }
+    # getGEO may return a bare GPL object or a list wrapping one (GEOquery version-dependent)
+    .unwrap_gpl <- function(x) {
+      if (inherits(x, "GPL")) return(x)
+      if (is.list(x)) {
+        els <- Filter(function(e) inherits(e, "GPL"), x)
+        if (length(els) > 0) return(els[[1L]])
+      }
+      NULL
+    }
+    gpl <- .unwrap_gpl(gpl_raw)
+    if (is.null(gpl)) return(NULL)
 
-  gpl_probes <- tab[[probe_col]]
-  idx <- match(probe_ids, gpl_probes)
-  if (mean(is.na(idx)) > 0.5 && any(grepl("_st$", probe_ids))) {
-    idx2 <- match(sub("_st$", "", probe_ids), gpl_probes)
-    if (sum(!is.na(idx2)) > sum(!is.na(idx))) idx <- idx2
-  }
+    tab <- tryCatch(GEOquery::Table(gpl), error = function(e) NULL)
+    if (is.null(tab) || nrow(tab) == 0 || ncol(tab) == 0) {
+      return(NULL)
+    }
+    tab <- as.data.frame(tab, stringsAsFactors = FALSE)
+    if (is.null(colnames(tab))) return(NULL)
 
-  out <- tab[[symbol_col]][idx]
-  names(out) <- probe_ids
-  if (sum(!is.na(out)) > length(probe_ids) * 0.1) {
-    return(out)
-  }
-  NULL
+    cn     <- colnames(tab)
+    cn_low <- tolower(trimws(cn))
+
+    # --- Probe ID column (case-insensitive) ---
+    probe_col <- NULL
+    probe_cands_low <- c("id", "probe_id", "probe id", "probeid", "spot_id",
+                         "id_ref", "idref", "probe")
+    for (i in seq_along(cn)) {
+      if (cn_low[i] %in% probe_cands_low) { probe_col <- cn[i]; break }
+    }
+    if (is.null(probe_col)) {
+      probe_idx <- which(grepl("(^id$|id_ref|probe|spot)", cn_low))
+      if (length(probe_idx) > 0) probe_col <- cn[probe_idx[1]]
+    }
+    if (is.null(probe_col) || !probe_col %in% cn) return(NULL)
+
+    # --- Gene symbol column (case-insensitive) ---
+    symbol_col <- NULL
+    sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
+                       "symbol", "hgnc_symbol", "hgnc symbol", "hgnc.symbol",
+                       "gene sym", "genesym", "official symbol", "official_symbol")
+    for (i in seq_along(cn)) {
+      if (cn_low[i] %in% sym_cands_low) { symbol_col <- cn[i]; break }
+    }
+    if (is.null(symbol_col)) {
+      idx <- grep("gene.*(sym|symbol)|hgnc", cn_low)
+      if (length(idx) > 0) symbol_col <- cn[idx[1]]
+    }
+    if (is.null(symbol_col)) {
+      idx <- grep("symbol", cn_low)
+      idx <- idx[!grepl("probe|spot|id$|accession|sequence|title|desc", cn_low[idx])]
+      if (length(idx) > 0) symbol_col <- cn[idx[1]]
+    }
+
+    # --- Assignment / description fallback ---
+    assignment_col <- NULL
+    if (is.null(symbol_col)) {
+      assign_cands_low <- c("gene assignment", "gene_assignment", "gene assignment.1")
+      for (i in seq_along(cn)) {
+        if (cn_low[i] %in% assign_cands_low) { assignment_col <- cn[i]; break }
+      }
+      if (is.null(assignment_col)) {
+        idx <- grep("gene.*assign", cn_low)
+        if (length(idx) > 0) assignment_col <- cn[idx[1]]
+      }
+    }
+    # Heuristic fallback: any column with keywords but not the probe column
+    if (is.null(symbol_col) && (is.null(assignment_col) || !assignment_col %in% cn)) {
+      candidate_idx <- which(
+        grepl("symbol|gene|assign|description|title|annotation", cn_low) &
+          !(cn %in% c(probe_col))
+      )
+      if (length(candidate_idx) > 0) {
+        assignment_col <- cn[candidate_idx[1]]
+      } else {
+        return(NULL)
+      }
+    }
+
+    tab[[probe_col]] <- as.character(tab[[probe_col]])
+    if (!is.null(symbol_col)) {
+      tab[[symbol_col]] <- as.character(tab[[symbol_col]])
+    } else {
+      tab[[assignment_col]] <- as.character(tab[[assignment_col]])
+      tab[[assignment_col]] <- vapply(tab[[assignment_col]], function(x) {
+        x <- as.character(x)
+        if (length(x) == 0 || is.na(x) || !nzchar(trimws(x))) return(NA_character_)
+        x <- trimws(x)
+        if (grepl("//", x, fixed = TRUE)) {
+          parts <- trimws(unlist(strsplit(x, "\\s*//\\s*")))
+          cand <- parts[grepl("^[A-Za-z][A-Za-z0-9._-]*$", parts)]
+          if (length(cand) > 0) return(cand[1])
+        }
+        toks <- trimws(unlist(strsplit(x, "\\s*///\\s*|\\s*;\\s*|\\s*,\\s*")))
+        toks <- toks[grepl("^[A-Za-z][A-Za-z0-9._-]*$", toks)]
+        if (length(toks) > 0) toks[1] else NA_character_
+      }, character(1))
+    }
+    symbol_source_col <- if (!is.null(symbol_col)) symbol_col else assignment_col
+    if (!symbol_source_col %in% cn) return(NULL)
+
+    # Filter out rows with missing/placeholder symbols
+    .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na", "null",
+                      "NULL", "none", "NONE", ".", "0", "no match", "no symbol",
+                      "unknown", "UNKNOWN")
+    tab <- tab[
+      !is.na(tab[[symbol_source_col]]) &
+        !tab[[symbol_source_col]] %in% .geo_na_vals &
+        nzchar(trimws(tab[[symbol_source_col]])),
+      , drop = FALSE
+    ]
+    if (nrow(tab) == 0) {
+      return(NULL)
+    }
+
+    gpl_probes     <- as.character(tab[[probe_col]])
+    gpl_probes_low <- tolower(trimws(gpl_probes))
+    ids_low        <- tolower(trimws(probe_ids))
+
+    idx <- match(probe_ids, gpl_probes)
+    # Try case-insensitive exact match
+    if (mean(is.na(idx)) > 0.5) {
+      idx2 <- match(ids_low, gpl_probes_low)
+      if (sum(!is.na(idx2)) > sum(!is.na(idx))) idx <- idx2
+    }
+    # Strip Affymetrix _st suffix
+    if (mean(is.na(idx)) > 0.5 && any(grepl("_st$", probe_ids))) {
+      idx2 <- match(sub("_st$", "", probe_ids), gpl_probes)
+      if (sum(!is.na(idx2)) > sum(!is.na(idx))) idx <- idx2
+    }
+    # Strip _PROBE[0-9]* suffix (CodeLink format: 000106CB1_PROBE1 -> 000106CB1)
+    if (mean(is.na(idx)) > 0.5 && any(grepl("_PROBE[0-9]*$", probe_ids, ignore.case = TRUE))) {
+      ids_stripped <- sub("_PROBE[0-9]*$", "", probe_ids, ignore.case = TRUE)
+      idx2 <- match(ids_stripped, gpl_probes)
+      if (sum(!is.na(idx2)) <= sum(!is.na(idx))) {
+        idx2 <- match(tolower(ids_stripped), gpl_probes_low)
+      }
+      if (sum(!is.na(idx2)) > sum(!is.na(idx))) idx <- idx2
+    }
+    # Generic: strip everything after the last underscore
+    if (mean(is.na(idx)) > 0.5 && any(grepl("_.+$", probe_ids))) {
+      idx2 <- match(sub("_.+$", "", probe_ids), gpl_probes)
+      if (sum(!is.na(idx2)) > sum(!is.na(idx))) idx <- idx2
+    }
+
+    out <- tab[[symbol_source_col]][idx]
+    out <- vapply(out, function(x) {
+      x <- as.character(x)
+      if (length(x) == 0 || is.na(x) || !nzchar(trimws(x))) return(NA_character_)
+      x <- trimws(x)
+      toks <- unlist(strsplit(x, "\\s*///\\s*|\\s*//\\s*|\\s*;\\s*|\\s*,\\s*"))
+      toks <- trimws(toks)
+      toks <- toks[nzchar(toks)]
+      if (length(toks) == 0) return(NA_character_)
+      toks[1]
+    }, character(1))
+    names(out) <- probe_ids
+    if (sum(!is.na(out)) > length(probe_ids) * 0.1) {
+      return(out)
+    }
+    NULL
+  }, error = function(e) {
+    NULL
+  })
 }
 
 # Map probe IDs to gene symbols via biomaRt (fallback). Returns named vector or NULL.
@@ -343,7 +466,10 @@ probe_ids_to_symbol_biomart <- function(probe_ids, gpl_id = NULL) {
   }
   probe_ids <- as.character(probe_ids)
 
-  attr_name <- if (!is.null(gpl_id) && nzchar(gpl_id)) GPL_to_biomart_probe_attr[[gpl_id]] else NULL
+  # Use [ not [[ to avoid "subscript out of bounds" when gpl_id is not in the named vector
+  attr_name <- if (!is.null(gpl_id) && nzchar(gpl_id) && gpl_id %in% names(GPL_to_biomart_probe_attr)) {
+    GPL_to_biomart_probe_attr[gpl_id][[1L]]
+  } else NULL
   if (is.null(attr_name) || is.na(attr_name)) {
     sample_ids <- head(probe_ids[!is.na(probe_ids) & nzchar(probe_ids)], 200)
     if (length(sample_ids) == 0) {
@@ -421,24 +547,52 @@ probe_ids_to_symbol_biomart <- function(probe_ids, gpl_id = NULL) {
 # Map microarray probe IDs to gene symbols.
 map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NULL) {
   probe_ids <- rownames(micro_expr)
+  n_probes  <- length(probe_ids)
 
-  possible_symbol_cols <- c(
-    "Gene Symbol", "Gene.symbol", "GENE_SYMBOL", "Symbol", "gene_symbol", "SYMBOL",
-    "GeneSymbol", "gene.symbol", "Gene_Symbol"
-  )
+  # Safety helper: only return a symbol vector when its length matches the probe count.
+  .safe_sym <- function(sym) {
+    if (is.null(sym)) return(NULL)
+    sym <- as.character(sym)
+    if (length(sym) == n_probes) sym else NULL
+  }
+
+  # Common GEO missing-value placeholders to treat as NA
+  .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na", "null",
+                    "NULL", "none", "NONE", ".", "0", "no match", "no symbol",
+                    "unknown", "UNKNOWN")
+
   gene_symbol_col <- NULL
-  if (!is.null(fdata) && ncol(fdata) > 0) {
-    for (col in possible_symbol_cols) {
-      if (col %in% colnames(fdata)) {
-        gene_symbol_col <- col
-        break
-      }
+  if (!is.null(fdata) && is.data.frame(fdata) && ncol(fdata) > 0) {
+    cn     <- colnames(fdata)
+    cn_low <- tolower(trimws(cn))
+    # 1) Exact case-insensitive match against known symbol column names
+    sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
+                       "symbol", "gene sym", "hgnc_symbol", "hgnc symbol",
+                       "hgnc.symbol", "official symbol", "official_symbol",
+                       "gene.sym", "genesym")
+    for (i in seq_along(cn)) {
+      if (cn_low[i] %in% sym_cands_low) { gene_symbol_col <- cn[i]; break }
+    }
+    # 2) Regex fallback: column name contains "gene" AND ("sym" or "symbol")
+    if (is.null(gene_symbol_col)) {
+      idx <- grep("gene.*(sym|symbol)|hgnc", cn_low)
+      if (length(idx) > 0) gene_symbol_col <- cn[idx[1]]
+    }
+    # 3) Broader regex: any column whose name contains "symbol" (not probe/id)
+    if (is.null(gene_symbol_col)) {
+      idx <- grep("symbol", cn_low)
+      idx <- idx[!grepl("probe|spot|id$|accession|sequence|title|desc", cn_low[idx])]
+      if (length(idx) > 0) gene_symbol_col <- cn[idx[1]]
     }
   }
   if (!is.null(gene_symbol_col)) {
-    gene_symbols <- as.character(fdata[[gene_symbol_col]])
-    gene_symbols[gene_symbols == "" | is.na(gene_symbols)] <- NA
-    return(gene_symbols)
+    gene_symbols <- tryCatch(as.character(fdata[[gene_symbol_col]]), error = function(e) NULL)
+    if (!is.null(gene_symbols)) {
+      gene_symbols[gene_symbols %in% .geo_na_vals | is.na(gene_symbols)] <- NA
+      # .safe_sym enforces that length must match n_probes
+      checked <- .safe_sym(gene_symbols)
+      if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.05) return(checked)
+    }
   }
 
   platform_id <- tryCatch(
@@ -467,8 +621,9 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
       },
       error = function(e) NULL
     )
-    if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(probe_ids) * 0.1) {
-      return(as.character(gene_symbols))
+    checked <- .safe_sym(gene_symbols)
+    if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+      return(checked)
     }
   }
 
@@ -510,8 +665,9 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
       },
       error = function(e) NULL
     )
-    if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(probe_ids) * 0.1) {
-      return(as.character(gene_symbols))
+    checked <- .safe_sym(gene_symbols)
+    if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+      return(checked)
     }
   }
 
@@ -527,8 +683,9 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
       },
       error = function(e) NULL
     )
-    if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(probe_ids) * 0.1) {
-      return(as.character(gene_symbols))
+    checked <- .safe_sym(gene_symbols)
+    if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+      return(checked)
     }
   }
 
@@ -543,28 +700,32 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     },
     error = function(e) NULL
   )
-  if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(probe_ids) * 0.1) {
-    return(as.character(gene_symbols))
+  checked <- .safe_sym(gene_symbols)
+  if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+    return(checked)
   }
 
   # HuGene .db (PROBEID -> SYMBOL) for _st probe IDs
   if (mean(grepl("^[0-9]+_st$", sample_ids), na.rm = TRUE) > 0.5) {
     gene_symbols <- probe_ids_to_symbol_hugene_db(probe_ids, platform_id)
-    if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(probe_ids) * 0.1) {
-      return(as.character(gene_symbols))
+    checked <- .safe_sym(gene_symbols)
+    if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+      return(checked)
     }
   }
 
   # GEO GPL annotation table
   gene_symbols <- probe_ids_to_symbol_gpl(probe_ids, platform_id)
-  if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(probe_ids) * 0.1) {
-    return(as.character(gene_symbols))
+  checked <- .safe_sym(gene_symbols)
+  if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+    return(checked)
   }
 
   # biomaRt
   gene_symbols <- probe_ids_to_symbol_biomart(probe_ids, platform_id)
-  if (!is.null(gene_symbols) && sum(!is.na(gene_symbols)) > length(probe_ids) * 0.1) {
-    return(as.character(gene_symbols))
+  checked <- .safe_sym(gene_symbols)
+  if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+    return(checked)
   }
 
   probe_ids
@@ -629,11 +790,12 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
   if (length(sample_ids) == 0) {
     return(ids)
   }
+  probe_like <- grepl("_at$|_st$|_x_at$|probe[0-9]*$|^ILMN_|^A_[0-9]+_P[0-9]+", sample_ids, ignore.case = TRUE)
 
   is_likely_symbol <- mean(grepl("^[A-Za-z]", sample_ids), na.rm = TRUE) > 0.6 &&
     mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) < 0.4 &&
     mean(grepl("^ENSG", sample_ids), na.rm = TRUE) < 0.5 &&
-    mean(grepl("_at$|_st$|_x_at$", sample_ids), na.rm = TRUE) < 0.2
+    mean(probe_like, na.rm = TRUE) < 0.2
   if (is_likely_symbol) {
     return(ids)
   }
@@ -694,18 +856,25 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
     return(as.character(sym))
   }
 
-  # Probe IDs
-  if (mean(grepl("_at$|_st$|_x_at$", sample_ids), na.rm = TRUE) > 0.2) {
-    db_sym <- probe_ids_to_symbol_hugene_db(ids, gpl_id)
-    if (!is.null(db_sym) && sum(!is.na(db_sym)) > length(ids) * 0.1) {
-      return(as.character(db_sym))
+  # Probe IDs — try Bioconductor .db, then GPL annotation table, then biomaRt.
+  # GPL annotation is tried for ALL probe-like formats (not just _at/_st),
+  # so CodeLink, Illumina BEADCHIP, and other non-Affymetrix arrays are handled.
+  if (mean(probe_like, na.rm = TRUE) > 0.2 || (!is.null(gpl_id) && nzchar(gpl_id))) {
+    if (mean(probe_like, na.rm = TRUE) > 0.2) {
+      db_sym <- probe_ids_to_symbol_hugene_db(ids, gpl_id)
+      if (!is.null(db_sym) && length(db_sym) == length(ids) && sum(!is.na(db_sym)) > length(ids) * 0.1) {
+        return(as.character(db_sym))
+      }
     }
-    gpl_sym <- probe_ids_to_symbol_gpl(ids, gpl_id)
-    if (!is.null(gpl_sym) && sum(!is.na(gpl_sym)) > length(ids) * 0.1) {
-      return(as.character(gpl_sym))
+    # GPL annotation table: always try when gpl_id is available
+    if (!is.null(gpl_id) && nzchar(gpl_id)) {
+      gpl_sym <- probe_ids_to_symbol_gpl(ids, gpl_id)
+      if (!is.null(gpl_sym) && length(gpl_sym) == length(ids) && sum(!is.na(gpl_sym)) > length(ids) * 0.05) {
+        return(as.character(gpl_sym))
+      }
     }
     bm <- probe_ids_to_symbol_biomart(ids, gpl_id)
-    if (!is.null(bm) && sum(!is.na(bm)) > length(ids) * 0.1) {
+    if (!is.null(bm) && length(bm) == length(ids) && sum(!is.na(bm)) > length(ids) * 0.1) {
       return(as.character(bm))
     }
   }

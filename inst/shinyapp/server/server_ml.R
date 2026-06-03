@@ -150,6 +150,52 @@ server_ml <- function(input, output, session, rv) {
     step_inc <- 0.8 / max(1, n_steps)
     prog <- 0.1
 
+    # ------------------------------------------------------------------
+    # Pre-flight: verify glmnet's compiled DLL is actually functional.
+    # After an R upgrade, the DLL can become incompatible causing the
+    # cryptic error "_glmnet_glmnet_control_get not available for .Call()".
+    # Detect this early and show a clear fix message rather than a raw C error.
+    # ------------------------------------------------------------------
+    if (any(c("lasso", "elastic", "ridge") %in% methods_sel)) {
+      .glmnet_ok <- tryCatch({
+        glmnet::glmnet_control()   # lightweight call that exercises the DLL
+        TRUE
+      }, error = function(e) FALSE)
+
+      if (!.glmnet_ok) {
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong(" glmnet library is broken (compiled for a different R version)."),
+            tags$br(),
+            "This causes the error: ",
+            tags$code("_glmnet_glmnet_control_get not available for .Call()"),
+            tags$br(), tags$br(),
+            tags$strong("How to fix (choose one):"),
+            tags$ol(
+              tags$li(
+                tags$strong("Restart the app"),
+                " — close GExPipe, restart R (RStudio: Ctrl+Shift+F10), ",
+                "then run GExPipe::runGExPipe() again. The startup check will ",
+                "automatically reinstall glmnet."
+              ),
+              tags$li(
+                "Or run in the R console: ",
+                tags$code('install.packages("glmnet", type = "source"); restart R')
+              )
+            ),
+            tags$em("Note: LASSO, Elastic Net, and Ridge will be skipped this run. ",
+                    "Random Forest, SVM-RFE, Boruta, sPLS-DA, and XGBoost still work."),
+            style = "font-size: 13px;"
+          ),
+          type = "error", duration = 30
+        )
+        # Remove glmnet-based methods from this run so the others still execute
+        methods_sel <- setdiff(methods_sel, c("lasso", "elastic", "ridge"))
+        if (length(methods_sel) == 0) return()
+      }
+    }
+
     withProgress(message = "Running ML analysis...", value = 0.1, {
       tryCatch({
         set.seed(123)
@@ -340,7 +386,27 @@ server_ml <- function(input, output, session, rv) {
         incProgress(1 - prog, detail = "Done")
         showNotification(paste0("ML analysis complete (", paste(method_names, collapse = ", "), "). Venn and common genes use selected methods only."), type = "message", duration = 5)
       }, error = function(e) {
-        showNotification(paste("ML error:", e$message), type = "error", duration = 10)
+        msg <- conditionMessage(e)
+        # Detect the glmnet DLL mismatch error specifically
+        if (grepl("_glmnet_glmnet_control_get|not available for .Call.*glmnet|glmnet.*not available for .Call", msg, ignore.case = TRUE)) {
+          showNotification(
+            tags$div(
+              icon("exclamation-triangle"),
+              tags$strong(" glmnet DLL error — compiled for a different R version."),
+              tags$br(),
+              "Fix: restart R (Ctrl+Shift+F10) and run GExPipe::runGExPipe() again. ",
+              "The startup check will automatically reinstall glmnet.",
+              tags$br(),
+              tags$small(tags$em("Technical detail: ", msg))
+            ),
+            type = "error", duration = 20
+          )
+        } else {
+          showNotification(
+            tags$div(icon("exclamation-triangle"), tags$strong(" ML error: "), msg),
+            type = "error", duration = 10
+          )
+        }
       })
     })
   })
