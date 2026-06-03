@@ -571,22 +571,41 @@ gexp_app_onStart <- function() {
 }
 
 .gexp_inst_file <- function(rel_path) {
-  # Prefer local checkout (so `runGExPipe()` from source uses the latest edits),
-  # then fall back to installed package files.
-  candidates <- c(
-    file.path(getwd(), "R", rel_path),
-    file.path(getwd(), "..", "R", rel_path),
-    file.path(getwd(), "inst", sub("^shiny_src/", "shinyapp/", rel_path)),
-    file.path(getwd(), "..", "inst", sub("^shiny_src/", "shinyapp/", rel_path)),
-    file.path(getwd(), "inst", rel_path),
-    file.path(getwd(), "..", "inst", rel_path)
-  )
-  hits <- candidates[file.exists(candidates)]
-  if (length(hits) >= 1L) {
-    return(hits[1])
+  # Only use getwd()-relative paths when we are genuinely running from the
+  # GExPipe *source* root (development mode).  When running from a GitHub
+  # install the working directory may be any folder, and checking it first
+  # would pick up stale/old UI files from old local copies (e.g. GExpipe_1/).
+  #
+  # Dev-mode detection: getwd() must have a DESCRIPTION file that says
+  # "Package: GExPipe".  Any other directory (user's home, Documents, an old
+  # project copy, etc.) skips local-file lookup and goes straight to the
+  # installed package files via system.file().
+  .is_gexpipe_src_root <- function(dir) {
+    desc <- file.path(dir, "DESCRIPTION")
+    if (!file.exists(desc)) return(FALSE)
+    lines <- tryCatch(readLines(desc, n = 10L, warn = FALSE), error = function(e) character(0))
+    any(grepl("^Package:\\s*GExPipe\\s*$", lines))
   }
 
-  # Fall back to installed package location.
+  dev_mode <- .is_gexpipe_src_root(getwd()) ||
+              .is_gexpipe_src_root(file.path(getwd(), ".."))
+
+  if (dev_mode) {
+    candidates <- c(
+      file.path(getwd(), "R", rel_path),
+      file.path(getwd(), "..", "R", rel_path),
+      file.path(getwd(), "inst", sub("^shiny_src/", "shinyapp/", rel_path)),
+      file.path(getwd(), "..", "inst", sub("^shiny_src/", "shinyapp/", rel_path)),
+      file.path(getwd(), "inst", rel_path),
+      file.path(getwd(), "..", "inst", rel_path)
+    )
+    hits <- candidates[file.exists(candidates)]
+    if (length(hits) >= 1L) {
+      return(hits[1])
+    }
+  }
+
+  # Installed package location (primary path when not in dev mode).
   p <- system.file(rel_path, package = "GExPipe")
   if (nzchar(p) && file.exists(p)) {
     return(p)
