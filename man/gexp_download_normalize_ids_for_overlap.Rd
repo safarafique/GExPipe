@@ -8,7 +8,8 @@ gexp_download_normalize_ids_for_overlap(
   micro_expr_list,
   rna_counts_list,
   platform_per_gse = NULL,
-  all_genes_list = NULL
+  all_genes_list = NULL,
+  micro_eset_list = NULL
 )
 }
 \arguments{
