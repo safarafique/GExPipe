@@ -610,27 +610,118 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
       platforms <- vapply(micro_data,
         function(x) tryCatch(Biobase::annotation(x), error = function(e) ""),
         character(1))
-      n_feat <- vapply(micro_data,
-        function(x) tryCatch(nrow(Biobase::exprs(x)), error = function(e) 0L),
-        integer(1))
-      idx <- which.max(n_feat)
-      if (length(idx) == 0 || is.na(idx) || idx < 1) idx <- 1L
-      eset   <- micro_data[[idx]]
-      plt_id <- tryCatch(Biobase::annotation(eset), error = function(e) "")
-      log_pfx <- if (length(micro_data) > 1) {
-        paste0("Platforms: ", paste(unique(platforms), collapse = ", "), ". Using ", plt_id, ". ")
+
+      # ----------------------------------------------------------------
+      # GEO sometimes splits one series into several GSEMatrix files
+      # (e.g. _series_matrix-1.txt.gz, _series_matrix-2.txt.gz).
+      # Each file becomes one ExpressionSet in the returned list, all
+      # sharing the same platform.  The old code used which.max(n_feat)
+      # which picked only the first file → missing samples.
+      #
+      # Fix: group ExpressionSets by platform; for groups that share the
+      # same probe set, cbind expression matrices and rbind pData so ALL
+      # samples are retained.  Then pick the platform group with the most
+      # combined samples.
+      # ----------------------------------------------------------------
+      unique_plts <- unique(platforms)
+      best_eset     <- NULL
+      best_expr_mat <- NULL
+      best_pdata    <- NULL
+      best_plt_id   <- ""
+      best_n_samp   <- 0L
+      n_files_used  <- 0L
+
+      for (plt in unique_plts) {
+        grp_idx  <- which(platforms == plt)
+        grp_mats <- lapply(micro_data[grp_idx],
+                           function(x) tryCatch(Biobase::exprs(x), error = function(e) NULL))
+        grp_pds  <- lapply(micro_data[grp_idx],
+                           function(x) tryCatch(Biobase::pData(x), error = function(e) NULL))
+
+        # Drop null / empty matrices
+        ok_idx   <- which(vapply(grp_mats, function(m) !is.null(m) && nrow(m) > 0 && ncol(m) > 0, logical(1)))
+        if (length(ok_idx) == 0) next
+        grp_mats <- grp_mats[ok_idx]
+        grp_pds  <- grp_pds[ok_idx]
+        grp_idx  <- grp_idx[ok_idx]
+
+        if (length(grp_mats) == 1) {
+          comb_mat <- grp_mats[[1]]
+          comb_pd  <- grp_pds[[1]]
+          n_used   <- 1L
+        } else {
+          # Check that all matrices have identical row names (same probes)
+          rn_ref  <- rownames(grp_mats[[1]])
+          all_same_rows <- all(vapply(grp_mats[-1],
+                                     function(m) identical(rownames(m), rn_ref), logical(1)))
+          if (all_same_rows) {
+            # Safe to cbind: combine all sample columns
+            all_cols <- unlist(lapply(grp_mats, colnames))
+            if (anyDuplicated(all_cols)) {
+              # Remove truly duplicate sample columns (same GSM ID)
+              seen <- character(0)
+              keep_mats <- list(); keep_pds <- list()
+              for (k in seq_along(grp_mats)) {
+                new_cols <- setdiff(colnames(grp_mats[[k]]), seen)
+                if (length(new_cols) > 0) {
+                  keep_mats[[length(keep_mats) + 1]] <- grp_mats[[k]][, new_cols, drop = FALSE]
+                  keep_pds[[length(keep_pds)  + 1]] <- grp_pds[[k]][new_cols, , drop = FALSE]
+                  seen <- c(seen, new_cols)
+                }
+              }
+              grp_mats <- keep_mats; grp_pds <- keep_pds
+            }
+            comb_mat <- do.call(cbind, grp_mats)
+            comb_pd  <- do.call(rbind, grp_pds)
+            n_used   <- length(grp_mats)
+          } else {
+            # Rows differ — fall back to the single largest matrix
+            nf       <- vapply(grp_mats, nrow, integer(1))
+            best_k   <- which.max(nf)
+            comb_mat <- grp_mats[[best_k]]
+            comb_pd  <- grp_pds[[best_k]]
+            n_used   <- 1L
+          }
+        }
+
+        n_samp <- ncol(comb_mat)
+        if (n_samp > best_n_samp) {
+          best_eset     <- micro_data[[grp_idx[1]]]   # template for fData / annotation
+          best_expr_mat <- comb_mat
+          best_pdata    <- comb_pd
+          best_plt_id   <- plt
+          best_n_samp   <- n_samp
+          n_files_used  <- n_used
+        }
+      }
+
+      if (is.null(best_eset)) {
+        return(structure(list(ok = FALSE, reason = "No valid ExpressionSet found in GEO object"), class = "eset_err"))
+      }
+
+      eset     <- best_eset
+      plt_id   <- best_plt_id
+      expr_mat <- best_expr_mat
+      pd       <- best_pdata
+      log_pfx  <- if (length(micro_data) > 1) {
+        file_note <- if (n_files_used > 1) paste0(" (", n_files_used, " matrix files combined)") else ""
+        paste0("Platforms: ", paste(unique_plts, collapse = ", "),
+               ". Using ", plt_id, file_note, ". ")
       } else {
         paste0("Platform ", plt_id, ". ")
       }
+
     } else if (!is.null(micro_data)) {
-      eset   <- micro_data
-      plt_id <- tryCatch(Biobase::annotation(eset), error = function(e) "")
-      log_pfx <- paste0("Platform ", plt_id, ". ")
+      eset     <- micro_data
+      plt_id   <- tryCatch(Biobase::annotation(eset), error = function(e) "")
+      expr_mat <- tryCatch(Biobase::exprs(eset),      error = function(e) NULL)
+      pd       <- tryCatch(Biobase::pData(eset),      error = function(e) NULL)
+      log_pfx  <- paste0("Platform ", plt_id, ". ")
     } else {
       return(structure(list(ok = FALSE, reason = "getGEO returned NULL or empty"), class = "eset_err"))
     }
-    expr_mat <- tryCatch(Biobase::exprs(eset),   error = function(e) NULL)
-    pd       <- tryCatch(Biobase::pData(eset),   error = function(e) NULL)
+    if (is.null(expr_mat)) expr_mat <- tryCatch(Biobase::exprs(eset), error = function(e) NULL)
+    if (is.null(pd))       pd       <- tryCatch(Biobase::pData(eset), error = function(e) NULL)
     if (is.null(expr_mat) || nrow(expr_mat) == 0 || ncol(expr_mat) == 0) {
       return(structure(list(ok = FALSE, reason = "ExpressionSet has empty expression matrix"), class = "eset_err"))
     }
