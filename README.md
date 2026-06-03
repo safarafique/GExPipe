@@ -55,7 +55,7 @@ if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
 shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
 ```
 
-> First run on a fresh machine takes **10–30 min** (downloading ~50 packages).
+> First run on a fresh machine takes **10–30 min** (downloading **63** dependencies from `DESCRIPTION`).
 > Every run after that starts in seconds.
 
 ---
@@ -76,8 +76,7 @@ shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
 
-Both options work on **R 4.4, 4.5, and 4.6** — the correct Bioconductor package
-versions are selected automatically for your R version.
+Both options require **R >= 4.5.0** (stable). Bioconductor **3.21** (R 4.5) or **3.22** (R 4.6 stable) is selected automatically for your R version. R 4.4 and pre-release R builds are not supported.
 
 ### From Bioconductor (when accepted)
 
@@ -104,15 +103,31 @@ Open port **3838** via Colab’s port-forwarding panel, or run a tunnel (`ngrok 
 
 ---
 
-## Package versions (tested with)
+## Package versions
 
-A full list of package names and versions is shipped with the package:
+Runtime dependencies are declared in **`DESCRIPTION`** (`Imports`, minimum versions). The app also installs **affy** and **oligo** for microarray CEL RMA (see `DESCRIPTION`).
 
-- **`inst/pkg_versions.txt`** — tab-separated (package, version).
-- **`inst/PACKAGE_VERSIONS.md`** — same info and how to get it from R:  
-  `system.file("pkg_versions.txt", package = "GExPipe")`.
+Shipped reference files:
 
-Use these when reporting issues or when you need exact versions.
+| File | Contents |
+|------|----------|
+| **`inst/pkg_versions.txt`** | Tab-separated **minimum** versions (`package`, `min_version`) — mirrors `DESCRIPTION` |
+| **`inst/PACKAGE_VERSIONS.md`** | Human-readable summary and R/Bioconductor notes |
+
+After install, list **your** installed versions (GExPipe library on Windows: `%LOCALAPPDATA%\GExPipe\<R-major.minor>\`):
+
+```r
+read.delim(system.file("pkg_versions.txt", package = "GExPipe"))
+# Installed versions on this machine:
+pkgs <- sub("\\s*\\(.*", "", strsplit(read.dcf(system.file("DESCRIPTION", package = "GExPipe"))[1, "Imports"], ",\\s*")[[1]])
+pkgs <- pkgs[pkgs != "parallel"]
+lib <- file.path(Sys.getenv("LOCALAPPDATA"), "GExPipe", paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor)))
+sapply(pkgs, function(p) as.character(packageVersion(p, lib.loc = lib)))
+```
+
+From a package checkout, `Rscript inst/scripts/check_pkg_alignment.R` verifies that `DESCRIPTION`, `pkg_versions.txt`, and the install lists in `R/utils_shiny_app.R` / `inst/shinyapp/global.R` match.
+
+Use `sessionInfo()` and the tables above when reporting issues.
 
 ---
 
@@ -124,7 +139,7 @@ The vignette is R Markdown and requires **Pandoc**. If Pandoc is not installed, 
 R CMD build . --no-build-vignettes
 ```
 
-The resulting `GExPipe_0.99.7.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
+The resulting `GExPipe_0.99.8.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
 
 ### Package check
 
@@ -132,10 +147,10 @@ From the package root:
 
 ```bash
 R CMD build . --no-build-vignettes
-R CMD check GExPipe_0.99.7.tar.gz --no-build-vignettes --no-manual
+R CMD check GExPipe_0.99.8.tar.gz --no-build-vignettes --no-manual
 ```
 
-Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.7.tar.gz")` and address any reported issues.
+Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.8.tar.gz")` and address any reported issues.
 
 ---
 

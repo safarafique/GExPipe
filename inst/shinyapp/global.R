@@ -142,6 +142,7 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
   # Shiny UI
   "shiny", "shinydashboard", "shinyjs", "DT",
   # Bioconductor core
+  "affy", "oligo",
   "Biobase", "GEOquery", "limma", "AnnotationDbi", "org.Hs.eg.db",
   "edgeR", "DESeq2", "sva", "clusterProfiler", "enrichplot", "STRINGdb", "WGCNA",
   # CRAN analysis
@@ -149,8 +150,10 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
   "ggplot2", "ggpubr", "ggrepel", "ggraph", "gridExtra", "RColorBrewer",
   "pheatmap", "circlize", "corrplot", "scales",
   "VennDiagram", "UpSetR", "igraph",
-  "randomForest", "caret", "e1071", "glmnet", "pROC", "kernlab",
+  "randomForest", "caret", "glmnet", "pROC", "kernlab",
   "msigdbr", "R.utils", "dynamicTreeCut", "parallel",
+  "cli", "glue", "lifecycle", "rlang", "vctrs",
+  "Matrix", "Rcpp", "withr", "pillar",
   # Feature packages
   "biomaRt", "Boruta", "car", "cicerone", "mixOmics",
   "xgboost", "SHAPforxgboost", "rms", "rmda"
@@ -165,12 +168,11 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
 # Any package below its floor is treated as "needs update" even when installed.
 # Direct version constraints copied from DESCRIPTION:
 .gexpipe_min_versions <- c(
-  rlang     = "1.2.0",   # DESCRIPTION: rlang (>= 1.2.0)
-  cli       = "3.6.0",   # DESCRIPTION: cli   (>= 3.6.0)
-  glue      = "1.7.0",   # DESCRIPTION: glue  (>= 1.7.0)
-  lifecycle = "1.0.4",   # DESCRIPTION: lifecycle (>= 1.0.4)
-  vctrs     = "0.6.5",   # DESCRIPTION: vctrs (>= 0.6.5)
-  # Indirect deps that frequently trigger runtime version-conflict errors:
+  rlang     = "1.1.0",
+  cli       = "3.6.0",
+  glue      = "1.6.0",
+  lifecycle = "1.0.0",
+  vctrs     = "0.6.0",
   Matrix    = "1.6.0",
   Rcpp      = "1.0.12",
   withr     = "2.5.0",
