@@ -743,7 +743,49 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   pdata       <- eset_parse$pdata
   if (is.null(pdata)) pdata <- data.frame(row.names = colnames(micro_expr))
 
-  out$log <- paste0(out$log, "Downloaded: ", nrow(micro_expr), " genes x ", ncol(micro_expr), " samples")
+  # ---- NA-sample detection and removal ----
+  # Some GEO samples have all-NA or mostly-NA expression values (failed
+  # hybridisations, placeholder columns, corrupt matrix files).  Detect
+  # them, remove them, and report to the user so sample counts stay clear.
+  n_total_samp <- ncol(micro_expr)
+  na_frac_per_sample <- colMeans(is.na(micro_expr) | !is.finite(micro_expr))
+  # Flag samples that are >90% NA/NaN/Inf
+  bad_samples <- names(which(na_frac_per_sample > 0.90))
+  na_log <- ""
+  if (length(bad_samples) > 0) {
+    na_log <- paste0(
+      " | ", length(bad_samples), "/", n_total_samp,
+      " sample(s) removed (>90% NA): ",
+      paste(head(bad_samples, 5), collapse = ", "),
+      if (length(bad_samples) > 5) paste0(" (+", length(bad_samples) - 5, " more)") else ""
+    )
+    good_samples <- setdiff(colnames(micro_expr), bad_samples)
+    micro_expr <- micro_expr[, good_samples, drop = FALSE]
+    pdata      <- pdata[intersect(rownames(pdata), good_samples), , drop = FALSE]
+  }
+
+  # Also count & report partially-NA samples (10–90% NA) for user awareness
+  if (ncol(micro_expr) > 0) {
+    partial_na <- colMeans(is.na(micro_expr) | !is.finite(micro_expr))
+    partial_bad <- names(which(partial_na > 0.10 & partial_na <= 0.90))
+    if (length(partial_bad) > 0) {
+      na_log <- paste0(na_log,
+                       " | ", length(partial_bad), " sample(s) have 10-90% NA values (",
+                       paste(head(partial_bad, 3), collapse = ", "),
+                       if (length(partial_bad) > 3) paste0(" +", length(partial_bad) - 3, " more") else "",
+                       ")")
+    }
+  }
+
+  if (ncol(micro_expr) == 0) {
+    out$reason <- "all samples were NA — no usable data"
+    return(out)
+  }
+
+  out$log <- paste0(out$log, "Downloaded: ", nrow(micro_expr), " genes x ",
+                    ncol(micro_expr), " samples",
+                    if (length(bad_samples) > 0) paste0(" (of ", n_total_samp, " total)") else "",
+                    na_log)
 
   cel <- character(0)
   tryCatch(
@@ -921,6 +963,35 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   count_matrix <- as.matrix(count_df[, -1, drop = FALSE])
   mode(count_matrix) <- "numeric"
   rownames(count_matrix) <- gene_ids
+
+  # ---- NA-sample detection and removal (RNA-seq) ----
+  n_total_samp_rna <- ncol(count_matrix)
+  na_frac_rna <- colMeans(is.na(count_matrix) | !is.finite(count_matrix))
+  bad_samp_rna <- names(which(na_frac_rna > 0.90))
+  rna_na_log <- ""
+  if (length(bad_samp_rna) > 0) {
+    rna_na_log <- paste0(
+      " | ", length(bad_samp_rna), "/", n_total_samp_rna,
+      " sample(s) removed (>90% NA): ",
+      paste(head(bad_samp_rna, 5), collapse = ", "),
+      if (length(bad_samp_rna) > 5) paste0(" (+", length(bad_samp_rna) - 5, " more)") else ""
+    )
+    good_samp_rna <- setdiff(colnames(count_matrix), bad_samp_rna)
+    count_matrix <- count_matrix[, good_samp_rna, drop = FALSE]
+  }
+  if (ncol(count_matrix) > 0) {
+    partial_na_rna <- colMeans(is.na(count_matrix) | !is.finite(count_matrix))
+    partial_bad_rna <- names(which(partial_na_rna > 0.10 & partial_na_rna <= 0.90))
+    if (length(partial_bad_rna) > 0) {
+      rna_na_log <- paste0(rna_na_log,
+                           " | ", length(partial_bad_rna), " sample(s) have 10-90% NA values")
+    }
+  }
+  if (ncol(count_matrix) == 0) {
+    out$reason <- "all samples were NA — no usable data"
+    return(out)
+  }
+  out$log <- paste0(out$log, rna_na_log)
 
   rna_metadata <- tryCatch(
     {

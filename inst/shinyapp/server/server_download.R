@@ -201,6 +201,27 @@ server_download <- function(input, output, session, rv) {
       }
 
       # --------------------------------------------------------------------------
+      # STEP 1 SUMMARY: sample counts per GSE so user sees exactly what was loaded
+      # --------------------------------------------------------------------------
+      total_samples_loaded <- 0L
+      if (length(rv$micro_expr_list) > 0 || length(rv$rna_counts_list) > 0) {
+        log_text <- paste0(log_text, "\n--- Step 1 sample summary ---\n")
+        for (gse in names(rv$micro_expr_list)) {
+          ns <- ncol(rv$micro_expr_list[[gse]])
+          ng <- nrow(rv$micro_expr_list[[gse]])
+          total_samples_loaded <- total_samples_loaded + ns
+          log_text <- paste0(log_text, "  ", gse, " (microarray): ", ns, " samples, ", ng, " probes/genes\n")
+        }
+        for (gse in names(rv$rna_counts_list)) {
+          ns <- ncol(rv$rna_counts_list[[gse]])
+          ng <- nrow(rv$rna_counts_list[[gse]])
+          total_samples_loaded <- total_samples_loaded + ns
+          log_text <- paste0(log_text, "  ", gse, " (RNA-seq): ", ns, " samples, ", ng, " genes\n")
+        }
+        log_text <- paste0(log_text, "  Total samples loaded: ", total_samples_loaded, "\n")
+      }
+
+      # --------------------------------------------------------------------------
       # STEP 2: GENE IDENTIFIER MAPPING & STANDARDIZATION (pipeline: map, remove NA, avereps)
       # --------------------------------------------------------------------------
 
