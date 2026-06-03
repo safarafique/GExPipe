@@ -3,50 +3,62 @@
 #' @keywords internal
 #' @name dummy_imports
 dummy_imports <- function() {
+  affy::ReadAffy
+  AnnotationDbi::mapIds
+  Biobase::exprs
+  biomaRt::useMart
+  Boruta::Boruta
+  car::vif
+  caret::createFolds
+  cicerone::Cicerone
+  circlize::chordDiagram
+  clusterProfiler::enrichGO
+  clusterProfiler::GSEA
+  corrplot::corrplot
+  data.table::fread
+  DESeq2::DESeqDataSetFromMatrix
+  dplyr::mutate
+  DT::datatable
+  dynamicTreeCut::cutreeDynamic
+  edgeR::DGEList
+  enrichplot::dotplot
+  enrichplot::gseaplot2
+  GEOquery::getGEO
+  ggplot2::ggplot
+  ggpubr::ggboxplot
+  ggraph::ggraph
+  ggrepel::geom_text_repel
+  glmnet::cv.glmnet
+  gridExtra::grid.arrange
+  igraph::graph_from_data_frame
+  kernlab::ksvm
+  limma::lmFit
+  mixOmics::splsda
+  msigdbr::msigdbr
+  oligo::read.celfiles
+  org.Hs.eg.db::org.Hs.eg.db
+  parallel::detectCores
+  pheatmap::pheatmap
+  pROC::roc
+  randomForest::randomForest
+  R.utils::gunzip
+  RColorBrewer::brewer.pal
+  reshape2::melt
+  rms::lrm
+  rmda::decision_curve
+  scales::comma
+  SHAPforxgboost::shap.values
   shiny::shinyApp
   shinydashboard::dashboardPage
   shinyjs::useShinyjs
-  DT::datatable
-  Biobase::exprs
-  GEOquery::getGEO
-  limma::lmFit
-  AnnotationDbi::mapIds
-  org.Hs.eg.db::org.Hs.eg.db
-  dplyr::mutate
-  data.table::fread
-  edgeR::DGEList
-  sva::ComBat
-  ggplot2::ggplot
-  gridExtra::grid.arrange
-  RColorBrewer::brewer.pal
-  pheatmap::pheatmap
-  ggrepel::geom_text_repel
-  VennDiagram::venn.diagram
-  UpSetR::upset
-  WGCNA::blockwiseModules
-  parallel::detectCores
-  clusterProfiler::enrichGO
-  enrichplot::dotplot
-  circlize::chordDiagram
   STRINGdb::STRINGdb
-  DESeq2::DESeqDataSetFromMatrix
-  igraph::graph_from_data_frame
-  ggraph::ggraph
-  tidygraph::as_tbl_graph
-  tidyr::gather
-  randomForest::randomForest
-  caret::train
-  e1071::svm
-  glmnet::cv.glmnet
-  pROC::roc
-  kernlab::ksvm
+  sva::ComBat
   tibble::tibble
-  msigdbr::msigdbr
-  ggpubr::ggboxplot
-  reshape2::melt
-  corrplot::corrplot
-  R.utils::gunzip
-  dynamicTreeCut::cutreeDynamic
-  scales::comma
+  tidyr::gather
+  tidygraph::as_tbl_graph
+  UpSetR::upset
+  VennDiagram::venn.diagram
+  WGCNA::blockwiseModules
+  xgboost::xgb.train
   invisible(NULL)
 }
