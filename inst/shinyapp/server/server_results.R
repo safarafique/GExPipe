@@ -93,7 +93,38 @@ server_results <- function(input, output, session, rv) {
     rv$de_running <- TRUE
     
     tryCatch({
-      # Pre-checks for count-based methods (DESeq2 / edgeR)
+      # ------------------------------------------------------------------
+      # Helper: attempt to rebuild raw counts on-the-fly from rna_counts_list
+      # when the user switches DE method after normalisation (counts were not
+      # cached during that particular normalization run).
+      # ------------------------------------------------------------------
+      .try_rebuild_raw_counts <- function() {
+        if (!is.null(rv$raw_counts_for_deseq2)) return(TRUE)   # already available
+        if (length(rv$rna_counts_list) == 0)   return(FALSE)   # pure microarray — can't rebuild
+
+        common_g <- rv$common_genes
+        if (is.null(common_g) || length(common_g) == 0) {
+          # Derive common genes from combined_expr as fallback
+          common_g <- rownames(if (!is.null(rv$batch_corrected)) rv$batch_corrected else rv$combined_expr)
+        }
+        raw_list <- list()
+        for (gse in names(rv$rna_counts_list)) {
+          raw_mat <- as.matrix(rv$rna_counts_list[[gse]])
+          keep    <- intersect(common_g, rownames(raw_mat))
+          if (length(keep) > 0) raw_list[[gse]] <- raw_mat[keep, , drop = FALSE]
+        }
+        if (length(raw_list) == 0) return(FALSE)
+
+        built <- round(do.call(cbind, raw_list))
+        storage.mode(built) <- "integer"
+        rv$raw_counts_for_deseq2 <- built
+        TRUE
+      }
+
+      # Pre-checks for count-based methods (DESeq2 / edgeR / limma-voom).
+      # For each method, if raw counts are missing we first try to rebuild
+      # them from the stored rna_counts_list.  Only if that also fails (pure
+      # microarray data) do we fall back to limma — we never hard-block.
       if (method == "deseq2") {
         if (!requireNamespace("DESeq2", quietly = TRUE)) {
           showNotification(
@@ -101,33 +132,33 @@ server_results <- function(input, output, session, rv) {
                      " Install with: BiocManager::install('DESeq2'). Falling back to limma."),
             type = "error", duration = 8)
           method <- "limma"
-        } else if (is.null(rv$raw_counts_for_deseq2)) {
+        } else if (!.try_rebuild_raw_counts()) {
           showNotification(
-            tags$div(icon("exclamation-triangle"), tags$strong(" Raw counts not available."),
-                     " DESeq2 requires RNA-seq raw counts. Re-run normalization (Step 3) with DESeq2 selected, or switch to limma."),
-            type = "error", duration = 8)
-          rv$de_running <- FALSE
-          return()
+            tags$div(icon("info-circle"), tags$strong(" No RNA-seq count data available."),
+                     " DESeq2 requires integer counts. Your data appears to be microarray-based.",
+                     " Automatically falling back to limma for differential expression."),
+            type = "warning", duration = 10)
+          method <- "limma"
         }
       }
       if (method == "edger") {
-        if (is.null(rv$raw_counts_for_deseq2)) {
+        if (!.try_rebuild_raw_counts()) {
           showNotification(
-            tags$div(icon("exclamation-triangle"), tags$strong(" Raw counts not available."),
-                     " edgeR requires RNA-seq raw counts. Re-run normalization (Step 3) with edgeR selected, or switch to limma."),
-            type = "error", duration = 8)
-          rv$de_running <- FALSE
-          return()
+            tags$div(icon("info-circle"), tags$strong(" No RNA-seq count data available."),
+                     " edgeR requires integer counts. Your data appears to be microarray-based.",
+                     " Automatically falling back to limma for differential expression."),
+            type = "warning", duration = 10)
+          method <- "limma"
         }
       }
       if (method == "limma_voom") {
-        if (is.null(rv$raw_counts_for_deseq2)) {
+        if (!.try_rebuild_raw_counts()) {
           showNotification(
-            tags$div(icon("exclamation-triangle"), tags$strong(" Raw counts not available."),
-                     " limma-voom requires RNA-seq raw counts. Re-run normalization (Step 3) with limma-voom selected, or switch to limma."),
-            type = "error", duration = 8)
-          rv$de_running <- FALSE
-          return()
+            tags$div(icon("info-circle"), tags$strong(" No RNA-seq count data available."),
+                     " limma-voom requires integer counts. Your data appears to be microarray-based.",
+                     " Automatically falling back to limma for differential expression."),
+            type = "warning", duration = 10)
+          method <- "limma"
         }
       }
       

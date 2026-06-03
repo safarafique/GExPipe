@@ -207,7 +207,10 @@ server_normalize <- function(input, output, session, rv) {
       # Count-based methods (DESeq2 / edgeR / limma-voom) require integer counts (raw, un-normalized).
       # For RNA-seq: save the original counts (pre-TMM) filtered to common genes.
       # For microarray: these methods are not appropriate (continuous data); raw not saved.
-      if (length(rv$rna_counts_list) > 0 && isTRUE(rv$de_method %in% c("deseq2", "edger", "limma_voom"))) {
+      # Always save raw counts when RNA-seq data is present, regardless of which DE method
+      # is currently selected. The user may change the DE method after normalization, and
+      # if raw counts were not saved they would get a confusing "re-run normalization" error.
+      if (length(rv$rna_counts_list) > 0) {
         raw_counts_list <- list()
         for (gse in names(rv$rna_counts_list)) {
           raw_mat <- as.matrix(rv$rna_counts_list[[gse]])

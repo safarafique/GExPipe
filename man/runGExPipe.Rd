@@ -33,13 +33,17 @@ WGCNA, pathway enrichment, PPI, machine learning, and more).
 }
 \section{Startup time}{
 
-The welcome screen loads first; the full dashboard (15 tabs) is inserted only after
-\strong{Go to Analysis}, so the first response avoids sourcing every tab UI file.
-\code{runGExPipe()} still builds a lazy session UI, and attaching many analysis packages
-on first open can take \strong{tens of seconds to a few minutes} on a cold session (DLL loads).
-Prefer \code{GExPipe::runGExPipe()} from an \strong{installed} package rather than opening
-\verb{inst/shinyapp/} in RStudio (that path runs \code{global.R}, which can auto-install
-packages and is slower).
+\code{runGExPipe()} checks for missing packages \strong{before} the browser opens and
+installs them in a single \code{BiocManager::install()} call.  On a machine where
+all packages are already present the check takes under one second.  On a
+fresh machine (no Bioconductor packages) expect \strong{10–30 minutes} for the
+initial download; every subsequent call takes only seconds.
+
+The welcome screen loads first; the full 15-tab dashboard is built only
+after the user clicks \strong{Go to Analysis}, so the initial browser response is
+fast even on slow networks.  Prefer \code{GExPipe::runGExPipe()} from an
+\strong{installed} package rather than opening \verb{inst/shinyapp/} in RStudio
+directly (that path runs \code{global.R}, which duplicates the install logic).
 
 Optional tuning before \code{runGExPipe()}:
 \itemize{
@@ -61,13 +65,14 @@ try \code{options(gexpipe.stringdb_try_versions = c("11.5", "11", "12"))} or upd
 }
 
 \examples{
-# Non-interactive: build an app object (this runs during R CMD check / `example()`).
+# Non-interactive (R CMD check / example()): build an app object only.
+# Dependency auto-install is skipped when interactive() is FALSE, so this
+# runs quickly without touching the network.
 app <- runGExPipe(launch.browser = FALSE, port = 0L)
 stopifnot(inherits(app, "shiny.appobj"))
 
-# Interactive: launch in a browser (blocks until the app is stopped).
+# Interactive: one line installs all missing packages, then opens the app.
 if (interactive()) {
-  app <- runGExPipe(launch.browser = TRUE, port = 3838L)
-  shiny::runApp(app, port = 3838L)
+  shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 }
 }
