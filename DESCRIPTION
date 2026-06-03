@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.7
+Version: 0.99.8
 Authors@R: c(
     person("Safa", "Rafique",
            email = "safa.sandhu@gmail.com",
@@ -105,4 +105,4 @@ VignetteBuilder: knitr
 Config/testthat/edition: 3
 SystemRequirements: GNU make
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.0.0
