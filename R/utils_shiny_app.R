@@ -380,6 +380,85 @@
   requireNamespace(pkg, quietly = TRUE)
 }
 
+## Detect packages that are installed but whose compiled DLL is broken (e.g. after
+## an R version upgrade).  Returns a character vector of broken package names.
+## Only tests packages that are installed; missing packages are not included.
+.gexpipe_detect_broken_pkgs <- function(pkgs) {
+  # Per-package lightweight DLL smoke-tests.
+  # Each entry is a zero-argument function that exercises native code.
+  .dll_tests <- list(
+    glmnet   = function() glmnet::glmnet_control(),
+    Matrix   = function() Matrix::Matrix(1),
+    Rcpp     = function() Rcpp::evalCpp("1 + 1"),
+    xgboost  = function() xgboost::xgb.DMatrix(matrix(0, 1, 1)),
+    glue     = function() glue::glue("x"),
+    stringi  = function() stringi::stri_length("x")
+  )
+  broken <- character(0)
+  for (pkg in pkgs) {
+    if (!requireNamespace(pkg, quietly = TRUE)) next  # missing, not broken
+    # Try to load the namespace; catch DLL-load errors
+    ns_err <- tryCatch({
+      loadNamespace(pkg)
+      NULL
+    }, error = function(e) conditionMessage(e))
+    dll_load_broken <- !is.null(ns_err) &&
+      grepl("not available for .Call|LoadLibrary|shared object|compiled for a different|undefined symbol|DLL",
+            ns_err, ignore.case = TRUE)
+    if (dll_load_broken) {
+      broken <- c(broken, pkg)
+      next
+    }
+    # Additional smoke-test for packages with known DLL entry points
+    if (pkg %in% names(.dll_tests)) {
+      smoke_ok <- tryCatch({ .dll_tests[[pkg]](); TRUE }, error = function(e) {
+        msg <- conditionMessage(e)
+        !grepl("not available for .Call|not available|DLL|undefined symbol", msg, ignore.case = TRUE)
+      })
+      if (!isTRUE(smoke_ok)) broken <- c(broken, pkg)
+    }
+  }
+  broken
+}
+
+## Auto-reinstall broken (DLL-mismatch) packages via the subprocess.
+## Returns TRUE if all were fixed, FALSE if a restart is still required.
+.gexpipe_fix_broken_pkgs <- function(broken_pkgs) {
+  if (length(broken_pkgs) == 0L) return(TRUE)
+  message("GExPipe: ", length(broken_pkgs),
+          " package(s) have broken native code (compiled for a different R version): ",
+          paste(broken_pkgs, collapse = ", "))
+  message("GExPipe: auto-reinstalling broken package(s)...")
+  .gexpipe_batch_install(broken_pkgs)
+  # Try to unload + reload each (only works if DLL is not currently locked)
+  still_broken <- character(0)
+  gexpipe_lib <- .gexpipe_get_lib()
+  for (pkg in broken_pkgs) {
+    fixed <- tryCatch({
+      if (isNamespaceLoaded(pkg))
+        suppressWarnings(unloadNamespace(pkg))
+      loadNamespace(pkg, lib.loc = gexpipe_lib)
+      TRUE
+    }, error = function(e) FALSE)
+    if (!fixed) still_broken <- c(still_broken, pkg)
+  }
+  if (length(still_broken) > 0L) {
+    message(
+      "GExPipe: ", paste(still_broken, collapse = ", "),
+      " reinstalled but DLL is locked — restart R once to apply.\n",
+      "  (RStudio: Ctrl+Shift+F10, then re-run GExPipe::runGExPipe())"
+    )
+    options(gexpipe.restart_required = TRUE)
+    options(gexpipe.still_conflicted = c(
+      getOption("gexpipe.still_conflicted", character(0)),
+      still_broken
+    ))
+    return(FALSE)
+  }
+  message("GExPipe: broken package(s) fixed — proceeding.")
+  TRUE
+}
+
 gexp_app_attach_packages <- function() {
   # Called from gexp_app_ui(), gexp_app_server(), and tab/server loaders. Attach once
   # per app; runGExPipe() clears the flags so each new app object gets a fresh attach.
@@ -446,10 +525,18 @@ gexp_app_attach_packages <- function() {
   pkgs    <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
   n_total <- length(pkgs)
 
+  # ── Detect and auto-fix broken (DLL-mismatch) packages before attach ────────
+  # This catches packages compiled for a different R version (e.g. after upgrading R).
+  broken_pre <- .gexpipe_detect_broken_pkgs(pkgs)
+  if (length(broken_pre) > 0L) {
+    .gexpipe_fix_broken_pkgs(broken_pre)
+  }
+
   hard_required <- c("shiny", "shinydashboard", "shinyjs", "DT")
   missing  <- character(0)
   loaded   <- character(0)
   failed   <- character(0)
+  broken   <- character(0)
 
   message("\n======================================================================")
   message("  GExPipe \u2014 loading ", n_total, " packages...\n")
@@ -476,10 +563,37 @@ gexp_app_attach_packages <- function() {
         loaded <- c(loaded, p)
       },
       error = function(e) {
-        message(idx, " ", label, "... \u2717 load error")
+        err_msg <- conditionMessage(e)
+        is_dll_err <- grepl(
+          "not available for .Call|LoadLibrary|shared object|compiled for a different|undefined symbol|DLL",
+          err_msg, ignore.case = TRUE)
+        if (is_dll_err) {
+          message(idx, " ", label, "... \u26A0 broken DLL (auto-fixing...)")
+          broken <<- c(broken, p)
+        } else {
+          message(idx, " ", label, "... \u2717 load error")
+        }
         failed <<- c(failed, p)
       }
     )
+  }
+
+  # Auto-fix any broken packages detected during attach
+  if (length(broken) > 0L) {
+    fixed <- .gexpipe_fix_broken_pkgs(broken)
+    if (fixed) {
+      # Try to attach newly fixed packages
+      for (p in broken) {
+        tryCatch({
+          pkg_search <- paste0("package:", p)
+          if (!pkg_search %in% search())
+            base::attachNamespace(asNamespace(p))
+          failed <<- setdiff(failed, p)
+          loaded  <<- c(loaded, p)
+          message("  [fix] ", p, " \u2713 reloaded successfully")
+        }, error = function(e) NULL)
+      }
+    }
   }
 
   # Store failed packages under the option that server_app.R reads for notifications.
