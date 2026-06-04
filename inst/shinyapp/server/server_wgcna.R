@@ -1178,25 +1178,83 @@ server_wgcna <- function(input, output, session, rv) {
     })
   })
   
-  output$me_correlation_heatmap <- renderPlot({
+  # Shared, aesthetic Module-Eigengene correlation plot.
+  # Uses corrplot (already a dependency) for a clean, readable heatmap with
+  # module-coloured labels and adaptive coefficient sizing. Falls back to an
+  # improved labeledHeatmap if corrplot is unavailable.
+  make_me_correlation_plot <- function() {
     req(rv$ME_correlation)
-    
-    if (!requireNamespace("WGCNA", quietly = TRUE)) {
-      par(bg = "white"); plot.new(); text(0.5, 0.5, "WGCNA package required", cex = 1.2)
-      return()
+    cm <- as.matrix(rv$ME_correlation)
+
+    # Clean labels: strip the "ME" prefix so cells aren't crowded ("MEblue" -> "blue")
+    raw_names   <- if (!is.null(colnames(cm))) colnames(cm) else names(rv$MEs)
+    clean_names <- sub("^ME", "", raw_names)
+    rownames(cm) <- colnames(cm) <- clean_names
+
+    # Colour each label with its actual module colour when it is a valid R colour.
+    valid_cols <- clean_names %in% grDevices::colors()
+    label_cols <- ifelse(valid_cols, clean_names, "#2c3e50")
+    # Lighten near-white module names (e.g. "lightcyan") so labels stay legible.
+    label_cols[clean_names %in% c("white", "lightcyan", "lightyellow")] <- "#7f8c8d"
+
+    n <- ncol(cm)
+    # Adaptive coefficient text size: shrink as the matrix grows.
+    num_cex <- max(0.45, min(0.95, 2.6 / sqrt(n)))
+    tl_cex  <- max(0.6,  min(1.1, 3.0 / sqrt(n)))
+
+    if (requireNamespace("corrplot", quietly = TRUE)) {
+      op <- par(bg = "white")
+      on.exit(par(op), add = TRUE)
+      pal <- grDevices::colorRampPalette(
+        c("#2166AC", "#67A9CF", "#D1E5F0", "#FFFFFF",
+          "#FDDBC7", "#EF8A62", "#B2182B")
+      )(200)
+      corrplot::corrplot(
+        cm,
+        method      = "color",
+        col         = pal,
+        type        = "full",
+        order       = "original",
+        addCoef.col = "#2c3e50",
+        number.cex  = num_cex,
+        tl.col      = label_cols,
+        tl.cex      = tl_cex,
+        tl.srt      = 45,
+        cl.cex      = 0.85,
+        cl.ratio    = 0.12,
+        mar         = c(0, 0, 2.2, 0),
+        col.lim     = c(-1, 1),
+        title       = "Module Eigengene Correlation"
+      )
+      return(invisible(NULL))
     }
-    op <- par(bg = "white", fg = "#2c3e50")
+
+    # Fallback: improved WGCNA labeledHeatmap with generous margins.
+    if (!requireNamespace("WGCNA", quietly = TRUE)) {
+      par(bg = "white"); plot.new(); text(0.5, 0.5, "corrplot/WGCNA package required", cex = 1.2)
+      return(invisible(NULL))
+    }
+    op <- par(bg = "white", fg = "#2c3e50", mar = c(8, 8, 3, 1))
     on.exit(par(op), add = TRUE)
     WGCNA::labeledHeatmap(
-      Matrix = rv$ME_correlation,
-      xLabels = names(rv$MEs),
-      yLabels = names(rv$MEs),
-      ySymbols = names(rv$MEs),
+      Matrix      = cm,
+      xLabels     = clean_names,
+      yLabels     = clean_names,
+      ySymbols    = clean_names,
       colorLabels = FALSE,
-      colors = WGCNA::blueWhiteRed(50),
-      textMatrix = round(rv$ME_correlation, 2),
-      main = "Module Eigengene Correlation"
+      colors      = WGCNA::blueWhiteRed(100),
+      textMatrix  = round(cm, 2),
+      setStdMargins = FALSE,
+      cex.text    = num_cex,
+      cex.lab     = tl_cex,
+      zlim        = c(-1, 1),
+      main        = "Module Eigengene Correlation"
     )
+    invisible(NULL)
+  }
+
+  output$me_correlation_heatmap <- renderPlot({
+    make_me_correlation_plot()
   })
   
   output$me_dendrogram_plot <- renderPlot({
@@ -1247,17 +1305,7 @@ server_wgcna <- function(input, output, session, rv) {
     content = function(file) {
       req(rv$ME_correlation)
       png(file, width = 8 * IMAGE_DPI, height = 7 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
-      par(bg = "white")
-      WGCNA::labeledHeatmap(
-        Matrix = rv$ME_correlation,
-        xLabels = names(rv$MEs),
-        yLabels = names(rv$MEs),
-        ySymbols = names(rv$MEs),
-        colorLabels = FALSE,
-        colors = WGCNA::blueWhiteRed(50),
-        textMatrix = round(rv$ME_correlation, 2),
-        main = "Module Eigengene Correlation"
-      )
+      make_me_correlation_plot()
       dev.off()
     }
   )
@@ -1265,16 +1313,7 @@ server_wgcna <- function(input, output, session, rv) {
     filename = function() "wgcna_me_correlation_heatmap.pdf",
     content = function(file) {
       pdf(file, width = 8, height = 7, bg = "white")
-      WGCNA::labeledHeatmap(
-        Matrix = rv$ME_correlation,
-        xLabels = names(rv$MEs),
-        yLabels = names(rv$MEs),
-        ySymbols = names(rv$MEs),
-        colorLabels = FALSE,
-        colors = WGCNA::blueWhiteRed(50),
-        textMatrix = round(rv$ME_correlation, 2),
-        main = "Module Eigengene Correlation"
-      )
+      make_me_correlation_plot()
       dev.off()
     }
   )
