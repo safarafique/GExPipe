@@ -163,36 +163,55 @@ server_ml <- function(input, output, session, rv) {
       }, error = function(e) FALSE)
 
       if (!.glmnet_ok) {
+        # ── Auto-reinstall glmnet ────────────────────────────────────────────
         showNotification(
-          tags$div(
-            icon("exclamation-triangle"),
-            tags$strong(" glmnet library is broken (compiled for a different R version)."),
-            tags$br(),
-            "This causes the error: ",
-            tags$code("_glmnet_glmnet_control_get not available for .Call()"),
-            tags$br(), tags$br(),
-            tags$strong("How to fix (choose one):"),
-            tags$ol(
-              tags$li(
-                tags$strong("Restart the app"),
-                " — close GExPipe, restart R (RStudio: Ctrl+Shift+F10), ",
-                "then run GExPipe::runGExPipe() again. The startup check will ",
-                "automatically reinstall glmnet."
-              ),
-              tags$li(
-                "Or run in the R console: ",
-                tags$code('install.packages("glmnet", type = "source"); restart R')
-              )
-            ),
-            tags$em("Note: LASSO, Elastic Net, and Ridge will be skipped this run. ",
-                    "Random Forest, SVM-RFE, Boruta, sPLS-DA, and XGBoost still work."),
-            style = "font-size: 13px;"
-          ),
-          type = "error", duration = 30
+          tags$div(icon("sync"), " glmnet DLL mismatch detected — auto-reinstalling..."),
+          type = "warning", duration = 10, id = "glmnet_fix_notif"
         )
-        # Remove glmnet-based methods from this run so the others still execute
-        methods_sel <- setdiff(methods_sel, c("lasso", "elastic", "ridge"))
-        if (length(methods_sel) == 0) return()
+        .glmnet_reinstall_ok <- tryCatch({
+          gexpipe_lib <- .gexpipe_get_lib()
+          # Force-reinstall into GExPipe library via BiocManager
+          BiocManager::install(
+            "glmnet", lib = gexpipe_lib, ask = FALSE, force = TRUE,
+            update = TRUE, INSTALL_opts = c("--no-staged-install", "--no-lock")
+          )
+          # Try to unload the broken DLL and reload the fresh one
+          if (isNamespaceLoaded("glmnet"))
+            suppressWarnings(tryCatch(unloadNamespace("glmnet"), error = function(e) NULL))
+          loadNamespace("glmnet", lib.loc = gexpipe_lib)
+          # Re-test
+          tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE)
+        }, error = function(e) FALSE)
+
+        removeNotification("glmnet_fix_notif")
+
+        if (isTRUE(.glmnet_reinstall_ok)) {
+          .glmnet_ok <- TRUE
+          showNotification(
+            tags$div(icon("check-circle"), tags$strong(" glmnet reinstalled and reloaded successfully."),
+                     " LASSO / Elastic Net / Ridge will now run normally."),
+            type = "message", duration = 8
+          )
+        } else {
+          # DLL still locked — reinstall is queued for next startup
+          showNotification(
+            tags$div(
+              icon("exclamation-triangle"),
+              tags$strong(" glmnet was reinstalled but requires an R restart to take effect."),
+              tags$br(),
+              "Restart R (RStudio: ", tags$kbd("Ctrl+Shift+F10"), "), ",
+              "then run ", tags$code("GExPipe::runGExPipe()"), " — it will open immediately.",
+              tags$br(),
+              tags$em("LASSO, Elastic Net, and Ridge will be skipped this run. ",
+                      "All other methods still work."),
+              style = "font-size: 13px;"
+            ),
+            type = "error", duration = 30
+          )
+          # Remove glmnet-based methods from this run so the others still execute
+          methods_sel <- setdiff(methods_sel, c("lasso", "elastic", "ridge"))
+          if (length(methods_sel) == 0) return()
+        }
       }
     }
 
