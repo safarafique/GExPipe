@@ -163,52 +163,58 @@ server_ml <- function(input, output, session, rv) {
       }, error = function(e) FALSE)
 
       if (!.glmnet_ok) {
-        # ── Auto-reinstall glmnet ────────────────────────────────────────────
         showNotification(
-          tags$div(icon("sync"), " glmnet DLL mismatch detected — auto-reinstalling..."),
-          type = "warning", duration = 10, id = "glmnet_fix_notif"
+          tags$div(icon("sync"), " glmnet needs a rebuild for this R version — fixing automatically..."),
+          type = "warning", duration = 12, id = "glmnet_fix_notif"
         )
         .glmnet_reinstall_ok <- tryCatch({
-          gexpipe_lib <- .gexpipe_get_lib()
-          # Force-reinstall into GExPipe library via BiocManager
-          BiocManager::install(
-            "glmnet", lib = gexpipe_lib, ask = FALSE, force = TRUE,
-            update = TRUE, INSTALL_opts = c("--no-staged-install", "--no-lock")
-          )
-          # Try to unload the broken DLL and reload the fresh one
-          if (isNamespaceLoaded("glmnet"))
-            suppressWarnings(tryCatch(unloadNamespace("glmnet"), error = function(e) NULL))
-          loadNamespace("glmnet", lib.loc = gexpipe_lib)
-          # Re-test
-          tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE)
+          if (exists(".gexpipe_ensure_native_pkg", mode = "function")) {
+            lib <- if (exists(".gexpipe_get_lib", mode = "function")) {
+              .gexpipe_get_lib()
+            } else {
+              getOption("gexpipe.lib", .libPaths()[1L])
+            }
+            .gexpipe_ensure_native_pkg("glmnet", lib = lib, quiet = TRUE)
+          } else {
+            gexpipe_lib <- getOption("gexpipe.lib", .libPaths()[1L])
+            if (isNamespaceLoaded("glmnet"))
+              suppressWarnings(tryCatch(unloadNamespace("glmnet"), error = function(e) NULL))
+            utils::install.packages(
+              "glmnet", lib = gexpipe_lib, repos = "https://cloud.r-project.org",
+              type = if (.Platform$OS.type == "windows") "binary" else "source",
+              quiet = TRUE
+            )
+            loadNamespace("glmnet", lib.loc = gexpipe_lib)
+            tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE)
+          }
         }, error = function(e) FALSE)
 
         removeNotification("glmnet_fix_notif")
 
-        if (isTRUE(.glmnet_reinstall_ok)) {
-          .glmnet_ok <- TRUE
+        .glmnet_ok <- isTRUE(.glmnet_reinstall_ok) || tryCatch({
+          glmnet::glmnet_control(); TRUE
+        }, error = function(e) FALSE)
+
+        if (isTRUE(.glmnet_ok)) {
           showNotification(
-            tags$div(icon("check-circle"), tags$strong(" glmnet reinstalled and reloaded successfully."),
-                     " LASSO / Elastic Net / Ridge will now run normally."),
+            tags$div(icon("check-circle"), tags$strong(" glmnet is ready."),
+                     " LASSO, Elastic Net, and Ridge will run now."),
             type = "message", duration = 8
           )
         } else {
-          # DLL still locked — reinstall is queued for next startup
           showNotification(
             tags$div(
-              icon("exclamation-triangle"),
-              tags$strong(" glmnet was reinstalled but requires an R restart to take effect."),
+              icon("info-circle"),
+              tags$strong(" glmnet was rebuilt — one R restart needed."),
               tags$br(),
-              "Restart R (RStudio: ", tags$kbd("Ctrl+Shift+F10"), "), ",
-              "then run ", tags$code("GExPipe::runGExPipe()"), " — it will open immediately.",
+              "Close the app, press ", tags$kbd("Ctrl+Shift+F10"), " in RStudio, then run ",
+              tags$code("GExPipe::runGExPipe()"), " again. No manual install required.",
               tags$br(),
-              tags$em("LASSO, Elastic Net, and Ridge will be skipped this run. ",
-                      "All other methods still work."),
+              tags$em("LASSO / Elastic Net / Ridge skipped this run; other ML methods still work."),
               style = "font-size: 13px;"
             ),
-            type = "error", duration = 30
+            type = "warning", duration = 25
           )
-          # Remove glmnet-based methods from this run so the others still execute
           methods_sel <- setdiff(methods_sel, c("lasso", "elastic", "ridge"))
           if (length(methods_sel) == 0) return()
         }
@@ -410,15 +416,15 @@ server_ml <- function(input, output, session, rv) {
         if (grepl("_glmnet_glmnet_control_get|not available for .Call.*glmnet|glmnet.*not available for .Call", msg, ignore.case = TRUE)) {
           showNotification(
             tags$div(
-              icon("exclamation-triangle"),
-              tags$strong(" glmnet DLL error — compiled for a different R version."),
+              icon("info-circle"),
+              tags$strong(" glmnet needs one R restart after auto-rebuild."),
               tags$br(),
-              "Fix: restart R (Ctrl+Shift+F10) and run GExPipe::runGExPipe() again. ",
-              "The startup check will automatically reinstall glmnet.",
+              "Press ", tags$kbd("Ctrl+Shift+F10"), ", then run ",
+              tags$code("GExPipe::runGExPipe()"), " — glmnet will work; no manual install.",
               tags$br(),
-              tags$small(tags$em("Technical detail: ", msg))
+              tags$small(tags$em(msg))
             ),
-            type = "error", duration = 20
+            type = "warning", duration = 20
           )
         } else {
           showNotification(
