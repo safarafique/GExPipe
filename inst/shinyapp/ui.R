@@ -1115,6 +1115,7 @@ ui_analysis <- dashboardPage(
           next_page_ml: 'download',
           next_page_ml_to_roc: 'validation',
           next_page_ml_to_validation: 'validation',
+          next_page_validation_to_roc: 'roc',
           next_page_roc: 'download',
           next_page_roc_to_nomogram: 'nomogram',
           next_page_roc_to_gsea: 'gsea',
