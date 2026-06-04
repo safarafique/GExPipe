@@ -72,18 +72,68 @@ ui_download <- tabItem(
             )
           ),
           column(12,
-            radioButtons("de_method",
-              tags$span("DE Method:",
-              tags$i(class = "fa fa-question-circle param-help",
-                     `data-toggle` = "tooltip", `data-placement` = "right",
-                     title = "Choose the statistical method for differential expression analysis in Step 6.<br><br><b>limma (empirical Bayes):</b> Gold standard for microarray and works well with any normalized data. Uses moderated t-statistics on batch-corrected log-expression.<br><br><b>limma-voom (mean–variance weights):</b> Recommended when you want limma-style models on RNA-seq <i>counts</i>. voom converts counts to logCPM and estimates precision weights before limma.<br><br><b>DESeq2 (negative binomial):</b> Gold standard for RNA-seq count data. Uses its own internal normalization (median-of-ratios) — raw counts are preserved and passed directly to DESeq2.<br><br><b>edgeR (quasi-likelihood):</b> Robust alternative for RNA-seq count data. Uses TMM normalization and quasi-likelihood F-tests for DE — well-suited for small sample sizes.<br><br><em>Tip:</em> For pure RNA-seq counts, DESeq2, edgeR, or limma-voom are appropriate. For microarray or merged platforms, limma is recommended.")),
-              choices = c(
-                "limma — empirical Bayes (recommended for microarray/mixed)" = "limma",
-                "limma-voom — voom + limma (RNA-seq counts)" = "limma_voom",
-                "DESeq2 — negative binomial (RNA-seq counts)" = "deseq2",
-                "edgeR — quasi-likelihood (RNA-seq counts)" = "edger"
+            style = "margin-bottom: 6px;",
+            tags$label("DE Method for Step 6:",
+              style = "font-weight: 700; font-size: 14px; color: #2c3e50; display: block; margin-bottom: 4px;"),
+            tags$div(
+              id = "de_method_wrapper",
+              radioButtons("de_method", label = NULL,
+                choices = c(
+                  "limma — empirical Bayes (recommended for microarray/mixed)" = "limma",
+                  "limma-voom — voom + limma (RNA-seq counts)" = "limma_voom",
+                  "DESeq2 — negative binomial (RNA-seq counts)" = "deseq2",
+                  "edgeR — quasi-likelihood (RNA-seq counts)" = "edger"
+                ),
+                selected = "limma")
+            ),
+            tags$div(
+              style = paste0(
+                "margin-top: 10px; padding: 14px 16px;",
+                "background: #f0f6ff; border-left: 4px solid #3b82f6;",
+                "border-radius: 6px; font-size: 13px; line-height: 1.6; color: #1e3a5f;"
               ),
-              selected = "limma")
+              tags$strong(icon("info-circle"), " Which DE method should I choose?"),
+              tags$table(
+                style = "margin-top: 8px; width: 100%; border-collapse: collapse;",
+                tags$thead(
+                  tags$tr(
+                    tags$th("Method",   style = "text-align:left; padding: 4px 8px; background:#dbeafe; border-radius:4px 0 0 0;"),
+                    tags$th("Use for",  style = "text-align:left; padding: 4px 8px; background:#dbeafe;"),
+                    tags$th("Requires", style = "text-align:left; padding: 4px 8px; background:#dbeafe; border-radius:0 4px 0 0;")
+                  )
+                ),
+                tags$tbody(
+                  tags$tr(style = "background:#fff;",
+                    tags$td(tags$strong("limma"), style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;"),
+                    tags$td("Microarray, merged, or any normalized data", style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;"),
+                    tags$td("Log-expression matrix (normalized)", style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;")
+                  ),
+                  tags$tr(style = "background:#f8faff;",
+                    tags$td(tags$strong("limma-voom"), style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;"),
+                    tags$td("RNA-seq counts with limma-style models", style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;"),
+                    tags$td("Raw integer counts", style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;")
+                  ),
+                  tags$tr(style = "background:#fff;",
+                    tags$td(tags$strong("DESeq2"), style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;"),
+                    tags$td("RNA-seq — gold standard negative binomial model", style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;"),
+                    tags$td("Raw integer counts", style = "padding:5px 8px; border-bottom:1px solid #e2e8f0;")
+                  ),
+                  tags$tr(style = "background:#f8faff;",
+                    tags$td(tags$strong("edgeR"), style = "padding:5px 8px;"),
+                    tags$td("RNA-seq — robust quasi-likelihood tests", style = "padding:5px 8px;"),
+                    tags$td("Raw integer counts", style = "padding:5px 8px;")
+                  )
+                )
+              ),
+              tags$p(
+                icon("lightbulb"),
+                tags$strong(" Tip:"),
+                " Microarray only (e.g. GSE44076) → select ",
+                tags$strong("limma"),
+                ". RNA-seq counts → select DESeq2, edgeR, or limma-voom.",
+                style = "margin: 8px 0 0 0; font-size: 12.5px; color: #374151;"
+              )
+            )
           )
         ),
         # Dynamic warning when DESeq2 or edgeR is selected for non-RNA-seq data

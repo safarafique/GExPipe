@@ -170,7 +170,7 @@ ui_analysis <- dashboardPage(
             // Ensure HTML in tooltip titles (e.g., <br><b>) renders instead of showing raw tags.
             els.attr('data-html', 'true');
             els.tooltip('dispose');
-            els.tooltip({ html: true, sanitize: false, container: 'body', trigger: 'hover focus' });
+            els.tooltip({ html: true, sanitize: false, container: 'body', trigger: 'hover focus', boundary: 'window' });
           }
           gexpInitTooltips();
           // Re-initialize when Shiny re-renders dynamic UI (e.g. after tab switch)
@@ -201,8 +201,51 @@ ui_analysis <- dashboardPage(
           transform: scale(1.15);
           box-shadow: 0 3px 10px rgba(102, 126, 234, 0.45);
         }
+        /* Keep help tooltips above shinydashboard boxes/tabs */
+        .tooltip {
+          z-index: 100050 !important;
+          pointer-events: none;
+        }
+        .tooltip.show {
+          opacity: 1 !important;
+        }
+        .box, .box-body, .tab-content, .content-wrapper {
+          overflow: visible !important;
+        }
+        /* DE method table guide */
+        #de_method_wrapper .shiny-input-radiogroup {
+          padding: 8px 0;
+          background: transparent;
+          border: none;
+        }
+        #de_method_wrapper .shiny-input-radiogroup label {
+          display: inline;
+          padding: 0;
+          margin: 0;
+          background: none;
+          border: none;
+          border-radius: 0;
+          font-weight: 400;
+          font-size: 14px;
+          box-shadow: none;
+          transform: none;
+        }
+        #de_method_wrapper .shiny-input-radiogroup label:hover {
+          background: none;
+          border: none;
+          transform: none;
+          box-shadow: none;
+          color: #3b82f6;
+        }
+        #de_method_wrapper .shiny-input-radiogroup input[type='radio']:checked ~ label {
+          background: none;
+          border: none;
+          box-shadow: none;
+          color: #3b82f6;
+          font-weight: 600;
+        }
         .tooltip-inner {
-          max-width: 320px;
+          max-width: min(420px, 92vw);
           font-size: 12.5px;
           line-height: 1.5;
           text-align: left;
@@ -820,9 +863,9 @@ ui_analysis <- dashboardPage(
           outline: none !important;
         }
         
-        /* ===== RADIO BUTTONS STYLING ===== */
+        /* ===== RADIO BUTTONS STYLING (platform/dataset selectors only) ===== */
         .shiny-input-radiogroup {
-          padding: 15px;
+          padding: 10px 14px;
           background: #f8f9fa;
           border-radius: 8px;
           border: 1px solid #dee2e6;
@@ -830,13 +873,13 @@ ui_analysis <- dashboardPage(
         
         .shiny-input-radiogroup label {
           display: block;
-          padding: 12px 15px;
-          margin: 8px 0;
+          padding: 10px 14px;
+          margin: 6px 0;
           background: white;
           border: 2px solid #e9ecef;
           border-radius: 6px;
           cursor: pointer;
-          transition: all 0.3s ease;
+          transition: border-color 0.2s ease, background 0.2s ease;
           font-weight: 500;
           font-size: 14px;
         }
@@ -844,8 +887,6 @@ ui_analysis <- dashboardPage(
         .shiny-input-radiogroup label:hover {
           background: #f0f4ff;
           border-color: #667eea;
-          transform: translateX(5px);
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
         }
         
         .shiny-input-radiogroup input[type='radio']:checked + span {
@@ -856,13 +897,12 @@ ui_analysis <- dashboardPage(
         .shiny-input-radiogroup input[type='radio']:checked ~ label {
           background: linear-gradient(135deg, #e8f0ff 0%, #f0f4ff 100%);
           border-color: #667eea;
-          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
         }
         
         .shiny-input-radiogroup input[type='radio'] {
           margin-right: 10px;
-          width: 18px;
-          height: 18px;
+          width: 16px;
+          height: 16px;
           cursor: pointer;
         }
         

@@ -71,36 +71,41 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("GExPipe")
 ```
 
-Then launch the app:
+Then launch the app (`runGExPipe()` returns the app object; `runApp()` starts it):
 
 ```{r launch-bioc, eval=FALSE}
-GExPipe::runGExPipe()
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
 
 ## From GitHub (Current — available now)
 
-Install the package from GitHub and launch the app with three commands.
-Works on **Windows, macOS, and Linux** without any manual dependency
-management:
+Install from [GitHub](https://github.com/safarafique/GExPipe) and open the app.
+Requires **R >= 4.5.0** (stable). Works on **Windows, macOS, and Linux**.
 
 ```{r install-github, eval=FALSE}
 options(timeout = 3600)   # 1 hour — needed for slow connections
 
-# Step 1: Install BiocManager and set repos so remotes can find
-#         Bioconductor packages (org.Hs.eg.db, DESeq2, etc.) automatically
+# Step 1: BiocManager + repos (so remotes can install Bioconductor packages)
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 options(repos = BiocManager::repositories())
 
-# Step 2: Install GExPipe from GitHub (all 54 dependencies installed automatically)
+# Step 2: Install GExPipe from GitHub (63 runtime dependencies from DESCRIPTION)
 if (!requireNamespace("remotes", quietly = TRUE))
     install.packages("remotes")
-remotes::install_github("safarafique/GExPipe", dependencies = TRUE)
+remotes::install_github(
+  "safarafique/GExPipe",
+  dependencies = TRUE,
+  INSTALL_opts = "--no-staged-install"
+)
 
-GExPipe::runGExPipe()
+# Step 3: Build app object and open in browser (runGExPipe() does not start the server by itself)
+library(GExPipe)
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
 
-The app handles all 54 dependencies automatically on first launch:
+On first launch, `runGExPipe()` may also install any missing packages interactively.
+The app uses an **isolated GExPipe library** and handles dependencies automatically:
 
 - Creates an **isolated GExPipe library** on your system
 - Downloads and installs all required packages into it
@@ -131,7 +136,7 @@ file.path(Sys.getenv("LOCALAPPDATA"), "GExPipe", rv)   # Windows
 > install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/)
 > once. R will then compile source packages automatically.
 >
-> **First run time:** Downloading and installing all 54 packages takes
+> **First run time:** Downloading and installing all 63 packages takes
 > approximately 10–40 minutes depending on internet speed. Every
 > subsequent run opens in seconds.
 
@@ -142,7 +147,7 @@ file.path(Sys.getenv("LOCALAPPDATA"), "GExPipe", rv)   # Windows
 After installation, start the application with a single command:
 
 ```{r launch, eval=FALSE}
-GExPipe::runGExPipe()
+shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
 ```
 
 The app opens in your default browser at **Step 1 — Download Data**.
@@ -151,13 +156,13 @@ On **first launch** the startup sequence runs automatically:
 
 ```
 ======================================================================
-  GExPipe — loading 54 packages...
-  [ 1/54] shiny             ... ✓ 1.13.0   Ready
-  [ 2/54] shinydashboard    ... ✓ 0.7.3    Ready
+  GExPipe — loading 63 packages...
+  [ 1/63] shiny             ... ✓ 1.13.0   Ready
+  [ 2/63] shinydashboard    ... ✓ 0.7.3    Ready
   ...
-  [54/54] xgboost           ... ✓ 3.2.1.1  Ready
+  [63/63] xgboost           ... ✓ 3.2.1.1  Ready
   ===============================================================
-  Loaded  : 54 / 54 packages
+  Loaded  : 63 / 63 packages
   Status  : All packages ready — opening app...
   ===============================================================
 ```
