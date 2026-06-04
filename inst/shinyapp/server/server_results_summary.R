@@ -486,7 +486,7 @@ server_results_summary <- function(input, output, session, rv) {
     n_pathways <- 0L
     if (length(by_gene) > 0) {
       n_pathways <- sum(sapply(by_gene, function(x) {
-        if (inherits(x, "enrichResult")) nrow(as.data.frame(x)) else 0L
+        if (inherits(x, c("gseaResult", "enrichResult"))) nrow(as.data.frame(x)) else 0L
       }))
     }
     tags$div(
@@ -500,13 +500,20 @@ server_results_summary <- function(input, output, session, rv) {
     by_gene <- rv$gsea_results_by_gene
     if (is.null(by_gene) || length(by_gene) == 0) { plot.new(); text(0.5, 0.5, "Run GSEA (Step 12) to see enrichment plot.", cex = 1); return(invisible(NULL)) }
     result <- by_gene[[1]]
-    if (!inherits(result, "enrichResult")) { plot.new(); text(0.5, 0.5, "No GSEA result for first gene.", cex = 1); return(invisible(NULL)) }
+    if (!inherits(result, c("gseaResult", "enrichResult"))) { plot.new(); text(0.5, 0.5, "No GSEA result for first gene.", cex = 1); return(invisible(NULL)) }
     tryCatch({
       df <- as.data.frame(result)
       if (is.null(df) || nrow(df) == 0) { plot.new(); text(0.5, 0.5, "No pathways for first gene.", cex = 1); return(invisible(NULL)) }
       gene_name <- names(by_gene)[1]
-      p <- enrichplot::gseaplot2(result, geneSetID = 1, title = paste0("GSEA: ", gene_name))
-      print(p)
+      top_id <- if ("p.adjust" %in% names(df)) df$ID[order(df$p.adjust)][1] else df$ID[1]
+      p <- enrichplot::gseaplot2(result, geneSetID = top_id, title = paste0("GSEA: ", gene_name))
+      if (inherits(p, "ggplot")) {
+        print(p)
+      } else if (inherits(p, "list")) {
+        do.call(gridExtra::grid.arrange, p)
+      } else {
+        grid::grid.draw(p)
+      }
     }, error = function(e) { plot.new(); text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red") })
   }, height = 260)
 

@@ -16,7 +16,7 @@ server_gsea <- function(input, output, session, rv) {
 
   output$gsea_process_summary_ui <- renderUI({
     n_gene <- length(rv$gsea_results_by_gene)
-    has_result <- !is.null(rv$gsea_result) && inherits(rv$gsea_result, "enrichResult") && nrow(rv$gsea_result@result) > 0
+    has_result <- !is.null(rv$gsea_result) && inherits(rv$gsea_result, c("gseaResult", "enrichResult")) && nrow(rv$gsea_result@result) > 0
     if (n_gene == 0 && !has_result) {
       return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run GSEA to see process summary."))
     }
