@@ -696,7 +696,67 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
       }
 
       if (is.null(best_eset)) {
-        return(structure(list(ok = FALSE, reason = "No valid ExpressionSet found in GEO object"), class = "eset_err"))
+        # Fallback: sometimes GEO does not provide a GSEMatrix ExpressionSet
+        # but supplies processed series_matrix or other text files as supplementary
+        # files. Try to download supplementary files and parse any candidate table.
+        try({
+          suppressMessages(invisible(capture.output(
+            GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE),
+            file = nullfile()
+          )))
+        }, silent = TRUE)
+
+        supp_dir <- file.path(micro_dir, gse_id)
+        if (!dir.exists(supp_dir)) supp_dir <- micro_dir
+        files <- list.files(supp_dir, full.names = TRUE, recursive = TRUE)
+        # Prefer series_matrix files if present
+        cand <- files[grepl("series_matrix.*\\.txt|series_matrix.*\\.gz|_matrix.*\\.txt|_matrix.*\\.gz", files, ignore.case = TRUE)]
+        # otherwise look for reasonably sized text-like files
+        if (length(cand) == 0) {
+          txts <- files[grepl("\\.txt$|\\.tsv$|\\.csv$|\\.gz$", files, ignore.case = TRUE)]
+          # pick those > 1KB
+          cand <- txts[file.info(txts)$size > 1024]
+        }
+        parsed_ok <- FALSE
+        for (cf in cand) {
+          try({
+            tf <- cf
+            if (grepl("\\.gz$", tf, ignore.case = TRUE)) {
+              con <- gzfile(tf, open = "rt")
+            } else {
+              con <- file(tf, open = "rt")
+            }
+            hdr_lines <- readLines(con, n = 50, warn = FALSE)
+            close(con)
+            # strip comment lines starting with '!' (GEO series_matrix style)
+            content <- paste(hdr_lines, collapse = "\n")
+            # try to read with read.table skipping '!' comment lines
+            df <- tryCatch({
+              utils::read.table(tf, header = TRUE, sep = "\\t", comment.char = "!", quote = "\"", fill = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+            }, error = function(e) NULL)
+            if (is.null(df) || nrow(df) == 0) next
+            # find numeric columns (likely expression data)
+            num_cols <- vapply(df, function(col) is.numeric(col) || suppressWarnings(!all(is.na(as.numeric(as.character(col))))), logical(1))
+            if (sum(num_cols) < 1) next
+            # assume first column is probe/gene id, numeric columns are samples
+            probe_col <- which(!num_cols)[1]
+            if (is.na(probe_col)) probe_col <- 1
+            probes <- as.character(df[[probe_col]])
+            expr_mat <- as.matrix(df[, which(num_cols), drop = FALSE])
+            rownames(expr_mat) <- make.names(probes, unique = TRUE)
+            if (nrow(expr_mat) > 0 && ncol(expr_mat) > 0) {
+              best_eset <- NULL
+              best_expr_mat <- expr_mat
+              best_pdata <- data.frame(row.names = colnames(expr_mat))
+              best_plt_id <- ""
+              parsed_ok <- TRUE
+              break
+            }
+          }, silent = TRUE)
+        }
+        if (!parsed_ok) {
+          return(structure(list(ok = FALSE, reason = "No valid ExpressionSet found in GEO object"), class = "eset_err"))
+        }
       }
 
       eset     <- best_eset
