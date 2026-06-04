@@ -89,7 +89,7 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
   }
   if (!is.null(rv$gsea_results_by_gene) && length(rv$gsea_results_by_gene) > 0) {
     rv$gsea_complete <- TRUE
-  } else if (!is.null(rv$gsea_result) && inherits(rv$gsea_result, "enrichResult") && nrow(rv$gsea_result@result) > 0) {
+  } else if (!is.null(rv$gsea_result) && inherits(rv$gsea_result, c("gseaResult", "enrichResult")) && nrow(rv$gsea_result@result) > 0) {
     rv$gsea_complete <- TRUE
   }
   if (isTRUE(rv$ml_complete) || (!is.null(rv$ml_common_genes) && length(rv$ml_common_genes) > 0)) {
