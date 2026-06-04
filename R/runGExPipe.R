@@ -91,6 +91,11 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
 
     needs_install <- length(missing_now) > 0L || length(version_conflict_now) > 0L
 
+    # Always verify native packages (glmnet etc.) — version checks miss DLL mismatches.
+    tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = FALSE), error = function(e) {
+      message("GExPipe: native package check note: ", conditionMessage(e))
+    })
+
     if (needs_install) {
       if (length(missing_now) > 0L)
         message("\nGExPipe: ", length(missing_now), " missing package(s):\n",

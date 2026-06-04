@@ -380,6 +380,158 @@
   requireNamespace(pkg, quietly = TRUE)
 }
 
+## Packages with compiled native code that must match the running R version.
+.gexpipe_native_pkgs <- function() c("glmnet", "xgboost", "Matrix", "Rcpp")
+
+## Return lib paths where pkg is installed (searches all .libPaths()).
+.gexpipe_pkg_lib_paths <- function(pkg) {
+  libs <- unique(c(.gexpipe_get_lib(), .libPaths()))
+  libs[vapply(libs, function(lib) {
+    dir.exists(file.path(lib, pkg))
+  }, logical(1L))]
+}
+
+## TRUE if DESCRIPTION Built: field matches current R major.minor.
+.gexpipe_pkg_built_for_current_r <- function(pkg, lib) {
+  built <- tryCatch({
+    desc <- utils::packageDescription(pkg, lib.loc = lib)
+    if (is.null(desc)) return(NA)
+    desc[["Built"]]
+  }, error = function(e) NULL)
+  if (is.null(built) || !nzchar(built)) return(NA)
+  m <- regexpr("R [0-9]+\\.[0-9]+", built, perl = TRUE)
+  if (m < 0L) return(NA)
+  built_r <- numeric_version(sub("^R ", "", regmatches(built, m)))
+  cur_r <- numeric_version(paste(R.Version()$major, R.Version()$minor, sep = "."))
+  identical(built_r[1, 1:2], cur_r[1, 1:2])
+}
+
+## Smoke-test native code for a package loaded from a specific library.
+.gexpipe_native_smoke_test <- function(pkg) {
+  switch(pkg,
+    glmnet  = { glmnet::glmnet_control(); TRUE },
+    xgboost = { xgboost::xgb.DMatrix(matrix(0, 1, 1)); TRUE },
+    Matrix  = { Matrix::Matrix(1); TRUE },
+    Rcpp    = TRUE,
+    TRUE
+  )
+}
+
+## Unload pkg and remove it from every library on .libPaths().
+.gexpipe_remove_pkg_all_libs <- function(pkg) {
+  if (isNamespaceLoaded(pkg)) {
+    tryCatch(suppressWarnings(unloadNamespace(pkg)), error = function(e) NULL)
+  }
+  for (lib in rev(unique(c(.gexpipe_get_lib(), .libPaths())))) {
+    pkg_dir <- file.path(lib, pkg)
+    if (!dir.exists(pkg_dir)) next
+    tryCatch(utils::remove.packages(pkg, lib = lib), error = function(e) {
+      unlink(pkg_dir, recursive = TRUE, force = TRUE)
+    })
+  }
+  invisible(TRUE)
+}
+
+## Install a native package into gexpipe_lib (binary on Windows for current R).
+.gexpipe_install_native_pkg <- function(pkg, lib) {
+  dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+  inst_type <- if (.Platform$OS.type == "windows") "binary" else "source"
+  tryCatch(
+    utils::install.packages(
+      pkg,
+      lib = lib,
+      repos = "https://cloud.r-project.org",
+      type = inst_type,
+      quiet = TRUE
+    ),
+    error = function(e) NULL
+  )
+  if (!requireNamespace(pkg, lib.loc = lib, quietly = TRUE)) {
+    if (!requireNamespace("BiocManager", quietly = TRUE)) {
+      utils::install.packages(
+        "BiocManager", lib = lib, repos = "https://cloud.r-project.org", quiet = TRUE
+      )
+    }
+    BiocManager::install(
+      pkg,
+      lib = lib,
+      ask = FALSE,
+      force = TRUE,
+      update = TRUE,
+      INSTALL_opts = c("--no-staged-install", "--no-lock")
+    )
+  }
+  requireNamespace(pkg, lib.loc = lib, quietly = TRUE)
+}
+
+## Ensure pkg works from gexpipe_lib: remove stale copies, reinstall, load, test.
+## Returns TRUE when native code is usable in this session.
+.gexpipe_ensure_native_pkg <- function(pkg, lib = .gexpipe_get_lib(), quiet = FALSE) {
+  if (!quiet) {
+    message("GExPipe: verifying native package ", pkg, " for R ",
+            paste(R.Version()$major, R.Version()$minor, sep = "."), " ...")
+  }
+
+  .works <- function() {
+    if (!requireNamespace(pkg, lib.loc = lib, quietly = TRUE)) return(FALSE)
+    was_loaded <- isNamespaceLoaded(pkg)
+    ok <- tryCatch({
+      if (!was_loaded) loadNamespace(pkg, lib.loc = lib)
+      .gexpipe_native_smoke_test(pkg)
+    }, error = function(e) FALSE)
+    if (!was_loaded && isNamespaceLoaded(pkg)) {
+      tryCatch(suppressWarnings(unloadNamespace(pkg)), error = function(e) NULL)
+    }
+    isTRUE(ok)
+  }
+
+  if (.works()) return(TRUE)
+
+  built_ok <- .gexpipe_pkg_built_for_current_r(pkg, lib)
+  if (isFALSE(built_ok) || is.na(built_ok)) {
+    if (!quiet) message("GExPipe: ", pkg, " was built for a different R version — reinstalling.")
+  } else if (!quiet) {
+    message("GExPipe: ", pkg, " native code failed smoke test — reinstalling.")
+  }
+
+  if (isNamespaceLoaded(pkg)) {
+    # DLL locked in this session — subprocess install to pending, active next run
+    if (!quiet) {
+      message("GExPipe: ", pkg, " DLL is locked; installing fresh build in background...")
+    }
+    .gexpipe_batch_install(pkg)
+    return(FALSE)
+  }
+
+  .gexpipe_remove_pkg_all_libs(pkg)
+  if (!.gexpipe_install_native_pkg(pkg, lib)) {
+    if (!quiet) message("GExPipe: could not install ", pkg, " into ", lib)
+    return(FALSE)
+  }
+
+  if (!.works()) {
+    if (!quiet) message("GExPipe: ", pkg, " still broken after reinstall — restart R once.")
+    return(FALSE)
+  }
+  if (!quiet) message("GExPipe: ", pkg, " OK.")
+  TRUE
+}
+
+.gexpipe_ensure_all_native_pkgs <- function(quiet = FALSE) {
+  all_ok <- TRUE
+  for (pkg in .gexpipe_native_pkgs()) {
+    ok <- tryCatch(
+      .gexpipe_ensure_native_pkg(pkg, quiet = quiet),
+      error = function(e) {
+        if (!quiet) message("GExPipe: ", pkg, " check failed: ", conditionMessage(e))
+        FALSE
+      }
+    )
+    all_ok <- all_ok && isTRUE(ok)
+  }
+  all_ok
+}
+
 ## Detect packages that are installed but whose compiled DLL is broken (e.g. after
 ## an R version upgrade).  Returns a character vector of broken package names.
 ## Only tests packages that are installed; missing packages are not included.
@@ -429,17 +581,21 @@
           " package(s) have broken native code (compiled for a different R version): ",
           paste(broken_pkgs, collapse = ", "))
   message("GExPipe: auto-reinstalling broken package(s)...")
-  .gexpipe_batch_install(broken_pkgs)
-  # Try to unload + reload each (only works if DLL is not currently locked)
   still_broken <- character(0)
   gexpipe_lib <- .gexpipe_get_lib()
   for (pkg in broken_pkgs) {
-    fixed <- tryCatch({
-      if (isNamespaceLoaded(pkg))
-        suppressWarnings(unloadNamespace(pkg))
-      loadNamespace(pkg, lib.loc = gexpipe_lib)
-      TRUE
-    }, error = function(e) FALSE)
+    if (pkg %in% .gexpipe_native_pkgs()) {
+      fixed <- tryCatch(.gexpipe_ensure_native_pkg(pkg, lib = gexpipe_lib, quiet = TRUE),
+                        error = function(e) FALSE)
+    } else {
+      .gexpipe_batch_install(pkg)
+      fixed <- tryCatch({
+        if (isNamespaceLoaded(pkg))
+          suppressWarnings(unloadNamespace(pkg))
+        loadNamespace(pkg, lib.loc = gexpipe_lib)
+        TRUE
+      }, error = function(e) FALSE)
+    }
     if (!fixed) still_broken <- c(still_broken, pkg)
   }
   if (length(still_broken) > 0L) {
@@ -525,8 +681,10 @@ gexp_app_attach_packages <- function() {
   pkgs    <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
   n_total <- length(pkgs)
 
-  # ── Detect and auto-fix broken (DLL-mismatch) packages before attach ────────
-  # This catches packages compiled for a different R version (e.g. after upgrading R).
+  # ── Native packages (glmnet, xgboost, …) must match this R version ─────────
+  tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = TRUE), error = function(e) NULL)
+
+  # ── Detect and auto-fix any other broken DLL packages before attach ─────────
   broken_pre <- .gexpipe_detect_broken_pkgs(pkgs)
   if (length(broken_pre) > 0L) {
     .gexpipe_fix_broken_pkgs(broken_pre)

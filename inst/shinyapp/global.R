@@ -179,6 +179,18 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
   pillar    = "1.9.0"
 )
 
+# Load shared helpers early (native-package fix must run before package attach).
+for (.rf in unique(c(
+  file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"),
+  file.path(getwd(), "R", "utils_shiny_app.R")
+))) {
+  if (file.exists(.rf)) {
+    tryCatch(source(.rf, local = FALSE), error = function(e) NULL)
+    break
+  }
+}
+options(gexpipe.lib = .gexpipe_lib)
+
 # ==============================================================================
 # STEP 3  \u2014  Detect missing, version-conflicted, and outdated packages
 # ==============================================================================
@@ -231,6 +243,21 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
 }, error = function(e) character(0L), warning = function(w) character(0L))
 
 .to_install <- unique(c(.missing_pkgs, .version_conflict_pkgs, .outdated_in_lib))
+
+# Native packages compiled for a different R version must be reinstalled.
+if (exists(".gexpipe_pkg_built_for_current_r", mode = "function")) {
+  .native_reinstall <- character(0)
+  for (.npkg in c("glmnet", "xgboost", "Matrix", "Rcpp")) {
+    if (!requireNamespace(.npkg, lib.loc = .gexpipe_lib, quietly = TRUE)) next
+    .built_ok <- .gexpipe_pkg_built_for_current_r(.npkg, .gexpipe_lib)
+    if (isFALSE(.built_ok)) .native_reinstall <- c(.native_reinstall, .npkg)
+  }
+  if (length(.native_reinstall) > 0L) {
+    cat("  Native packages need rebuild for this R version:",
+        paste(.native_reinstall, collapse = ", "), "\n")
+    .to_install <- unique(c(.to_install, .native_reinstall))
+  }
+}
 
 # ==============================================================================
 # STEP 4  \u2014  Install / update packages with per-package visible progress
@@ -454,14 +481,14 @@ failed_required <- .gexpipe_all_required[
 # STEP 5  \u2014  Load all libraries and show full package status table
 # ==============================================================================
 .gexpipe_load_quietly <- function(pkg) {
-  if (!requireNamespace(pkg, quietly = TRUE)) return(FALSE)
   if (pkg == "parallel") {
     suppressPackageStartupMessages(library(parallel, quietly = TRUE))
     return(TRUE)
   }
+  if (!requireNamespace(pkg, lib.loc = .gexpipe_lib, quietly = TRUE)) return(FALSE)
   tryCatch({
     suppressPackageStartupMessages(
-      library(pkg, character.only = TRUE, quietly = TRUE)
+      library(pkg, lib.loc = .gexpipe_lib, character.only = TRUE, quietly = TRUE)
     )
     TRUE
   }, error = function(e) FALSE)
@@ -471,6 +498,14 @@ all_pkgs    <- c(.gexpipe_all_required, .gexpipe_all_optional)
 n_total     <- length(all_pkgs)
 loaded      <- character(0)
 failed_load <- character(0)
+
+# Verify glmnet / xgboost etc. match this R version BEFORE attaching all packages.
+if (exists(".gexpipe_ensure_all_native_pkgs", mode = "function")) {
+  cat("\n  [4b] Verifying native packages (glmnet, xgboost, ...)...\n")
+  tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = FALSE), error = function(e) {
+    cat("  Native package check note:", conditionMessage(e), "\n")
+  })
+}
 
 cat("\n  [4/4] Loading", n_total, "libraries...\n")
 cat("  ---------------------------------------------------------------\n")
@@ -497,83 +532,6 @@ for (i in seq_along(all_pkgs)) {
   }
 }
 cat("  ---------------------------------------------------------------\n")
-
-# ==============================================================================
-# STEP 5b — glmnet native-code health check
-# ==============================================================================
-# The version check above only confirms the R package is installed; it does NOT
-# verify that the compiled C library (DLL / .so) is usable.  When R is updated
-# without reinstalling packages, the DLL becomes incompatible and every glmnet
-# call throws "_glmnet_glmnet_control_get not available for .Call()".
-# We call glmnet_control() (the lightest internal function that exercises the
-# DLL entry point) and force-reinstall if it fails.
-if (isNamespaceLoaded("glmnet")) {
-  .glmnet_dll_ok <- tryCatch({
-    glmnet::glmnet_control()   # calls _glmnet_glmnet_control_get internally
-    TRUE
-  }, error = function(e) FALSE)
-
-  if (!.glmnet_dll_ok) {
-    cat("\n  ⚠  glmnet DLL broken (_glmnet_glmnet_control_get not available).\n")
-    cat("      Cause: glmnet was compiled for a different R version.\n")
-
-    if (.dll_locked_in_parent("glmnet")) {
-      # DLL is already mapped into this R process — cannot overwrite it now.
-      # Install the fresh build into the pending lib; takes effect on next run.
-      cat("      DLL is locked in this session. Installing fresh build into pending lib...\n")
-      tryCatch({
-        if (!dir.exists(.pend_lib)) dir.create(.pend_lib, recursive = TRUE)
-        BiocManager::install(
-          "glmnet",
-          lib     = .pend_lib,
-          ask     = FALSE,
-          update  = TRUE,
-          force   = TRUE,
-          quiet   = FALSE,
-          Ncpus   = .ncpus_install
-        )
-        cat("      ✓ Fresh glmnet installed into pending lib.\n")
-        cat("  ╔", strrep("═", 62L), "╗\n", sep = "")
-        cat("  ║  RESTART REQUIRED  —  glmnet DLL was rebuilt            ║\n")
-        cat("  ║                                                              ║\n")
-        cat("  ║  1. Press Ctrl+C (or RStudio Stop ■)                        ║\n")
-        cat("  ║  2. Restart R  (RStudio: Ctrl+Shift+F10)                    ║\n")
-        cat("  ║  3. Run GExPipe::runGExPipe() again                         ║\n")
-        cat("  ╚", strrep("═", 62L), "╝\n\n", sep = "")
-        stop("GExPipe: restart R to apply glmnet rebuild (DLL was broken).", call. = FALSE)
-      }, error = function(e) {
-        if (grepl("restart R", conditionMessage(e), fixed = TRUE)) stop(e)
-        cat("      ✗ Failed to install fresh glmnet:", conditionMessage(e), "\n")
-      })
-    } else {
-      # Not locked — we can remove the broken copy and reinstall right now.
-      cat("      Removing broken glmnet and reinstalling...\n")
-      tryCatch(unloadNamespace("glmnet"), error = function(e) NULL)
-      tryCatch(
-        utils::remove.packages("glmnet", lib = .gexpipe_lib),
-        error = function(e) NULL
-      )
-      tryCatch({
-        BiocManager::install(
-          "glmnet",
-          lib     = .gexpipe_lib,
-          ask     = FALSE,
-          update  = TRUE,
-          force   = TRUE,
-          quiet   = FALSE,
-          Ncpus   = .ncpus_install
-        )
-        suppressPackageStartupMessages(
-          library(glmnet, lib.loc = .gexpipe_lib, character.only = TRUE)
-        )
-        cat("      ✓ glmnet reinstalled and reloaded successfully.\n")
-      }, error = function(e) {
-        cat("      ✗ Reinstall failed:", conditionMessage(e), "\n")
-        cat("         Run manually: install.packages('glmnet', type='source')\n")
-      })
-    }
-  }
-}
 
 # ==============================================================================
 # Runtime options
