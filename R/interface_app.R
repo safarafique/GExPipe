@@ -211,7 +211,7 @@ gexp_app_head <- function() {
             // Ensure HTML in tooltip titles (e.g., <br><b>) renders instead of showing raw tags.
             els.attr('data-html', 'true');
             els.tooltip('dispose');
-            els.tooltip({ html: true, sanitize: false, container: 'body', trigger: 'hover focus' });
+            els.tooltip({ html: true, sanitize: false, container: 'body', trigger: 'hover focus', boundary: 'window' });
           }
           gexpInitTooltips();
           // Re-initialize when Shiny re-renders dynamic UI (e.g. after tab switch)
@@ -242,8 +242,50 @@ gexp_app_head <- function() {
           transform: scale(1.15);
           box-shadow: 0 3px 10px rgba(102, 126, 234, 0.45);
         }
+        .tooltip {
+          z-index: 100050 !important;
+          pointer-events: none;
+        }
+        .tooltip.show {
+          opacity: 1 !important;
+        }
+        .box, .box-body, .tab-content, .content-wrapper {
+          overflow: visible !important;
+        }
+        /* DE method radio wrapper — plain list, no borders */
+        #de_method_wrapper .shiny-input-radiogroup {
+          padding: 8px 0;
+          background: transparent;
+          border: none;
+        }
+        #de_method_wrapper .shiny-input-radiogroup label {
+          display: inline;
+          padding: 0;
+          margin: 0;
+          background: none;
+          border: none;
+          border-radius: 0;
+          font-weight: 400;
+          font-size: 14px;
+          box-shadow: none;
+          transform: none;
+        }
+        #de_method_wrapper .shiny-input-radiogroup label:hover {
+          background: none;
+          border: none;
+          transform: none;
+          box-shadow: none;
+          color: #3b82f6;
+        }
+        #de_method_wrapper .shiny-input-radiogroup input[type='radio']:checked ~ label {
+          background: none;
+          border: none;
+          box-shadow: none;
+          color: #3b82f6;
+          font-weight: 600;
+        }
         .tooltip-inner {
-          max-width: 320px;
+          max-width: min(420px, 92vw);
           font-size: 12.5px;
           line-height: 1.5;
           text-align: left;
