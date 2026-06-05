@@ -71,10 +71,12 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("GExPipe")
 ```
 
-Then launch the app (`runGExPipe()` returns the app object; `runApp()` starts it):
+Then launch the app in two steps — `runGExPipe()` builds and returns the
+Shiny app object, and `shiny::runApp()` starts the server:
 
 ```{r launch-bioc, eval=FALSE}
-shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+app <- GExPipe::runGExPipe()      # Step 1: build the app object
+shiny::runApp(app, port = 3838L)  # Step 2: start the server
 ```
 
 ## From GitHub (Current — available now)
@@ -99,9 +101,10 @@ remotes::install_github(
   INSTALL_opts = "--no-staged-install"
 )
 
-# Step 3: Build app object and open in browser (runGExPipe() does not start the server by itself)
+# Step 3: Build the app object, then start it (runGExPipe() does not start the server by itself)
 library(GExPipe)
-shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+app <- runGExPipe()               # build the app object (installs deps on first run)
+shiny::runApp(app, port = 3838L)  # start the server and open the app
 ```
 
 On first launch, `runGExPipe()` may also install any missing packages interactively.
@@ -144,10 +147,13 @@ file.path(Sys.getenv("LOCALAPPDATA"), "GExPipe", rv)   # Windows
 
 ## Launch the App
 
-After installation, start the application with a single command:
+After installation, start the application in two steps. `runGExPipe()`
+builds and returns the Shiny app object (installing any missing
+dependencies on the first run); `shiny::runApp()` then starts the server:
 
 ```{r launch, eval=FALSE}
-shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+app <- GExPipe::runGExPipe()      # Step 1: build the app object
+shiny::runApp(app, port = 3838L)  # Step 2: start the server
 ```
 
 The app opens in your default browser at **Step 1 — Download Data**.
@@ -214,8 +220,12 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("safarafique/GExPipe",
                      dependencies = TRUE, ask = FALSE)
 
-GExPipe::runGExPipe(host = "0.0.0.0", port = 3838L,
-                    launch.browser = FALSE)
+# Step 1: build the app object (no local browser in Colab)
+app <- GExPipe::runGExPipe(host = "0.0.0.0", port = 3838L,
+                           launch.browser = FALSE)
+
+# Step 2: start the server (this cell blocks while the app runs)
+shiny::runApp(app, host = "0.0.0.0", port = 3838L)
 ```
 
 # Workflow Example

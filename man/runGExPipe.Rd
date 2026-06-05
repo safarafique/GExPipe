@@ -71,8 +71,10 @@ try \code{options(gexpipe.stringdb_try_versions = c("11.5", "11", "12"))} or upd
 app <- runGExPipe(launch.browser = FALSE, port = 0L)
 stopifnot(inherits(app, "shiny.appobj"))
 
-# Interactive: one line installs all missing packages, then opens the app.
+# Interactive: two-step launch. runGExPipe() builds the app object
+# (installing any missing packages on first run); shiny::runApp() starts it.
 if (interactive()) {
-  shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+  app <- GExPipe::runGExPipe()      # Step 1: build the app object
+  shiny::runApp(app, port = 3838L)  # Step 2: start the server
 }
 }

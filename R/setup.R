@@ -166,7 +166,8 @@ gexpipe_setup <- function(update   = TRUE,
     shiny::runApp(app, port = as.integer(port), ...)
   } else if (isTRUE(launch) && length(missing) > 0L) {
     message("App not launched: fix missing packages above first, then run:\n",
-            "  shiny::runApp(GExPipe::runGExPipe(), port = ", port, ")")
+            "  app <- GExPipe::runGExPipe()\n",
+            "  shiny::runApp(app, port = ", port, ")")
   }
 
   invisible(status)
