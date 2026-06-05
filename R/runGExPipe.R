@@ -47,9 +47,11 @@
 #' app <- runGExPipe(launch.browser = FALSE, port = 0L)
 #' stopifnot(inherits(app, "shiny.appobj"))
 #'
-#' # Interactive: one line installs all missing packages, then opens the app.
+#' # Interactive: two-step launch. runGExPipe() builds the app object
+#' # (installing any missing packages on first run); shiny::runApp() starts it.
 #' if (interactive()) {
-#'   shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+#'   app <- GExPipe::runGExPipe()      # Step 1: build the app object
+#'   shiny::runApp(app, port = 3838L)  # Step 2: start the server
 #' }
 runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
   # Bioconductor Shiny guidance: do not launch the app inside the package.

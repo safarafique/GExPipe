@@ -67,13 +67,19 @@ shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
 ```r
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 remotes::install_github("safarafique/GExPipe", INSTALL_opts = "--no-staged-install")
-shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+
+# Step 1: build the app object (installs any missing dependencies on first run)
+app <- GExPipe::runGExPipe()
+
+# Step 2: start the server and open the app in your browser
+shiny::runApp(app, port = 3838L)
 ```
 
-**Every session after that** — just 1 line:
+**Every session after that** — just 2 lines:
 
 ```r
-shiny::runApp(GExPipe::runGExPipe(), port = 3838L)
+app <- GExPipe::runGExPipe()   # Step 1: build the app object
+shiny::runApp(app, port = 3838L)  # Step 2: start the app
 ```
 
 Both options require **R >= 4.5.0** (stable). Bioconductor **3.21** (R 4.5) or **3.22** (R 4.6 stable) is selected automatically for your R version. R 4.4 and pre-release R builds are not supported.
