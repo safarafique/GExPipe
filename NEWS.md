@@ -2,6 +2,15 @@
 
 ## Version 0.99.8
 
+### Documentation — Shiny app launch instructions
+- Clarified how to start the app as an explicit two-step pattern across all
+  docs (`README.md`, `vignettes/GExPipe.Rmd`, `runGExPipe()` examples,
+  `man/runGExPipe.Rd`, and the `gexpipe_setup()` fallback message): first
+  `app <- runGExPipe()` builds and returns the Shiny app object, then
+  `shiny::runApp(app, port = 3838L)` starts the server. This replaces the
+  nested one-liner `shiny::runApp(GExPipe::runGExPipe(), ...)` and matches the
+  Bioconductor Shiny guideline that the package function returns an app object.
+
 ### Dependencies and documentation
 - Aligned `DESCRIPTION` `Imports` with packages used in the Shiny app (63 runtime
   dependencies); added `affy`, `oligo`, `Matrix`, `Rcpp`, `withr`, `pillar`;
