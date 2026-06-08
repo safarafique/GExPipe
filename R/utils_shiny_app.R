@@ -13,7 +13,7 @@
     "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils",
     "dynamicTreeCut", "scales",
     "biomaRt", "Boruta", "car", "cicerone", "mixOmics",
-    "xgboost", "SHAPforxgboost", "rms", "rmda",
+    "xgboost", "SHAPforxgboost", "rms", "dcurves",
     "cli", "glue", "lifecycle", "rlang", "vctrs",
     "Matrix", "Rcpp", "withr", "pillar"
   )
