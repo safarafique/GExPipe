@@ -45,7 +45,7 @@ dummy_imports <- function() {
   RColorBrewer::brewer.pal
   reshape2::melt
   rms::lrm
-  rmda::decision_curve
+  dcurves::dca
   scales::comma
   SHAPforxgboost::shap.values
   shiny::shinyApp

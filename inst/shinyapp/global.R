@@ -156,7 +156,7 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
   "Matrix", "Rcpp", "withr", "pillar",
   # Feature packages
   "biomaRt", "Boruta", "car", "cicerone", "mixOmics",
-  "xgboost", "SHAPforxgboost", "rms", "rmda"
+  "xgboost", "SHAPforxgboost", "rms", "dcurves"
 )
 
 .gexpipe_all_optional <- character(0)
