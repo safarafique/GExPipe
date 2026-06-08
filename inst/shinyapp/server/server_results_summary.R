@@ -70,7 +70,7 @@ server_results_summary <- function(input, output, session, rv) {
     tags$div(
       tags$h4("If you use GExPipe in your work, please cite:"),
       tags$p("GExPipe (Gene Expression Pipeline) v0.1 (please add your own manuscript or DOI when available)."),
-      tags$p("Key methods and packages: limma, WGCNA, clusterProfiler, STRINGdb, pROC, rms, rmda."),
+      tags$p("Key methods and packages: limma, WGCNA, clusterProfiler, STRINGdb, pROC, rms, dcurves."),
       tags$p(tags$strong("Example citation for limma:"), style = "margin-top: 8px;"),
       tags$pre(limma_cite, style = "font-size: 11px; max-height: 220px; overflow-y: auto; background: #f8f9fa; border: 1px solid #ddd; padding: 8px;")
     )

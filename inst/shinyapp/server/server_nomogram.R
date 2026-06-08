@@ -350,16 +350,37 @@ server_nomogram <- function(input, output, session, rv) {
         SE = sqrt(mean(.data$Outcome) * (1 - mean(.data$Outcome)) / dplyr::n()), .groups = "drop") %>%
       dplyr::filter(!is.na(.data$Predicted) & .data$N >= 2)
 
-    dca_train <- tryCatch({
-      rmda::decision_curve(Outcome ~ Predicted_Prob, data = train_data, fitted.risk = TRUE, thresholds = seq(0.01, 0.99, by = 0.02), bootstraps = 25)
-    }, error = function(e) tryCatch({
-      rmda::decision_curve(Outcome ~ Predicted_Prob, data = train_data, fitted.risk = TRUE, thresholds = seq(0.01, 0.99, by = 0.02), bootstraps = 0)
-    }, error = function(e2) NULL))
-    dca_val <- tryCatch({
-      rmda::decision_curve(Outcome ~ Predicted_Prob, data = validation_data, fitted.risk = TRUE, thresholds = seq(0.01, 0.99, by = 0.02), bootstraps = 25)
-    }, error = function(e) tryCatch({
-      rmda::decision_curve(Outcome ~ Predicted_Prob, data = validation_data, fitted.risk = TRUE, thresholds = seq(0.01, 0.99, by = 0.02), bootstraps = 0)
-    }, error = function(e2) NULL))
+    dca_thresholds <- seq(0.01, 0.99, by = 0.02)
+    # Prefer rmda when it is installed; otherwise fall back to dcurves (rmda was
+    # archived from CRAN, so it may be unavailable on newer R versions).
+    dca_engine <- if (requireNamespace("rmda", quietly = TRUE)) {
+      "rmda"
+    } else if (requireNamespace("dcurves", quietly = TRUE)) {
+      "dcurves"
+    } else {
+      NA_character_
+    }
+
+    compute_dca <- function(dat) {
+      if (identical(dca_engine, "rmda")) {
+        tryCatch(
+          rmda::decision_curve(Outcome ~ Predicted_Prob, data = dat, fitted.risk = TRUE,
+                               thresholds = dca_thresholds, bootstraps = 25),
+          error = function(e) tryCatch(
+            rmda::decision_curve(Outcome ~ Predicted_Prob, data = dat, fitted.risk = TRUE,
+                                 thresholds = dca_thresholds, bootstraps = 0),
+            error = function(e2) NULL))
+      } else if (identical(dca_engine, "dcurves")) {
+        tryCatch(
+          dcurves::dca(Outcome ~ Predicted_Prob, data = dat, thresholds = dca_thresholds),
+          error = function(e) NULL)
+      } else {
+        NULL
+      }
+    }
+
+    dca_train <- compute_dca(train_data)
+    dca_val   <- compute_dca(validation_data)
 
     thresholds <- seq(0.01, 0.99, by = 0.02)
     n_train <- nrow(train_data)
@@ -390,6 +411,7 @@ server_nomogram <- function(input, output, session, rv) {
     rv$nomogram_cal_validation <- cal_validation
     rv$nomogram_dca_train <- dca_train
     rv$nomogram_dca_val <- dca_val
+    rv$nomogram_dca_engine <- dca_engine
     rv$nomogram_ci_train <- ci_train
     rv$nomogram_ci_val <- ci_val
     rv$nomogram_complete <- TRUE
@@ -453,9 +475,21 @@ server_nomogram <- function(input, output, session, rv) {
     lines(cv$Predicted, cv$Observed, col = col, lwd = 2)
   }, height = 320)
 
+  render_dca <- function(dca_obj, model_col) {
+    engine <- rv$nomogram_dca_engine
+    if (identical(engine, "rmda")) {
+      rmda::plot_decision_curve(dca_obj, col = c("grey60", model_col, "grey60"),
+                                legend.position = "topright", lwd = 2)
+    } else {
+      p <- plot(dca_obj, smooth = FALSE)
+      print(p + ggplot2::scale_color_manual(values = c("grey60", model_col, "grey60")) +
+        ggplot2::theme(legend.position = c(0.99, 0.99), legend.justification = c(1, 1)))
+    }
+  }
+
   output$nomogram_plot_dca_train <- renderPlot({
     req(rv$nomogram_dca_train)
-    rmda::plot_decision_curve(rv$nomogram_dca_train, col = c("grey60", "#E74C3C", "grey60"), legend.position = "topright", lwd = 2)
+    render_dca(rv$nomogram_dca_train, "#E74C3C")
   }, height = 320)
 
   output$nomogram_plot_dca_val <- renderPlot({
@@ -463,7 +497,7 @@ server_nomogram <- function(input, output, session, rv) {
     mode <- rv$validation_mode
     if (is.null(mode)) mode <- "internal"
     col <- if (mode == "external") "#27AE60" else "#3498DB"
-    rmda::plot_decision_curve(rv$nomogram_dca_val, col = c("grey60", col, "grey60"), legend.position = "topright", lwd = 2)
+    render_dca(rv$nomogram_dca_val, col)
   }, height = 320)
 
   output$nomogram_plot_impact_train <- renderPlot({
