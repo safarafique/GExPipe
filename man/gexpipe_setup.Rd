@@ -18,7 +18,7 @@ packages to the versions matching your current Bioconductor release.
 Set to \code{FALSE} to only install missing packages without updating existing ones.}
 
 \item{optional}{Logical. If \code{TRUE} (default), also install optional packages
-(\code{Boruta}, \code{xgboost}, \code{SHAPforxgboost}, \code{mixOmics}, \code{rms}, \code{rmda},
+(\code{Boruta}, \code{xgboost}, \code{SHAPforxgboost}, \code{mixOmics}, \code{rms}, \code{dcurves},
 \code{cicerone}, \code{biomaRt}). These unlock additional ML methods, the guided
 tour, the nomogram, and Ensembl ID mapping.}
 
