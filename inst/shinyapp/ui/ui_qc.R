@@ -73,7 +73,8 @@ ui_qc <- tabItem(
           column(3,
             actionButton("run_outlier_detection",
               tagList(icon("play"), " Run Outlier Detection"),
-              class = "btn-danger btn-lg", style = "font-weight: bold; width: 100%;")
+              class = "btn-danger btn-lg",
+              style = "font-weight: bold; width: 100%; background: #e74c3c !important; background-image: none !important; border-color: #c0392b !important; color: #fff !important;")
           ),
           column(9, uiOutput("qc_outlier_summary_ui"))
         ),

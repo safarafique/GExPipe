@@ -332,7 +332,8 @@ server_results_summary <- function(input, output, session, rv) {
     if (!requireNamespace("WGCNA", quietly = TRUE)) { par(bg = "white"); plot.new(); text(0.5, 0.5, "WGCNA required", cex = 1.2); return(invisible(NULL)) }
     op <- par(bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
-    WGCNA::labeledHeatmap(Matrix = rv$moduleTraitCor, xLabels = colnames(rv$trait_data), yLabels = rownames(rv$moduleTraitCor), ySymbols = rownames(rv$moduleTraitCor), colorLabels = FALSE, colors = WGCNA::blueWhiteRed(50), textMatrix = NULL, main = "Module-Trait Relationships")
+    .mtc <- if (exists(".wgcna_heatmap_cor", mode = "function")) .wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait) else rv$moduleTraitCor
+    WGCNA::labeledHeatmap(Matrix = .mtc, xLabels = colnames(.mtc), yLabels = rownames(.mtc), ySymbols = rownames(.mtc), colorLabels = FALSE, colors = WGCNA::blueWhiteRed(50), textMatrix = NULL, main = "Module-Trait Relationships")
   }, height = 260)
 
   # ----- 5. Common genes -----

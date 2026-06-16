@@ -91,8 +91,20 @@ gexp_batch_correct <- function(
     filter_percent, "%)\n\n"
   )
 
-  # ---- Design matrix for Condition ----
-  design <- stats::model.matrix(~Condition, data = metadata)
+  # ---- Design matrix: preserve Condition (+ Platform when estimable) ----
+  plat_info <- gexpipe_batch_covariate_info(metadata)
+  mod <- gexpipe_build_batch_mod(metadata)
+  if (plat_info$mixed_platforms) {
+    log_text <- paste0(
+      log_text,
+      "Mixed platforms detected (Microarray + RNA-seq).\n",
+      if (plat_info$include_platform_covariate) {
+        "  Platform included as covariate in batch model (not confounded with Dataset).\n"
+      } else {
+        "  Platform is confounded with Dataset — Dataset batch term absorbs platform effect.\n"
+      }
+    )
+  }
 
   # ---- Apply batch method ----
   batch_corrected <- expr_filtered
@@ -101,24 +113,28 @@ gexp_batch_correct <- function(
     batch_corrected <- limma::removeBatchEffect(
       expr_filtered,
       batch = metadata$Dataset,
-      design = design
+      design = mod
     )
-    log_text <- paste0(log_text, "Batch method: limma removeBatchEffect\n")
+    log_text <- paste0(log_text, "Batch method: limma removeBatchEffect (Condition",
+                       if (plat_info$include_platform_covariate) " + Platform" else "",
+                       " protected)\n")
   } else if (method == "combat") {
     batch_corrected <- sva::ComBat(
       expr_filtered,
       batch = metadata$Dataset,
-      mod = NULL,
+      mod = mod,
       par.prior = TRUE,
       prior.plots = FALSE
     )
-    log_text <- paste0(log_text, "Batch method: ComBat (mod = NULL)\n")
+    log_text <- paste0(log_text, "Batch method: ComBat (Condition",
+                       if (plat_info$include_platform_covariate) " + Platform" else "",
+                       " in mod)\n")
   } else if (method == "quantile_limma") {
     expr_q <- limma::normalizeBetweenArrays(expr_filtered, method = "quantile")
     batch_corrected <- limma::removeBatchEffect(
       expr_q,
       batch = metadata$Dataset,
-      design = design
+      design = mod
     )
     log_text <- paste0(log_text, "Batch method: Quantile + limma removeBatchEffect\n")
   } else if (method == "hybrid") {
@@ -126,29 +142,32 @@ gexp_batch_correct <- function(
     batch_corrected <- sva::ComBat(
       expr_q,
       batch = metadata$Dataset,
-      mod = NULL,
+      mod = mod,
       par.prior = TRUE,
       prior.plots = FALSE
     )
-    log_text <- paste0(log_text, "Batch method: Hybrid (Quantile + ComBat, mod = NULL)\n")
+    log_text <- paste0(log_text, "Batch method: Hybrid (Quantile + ComBat, Condition",
+                       if (plat_info$include_platform_covariate) " + Platform" else "",
+                       " in mod)\n")
   } else if (method == "combat_ref") {
     sizes <- table(metadata$Dataset)
     ref <- names(sizes)[which.max(sizes)]
     batch_corrected <- sva::ComBat(
       expr_filtered,
       batch = metadata$Dataset,
-      mod = NULL,
+      mod = mod,
       par.prior = TRUE,
       prior.plots = FALSE,
       ref.batch = ref
     )
     log_text <- paste0(
       log_text,
-      "Batch method: ComBat-ref (ref.batch = ", ref, ", mod = NULL)\n"
+      "Batch method: ComBat-ref (ref.batch = ", ref, ", Condition",
+      if (plat_info$include_platform_covariate) " + Platform" else "",
+      " in mod)\n"
     )
   } else if (method == "sva") {
-    # Surrogate variable analysis: estimate hidden confounders, then ComBat with mod = design + SVs
-    mod <- stats::model.matrix(~Condition, data = metadata)
+    # Surrogate variable analysis: estimate hidden confounders, then ComBat with mod + SVs
     mod0 <- stats::model.matrix(~1, data = metadata)
     n_sv <- tryCatch(
       sva::num.sv(expr_filtered, mod, method = "be"),
