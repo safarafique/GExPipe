@@ -2,6 +2,44 @@
 
 ## Version 0.99.8
 
+### Mixed microarray + RNA-seq — platform covariates, caveats, and diagnostics
+- New helpers in `R/gexp_platform_helpers.R`: detect mixed platforms, test
+  Platform–Dataset confounding, build batch/DE design matrices with `Platform`
+  when estimable, and polar PCA coordinates for diagnostics.
+- Batch correction (`R/gexp_batch_pipeline.R`): ComBat / ComBat-ref / Hybrid now
+  protect `Condition` (+ `Platform` when not confounded with `Dataset`) instead
+  of `mod = NULL`; limma path uses the same protected model matrix.
+- DE (`server_results.R`, `R/gexp_de_pipeline.R`): limma, DESeq2, edgeR, and
+  limma-voom include `Platform` in the design when mixed and identifiable.
+- Step 1 (Download): in-app caveat panel when **Merged (Both)** is selected.
+- Step 5 (Batch): mixed-platform info banner, **Platform-coloured PCA** before/after
+  batch correction, Platform in PVCA and clustering annotations, updated confounding
+  guidance.
+
+### WGCNA module-trait heatmap — no redundant duplicate column
+- For a 2-group design the auto-generated combined contrast trait (e.g.
+  "Disease vs Normal") is, by definition, a copy of one group indicator and the
+  mirror image of the other, so it rendered as a column identical to "Disease"
+  in the Module-Trait Relationships heatmap. The heatmap now drops that
+  redundant column (via new helper `.wgcna_heatmap_cor()` in
+  `inst/shinyapp/server/server_wgcna.R`), so only the distinct per-group columns
+  are shown (Normal vs Disease, which are visibly opposite). The combined trait
+  is still kept in `rv$trait_data` for the GS-vs-MM trait selector. Applied to
+  all four render paths (live heatmap, PNG/JPG/PDF export, WGCNA summary plot,
+  and the Results Summary tab).
+
+### Native package handling — no manual R restart after an R upgrade
+- `.gexpipe_ensure_native_pkg()` (`R/utils_shiny_app.R`) now rebuilds a
+  version-mismatched native package (e.g. `glmnet`, `xgboost`) **before** its
+  compiled DLL is ever loaded, deciding from the DESCRIPTION `Built:` field
+  instead of loading the DLL to smoke-test it. On Windows a mismatched DLL,
+  once mapped into the R process, cannot be swapped in the same session — which
+  previously forced the "glmnet was rebuilt — one R restart needed" message and
+  skipped LASSO / Elastic Net / Ridge for that run. The fresh build now loads
+  cleanly the same session, so those methods run immediately with no restart.
+  Both launch paths (`runGExPipe()` and the standalone `inst/shinyapp/global.R`)
+  benefit, since both route through this helper.
+
 ### Documentation — Shiny app launch instructions
 - Clarified how to start the app as an explicit two-step pattern across all
   docs (`README.md`, `vignettes/GExPipe.Rmd`, `runGExPipe()` examples,
