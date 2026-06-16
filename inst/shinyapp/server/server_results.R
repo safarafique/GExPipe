@@ -193,22 +193,13 @@ server_results <- function(input, output, session, rv) {
           
           incProgress(0.2, detail = "Creating DESeqDataSet...")
           
-          # Build DESeqDataSet with batch (Dataset) as covariate if > 1 batch
-          n_batches <- length(unique(meta$Dataset))
-          if (n_batches > 1) {
-            meta$Dataset <- factor(meta$Dataset)
-            dds <- DESeq2::DESeqDataSetFromMatrix(
-              countData = count_mat,
-              colData = meta,
-              design = ~ Dataset + Condition
-            )
-          } else {
-            dds <- DESeq2::DESeqDataSetFromMatrix(
-              countData = count_mat,
-              colData = meta,
-              design = ~ Condition
-            )
-          }
+          ds_design <- gexpipe_deseq2_design(meta)
+          dds <- DESeq2::DESeqDataSetFromMatrix(
+            countData = count_mat,
+            colData = meta,
+            design = ds_design$formula
+          )
+          rv$de_design_formula <- ds_design$formula_desc
           
           incProgress(0.3, detail = "Running DESeq2...")
           
@@ -293,14 +284,9 @@ server_results <- function(input, output, session, rv) {
           dge <- edgeR::DGEList(counts = count_mat, group = meta$Condition)
           dge <- edgeR::calcNormFactors(dge, method = "TMM")
           
-          # Build design matrix with batch if multiple datasets
-          n_batches <- length(unique(meta$Dataset))
-          if (n_batches > 1) {
-            meta$Dataset <- factor(meta$Dataset)
-            design <- model.matrix(~ Dataset + Condition, data = meta)
-          } else {
-            design <- model.matrix(~ Condition, data = meta)
-          }
+          de_design <- gexpipe_build_de_design(meta)
+          design <- de_design$design
+          rv$de_design_formula <- de_design$formula_desc
           
           incProgress(0.2, detail = "Estimating dispersion...")
           
@@ -311,7 +297,7 @@ server_results <- function(input, output, session, rv) {
           incProgress(0.3, detail = "Testing for DE...")
           
           # Test the Condition coefficient (last column)
-          qlf <- edgeR::glmQLFTest(fit, coef = ncol(design))
+          qlf <- edgeR::glmQLFTest(fit, coef = de_design$coef_condition)
           res <- edgeR::topTags(qlf, n = Inf, sort.by = "PValue")$table
           
           incProgress(0.2, detail = "Formatting results...")
@@ -379,14 +365,9 @@ server_results <- function(input, output, session, rv) {
           keep <- rowSums(count_mat) > 0
           count_mat <- count_mat[keep, , drop = FALSE]
           
-          # Build design matrix with batch (Dataset) as covariate if > 1 batch
-          n_batches <- length(unique(meta$Dataset))
-          if (n_batches > 1) {
-            meta$Dataset <- factor(meta$Dataset)
-            design <- model.matrix(~ Dataset + Condition, data = meta)
-          } else {
-            design <- model.matrix(~ Condition, data = meta)
-          }
+          de_design <- gexpipe_build_de_design(meta)
+          design <- de_design$design
+          rv$de_design_formula <- de_design$formula_desc
           
           incProgress(0.3, detail = "Estimating mean–variance with voom...")
           
@@ -399,7 +380,7 @@ server_results <- function(input, output, session, rv) {
           fit <- limma::eBayes(fit)
           
           # Extract results for Condition effect (last column of design)
-          coef_idx <- ncol(design)
+          coef_idx <- de_design$coef_condition
           tt <- limma::topTable(fit, coef = coef_idx, number = Inf, adjust.method = "BH", sort.by = "P")
           
           # Format to match limma output for downstream compatibility
@@ -459,16 +440,10 @@ server_results <- function(input, output, session, rv) {
           rv$batch_corrected <- rv$batch_corrected[, common_samp, drop = FALSE]
           meta <- meta[common_samp, , drop = FALSE]
           
-          # Design: include Dataset (batch) when multiple datasets (merged or multi-GSE)
-          n_batches <- length(unique(meta$Dataset))
-          if (n_batches > 1) {
-            meta$Dataset <- factor(meta$Dataset)
-            design <- model.matrix(~ Dataset + Condition, data = meta)
-            coef_condition <- ncol(design)  # last column is ConditionDisease
-            fit <- limma::lmFit(rv$batch_corrected, design)
-            fit2 <- limma::eBayes(fit)
-            de_results <- limma::topTable(fit2, coef = coef_condition, number = Inf, adjust.method = "BH")
-          } else {
+          plat_info <- gexpipe_batch_covariate_info(meta)
+          use_contrast <- length(unique(meta$Dataset)) == 1L && !plat_info$include_platform_covariate
+          
+          if (use_contrast) {
             design <- model.matrix(~ 0 + Condition, data = meta)
             colnames(design) <- levels(meta$Condition)
             contrast <- limma::makeContrasts(Disease - Normal, levels = design)
@@ -476,6 +451,14 @@ server_results <- function(input, output, session, rv) {
             fit2 <- limma::contrasts.fit(fit, contrast)
             fit2 <- limma::eBayes(fit2)
             de_results <- limma::topTable(fit2, number = Inf, adjust.method = "BH")
+            rv$de_design_formula <- "~ Condition (contrast: Disease vs Normal)"
+          } else {
+            de_design <- gexpipe_build_de_design(meta)
+            design <- de_design$design
+            rv$de_design_formula <- de_design$formula_desc
+            fit <- limma::lmFit(rv$batch_corrected, design)
+            fit2 <- limma::eBayes(fit)
+            de_results <- limma::topTable(fit2, coef = de_design$coef_condition, number = Inf, adjust.method = "BH")
           }
           
           incProgress(0.5)

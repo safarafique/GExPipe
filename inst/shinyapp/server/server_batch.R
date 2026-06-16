@@ -4,6 +4,36 @@
 
 server_batch <- function(input, output, session, rv) {
 
+  output$batch_merged_platform_ui <- renderUI({
+    if (is.null(rv$unified_metadata) || !gexpipe_has_mixed_platforms(rv$unified_metadata)) {
+      return(NULL)
+    }
+    info <- gexpipe_batch_covariate_info(rv$unified_metadata)
+    tags$div(
+      class = "alert alert-info",
+      style = "margin-top: 10px; font-size: 13px; line-height: 1.6;",
+      icon("dna"),
+      tags$strong(" Mixed microarray + RNA-seq integration"),
+      tags$p(
+        "This run combines both technologies on a common gene set. Results are for ",
+        tags$strong("cross-platform discovery"),
+        ", not a substitute for separate per-platform analyses.",
+        style = "margin: 8px 0;"
+      ),
+      tags$ul(
+        style = "margin-bottom: 8px; padding-left: 20px;",
+        tags$li(tags$strong("DE:"), " use ", tags$strong("limma"), " (recommended for merged data)."),
+        tags$li(tags$strong("Batch / DE models:"), " ",
+                if (info$include_platform_covariate) {
+                  "Platform is included as an explicit covariate (not confounded with Dataset)."
+                } else {
+                  "Platform is confounded with Dataset (e.g. one microarray GSE + one RNA-seq GSE) — the Dataset term absorbs the platform effect."
+                }),
+        tags$li(tags$strong("Check:"), " review the ", tags$strong("Platform PCA"), " plots below — samples should intermingle by platform after batch correction.")
+      )
+    )
+  })
+
   output$batch_single_dataset_ui <- renderUI({
     if (isTRUE(rv$single_dataset)) {
       return(
@@ -274,7 +304,8 @@ server_batch <- function(input, output, session, rv) {
         paste0(
           "✓ Batch correction complete\n",
           "Method: ", input$batch_method, "\n\n",
-          "Gene Filtering:\n",
+          res$log_text,
+          "\nGene Filtering:\n",
           "  Before filter: ", format(genes_before, big.mark = ","), " genes\n",
           "  After filter:  ", format(genes_after, big.mark = ","), " genes\n",
           "  Filtered out:  ", format(genes_before - genes_after, big.mark = ","), " genes (", filter_percent, "%)\n\n",
@@ -399,6 +430,65 @@ server_batch <- function(input, output, session, rv) {
     }
   })
   
+  # PCA Before / After — coloured by Platform (mixed microarray + RNA-seq only)
+  output$batch_platform_pca_row <- renderUI({
+    if (is.null(rv$unified_metadata) || !gexpipe_has_mixed_platforms(rv$unified_metadata)) {
+      return(NULL)
+    }
+    fluidRow(
+      box(
+        title = tags$span(icon("exclamation-triangle"), " Before Batch Correction - By Platform"),
+        width = 6, status = "warning", solidHeader = TRUE,
+        plotOutput("pca_before_platform", height = "400px")
+      ),
+      box(
+        title = tags$span(icon("check-circle"), " After Batch Correction - By Platform"),
+        width = 6, status = "success", solidHeader = TRUE,
+        plotOutput("pca_after_platform", height = "400px")
+      )
+    )
+  })
+
+  .batch_pca_platform_plot <- function(expr, meta, when = c("before", "after")) {
+    when <- match.arg(when)
+    df <- gexpipe_pca_polar_df(expr, meta, "Platform")
+    ttl <- if (when == "before") {
+      "Before Batch Correction - By Platform"
+    } else {
+      "After Batch Correction - By Platform"
+    }
+    sub <- if (when == "before") {
+      "Strong platform separation indicates a technology effect to remove"
+    } else {
+      "Platforms should intermingle; persistent separation suggests residual platform bias"
+    }
+    ggplot(df, aes(x = theta, y = r, color = Platform)) +
+      geom_point(size = 3.5, alpha = 0.7) +
+      scale_color_manual(values = c("Microarray" = "#e67e22", "RNAseq" = "#9b59b6")) +
+      coord_polar(theta = "x", start = -pi / 2, direction = 1) +
+      scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
+                        labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+      scale_y_continuous(limits = c(0, NA)) +
+      theme_bw(base_size = 14) +
+      labs(title = ttl, subtitle = sub, x = "Angle (PC1–PC2)", y = "Radius", color = "Platform") +
+      theme(
+        plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
+        legend.position = "right",
+        panel.grid.minor = element_blank()
+      )
+  }
+
+  output$pca_before_platform <- renderPlot({
+    req(rv$expr_filtered, rv$unified_metadata)
+    .batch_pca_platform_plot(rv$expr_filtered, rv$unified_metadata, "before")
+  })
+
+  output$pca_after_platform <- renderPlot({
+    req(rv$batch_corrected, rv$unified_metadata)
+    .batch_pca_platform_plot(rv$batch_corrected, rv$unified_metadata, "after")
+  })
+  
   # PCA After Batch Correction - Colored by Dataset (circular / polar)
   output$pca_after_dataset <- renderPlot({
     req(rv$batch_corrected)
@@ -509,6 +599,9 @@ server_batch <- function(input, output, session, rv) {
         Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", metadata_subset$Condition),
         row.names = colnames(expr_subset)
       )
+      if (gexpipe_has_mixed_platforms(metadata_subset)) {
+        annotation_col$Platform <- metadata_subset$Platform
+      }
       
       # Reorder correlation matrix by dendrogram
       cor_matrix_ordered <- cor_matrix[hclust_result$order, hclust_result$order]
@@ -564,6 +657,9 @@ server_batch <- function(input, output, session, rv) {
         Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", metadata_subset$Condition),
         row.names = colnames(expr_subset)
       )
+      if (gexpipe_has_mixed_platforms(metadata_subset)) {
+        annotation_col$Platform <- metadata_subset$Platform
+      }
       
       # Reorder correlation matrix by dendrogram
       cor_matrix_ordered <- cor_matrix[hclust_result$order, hclust_result$order]
@@ -634,6 +730,16 @@ server_batch <- function(input, output, session, rv) {
                              data.frame(Factor = "Dataset", Variance = dataset_var))
       }
       
+      if (gexpipe_has_mixed_platforms(metadata_subset)) {
+        platform_var <- sum(apply(pca_scores, 2, function(pc) {
+          aov_result <- aov(pc ~ metadata_subset$Platform)
+          sum_sq <- summary(aov_result)[[1]]$`Sum Sq`
+          sum_sq[1] / sum(sum_sq)
+        })) / n_pcs
+        pvca_results <- rbind(pvca_results,
+                             data.frame(Factor = "Platform", Variance = platform_var))
+      }
+      
       # Condition variance
       if (!all(is.na(metadata_subset$Condition)) && 
           length(unique(metadata_subset$Condition[!is.na(metadata_subset$Condition)])) > 1) {
@@ -653,13 +759,15 @@ server_batch <- function(input, output, session, rv) {
                            data.frame(Factor = "Residual", Variance = residual_var))
       
       # Create bar plot
-      pvca_results$Factor <- factor(pvca_results$Factor, 
-                                    levels = c("Dataset", "Condition", "Residual"))
+      pvca_levels <- c("Dataset", "Platform", "Condition", "Residual")
+      present <- intersect(pvca_levels, unique(as.character(pvca_results$Factor)))
+      pvca_results$Factor <- factor(pvca_results$Factor, levels = present)
       
       p <- ggplot(pvca_results, aes(x = Factor, y = Variance, fill = Factor)) +
         geom_bar(stat = "identity", alpha = 0.8) +
-        scale_fill_manual(values = c("Dataset" = "#e74c3c", 
-                                     "Condition" = "#3498db", 
+        scale_fill_manual(values = c("Dataset" = "#e74c3c",
+                                     "Platform" = "#e67e22",
+                                     "Condition" = "#3498db",
                                      "Residual" = "#95a5a6")) +
         theme_bw(base_size = 14) +
         labs(
@@ -730,6 +838,16 @@ server_batch <- function(input, output, session, rv) {
                              data.frame(Factor = "Dataset", Variance = dataset_var))
       }
       
+      if (gexpipe_has_mixed_platforms(metadata_subset)) {
+        platform_var <- sum(apply(pca_scores, 2, function(pc) {
+          aov_result <- aov(pc ~ metadata_subset$Platform)
+          sum_sq <- summary(aov_result)[[1]]$`Sum Sq`
+          sum_sq[1] / sum(sum_sq)
+        })) / n_pcs
+        pvca_results <- rbind(pvca_results,
+                             data.frame(Factor = "Platform", Variance = platform_var))
+      }
+      
       # Condition variance (should be increased after batch correction)
       if (!all(is.na(metadata_subset$Condition)) && 
           length(unique(metadata_subset$Condition[!is.na(metadata_subset$Condition)])) > 1) {
@@ -749,13 +867,15 @@ server_batch <- function(input, output, session, rv) {
                            data.frame(Factor = "Residual", Variance = residual_var))
       
       # Create bar plot
-      pvca_results$Factor <- factor(pvca_results$Factor, 
-                                    levels = c("Dataset", "Condition", "Residual"))
+      pvca_levels <- c("Dataset", "Platform", "Condition", "Residual")
+      present <- intersect(pvca_levels, unique(as.character(pvca_results$Factor)))
+      pvca_results$Factor <- factor(pvca_results$Factor, levels = present)
       
       p <- ggplot(pvca_results, aes(x = Factor, y = Variance, fill = Factor)) +
         geom_bar(stat = "identity", alpha = 0.8) +
-        scale_fill_manual(values = c("Dataset" = "#e74c3c", 
-                                     "Condition" = "#3498db", 
+        scale_fill_manual(values = c("Dataset" = "#e74c3c",
+                                     "Platform" = "#e67e22",
+                                     "Condition" = "#3498db",
                                      "Residual" = "#95a5a6")) +
         theme_bw(base_size = 14) +
         labs(
