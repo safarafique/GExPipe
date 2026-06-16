@@ -11,6 +11,19 @@
 #
 # ==============================================================================
 
+# Drop the auto-generated combined "X vs Y" contrast column from a module-trait
+# correlation matrix before plotting. For a 2-group design that column is a copy
+# of one group indicator (and the mirror image of the other), so leaving it in
+# makes the heatmap show a redundant, identical-looking column. Removing it keeps
+# the distinct per-group columns (e.g. Normal vs Disease, which are opposite).
+.wgcna_heatmap_cor <- function(cor_mat, combined) {
+  if (is.null(cor_mat)) return(cor_mat)
+  if (!is.null(combined) && combined %in% colnames(cor_mat) && ncol(cor_mat) > 1L) {
+    cor_mat <- cor_mat[, setdiff(colnames(cor_mat), combined), drop = FALSE]
+  }
+  cor_mat
+}
+
 server_wgcna <- function(input, output, session, rv) {
   
   output$wgcna_timer <- renderText({
@@ -901,6 +914,7 @@ server_wgcna <- function(input, output, session, rv) {
         } else {
           unique_groups <- character(0)
         }
+        combined_trait <- NULL
         if (length(unique_groups) <= 1) {
           trait_data <- data.frame(Trait1 = rnorm(nrow(sample_info)))
           rownames(trait_data) <- rownames(sample_info)
@@ -909,7 +923,12 @@ server_wgcna <- function(input, output, session, rv) {
           for (g in unique_groups) {
             trait_data[[as.character(g)]] <- ifelse(sample_info[[cond_col]] == g, 1, 0)
           }
-          # Add "Disease vs Normal" (or "A vs B") so both show on one line when selected
+          # Add "Disease vs Normal" (or "A vs B") so both show on one line when selected.
+          # NOTE: for a 2-group design this column is, by definition, a copy of one
+          # group indicator (and the mirror image of the other), so it is redundant in
+          # the module-trait heatmap. We keep it in trait_data for the GS/MM trait
+          # selector but record its name so the heatmap can drop it (see
+          # .wgcna_heatmap_cor() below) — otherwise the heatmap shows a duplicate column.
           if (length(unique_groups) == 2L) {
             ug <- as.character(unique_groups)
             if ("Normal" %in% ug && "Disease" %in% ug) {
@@ -919,9 +938,11 @@ server_wgcna <- function(input, output, session, rv) {
               both_label <- paste(ug, collapse = " vs ")
               trait_data[[both_label]] <- trait_data[[ug[1]]]
             }
+            combined_trait <- both_label
           }
         }
         rv$trait_data <- trait_data
+        rv$wgcna_combined_trait <- combined_trait
         
         add_wgcna_log("Calculating module-trait correlations...")
         moduleTraitCor <- cor(MEs, trait_data, use = "pairwise.complete.obs")
@@ -1012,10 +1033,10 @@ server_wgcna <- function(input, output, session, rv) {
     }
     op <- par(bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
-    moduleTraitCor <- rv$moduleTraitCor
+    moduleTraitCor <- .wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
     WGCNA::labeledHeatmap(
       Matrix = moduleTraitCor,
-      xLabels = colnames(rv$trait_data),
+      xLabels = colnames(moduleTraitCor),
       yLabels = rownames(moduleTraitCor),
       ySymbols = rownames(moduleTraitCor),
       colorLabels = FALSE,
@@ -1054,12 +1075,12 @@ server_wgcna <- function(input, output, session, rv) {
   wgcna_module_trait_to_file <- function(file, dev_fun) {
     req(rv$moduleTraitCor)
     if (!requireNamespace("WGCNA", quietly = TRUE)) stop("WGCNA package required")
-    moduleTraitCor <- rv$moduleTraitCor
+    moduleTraitCor <- .wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
     dev_fun(file)
     par(bg = "white")
     WGCNA::labeledHeatmap(
       Matrix = moduleTraitCor,
-      xLabels = colnames(rv$trait_data),
+      xLabels = colnames(moduleTraitCor),
       yLabels = rownames(moduleTraitCor),
       ySymbols = rownames(moduleTraitCor),
       colorLabels = FALSE,
@@ -1944,9 +1965,10 @@ server_wgcna <- function(input, output, session, rv) {
       # Module-trait heatmap
       if (!is.null(rv$moduleTraitCor)) {
         par(bg = "white")
-        WGCNA::labeledHeatmap(Matrix = rv$moduleTraitCor,
-                              xLabels = colnames(rv$trait_data),
-                              yLabels = rownames(rv$moduleTraitCor),
+        .mtc <- .wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+        WGCNA::labeledHeatmap(Matrix = .mtc,
+                              xLabels = colnames(.mtc),
+                              yLabels = rownames(.mtc),
                               colors = WGCNA::blueWhiteRed(50),
                               main = "Module-Trait Relationships")
       }

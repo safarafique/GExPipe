@@ -180,13 +180,15 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
 )
 
 # Load shared helpers early (native-package fix must run before package attach).
-for (.rf in unique(c(
-  file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"),
-  file.path(getwd(), "R", "utils_shiny_app.R")
-))) {
-  if (file.exists(.rf)) {
-    tryCatch(source(.rf, local = FALSE), error = function(e) NULL)
-    break
+for (.helper in list(
+  c(file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"), file.path(getwd(), "R", "utils_shiny_app.R")),
+  c(file.path(getwd(), "..", "..", "R", "gexp_platform_helpers.R"), file.path(getwd(), "R", "gexp_platform_helpers.R"))
+)) {
+  for (.rf in .helper) {
+    if (file.exists(.rf)) {
+      tryCatch(source(.rf, local = FALSE), error = function(e) NULL)
+      break
+    }
   }
 }
 options(gexpipe.lib = .gexpipe_lib)

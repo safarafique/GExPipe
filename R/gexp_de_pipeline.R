@@ -72,20 +72,16 @@ gexp_run_de <- function(
   expr <- expr[, common_samples, drop = FALSE]
   metadata <- metadata[common_samples, , drop = FALSE]
 
-  # Design matrix with optional batch covariate
-  if ("Dataset" %in% colnames(metadata) && length(unique(metadata$Dataset)) > 1) {
-    metadata$Dataset <- factor(metadata$Dataset)
-    design <- stats::model.matrix(~ Dataset + Condition, data = metadata)
-  } else {
-    design <- stats::model.matrix(~Condition, data = metadata)
-  }
+  # Design: include Dataset when multiple GSEs; add Platform when mixed and not confounded
+  de_design <- gexpipe_build_de_design(metadata)
+  design <- de_design$design
+  coef_idx <- de_design$coef_condition
 
   # Fit limma model
   fit <- limma::lmFit(expr, design)
   fit <- limma::eBayes(fit)
 
-  # Last coefficient corresponds to Condition effect (Disease vs Normal)
-  coef_idx <- ncol(design)
+  # Condition effect coefficient
   tt <- limma::topTable(
     fit,
     coef = coef_idx,

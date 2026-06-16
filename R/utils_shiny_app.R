@@ -485,6 +485,28 @@
     isTRUE(ok)
   }
 
+  # ── Pre-load rebuild (avoids the manual R restart) ──────────────────────────
+  # If the namespace is NOT loaded yet, decide whether to rebuild using the
+  # DESCRIPTION "Built:" field, which reads a text file and does NOT load the
+  # compiled DLL. On Windows, once a mismatched native DLL is mapped into the R
+  # process it cannot be reliably unloaded or overwritten in the same session —
+  # that is exactly what forces "restart R once". By reinstalling a fresh build
+  # *before* the first load, the good DLL loads cleanly this session, so glmnet /
+  # xgboost work immediately with no restart required.
+  if (!isNamespaceLoaded(pkg) &&
+      requireNamespace(pkg, lib.loc = lib, quietly = TRUE) &&
+      isFALSE(.gexpipe_pkg_built_for_current_r(pkg, lib))) {
+    if (!quiet) {
+      message("GExPipe: ", pkg, " was built for a different R version — ",
+              "rebuilding before first load (no restart needed).")
+    }
+    .gexpipe_remove_pkg_all_libs(pkg)  # safe: not loaded, so the DLL isn't locked
+    if (.gexpipe_install_native_pkg(pkg, lib) && .works()) {
+      if (!quiet) message("GExPipe: ", pkg, " OK.")
+      return(TRUE)
+    }
+  }
+
   if (.works()) return(TRUE)
 
   built_ok <- .gexpipe_pkg_built_for_current_r(pkg, lib)
