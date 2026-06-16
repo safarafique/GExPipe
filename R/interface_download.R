@@ -87,6 +87,25 @@ gexp_ui_download <- function() {
               selected = "rnaseq", inline = TRUE
             )
           ),
+          conditionalPanel(
+            condition = "input.analysis_type == 'merged'",
+            column(12,
+              tags$div(
+                class = "alert alert-warning",
+                style = "margin-top: 10px; margin-bottom: 0; font-size: 13px; line-height: 1.6;",
+                icon("exclamation-triangle"),
+                tags$strong(" Merged microarray + RNA-seq \u2014 read before proceeding"),
+                tags$ul(
+                  style = "margin: 8px 0 0 0; padding-left: 20px;",
+                  tags$li("This mode performs ", tags$strong("cross-platform integration"), ", not separate per-platform analyses."),
+                  tags$li("Use ", tags$strong("limma"), " for DE (recommended). DESeq2/edgeR/voom use RNA-seq counts only."),
+                  tags$li("Prefer ", tags$strong("multiple GSEs"), " so batch correction can run; use \u22652 datasets when possible."),
+                  tags$li("After batch correction, check ", tags$strong("Platform PCA"), " (Step 5) \u2014 platforms should intermingle."),
+                  tags$li("Treat results as ", tags$strong("hypothesis-generating"), "; validate findings on a held-out platform when possible.")
+                )
+              )
+            )
+          ),
           column(
             6,
             radioButtons(

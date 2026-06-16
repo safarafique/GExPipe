@@ -7,6 +7,7 @@ ui_batch <- tabItem(
     h2(icon("filter"), " Step 5: Gene Filtering & Batch Correction"),
 
     # When only one dataset is selected, batch correction is skipped automatically.
+    uiOutput("batch_merged_platform_ui"),
     uiOutput("batch_single_dataset_ui"),
     
     fluidRow(
@@ -103,18 +104,18 @@ ui_batch <- tabItem(
                        style = "margin: 10px 0 0 0; font-size: 12px; line-height: 1.55;",
                        icon("exclamation-triangle"),
                        tags$strong(" Key note (confounding risk): "),
-                       "In this app, ",
-                       tags$strong("ComBat / ComBat-ref / Hybrid"),
-                       " run with ",
-                       tags$code("mod = NULL"),
-                       " (Condition is not protected). If ",
-                       tags$strong("Dataset/Platform is confounded with Condition"),
-                       " (e.g., one dataset is all Disease and another is all Normal), these methods can remove true biological signal. ",
-                       "In that situation, prefer ",
+                       "ComBat-based methods protect ",
+                       tags$strong("Condition"),
+                       " (and ",
+                       tags$strong("Platform"),
+                       " when estimable) in the model matrix. If ",
+                       tags$strong("Dataset is confounded with Condition"),
+                       " (e.g., one dataset is all Disease and another all Normal), batch correction can still remove biological signal. ",
+                       "Prefer ",
                        tags$strong("limma removeBatchEffect"),
                        " or ",
                        tags$strong("SVA"),
-                       " to better preserve Condition effects."
+                       " in that situation."
                      ),
                      tags$div(
                        style = "margin-top: 20px;",
@@ -159,7 +160,8 @@ ui_batch <- tabItem(
           tags$ul(
             style = "margin: 0; padding-left: 20px; color: #495057; font-size: 12px; line-height: 1.8;",
             tags$li(tags$strong("By Dataset:"), " Compare left (before) vs right (after) - datasets should be intermingled after correction"),
-            tags$li(tags$strong("By Condition:"), " Compare left (before) vs right (after) - biological signal should be clearer after correction")
+            tags$li(tags$strong("By Condition:"), " Compare left (before) vs right (after) - biological signal should be clearer after correction"),
+            tags$li(tags$strong("By Platform (merged runs):"), " Microarray vs RNA-seq should intermingle after correction; persistent separation indicates residual platform bias")
           )
         )
       )
@@ -194,6 +196,8 @@ ui_batch <- tabItem(
         tags$div(style = "margin-top: 6px;", downloadButton("download_pca_after_condition_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_condition_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
       )
     ),
+    
+    uiOutput("batch_platform_pca_row"),
     
     fluidRow(
       box(
