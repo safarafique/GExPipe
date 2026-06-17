@@ -21,4 +21,7 @@ test_that("gexp_run_de returns expected columns", {
   res <- gexp_run_de(expr = expr, metadata = metadata, method = "limma")
   expect_true(is.data.frame(res$de_results))
   expect_true(all(c("Gene", "logFC", "adj.P.Val", "Significance") %in% colnames(res$de_results)))
+  expect_true(!is.null(res$filter_note))
+  expect_true(!is.null(res$formula_desc))
+  expect_true(!is.null(res$sample_info))
 })

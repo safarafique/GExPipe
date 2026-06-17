@@ -9,6 +9,18 @@ ui_batch <- tabItem(
     # When only one dataset is selected, batch correction is skipped automatically.
     uiOutput("batch_merged_platform_ui"),
     uiOutput("batch_single_dataset_ui"),
+
+    fluidRow(
+      box(
+        title = tags$span(icon("table"), " Dataset \u00d7 Condition confounding"),
+        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+        tags$p(
+          "Check that each dataset includes both Normal and Disease samples before interpreting batch correction and DE.",
+          style = "font-size: 13px; color: #495057; margin-bottom: 10px;"
+        ),
+        uiOutput("batch_confounding_ui")
+      )
+    ),
     
     fluidRow(
       box(title = tags$span(icon("chart-bar"), " Gene Variance Distribution"), 
@@ -99,6 +111,7 @@ ui_batch <- tabItem(
                                     selected = "combat_ref",
                                     width = "100%")
                      ),
+                     uiOutput("batch_method_guidance_ui"),
                      tags$div(
                        class = "alert alert-warning",
                        style = "margin: 10px 0 0 0; font-size: 12px; line-height: 1.55;",
@@ -130,17 +143,69 @@ ui_batch <- tabItem(
           tags$div(
             style = "margin-top: 20px; padding: 15px; background: #f8f9fa; border-left: 4px solid #3498db; border-radius: 5px;",
             tags$p(
-              tags$strong(icon("info-circle"), " Method Descriptions:"),
+              tags$strong(icon("compass"), " Which method for which analysis?"),
               style = "margin-bottom: 10px; color: #2c3e50; font-size: 14px;"
             ),
+            tags$table(
+              class = "table table-bordered table-condensed",
+              style = "font-size: 12px; background: white; margin-bottom: 10px;",
+              tags$thead(
+                tags$tr(
+                  tags$th("Your setup (Step 1 platform)"),
+                  tags$th("Recommended method"),
+                  tags$th("Why")
+                )
+              ),
+              tags$tbody(
+                tags$tr(
+                  tags$td(tags$strong("Microarray"), " — 2+ GEO studies, groups crossed"),
+                  tags$td(tags$span(class = "label label-success", "ComBat-ref")),
+                  tags$td("Largest study as reference; protects Condition in the model.")
+                ),
+                tags$tr(
+                  tags$td(tags$strong("RNA-seq"), " — 2+ studies, log/TMM normalized"),
+                  tags$td(tags$span(class = "label label-success", "ComBat-ref")),
+                  tags$td("Standard multi-study correction on expression scale; pair with DESeq2/edgeR batch in DE if using counts.")
+                ),
+                tags$tr(
+                  tags$td(tags$strong("Merged"), " — microarray + RNA-seq"),
+                  tags$td(tags$span(class = "label label-primary", "limma")),
+                  tags$td("Gentler linear adjustment across technologies; use ", tags$strong("limma"), " DE at Step 6.")
+                ),
+                tags$tr(
+                  tags$td("Studies on very different scales (medians far apart, same platform)"),
+                  tags$td(tags$span(class = "label label-info", "Quantile + limma"), " or ", tags$span(class = "label label-info", "Hybrid")),
+                  tags$td("Extra quantile step before batch removal (after Step 3 global quantile if needed).")
+                ),
+                tags$tr(
+                  tags$td("Hidden confounders (batch unknown, e.g. processing date)"),
+                  tags$td(tags$span(class = "label label-warning", "SVA")),
+                  tags$td("Estimates surrogate variables; falls back to ComBat if SVA fails.")
+                ),
+                tags$tr(
+                  tags$td(tags$span(style = "color: #c0392b;", "Dataset confounded with Condition"), " (see table above)"),
+                  tags$td(tags$span(class = "label label-warning", "limma"), " or ", tags$span(class = "label label-warning", "SVA")),
+                  tags$td(tags$em("Avoid ComBat"), " — can remove disease signal when one GSE is all Normal and another all Disease.")
+                ),
+                tags$tr(
+                  tags$td("Equal-sized batches, well-balanced design"),
+                  tags$td(tags$span(class = "label label-default", "ComBat")),
+                  tags$td("Classic empirical Bayes; similar to ComBat-ref when batches are balanced.")
+                )
+              )
+            ),
+            tags$p(
+              tags$strong(icon("info-circle"), " Method summaries:"),
+              style = "margin-bottom: 8px; color: #2c3e50; font-size: 13px;"
+            ),
             tags$ul(
-              style = "margin: 0; padding-left: 20px; color: #495057; font-size: 13px; line-height: 1.8;",
-              tags$li(tags$strong("ComBat-ref:"), " Recommended for multiple datasets with reference batch"),
-              tags$li(tags$strong("SVA:"), " Surrogate variable analysis — captures unknown/hidden confounders"),
-              tags$li(tags$strong("limma:"), " Fast batch effect removal using linear models"),
-              tags$li(tags$strong("ComBat:"), " Empirical Bayes batch correction"),
-              tags$li(tags$strong("Quantile + limma:"), " Quantile normalization followed by limma"),
-              tags$li(tags$strong("Hybrid:"), " Quantile normalization + ComBat combination")
+              style = "margin: 0; padding-left: 20px; color: #495057; font-size: 12px; line-height: 1.7;",
+              tags$li(tags$strong("ComBat-ref:"), " ComBat with the largest dataset as reference batch (default for most multi-GSE runs)."),
+              tags$li(tags$strong("ComBat:"), " Standard ComBat when batch sizes are similar."),
+              tags$li(tags$strong("limma:"), " Fast ", tags$code("removeBatchEffect"), " — preferred for merged platforms or confounded designs."),
+              tags$li(tags$strong("SVA:"), " Surrogate variable analysis for unknown batch factors."),
+              tags$li(tags$strong("Quantile + limma:"), " Global quantile alignment, then limma batch removal."),
+              tags$li(tags$strong("Hybrid:"), " Quantile normalization followed by ComBat.")
             )
           )
         )
@@ -197,6 +262,10 @@ ui_batch <- tabItem(
       )
     ),
     
+    fluidRow(
+      uiOutput("batch_qc_decision_ui")
+    ),
+    
     uiOutput("batch_platform_pca_row"),
     
     fluidRow(
@@ -243,8 +312,9 @@ ui_batch <- tabItem(
           style = "padding: 10px 0;",
           tags$p(
             tags$strong(icon("info-circle"), " PVCA Interpretation:"),
-            " Quantifies the proportion of variance explained by Dataset vs Condition.",
-            " Before correction: Dataset variance is high. After correction: Dataset variance decreases, Condition variance increases.",
+            " Bars show how much of the top PCA variance is tagged to Dataset, Platform, or Condition.",
+            " Before: expect visible Dataset/Platform bars.",
+            " After: those should shrink; a large Residual bar is normal (most biology sits outside these factors).",
             style = "color: #495057; font-size: 12px; margin-bottom: 15px; padding: 8px; background: #d1ecf1; border-radius: 5px;"
           ),
           fluidRow(

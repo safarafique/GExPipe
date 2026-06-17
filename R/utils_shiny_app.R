@@ -485,14 +485,7 @@
     isTRUE(ok)
   }
 
-  # ── Pre-load rebuild (avoids the manual R restart) ──────────────────────────
-  # If the namespace is NOT loaded yet, decide whether to rebuild using the
-  # DESCRIPTION "Built:" field, which reads a text file and does NOT load the
-  # compiled DLL. On Windows, once a mismatched native DLL is mapped into the R
-  # process it cannot be reliably unloaded or overwritten in the same session —
-  # that is exactly what forces "restart R once". By reinstalling a fresh build
-  # *before* the first load, the good DLL loads cleanly this session, so glmnet /
-  # xgboost work immediately with no restart required.
+  # Reinstall before first load: avoids Windows DLL-lock requiring a restart.
   if (!isNamespaceLoaded(pkg) &&
       requireNamespace(pkg, lib.loc = lib, quietly = TRUE) &&
       isFALSE(.gexpipe_pkg_built_for_current_r(pkg, lib))) {

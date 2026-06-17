@@ -50,6 +50,8 @@ utils::globalVariables(c("."))
 #'   de_method = "limma"
 #' )
 #' dim(out$combined_expr)
+#' @param micro_eset_list optional named list of ExpressionSet objects per GSE (for RMA ID mapping).
+#' @param apply_global_quantile logical; if TRUE, apply limma quantile normalization across all samples.
 #' @export
 gexp_normalize_and_intersect <- function(
   micro_expr_list,
@@ -58,7 +60,9 @@ gexp_normalize_and_intersect <- function(
   rnaseq_norm_method = "TMM",
   micro_cel_paths = NULL,
   platform_per_gse = NULL,
-  de_method = "limma"
+  micro_eset_list = NULL,
+  de_method = "limma",
+  apply_global_quantile = TRUE
 ) {
   all_expr_norm <- list()
   normalization_stats <- list()
@@ -75,10 +79,20 @@ gexp_normalize_and_intersect <- function(
         plat <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
         probe_mat <- normalize_microarray_rma(micro_cel_paths[[gse]], plat, dataset_name = gse)
         if (!is.null(probe_mat) && nrow(probe_mat) > 0 && ncol(probe_mat) > 0) {
-          # Map to gene symbols
-          micro_eset <- NULL
+          micro_eset <- if (!is.null(micro_eset_list) && gse %in% names(micro_eset_list)) {
+            micro_eset_list[[gse]]
+          } else {
+            NULL
+          }
           fdata <- if (!is.null(micro_eset)) Biobase::fData(micro_eset) else data.frame()
           gene_symbols <- suppressMessages(map_microarray_ids(probe_mat, fdata, micro_eset, gse_id = gse))
+          if (length(gene_symbols) != nrow(probe_mat)) {
+            log_text <- paste0(
+              log_text, "  ", gse, ": symbol length mismatch (", length(gene_symbols),
+              " vs ", nrow(probe_mat), " rows) — keeping probe IDs\n"
+            )
+            gene_symbols <- rownames(probe_mat)
+          }
           rownames(probe_mat) <- gene_symbols
           valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
           expr_norm <- probe_mat[valid, , drop = FALSE]
@@ -111,7 +125,9 @@ gexp_normalize_and_intersect <- function(
           )
         }
       } else {
-        expr_norm <- normalize_microarray(micro_expr_list[[gse]], dataset_name = gse, method = "quantile")
+        expr_norm <- normalize_microarray(
+          micro_expr_list[[gse]], dataset_name = gse, method = micro_norm_method
+        )
         norm_info <- attr(expr_norm, "normalization_info")
         all_expr_norm[[gse]] <- expr_norm
         normalization_stats[[gse]] <- norm_info
@@ -171,16 +187,36 @@ gexp_normalize_and_intersect <- function(
   )
 
   common_genes <- Reduce(intersect, gene_lists)
+  if (length(common_genes) == 0L) {
+    stop(
+      "No common genes across datasets after normalization. ",
+      "Re-run Step 1 and confirm gene symbols overlap (see download log for ID mapping)."
+    )
+  }
   for (i in seq_along(all_expr_norm)) {
     all_expr_norm[[i]] <- all_expr_norm[[i]][common_genes, , drop = FALSE]
   }
 
   final_count <- length(common_genes)
+  if (length(gene_lists) > 1L) {
+    log_text <- paste0(log_text, "  Per-dataset genes not in intersection:\n")
+    for (gse in names(gene_lists)) {
+      n_ds <- length(gene_lists[[gse]])
+      n_lost <- n_ds - final_count
+      log_text <- paste0(
+        log_text, "    ", gse, ": ", format(n_ds, big.mark = ","), " \u2192 ",
+        format(final_count, big.mark = ","), " shared (", format(n_lost, big.mark = ","), " dropped)\n"
+      )
+    }
+  }
   log_text <- paste0(
     log_text,
     "  \u2713 Common genes identified: ",
     format(final_count, big.mark = ","), "\n"
   )
+  if (!isTRUE(apply_global_quantile)) {
+    log_text <- paste0(log_text, "  Global quantile normalization: skipped (per-dataset normalization only).\n")
+  }
 
   normalization_stats_global <- list(
     initial_total = initial_total,
@@ -190,9 +226,13 @@ gexp_normalize_and_intersect <- function(
     filter_method = "intersection"
   )
 
-  # ---- Combine and global quantile normalization ----
+  # ---- Combine and optional global quantile normalization ----
   combined_before_global <- do.call(cbind, all_expr_norm)
-  combined_expr <- limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
+  combined_expr <- if (isTRUE(apply_global_quantile) && ncol(combined_before_global) > 1L) {
+    limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
+  } else {
+    combined_before_global
+  }
 
   # ---- Optional raw counts for count-based DE ----
   raw_counts_for_deseq2 <- NULL
@@ -219,26 +259,26 @@ gexp_normalize_and_intersect <- function(
     }
   }
 
-  # ---- Unified metadata (platform + dataset per sample) ----
-  micro_n <- if (length(micro_expr_list) > 0) {
-    sum(vapply(micro_expr_list, ncol, integer(1)))
-  } else {
-    0L
-  }
-  rna_n <- if (length(rna_counts_list) > 0) {
-    sum(vapply(rna_counts_list, ncol, integer(1)))
-  } else {
-    0L
-  }
-  platform_labels <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
+  # ---- Unified metadata (aligned to combined expression columns) ----
   dataset_labels <- rep(names(all_expr_norm), times = vapply(all_expr_norm, ncol, integer(1)))
+  micro_gses <- names(micro_expr_list)
+  platform_labels <- ifelse(dataset_labels %in% micro_gses, "Microarray", "RNAseq")
+  sample_ids <- colnames(combined_expr)
+  if (length(platform_labels) != length(sample_ids) || length(dataset_labels) != length(sample_ids)) {
+    stop(
+      "Sample metadata alignment failed during normalization (",
+      length(sample_ids), " expression columns vs ",
+      length(platform_labels), " platform labels). ",
+      "If using RMA, ensure CEL sample count matches the series matrix."
+    )
+  }
 
   unified_metadata <- data.frame(
-    SampleID = colnames(combined_expr),
+    SampleID = sample_ids,
     Platform = platform_labels,
     Dataset = dataset_labels,
     Condition = NA_character_,
-    row.names = colnames(combined_expr),
+    row.names = sample_ids,
     stringsAsFactors = FALSE
   )
 
