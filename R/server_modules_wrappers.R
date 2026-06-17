@@ -7,7 +7,17 @@
 
 .gexp_load_inst_server_module <- function(inst_rel_file, object_name) {
   p <- .gexp_inst_file(inst_rel_file)
-  env <- new.env(parent = parent.frame())
+  parent_env <- if (requireNamespace("GExPipe", quietly = TRUE)) {
+    asNamespace("GExPipe")
+  } else {
+    .GlobalEnv
+  }
+  env <- new.env(parent = parent_env)
+  if (exists(".gexpipe_call", envir = parent_env, inherits = FALSE, mode = "function")) {
+    assign(".gexpipe_call", get(".gexpipe_call", envir = parent_env, mode = "function"), envir = env)
+  } else if (exists(".gexpipe_call", envir = .GlobalEnv, inherits = FALSE, mode = "function")) {
+    assign(".gexpipe_call", get(".gexpipe_call", envir = .GlobalEnv, mode = "function"), envir = env)
+  }
   source(p, local = env)
   if (!exists(object_name, envir = env, inherits = FALSE)) {
     stop("GExPipe: expected server object '", object_name, "' not found in ", inst_rel_file)

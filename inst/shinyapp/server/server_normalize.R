@@ -59,7 +59,8 @@ server_normalize <- function(input, output, session, rv) {
       stop("No expression data to normalize. Complete Step 1 (Download) first.")
     }
 
-    norm_out <- GExPipe::gexp_normalize_and_intersect(
+    norm_out <- .gexpipe_call(
+      "gexp_normalize_and_intersect",
       micro_expr_list = micro_list,
       rna_counts_list = rna_list,
       micro_norm_method = micro_norm_method,

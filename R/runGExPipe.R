@@ -97,6 +97,9 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
     tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = FALSE), error = function(e) {
       message("GExPipe: native package check note: ", conditionMessage(e))
     })
+    tryCatch(.gexpipe_ensure_self(quiet = FALSE), error = function(e) {
+      message("GExPipe: package integrity check note: ", conditionMessage(e))
+    })
 
     if (needs_install) {
       if (length(missing_now) > 0L)

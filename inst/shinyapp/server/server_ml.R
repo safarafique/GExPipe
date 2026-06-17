@@ -169,73 +169,53 @@ server_ml <- function(input, output, session, rv) {
     prog <- 0.1
 
     # ------------------------------------------------------------------
-    # Pre-flight: verify glmnet's compiled DLL is actually functional.
-    # After an R upgrade, the DLL can become incompatible causing the
-    # cryptic error "_glmnet_glmnet_control_get not available for .Call()".
-    # Detect this early and show a clear fix message rather than a raw C error.
+    # Pre-flight: glmnet DLL must work for LASSO / Elastic Net / Ridge.
+    # If the parent session has a locked DLL, .gexpipe_glmnet_cv_fit() runs
+    # cv.glmnet in a fresh R subprocess — no restart required.
     # ------------------------------------------------------------------
+    .glmnet_cv_fit <- function(x, y, alpha) {
+      if (exists(".gexpipe_glmnet_cv_fit", mode = "function", inherits = TRUE)) {
+        return(.gexpipe_glmnet_cv_fit(x, y, alpha = alpha, family = "binomial"))
+      }
+      glmnet::cv.glmnet(x, y, alpha = alpha, family = "binomial")
+    }
+
     if (any(c("lasso", "elastic", "ridge") %in% methods_sel)) {
-      .glmnet_ok <- tryCatch({
-        glmnet::glmnet_control()   # lightweight call that exercises the DLL
-        TRUE
-      }, error = function(e) FALSE)
-
-      if (!.glmnet_ok) {
-        showNotification(
-          tags$div(icon("sync"), " glmnet needs a rebuild for this R version — fixing automatically..."),
-          type = "warning", duration = 12, id = "glmnet_fix_notif"
-        )
-        .glmnet_reinstall_ok <- tryCatch({
-          if (exists(".gexpipe_ensure_native_pkg", mode = "function")) {
-            lib <- if (exists(".gexpipe_get_lib", mode = "function")) {
-              .gexpipe_get_lib()
-            } else {
-              getOption("gexpipe.lib", .libPaths()[1L])
-            }
-            .gexpipe_ensure_native_pkg("glmnet", lib = lib, quiet = TRUE)
-          } else {
-            gexpipe_lib <- getOption("gexpipe.lib", .libPaths()[1L])
-            if (isNamespaceLoaded("glmnet"))
-              suppressWarnings(tryCatch(unloadNamespace("glmnet"), error = function(e) NULL))
-            utils::install.packages(
-              "glmnet", lib = gexpipe_lib, repos = "https://cloud.r-project.org",
-              type = if (.Platform$OS.type == "windows") "binary" else "source",
-              quiet = TRUE
-            )
-            loadNamespace("glmnet", lib.loc = gexpipe_lib)
-            tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE)
-          }
-        }, error = function(e) FALSE)
-
-        removeNotification("glmnet_fix_notif")
-
-        .glmnet_ok <- isTRUE(.glmnet_reinstall_ok) || tryCatch({
+      .glmnet_ready <- FALSE
+      if (exists(".gexpipe_native_session_ok", mode = "function", inherits = TRUE)) {
+        .glmnet_ready <- isTRUE(.gexpipe_native_session_ok("glmnet", try_repair = TRUE))
+      } else {
+        .glmnet_ready <- isTRUE(tryCatch({
           glmnet::glmnet_control(); TRUE
-        }, error = function(e) FALSE)
-
-        if (isTRUE(.glmnet_ok)) {
-          showNotification(
-            tags$div(icon("check-circle"), tags$strong(" glmnet is ready."),
-                     " LASSO, Elastic Net, and Ridge will run now."),
-            type = "message", duration = 8
-          )
-        } else {
-          showNotification(
-            tags$div(
-              icon("info-circle"),
-              tags$strong(" glmnet was rebuilt — one R restart needed."),
-              tags$br(),
-              "Close the app, press ", tags$kbd("Ctrl+Shift+F10"), " in RStudio, then run ",
-              tags$code("GExPipe::runGExPipe()"), " again. No manual install required.",
-              tags$br(),
-              tags$em("LASSO / Elastic Net / Ridge skipped this run; other ML methods still work."),
-              style = "font-size: 13px;"
-            ),
-            type = "warning", duration = 25
-          )
-          methods_sel <- setdiff(methods_sel, c("lasso", "elastic", "ridge"))
-          if (length(methods_sel) == 0) return()
-        }
+        }, error = function(e) FALSE))
+      }
+      if (!.glmnet_ready && exists(".gexpipe_glmnet_smoke_subprocess", mode = "function", inherits = TRUE)) {
+        .glmnet_ready <- isTRUE(.gexpipe_glmnet_smoke_subprocess())
+      }
+      if (!.glmnet_ready) {
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong(" glmnet is not available."),
+            tags$br(),
+            "Restart R (", tags$kbd("Ctrl+Shift+F10"), "), then run ",
+            tags$code("GExPipe::runGExPipe()"), " again.",
+            tags$br(),
+            tags$em("LASSO / Elastic Net / Ridge skipped this run; other ML methods still work.")
+          ),
+          type = "error", duration = 20
+        )
+        methods_sel <- setdiff(methods_sel, c("lasso", "elastic", "ridge"))
+        if (length(methods_sel) == 0) return()
+      } else if (!isTRUE(tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE))) {
+        showNotification(
+          tags$div(
+            icon("info-circle"),
+            tags$strong(" glmnet will run in an isolated R process"),
+            " (DLL was rebuilt mid-session). LASSO, Elastic Net, and Ridge will still complete."
+          ),
+          type = "message", duration = 10
+        )
       }
     }
 
@@ -247,7 +227,7 @@ server_ml <- function(input, output, session, rv) {
 
         if ("lasso" %in% methods_sel) {
           incProgress(step_inc, detail = "LASSO...")
-          cv_fit <- glmnet::cv.glmnet(x, y, alpha = 1, family = "binomial")
+          cv_fit <- .glmnet_cv_fit(x, y, alpha = 1)
           coef_min <- as.matrix(coef(cv_fit, s = cv_fit$lambda.min))
           lasso_df <- data.frame(Gene = rownames(coef_min), Coefficient = coef_min[, 1], stringsAsFactors = FALSE)
           lasso_df <- lasso_df[lasso_df$Gene != "(Intercept)" & lasso_df$Coefficient != 0, ]
@@ -263,7 +243,7 @@ server_ml <- function(input, output, session, rv) {
         if ("elastic" %in% methods_sel) {
           incProgress(step_inc, detail = "Elastic Net...")
           set.seed(123)
-          cv_elastic <- glmnet::cv.glmnet(x, y, alpha = 0.5, family = "binomial")
+          cv_elastic <- .glmnet_cv_fit(x, y, alpha = 0.5)
           coef_elastic <- as.matrix(coef(cv_elastic, s = cv_elastic$lambda.min))
           elastic_df <- data.frame(Gene = rownames(coef_elastic), Coefficient = coef_elastic[, 1], stringsAsFactors = FALSE)
           elastic_df <- elastic_df[elastic_df$Gene != "(Intercept)" & elastic_df$Coefficient != 0, ]
@@ -279,7 +259,7 @@ server_ml <- function(input, output, session, rv) {
         if ("ridge" %in% methods_sel) {
           incProgress(step_inc, detail = "Ridge...")
           set.seed(123)
-          cv_ridge <- glmnet::cv.glmnet(x, y, alpha = 0, family = "binomial")
+          cv_ridge <- .glmnet_cv_fit(x, y, alpha = 0)
           coef_ridge <- as.matrix(coef(cv_ridge, s = cv_ridge$lambda.min))
           ridge_df <- data.frame(Gene = rownames(coef_ridge), Coefficient = coef_ridge[, 1], stringsAsFactors = FALSE)
           ridge_df <- ridge_df[ridge_df$Gene != "(Intercept)" & ridge_df$Coefficient != 0, ]
@@ -435,10 +415,9 @@ server_ml <- function(input, output, session, rv) {
           showNotification(
             tags$div(
               icon("info-circle"),
-              tags$strong(" glmnet needs one R restart after auto-rebuild."),
-              tags$br(),
-              "Press ", tags$kbd("Ctrl+Shift+F10"), ", then run ",
-              tags$code("GExPipe::runGExPipe()"), " — glmnet will work; no manual install.",
+              tags$strong(" glmnet DLL mismatch."),
+              " Restart R (Ctrl+Shift+F10) and run ",
+              tags$code("GExPipe::runGExPipe()"), ", or click Run ML again (isolated glmnet process).",
               tags$br(),
               tags$small(tags$em(msg))
             ),

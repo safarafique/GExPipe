@@ -21,6 +21,25 @@
   if (include_optional) c(required, core, optional) else c(required, core)
 }
 
+## Resolve and call an exported GExPipe helper (works from Shiny server modules and global.R).
+.gexpipe_call <- function(name, ...) {
+  if (requireNamespace("GExPipe", quietly = TRUE)) {
+    ns <- asNamespace("GExPipe")
+    if (exists(name, envir = ns, inherits = FALSE, mode = "function")) {
+      return(get(name, envir = ns, mode = "function")(...))
+    }
+  }
+  if (exists(name, mode = "function", inherits = TRUE)) {
+    return(get(name, mode = "function", inherits = TRUE)(...))
+  }
+  stop(
+    "Function ", name, " is not available. Update GExPipe:\n",
+    "  remotes::install_github('safarafique/GExPipe')\n",
+    "Then restart R and run GExPipe::runGExPipe() again.",
+    call. = FALSE
+  )
+}
+
 ## Minimum versions for packages that frequently cause version-conflict errors.
 ## Any package below its floor is treated as "needs update" even when installed.
 # Minimum versions — must stay in sync with DESCRIPTION Imports section.
@@ -417,6 +436,126 @@
   )
 }
 
+## Detach a package from the search path and unload its namespace.
+.gexpipe_detach_pkg <- function(pkg) {
+  while (paste0("package:", pkg) %in% search()) {
+    ok <- tryCatch(
+      detach(paste0("package:", pkg), unload = TRUE, character.only = TRUE),
+      error = function(e) FALSE
+    )
+    if (!isTRUE(ok)) break
+  }
+  if (isNamespaceLoaded(pkg)) {
+    tryCatch(suppressWarnings(unloadNamespace(pkg)), error = function(e) NULL)
+  }
+  invisible(TRUE)
+}
+
+## Return TRUE when native code for pkg works in this R session (optional repair).
+.gexpipe_native_session_ok <- function(pkg, lib = .gexpipe_get_lib(), try_repair = FALSE) {
+  ok <- tryCatch({
+    if (!requireNamespace(pkg, lib.loc = lib, quietly = TRUE)) return(FALSE)
+    if (!isNamespaceLoaded(pkg)) loadNamespace(pkg, lib.loc = lib)
+    .gexpipe_native_smoke_test(pkg)
+  }, error = function(e) FALSE)
+  if (isTRUE(ok) || !isTRUE(try_repair)) return(isTRUE(ok))
+
+  .gexpipe_detach_pkg(pkg)
+  if (pkg %in% .gexpipe_native_pkgs()) {
+    tryCatch(.gexpipe_ensure_native_pkg(pkg, lib = lib, quiet = TRUE), error = function(e) NULL)
+  }
+  tryCatch({
+    if (!isNamespaceLoaded(pkg)) loadNamespace(pkg, lib.loc = lib)
+    .gexpipe_native_smoke_test(pkg)
+  }, error = function(e) FALSE)
+}
+
+## Run a short Rscript in a fresh R process (avoids Windows DLL locks in the parent).
+.gexpipe_rscript_eval <- function(lines, timeout = 600L) {
+  tmp_script <- tempfile(pattern = "gexpipe_", fileext = ".R")
+  tmp_log <- tempfile(pattern = "gexpipe_log_", fileext = ".txt")
+  on.exit(unlink(c(tmp_script, tmp_log)), add = TRUE)
+  writeLines(lines, tmp_script)
+  ec <- system2(
+    file.path(R.home("bin"), "Rscript"),
+    args = c("--vanilla", "--no-save", shQuote(normalizePath(tmp_script, winslash = "/"))),
+    stdout = tmp_log,
+    stderr = tmp_log,
+    timeout = timeout
+  )
+  list(
+    ok = identical(ec, 0L),
+    exit = ec,
+    log = tryCatch(readLines(tmp_log, warn = FALSE), error = function(e) character(0))
+  )
+}
+
+## glmnet smoke test in a child R process (works when parent DLL is locked).
+.gexpipe_glmnet_smoke_subprocess <- function(lib = .gexpipe_get_lib()) {
+  lib_fwd <- gsub("\\\\", "/", normalizePath(lib, winslash = "/", mustWork = FALSE))
+  res <- .gexpipe_rscript_eval(c(
+    paste0('.libPaths(c("', lib_fwd, '", .libPaths()))'),
+    "suppressPackageStartupMessages(library(glmnet, lib.loc = .libPaths()[1L]))",
+    "glmnet::glmnet_control()",
+    'cat("OK\\n")'
+  ))
+  isTRUE(res$ok) && any(grepl("^OK$", res$log))
+}
+
+## cv.glmnet in a child R process when the parent session cannot load glmnet's DLL.
+.gexpipe_glmnet_cv_subprocess <- function(x, y, alpha = 1, family = "binomial",
+                                          lib = .gexpipe_get_lib()) {
+  tmp_x <- normalizePath(tempfile(pattern = "gexp_x_", fileext = ".rds"), winslash = "/", mustWork = FALSE)
+  tmp_y <- normalizePath(tempfile(pattern = "gexp_y_", fileext = ".rds"), winslash = "/", mustWork = FALSE)
+  tmp_out <- normalizePath(tempfile(pattern = "gexp_fit_", fileext = ".rds"), winslash = "/", mustWork = FALSE)
+  on.exit(unlink(c(tmp_x, tmp_y, tmp_out)), add = TRUE)
+  saveRDS(x, tmp_x)
+  saveRDS(y, tmp_y)
+  lib_fwd <- gsub("\\\\", "/", normalizePath(lib, winslash = "/", mustWork = FALSE))
+  res <- .gexpipe_rscript_eval(c(
+    paste0('.libPaths(c("', lib_fwd, '", .libPaths()))'),
+    "suppressPackageStartupMessages(library(glmnet, lib.loc = .libPaths()[1L]))",
+    paste0('x <- readRDS("', tmp_x, '")'),
+    paste0('y <- readRDS("', tmp_y, '")'),
+    paste0('fit <- glmnet::cv.glmnet(x, y, alpha = ', as.numeric(alpha),
+           ', family = "', family, '")'),
+    paste0('saveRDS(fit, "', tmp_out, '")')
+  ))
+  if (!isTRUE(res$ok) || !file.exists(tmp_out)) {
+    log_tail <- paste(utils::tail(res$log, 8L), collapse = "\n")
+    stop("glmnet could not run in an isolated R process. ", log_tail, call. = FALSE)
+  }
+  readRDS(tmp_out)
+}
+
+## cv.glmnet in the current session, or subprocess fallback — no R restart required.
+.gexpipe_glmnet_cv_fit <- function(x, y, alpha = 1, family = "binomial",
+                                   lib = .gexpipe_get_lib()) {
+  in_session <- tryCatch({
+    if (!requireNamespace("glmnet", lib.loc = lib, quietly = TRUE)) {
+      FALSE
+    } else {
+      if (!isNamespaceLoaded("glmnet")) loadNamespace("glmnet", lib.loc = lib)
+      glmnet::glmnet_control()
+      glmnet::cv.glmnet(x, y, alpha = alpha, family = family)
+    }
+  }, error = function(e) NULL)
+  if (!is.null(in_session)) {
+    options(gexpipe.glmnet_subprocess = FALSE)
+    return(in_session)
+  }
+
+  if (!isTRUE(.gexpipe_glmnet_smoke_subprocess(lib = lib))) {
+    stop(
+      "glmnet is not available in this R session or in an isolated process. ",
+      "Restart R (Ctrl+Shift+F10), then run GExPipe::runGExPipe() again.",
+      call. = FALSE
+    )
+  }
+  options(gexpipe.glmnet_subprocess = TRUE)
+  .gexpipe_glmnet_cv_subprocess(x, y, alpha = alpha, family = family, lib = lib)
+}
+
 ## Unload pkg and remove it from every library on .libPaths().
 .gexpipe_remove_pkg_all_libs <- function(pkg) {
   if (isNamespaceLoaded(pkg)) {
@@ -510,11 +649,19 @@
   }
 
   if (isNamespaceLoaded(pkg)) {
-    # DLL locked in this session — subprocess install to pending, active next run
+    # DLL locked in this session — reinstall, then try detach + reload once.
     if (!quiet) {
-      message("GExPipe: ", pkg, " DLL is locked; installing fresh build in background...")
+      message("GExPipe: ", pkg, " DLL is locked; reinstalling and retrying reload...")
     }
     .gexpipe_batch_install(pkg)
+    .gexpipe_detach_pkg(pkg)
+    if (.gexpipe_install_native_pkg(pkg, lib) && .works()) {
+      if (!quiet) message("GExPipe: ", pkg, " OK after reload.")
+      return(TRUE)
+    }
+    if (!quiet) {
+      message("GExPipe: ", pkg, " reinstalled; parent session will use subprocess fallback where supported.")
+    }
     return(FALSE)
   }
 
@@ -545,6 +692,68 @@
     all_ok <- all_ok && isTRUE(ok)
   }
   all_ok
+}
+
+## Detect and repair a corrupted GExPipe lazy-load database (common after in-session reinstall).
+.gexpipe_ensure_self <- function(quiet = FALSE) {
+  if (!requireNamespace("GExPipe", quietly = TRUE)) {
+    return(invisible(TRUE))
+  }
+  smoke_ok <- tryCatch({
+    utils::getFromNamespace("gexpipe_wgcna_heatmap_cor", "GExPipe")
+    TRUE
+  }, error = function(e) {
+    msg <- conditionMessage(e)
+    if (grepl("corrupt|lazy-load", msg, ignore.case = TRUE)) {
+      return(FALSE)
+    }
+    TRUE
+  })
+  if (isTRUE(smoke_ok)) {
+    return(invisible(TRUE))
+  }
+
+  lib <- dirname(utils::find.package("GExPipe", quiet = TRUE))
+  if (!nzchar(lib)) {
+    return(invisible(FALSE))
+  }
+  if (!quiet) {
+    message("GExPipe: corrupted install detected — reinstalling package into ", lib, " ...")
+  }
+  if (isNamespaceLoaded("GExPipe")) {
+    tryCatch(suppressWarnings(unloadNamespace("GExPipe")), error = function(e) NULL)
+  }
+  tryCatch(utils::remove.packages("GExPipe", lib = lib), error = function(e) NULL)
+  ok <- tryCatch({
+    if (requireNamespace("remotes", quietly = TRUE)) {
+      remotes::install_github(
+        "safarafique/GExPipe",
+        lib = lib,
+        upgrade = "never",
+        quiet = TRUE,
+        force = TRUE
+      )
+    } else {
+      if (!requireNamespace("BiocManager", quietly = TRUE)) {
+        utils::install.packages("BiocManager", repos = "https://cloud.r-project.org")
+      }
+      BiocManager::install(
+        "safarafique/GExPipe",
+        lib = lib,
+        ask = FALSE,
+        update = FALSE,
+        quiet = TRUE
+      )
+    }
+    requireNamespace("GExPipe", lib.loc = lib, quietly = TRUE)
+  }, error = function(e) {
+    if (!quiet) message("GExPipe: self-repair failed: ", conditionMessage(e))
+    FALSE
+  })
+  if (!quiet && isTRUE(ok)) {
+    message("GExPipe: package reinstalled. Restart R if errors persist.")
+  }
+  invisible(isTRUE(ok))
 }
 
 ## Detect packages that are installed but whose compiled DLL is broken (e.g. after

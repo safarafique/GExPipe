@@ -1027,7 +1027,7 @@ server_wgcna <- function(input, output, session, rv) {
     }
     op <- par(bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
-    moduleTraitCor <- GExPipe::gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+    moduleTraitCor <- gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
     WGCNA::labeledHeatmap(
       Matrix = moduleTraitCor,
       xLabels = colnames(moduleTraitCor),
@@ -1069,7 +1069,7 @@ server_wgcna <- function(input, output, session, rv) {
   wgcna_module_trait_to_file <- function(file, dev_fun) {
     req(rv$moduleTraitCor)
     if (!requireNamespace("WGCNA", quietly = TRUE)) stop("WGCNA package required")
-    moduleTraitCor <- GExPipe::gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+    moduleTraitCor <- gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
     dev_fun(file)
     par(bg = "white")
     WGCNA::labeledHeatmap(
@@ -1959,7 +1959,7 @@ server_wgcna <- function(input, output, session, rv) {
       # Module-trait heatmap
       if (!is.null(rv$moduleTraitCor)) {
         par(bg = "white")
-        .mtc <- GExPipe::gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+        .mtc <- gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
         WGCNA::labeledHeatmap(Matrix = .mtc,
                               xLabels = colnames(.mtc),
                               yLabels = rownames(.mtc),
