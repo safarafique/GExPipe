@@ -100,6 +100,21 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
     tryCatch(.gexpipe_ensure_self(quiet = FALSE), error = function(e) {
       message("GExPipe: package integrity check note: ", conditionMessage(e))
     })
+    glm_ok <- tryCatch({
+      if (exists(".gexpipe_native_session_ok", mode = "function")) {
+        isTRUE(.gexpipe_native_session_ok("glmnet", try_repair = TRUE))
+      } else {
+        tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE)
+      }
+    }, error = function(e) FALSE)
+    if (isTRUE(glm_ok)) {
+      message("GExPipe: glmnet OK for LASSO / Elastic Net / Ridge in this session.")
+    } else if (exists(".gexpipe_glmnet_smoke_subprocess", mode = "function") &&
+               isTRUE(.gexpipe_glmnet_smoke_subprocess())) {
+      message("GExPipe: glmnet will use an isolated R process for LASSO / Elastic Net / Ridge (no restart needed).")
+    } else {
+      message("GExPipe: glmnet not ready — restart R (Ctrl+Shift+F10), then run GExPipe::runGExPipe() before ML.")
+    }
 
     if (needs_install) {
       if (length(missing_now) > 0L)

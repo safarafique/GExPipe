@@ -492,13 +492,16 @@
 
 ## glmnet smoke test in a child R process (works when parent DLL is locked).
 .gexpipe_glmnet_smoke_subprocess <- function(lib = .gexpipe_get_lib()) {
-  lib_fwd <- gsub("\\\\", "/", normalizePath(lib, winslash = "/", mustWork = FALSE))
+  libs_fwd <- vapply(unique(c(lib, .libPaths())), function(lp) {
+    gsub("\\\\", "/", normalizePath(lp, winslash = "/", mustWork = FALSE))
+  }, character(1L))
+  libs_expr <- paste0('"', libs_fwd, '"', collapse = ", ")
   res <- .gexpipe_rscript_eval(c(
-    paste0('.libPaths(c("', lib_fwd, '", .libPaths()))'),
+    paste0(".libPaths(c(", libs_expr, "))"),
     "suppressPackageStartupMessages(library(glmnet, lib.loc = .libPaths()[1L]))",
     "glmnet::glmnet_control()",
     'cat("OK\\n")'
-  ))
+  ), timeout = 120L)
   isTRUE(res$ok) && any(grepl("^OK$", res$log))
 }
 
@@ -512,15 +515,19 @@
   saveRDS(x, tmp_x)
   saveRDS(y, tmp_y)
   lib_fwd <- gsub("\\\\", "/", normalizePath(lib, winslash = "/", mustWork = FALSE))
+  libs_fwd <- vapply(unique(c(lib, .libPaths())), function(lp) {
+    gsub("\\\\", "/", normalizePath(lp, winslash = "/", mustWork = FALSE))
+  }, character(1L))
+  libs_expr <- paste0('"', libs_fwd, '"', collapse = ", ")
   res <- .gexpipe_rscript_eval(c(
-    paste0('.libPaths(c("', lib_fwd, '", .libPaths()))'),
+    paste0(".libPaths(c(", libs_expr, "))"),
     "suppressPackageStartupMessages(library(glmnet, lib.loc = .libPaths()[1L]))",
     paste0('x <- readRDS("', tmp_x, '")'),
     paste0('y <- readRDS("', tmp_y, '")'),
     paste0('fit <- glmnet::cv.glmnet(x, y, alpha = ', as.numeric(alpha),
            ', family = "', family, '")'),
     paste0('saveRDS(fit, "', tmp_out, '")')
-  ))
+  ), timeout = 1800L)
   if (!isTRUE(res$ok) || !file.exists(tmp_out)) {
     log_tail <- paste(utils::tail(res$log, 8L), collapse = "\n")
     stop("glmnet could not run in an isolated R process. ", log_tail, call. = FALSE)
@@ -533,14 +540,15 @@
                                    lib = .gexpipe_get_lib()) {
   in_session <- tryCatch({
     if (!requireNamespace("glmnet", lib.loc = lib, quietly = TRUE)) {
-      FALSE
-    } else {
-      if (!isNamespaceLoaded("glmnet")) loadNamespace("glmnet", lib.loc = lib)
-      glmnet::glmnet_control()
-      glmnet::cv.glmnet(x, y, alpha = alpha, family = family)
+      stop("glmnet is not installed in ", lib)
     }
+    if (!isNamespaceLoaded("glmnet")) {
+      loadNamespace("glmnet", lib.loc = lib)
+    }
+    glmnet::glmnet_control()
+    glmnet::cv.glmnet(x, y, alpha = alpha, family = family)
   }, error = function(e) NULL)
-  if (!is.null(in_session)) {
+  if (inherits(in_session, "cv.glmnet")) {
     options(gexpipe.glmnet_subprocess = FALSE)
     return(in_session)
   }
