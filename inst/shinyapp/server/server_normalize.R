@@ -4,6 +4,19 @@
 
 server_normalize <- function(input, output, session, rv) {
 
+  .norm_plot_context <- function() {
+    mixed <- FALSE
+    if (!is.null(rv$unified_metadata)) {
+      mixed <- gexpipe_has_mixed_platforms(rv$unified_metadata)
+    } else {
+      n_micro <- length(if (is.null(rv$micro_expr_list)) list() else rv$micro_expr_list)
+      n_rna <- length(if (is.null(rv$rna_counts_list)) list() else rv$rna_counts_list)
+      mixed <- n_micro > 0L && n_rna > 0L
+    }
+    gq_on <- !is.null(input$apply_global_quantile) && isTRUE(input$apply_global_quantile)
+    list(mixed = mixed, gq_on = gq_on, mixed_no_gq = mixed && !gq_on, mixed_gq = mixed && gq_on)
+  }
+
   # Store last ggplot for each normalization plot (for download)
   norm_plots <- reactiveValues(
     plot = NULL, density = NULL, qq = NULL, median_range = NULL,
@@ -36,7 +49,107 @@ server_normalize <- function(input, output, session, rv) {
     elapsed <- as.integer(difftime(Sys.time(), rv$normalize_start, units = "secs"))
     sprintf("%02d:%02d", elapsed %/% 60, elapsed %% 60)
   })
+
+  # Single source of truth: R/gexp_normalize_pipeline.R
+  .apply_norm_pipeline_to_rv <- function(rv, micro_norm_method, rnaseq_norm_method, de_method,
+                                       apply_global_quantile = TRUE) {
+    micro_list <- if (is.null(rv$micro_expr_list)) list() else rv$micro_expr_list
+    rna_list <- if (is.null(rv$rna_counts_list)) list() else rv$rna_counts_list
+    if (length(micro_list) == 0L && length(rna_list) == 0L) {
+      stop("No expression data to normalize. Complete Step 1 (Download) first.")
+    }
+
+    norm_out <- GExPipe::gexp_normalize_and_intersect(
+      micro_expr_list = micro_list,
+      rna_counts_list = rna_list,
+      micro_norm_method = micro_norm_method,
+      rnaseq_norm_method = rnaseq_norm_method,
+      micro_cel_paths = rv$micro_cel_paths,
+      platform_per_gse = rv$platform_per_gse,
+      micro_eset_list = rv$micro_eset_list,
+      de_method = de_method,
+      apply_global_quantile = isTRUE(apply_global_quantile)
+    )
+
+    rv$common_genes <- norm_out$common_genes
+    rv$all_expr_norm_list <- norm_out$all_expr_norm_list
+    rv$combined_expr_before_global_norm <- norm_out$combined_expr_before_global
+    rv$combined_expr <- norm_out$combined_expr
+    rv$raw_counts_for_deseq2 <- norm_out$raw_counts_for_deseq2
+    rv$unified_metadata <- norm_out$unified_metadata
+    rv$normalization_stats <- norm_out$normalization_stats
+    rv$normalization_summary_table <- norm_out$normalization_summary_table
+
+    if (!is.null(norm_out$raw_counts_for_deseq2) && !is.null(norm_out$raw_counts_metadata)) {
+      rv$raw_counts_metadata <- norm_out$raw_counts_metadata
+    } else {
+      rv$raw_counts_metadata <- NULL
+    }
+
+    stats <- norm_out$normalization_stats
+    initial_total <- stats$initial_total
+    after_filter_total <- stats$after_filter_total
+    rnaseq_removed <- stats$rnaseq_removed
+    final_count <- stats$final_count
+
+    rv$normalization_caption <- paste0(
+      "Gene Expression Normalization Pipeline: Starting with ",
+      format(initial_total, big.mark = ","), " total genes across ",
+      length(norm_out$all_expr_norm_list), " dataset(s)",
+      if (rnaseq_removed > 0) {
+        paste0(", ", format(rnaseq_removed, big.mark = ","),
+               " genes were removed due to low-expression filtering (RNA-seq)")
+      },
+      ", resulting in ", format(after_filter_total, big.mark = ","),
+      " genes after individual dataset normalization. ",
+      "After automatic filtering to common genes (intersection), ",
+      format(final_count, big.mark = ","),
+      " high-confidence genes present in all datasets were retained for downstream analysis."
+    )
+
+    log_text <- paste0(
+      norm_out$log_text,
+      "\n\u2713 Normalization Complete!\n",
+      "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+      "Gene Statistics Summary:\n",
+      "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n"
+    )
+    if (rnaseq_removed > 0) {
+      log_text <- paste0(
+        log_text,
+        "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
+        "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n"
+      )
+    }
+    log_text <- paste0(
+      log_text,
+      "  Gene Filtering:           Filtered to common genes (intersection)\n",
+      "  Common genes retained: ", format(final_count, big.mark = ","), "\n",
+      "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+      "Final Dataset:\n",
+      "  Genes:   ", format(nrow(rv$combined_expr), big.mark = ","), "\n",
+      "  Samples: ", format(ncol(rv$combined_expr), big.mark = ","), "\n",
+      "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+      "\nNote: DE analysis applies independent gene filtering (filterByExpr) at Step 6.\n",
+      "      Batch correction may apply an optional variance filter in Step 5.\n"
+    )
+
+    list(
+      log_text = log_text,
+      total_genes = nrow(rv$combined_expr),
+      total_samples = ncol(rv$combined_expr)
+    )
+  }
   
+  observeEvent(input$analysis_type, {
+    if (identical(input$analysis_type, "merged")) {
+      tryCatch(
+        updateCheckboxInput(session, "apply_global_quantile", value = FALSE),
+        error = function(e) NULL
+      )
+    }
+  })
+
   observeEvent(input$apply_normalization, {
     if (!isTRUE(rv$download_complete)) {
       showNotification(
@@ -53,6 +166,16 @@ server_normalize <- function(input, output, session, rv) {
     
     rv$normalize_start <- Sys.time()
     rv$normalize_running <- TRUE
+
+    .norm_reset_ui <- function() {
+      rv$normalize_running <- FALSE
+      tryCatch(shinyjs::enable("apply_normalization"), error = function(e) NULL)
+      tryCatch(
+        shinyjs::html("apply_normalization", HTML('<i class="fa fa-check-circle"></i> Apply Normalization')),
+        error = function(e) NULL
+      )
+      removeNotification("normalize_processing")
+    }
     
     # Show processing notification
     showNotification(
@@ -69,11 +192,6 @@ server_normalize <- function(input, output, session, rv) {
     )
     
     withProgress(message = 'Normalizing...', value = 0, {
-      log_text <- "Normalizing data...\n\n"
-      all_expr_norm <- list()
-      normalization_stats <- list()
-
-      # Normalization method choices (defaults if not set)
       mode <- if (is.null(input$normalize_mode) || !nzchar(input$normalize_mode)) "auto" else input$normalize_mode
       if (identical(mode, "auto")) {
         micro_norm_method <- "quantile"
@@ -82,264 +200,41 @@ server_normalize <- function(input, output, session, rv) {
         micro_norm_method <- if (!is.null(input$micro_norm_method)) input$micro_norm_method else "quantile"
         rnaseq_norm_method <- if (!is.null(input$rnaseq_norm_method)) input$rnaseq_norm_method else "TMM"
       }
+      de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
+      apply_gq <- if (!is.null(input$apply_global_quantile)) isTRUE(input$apply_global_quantile) else TRUE
 
-      # Normalize microarray
-      if (length(rv$micro_expr_list) > 0) {
-        log_text <- paste0(log_text, "Microarray normalization (method: ", micro_norm_method, "):\n")
-        for (gse in names(rv$micro_expr_list)) {
-          use_rma <- (micro_norm_method == "rma") && !is.null(rv$micro_cel_paths) && length(rv$micro_cel_paths[[gse]]) > 0
-          if (use_rma) {
-            plat <- if (!is.null(rv$platform_per_gse)) rv$platform_per_gse[[gse]] else NULL
-            probe_mat <- normalize_microarray_rma(rv$micro_cel_paths[[gse]], plat, dataset_name = gse)
-            if (!is.null(probe_mat) && nrow(probe_mat) > 0 && ncol(probe_mat) > 0) {
-              micro_eset <- rv$micro_eset_list[[gse]]
-              fdata <- if (!is.null(micro_eset)) Biobase::fData(micro_eset) else data.frame()
-              gene_symbols <- suppressMessages(map_microarray_ids(probe_mat, fdata, micro_eset, gse_id = gse))
-              rownames(probe_mat) <- gene_symbols
-              valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
-              expr_norm <- probe_mat[valid, , drop = FALSE]
-              if (nrow(expr_norm) > 0 && any(duplicated(rownames(expr_norm)))) {
-                expr_norm <- limma::avereps(expr_norm, ID = rownames(expr_norm))
-              }
-              norm_info <- attr(probe_mat, "normalization_info")
-              if (is.null(norm_info)) norm_info <- list(initial_genes = nrow(probe_mat), final_genes = nrow(expr_norm), method = "RMA")
-              attr(expr_norm, "normalization_info") <- norm_info
-              all_expr_norm[[gse]] <- expr_norm
-              normalization_stats[[gse]] <- norm_info
-              log_text <- paste0(log_text, "  ", gse, ": RMA → ", format(nrow(expr_norm), big.mark = ","), " genes ✓\n")
-            } else {
-              expr_norm <- normalize_microarray(rv$micro_expr_list[[gse]], dataset_name = gse, method = "quantile")
-              norm_info <- attr(expr_norm, "normalization_info")
-              all_expr_norm[[gse]] <- expr_norm
-              normalization_stats[[gse]] <- norm_info
-              log_text <- paste0(log_text, "  ", gse, ": RMA not available, used Quantile. ", format(norm_info$final_genes, big.mark = ","), " genes ✓\n")
-            }
-          } else {
-            expr_norm <- normalize_microarray(rv$micro_expr_list[[gse]], dataset_name = gse, method = "quantile")
-            norm_info <- attr(expr_norm, "normalization_info")
-            all_expr_norm[[gse]] <- expr_norm
-            normalization_stats[[gse]] <- norm_info
-            log_text <- paste0(log_text, "  ", gse, ": ", format(norm_info$initial_genes, big.mark = ","), " → ",
-                              format(norm_info$final_genes, big.mark = ","), " genes ✓\n")
-          }
+      norm_res <- tryCatch(
+        .apply_norm_pipeline_to_rv(
+          rv, micro_norm_method, rnaseq_norm_method, de_method, apply_global_quantile = apply_gq
+        ),
+        error = function(e) {
+          .norm_reset_ui()
+          showNotification(
+            tags$div(
+              icon("exclamation-triangle"),
+              tags$strong(" Normalization failed: "),
+              conditionMessage(e)
+            ),
+            type = "error", duration = 12
+          )
+          NULL
         }
-      }
-      
-      incProgress(0.5)
-      
-      # Normalize RNA-seq
-      if (length(rv$rna_counts_list) > 0) {
-        log_text <- paste0(log_text, "\nRNA-seq normalization (method: ", rnaseq_norm_method, "):\n")
-        for (gse in names(rv$rna_counts_list)) {
-          expr_norm <- normalize_rnaseq(rv$rna_counts_list[[gse]], dataset_name = gse, method = rnaseq_norm_method)
-          norm_info <- attr(expr_norm, "normalization_info")
-          
-          all_expr_norm[[gse]] <- expr_norm
-          normalization_stats[[gse]] <- norm_info
-          
-          log_text <- paste0(log_text, "  ", gse, ": ", 
-                            format(norm_info$initial_genes, big.mark = ","), " → ",
-                            format(norm_info$genes_after_filtering, big.mark = ","),
-                            " (removed ", format(norm_info$genes_removed, big.mark = ","), " low-expression) ✓\n")
-        }
-      }
-      
-      # Calculate statistics before filtering
-      gene_lists <- lapply(all_expr_norm, rownames)
-      initial_total <- sum(sapply(normalization_stats, function(info) {
-        if (!is.null(info)) info$initial_genes else 0
-      }), na.rm = TRUE)
-      
-      after_filter_total <- sum(sapply(normalization_stats, function(info) {
-        if (!is.null(info)) {
-          if (!is.null(info$genes_after_filtering)) {
-            info$genes_after_filtering
-          } else {
-            info$final_genes
-          }
-        } else 0
-      }), na.rm = TRUE)
-      
-      rnaseq_removed <- sum(sapply(normalization_stats, function(info) {
-        if (!is.null(info) && !is.null(info$genes_removed)) {
-          info$genes_removed
-        } else 0
-      }), na.rm = TRUE)
-      
-      # Automatically filter to common genes (intersection) - required for downstream analysis
-      log_text <- paste0(log_text, "\nAutomatic gene filtering (background process):\n")
-      log_text <- paste0(log_text, "  Filtering to common genes ensures consistent gene sets across datasets.\n")
-      log_text <- paste0(log_text, "  This is required for accurate batch correction and differential expression analysis.\n")
-
-      rv$common_genes <- Reduce(intersect, gene_lists)
-      for (i in seq_along(all_expr_norm)) {
-        all_expr_norm[[i]] <- all_expr_norm[[i]][rv$common_genes, ]
-      }
-
-      filter_status <- "Filtered to common genes (intersection)"
-      filter_note <- paste0("  Common genes retained: ", format(length(rv$common_genes), big.mark = ","), "\n")
-      final_count <- length(rv$common_genes)
-
-      log_text <- paste0(log_text, "  ✓ Common genes identified: ", format(length(rv$common_genes), big.mark = ","), "\n")
-      
-      # Store statistics for reporting
-      rv$normalization_stats <- list(
-        initial_total = initial_total,
-        after_filter_total = after_filter_total,
-        rnaseq_removed = rnaseq_removed,
-        final_count = final_count,
-        filter_method = "intersection"
       )
-      
-      # Store pre-combined normalized data for visualization
-      rv$all_expr_norm_list <- all_expr_norm
+      if (is.null(norm_res)) return()
 
-      # Combine individual normalized datasets (before global normalization)
-      combined_before_global <- do.call(cbind, all_expr_norm)
-      rv$combined_expr_before_global_norm <- combined_before_global
+      log_text <- norm_res$log_text
+      total_genes <- norm_res$total_genes
+      total_samples <- norm_res$total_samples
 
-      # Apply global quantile normalization
-      rv$combined_expr <- limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
-
-      # ====================================================================
-      # SAVE RAW COUNTS FOR DESeq2 (before global quantile normalization)
-      # ====================================================================
-      # Count-based methods (DESeq2 / edgeR / limma-voom) require integer counts (raw, un-normalized).
-      # For RNA-seq: save the original counts (pre-TMM) filtered to common genes.
-      # For microarray: these methods are not appropriate (continuous data); raw not saved.
-      # Always save raw counts when RNA-seq data is present, regardless of which DE method
-      # is currently selected. The user may change the DE method after normalization, and
-      # if raw counts were not saved they would get a confusing "re-run normalization" error.
-      if (length(rv$rna_counts_list) > 0) {
-        raw_counts_list <- list()
-        for (gse in names(rv$rna_counts_list)) {
-          raw_mat <- as.matrix(rv$rna_counts_list[[gse]])
-          # Keep only common genes
-          common_in_raw <- intersect(rv$common_genes, rownames(raw_mat))
-          if (length(common_in_raw) > 0) {
-            raw_counts_list[[gse]] <- raw_mat[common_in_raw, , drop = FALSE]
-          }
-        }
-        if (length(raw_counts_list) > 0) {
-          rv$raw_counts_for_deseq2 <- do.call(cbind, raw_counts_list)
-          # Ensure integer counts (round any fractional values from gene mapping)
-          rv$raw_counts_for_deseq2 <- round(rv$raw_counts_for_deseq2)
-          storage.mode(rv$raw_counts_for_deseq2) <- "integer"
-          log_text <- paste0(log_text, "  ✓ Raw counts saved for DESeq2: ",
-                            format(nrow(rv$raw_counts_for_deseq2), big.mark = ","), " genes × ",
-                            format(ncol(rv$raw_counts_for_deseq2), big.mark = ","), " samples\n")
-        }
-      }
-      
-      # Create metadata
-      micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
-      rna_n <- if (length(rv$rna_counts_list) > 0) sum(vapply(rv$rna_counts_list, ncol, integer(1))) else 0L
-      platform_labels <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
-      dataset_labels <- rep(names(all_expr_norm), times = vapply(all_expr_norm, ncol, integer(1)))
-      
-      rv$unified_metadata <- data.frame(
-        SampleID = colnames(rv$combined_expr),
-        Platform = platform_labels,
-        Dataset = dataset_labels,
-        Condition = NA_character_,
-        row.names = colnames(rv$combined_expr)
-      )
-      
-      total_genes <- nrow(rv$combined_expr)
-      total_samples <- ncol(rv$combined_expr)
-      
-      # Store metadata for DESeq2 raw counts (align samples if raw counts were saved)
-      if (!is.null(rv$raw_counts_for_deseq2)) {
-        raw_samples <- colnames(rv$raw_counts_for_deseq2)
-        meta_samples <- rv$unified_metadata$SampleID
-        common_samples <- intersect(raw_samples, meta_samples)
-        if (length(common_samples) > 0) {
-          rv$raw_counts_for_deseq2 <- rv$raw_counts_for_deseq2[, common_samples, drop = FALSE]
-          rv$raw_counts_metadata <- rv$unified_metadata[rv$unified_metadata$SampleID %in% common_samples, , drop = FALSE]
-        }
-      }
-      
-      # Create detailed summary table
-      summary_data <- data.frame(
-        Dataset = names(normalization_stats),
-        Initial_Genes = sapply(normalization_stats, function(x) {
-          if (!is.null(x)) x$initial_genes else 0
-        }),
-        After_Filtering = sapply(normalization_stats, function(x) {
-          if (!is.null(x)) {
-            if (!is.null(x$genes_after_filtering)) {
-              x$genes_after_filtering
-            } else {
-              x$final_genes
-            }
-          } else 0
-        }),
-        Final_Common_Genes = final_count,
-        stringsAsFactors = FALSE
-      )
-      
-      # Add totals row
-      summary_data <- rbind(summary_data,
-                            data.frame(
-                              Dataset = "TOTAL/COMMON",
-                              Initial_Genes = sum(summary_data$Initial_Genes),
-                              After_Filtering = sum(summary_data$After_Filtering),
-                              Final_Common_Genes = final_count,
-                              stringsAsFactors = FALSE
-                            ))
-      
-      rv$normalization_summary_table <- summary_data
-      
-      # Generate detailed summary
-      log_text <- paste0(log_text, "\n✓ Normalization Complete!\n",
-                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
-                         "Gene Statistics Summary:\n",
-                         "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n")
-      
-      if (rnaseq_removed > 0) {
-        log_text <- paste0(log_text,
-                           "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
-                           "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n")
-      }
-      
-      log_text <- paste0(log_text,
-                         "  Gene Filtering:           ", filter_status, "\n",
-                         filter_note,
-                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
-                         "Final Dataset:\n",
-                         "  Genes:   ", format(total_genes, big.mark = ","), "\n",
-                         "  Samples: ", format(total_samples, big.mark = ","), "\n",
-                         "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
-                         "\nNote: Gene count may be reduced after group selection\n",
-                         "      and variance filtering in batch correction.\n")
-      
-      # Generate report caption
-      rv$normalization_caption <- paste0(
-        "Gene Expression Normalization Pipeline: Starting with ",
-        format(initial_total, big.mark = ","), " total genes across ",
-        length(all_expr_norm), " dataset(s)",
-        if (rnaseq_removed > 0) {
-          paste0(", ", format(rnaseq_removed, big.mark = ","),
-                 " genes were removed due to low-expression filtering (RNA-seq)")
-        },
-        ", resulting in ", format(after_filter_total, big.mark = ","),
-        " genes after individual dataset normalization. ",
-        "After automatic filtering to common genes (intersection), ",
-        format(final_count, big.mark = ","),
-        " high-confidence genes present in all datasets were retained for downstream analysis."
-      )
-      
       rv$normalization_complete <- TRUE
       rv$normalize_running <- FALSE
       
       output$normalization_log <- renderText({ log_text })
       
-      # Re-enable button
       shinyjs::enable("apply_normalization")
       shinyjs::html("apply_normalization", 
                     HTML('<i class="fa fa-check-circle"></i> Apply Normalization'))
       
-      # Remove processing notification
       removeNotification("normalize_processing")
       
       # Show notification with gene count
@@ -355,7 +250,9 @@ server_normalize <- function(input, output, session, rv) {
       )
     })
 
-    rv$normalize_running <- FALSE
+    if (!isTRUE(rv$normalization_complete)) {
+      rv$normalize_running <- FALSE
+    }
   })
   
   # ==========================================================================
@@ -369,78 +266,12 @@ server_normalize <- function(input, output, session, rv) {
     if (is.null(input$de_method) || !(input$de_method %in% c("deseq2", "edger", "limma_voom"))) return()
     if (isTRUE(rv$normalization_complete)) return()
     
-    # Run the same normalization logic silently
+    # Run the same normalization logic silently via R/ helper
     tryCatch({
       rv$normalize_running <- TRUE
-      
-      all_expr_norm <- list()
-      
-      # Normalize microarray
-      if (length(rv$micro_expr_list) > 0) {
-        for (gse in names(rv$micro_expr_list)) {
-          all_expr_norm[[gse]] <- normalize_microarray(rv$micro_expr_list[[gse]], dataset_name = gse)
-        }
-      }
-      
-      # Normalize RNA-seq
-      if (length(rv$rna_counts_list) > 0) {
-        for (gse in names(rv$rna_counts_list)) {
-          all_expr_norm[[gse]] <- normalize_rnaseq(rv$rna_counts_list[[gse]], dataset_name = gse)
-        }
-      }
-      
-      # Filter to common genes
-      gene_lists <- lapply(all_expr_norm, rownames)
-      rv$common_genes <- Reduce(intersect, gene_lists)
-      for (i in seq_along(all_expr_norm)) {
-        all_expr_norm[[i]] <- all_expr_norm[[i]][rv$common_genes, ]
-      }
-
-      # Save raw counts for DESeq2 before global normalization
-      if (length(rv$rna_counts_list) > 0) {
-        raw_counts_list <- list()
-        for (gse in names(rv$rna_counts_list)) {
-          raw_mat <- as.matrix(rv$rna_counts_list[[gse]])
-          common_in_raw <- intersect(rv$common_genes, rownames(raw_mat))
-          if (length(common_in_raw) > 0) {
-            raw_counts_list[[gse]] <- raw_mat[common_in_raw, , drop = FALSE]
-          }
-        }
-        if (length(raw_counts_list) > 0) {
-          rv$raw_counts_for_deseq2 <- round(do.call(cbind, raw_counts_list))
-          storage.mode(rv$raw_counts_for_deseq2) <- "integer"
-        }
-      }
-      
-      # Combine and apply global quantile normalization
-      combined_before_global <- do.call(cbind, all_expr_norm)
-      rv$combined_expr_before_global_norm <- combined_before_global
-      rv$combined_expr <- limma::normalizeBetweenArrays(combined_before_global, method = "quantile")
-      rv$all_expr_norm_list <- all_expr_norm
-      
-      # Create metadata
-      micro_n <- if (length(rv$micro_expr_list) > 0) sum(vapply(rv$micro_expr_list, ncol, integer(1))) else 0L
-      rna_n   <- if (length(rv$rna_counts_list) > 0) sum(vapply(rv$rna_counts_list, ncol, integer(1))) else 0L
-      platform_labels <- c(rep("Microarray", micro_n), rep("RNAseq", rna_n))
-      dataset_labels  <- rep(names(all_expr_norm), times = vapply(all_expr_norm, ncol, integer(1)))
-      
-      rv$unified_metadata <- data.frame(
-        SampleID  = colnames(rv$combined_expr),
-        Platform  = platform_labels,
-        Dataset   = dataset_labels,
-        Condition = NA_character_,
-        row.names = colnames(rv$combined_expr)
-      )
-      
-      # Align raw counts metadata
-      if (!is.null(rv$raw_counts_for_deseq2)) {
-        common_samp <- intersect(colnames(rv$raw_counts_for_deseq2), rv$unified_metadata$SampleID)
-        if (length(common_samp) > 0) {
-          rv$raw_counts_for_deseq2 <- rv$raw_counts_for_deseq2[, common_samp, drop = FALSE]
-          rv$raw_counts_metadata   <- rv$unified_metadata[rv$unified_metadata$SampleID %in% common_samp, , drop = FALSE]
-        }
-      }
-      
+      de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
+      apply_gq <- if (!is.null(input$apply_global_quantile)) isTRUE(input$apply_global_quantile) else TRUE
+      .apply_norm_pipeline_to_rv(rv, "quantile", "TMM", de_method, apply_global_quantile = apply_gq)
       rv$normalization_complete <- TRUE
       rv$normalize_running <- FALSE
       
@@ -894,13 +725,22 @@ server_normalize <- function(input, output, session, rv) {
         Expression = as.vector(expr_after),
         Dataset = rep(sample_stats$Dataset, each = nrow(expr_after))
       )
+
+      ctx <- .norm_plot_context()
+      med_sub <- if (isTRUE(ctx$mixed_no_gq)) {
+        "Mixed platform, global quantile OFF: OK if each GSE block is internally aligned (offset across GSEs is expected)"
+      } else if (isTRUE(ctx$mixed_gq)) {
+        "Global quantile ON: all medians match visually — alignment is forced; not recommended for mixed microarray + RNA-seq"
+      } else {
+        "Aligned medians and ranges across samples indicate successful normalization"
+      }
       
       p <- ggplot(plot_data, aes(x = Sample, y = Expression, fill = Dataset)) +
         geom_boxplot(alpha = 0.7, outlier.size = 0.5, outlier.alpha = 0.3) +
         theme_bw(base_size = 11) +
         labs(
           title = "Median & Range Alignment",
-          subtitle = "Aligned medians and ranges indicate successful normalization",
+          subtitle = med_sub,
           x = "Sample",
           y = "Expression Value",
           fill = "Dataset"
@@ -984,6 +824,15 @@ server_normalize <- function(input, output, session, rv) {
       
       plot_data <- do.call(rbind, plot_data_list)
       plot_data$Stage <- factor(plot_data$Stage, levels = c("Before", "After"))
+
+      ctx <- .norm_plot_context()
+      dist_sub <- if (isTRUE(ctx$mixed_no_gq)) {
+        "Within each GSE facet, curves should overlap; different peak positions between facets are expected without global quantile"
+      } else if (isTRUE(ctx$mixed_gq)) {
+        "Global quantile warped all samples to one scale — visual overlap does not mean biologically safe for mixed platforms"
+      } else {
+        "Overlapping distributions indicate successful normalization"
+      }
       
       p <- ggplot(plot_data, aes(x = x, y = y, color = Stage, group = interaction(Sample, Stage))) +
         geom_line(alpha = 0.6, linewidth = 0.7) +
@@ -992,7 +841,7 @@ server_normalize <- function(input, output, session, rv) {
         theme_bw(base_size = 12) +
         labs(
           title = "Distribution Overlap",
-          subtitle = "Overlapping distributions indicate successful normalization",
+          subtitle = dist_sub,
           x = "Expression Value",
           y = "Density",
           color = "Stage"
@@ -1222,6 +1071,71 @@ server_normalize <- function(input, output, session, rv) {
       write.csv(rv$normalization_summary_table, file.path(CSV_EXPORT_DIR(), "Normalization_Summary_Table.csv"), row.names = FALSE)
     }
   )
+
+  output$normalize_mixed_scale_ui <- renderUI({
+    if (!isTRUE(rv$normalization_complete)) return(NULL)
+    mixed <- FALSE
+    if (!is.null(rv$unified_metadata)) {
+      mixed <- gexpipe_has_mixed_platforms(rv$unified_metadata)
+    } else {
+      n_micro <- length(if (is.null(rv$micro_expr_list)) list() else rv$micro_expr_list)
+      n_rna <- length(if (is.null(rv$rna_counts_list)) list() else rv$rna_counts_list)
+      mixed <- n_micro > 0L && n_rna > 0L
+    }
+    if (!mixed) return(NULL)
+    gq_on <- !is.null(input$apply_global_quantile) && isTRUE(input$apply_global_quantile)
+    if (gq_on) return(NULL)
+
+    column(
+      12,
+      box(
+        title = tags$span(icon("dna"), " Mixed platform — different scales are expected"),
+        width = 12,
+        status = "info",
+        solidHeader = TRUE,
+        collapsible = TRUE,
+        collapsed = FALSE,
+        tags$div(
+          class = "alert alert-info",
+          style = "margin: 0; font-size: 13px; line-height: 1.65;",
+          tags$p(
+            style = "margin: 0 0 10px 0;",
+            icon("info-circle"),
+            tags$strong(" You correctly left global quantile OFF."),
+            " Microarray and RNA-seq are normalized correctly ",
+            tags$strong("within each study"),
+            " (TMM/log-CPM vs quantile log-intensity). They ",
+            tags$strong("should not"),
+            " share the same median when global quantile is off — that offset is ",
+            tags$em("not"),
+            " failed normalization."
+          ),
+          tags$p(
+            style = "margin: 0 0 10px 0; padding: 8px; background: #fff3cd; border-radius: 4px; font-size: 12px;",
+            icon("exclamation-triangle"),
+            tags$strong(" Why global quantile looks \"better\": "),
+            "it forces every sample to the same distribution, so plots look perfect. For mixed platforms that can ",
+            tags$strong("hide technology bias"),
+            " and distort RNA-seq counts. Use batch correction (Step 5) instead of global quantile for cross-platform alignment."
+          ),
+          tags$p(tags$strong("What to do before Step 5 (batch correction):"), style = "margin: 0 0 6px 0;"),
+          tags$ol(
+            style = "margin: 0 0 10px 0; padding-left: 22px;",
+            tags$li(tags$strong("Step 4:"), " Assign Normal / Disease groups."),
+            tags$li(tags$strong("Step 5:"), " Use ", tags$strong("limma removeBatchEffect"), " (not ComBat alone). Check Platform PCA — platforms should intermingle after correction."),
+            tags$li(tags$strong("Step 6:"), " Use ", tags$strong("limma"), " DE (auto-selected for merged). Platform is included in the model when estimable.")
+          ),
+          tags$p(
+            style = "margin: 0; font-size: 12px; color: #555;",
+            icon("lightbulb"),
+            " Within each dataset, samples should already align (density facets per GSE). Between-platform alignment is handled in ",
+            tags$strong("batch correction"),
+            ", not by global quantile here."
+          )
+        )
+      )
+    )
+  })
 
   output$normalize_process_summary_ui <- renderUI({
     if (is.null(rv$normalization_summary_table) || nrow(rv$normalization_summary_table) == 0) {
