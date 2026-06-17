@@ -1,5 +1,24 @@
 # GExPipe NEWS
 
+## Version 0.99.9
+
+### Machine learning (glmnet) — no more skipped LASSO / Elastic Net / Ridge
+- Fixed a bug where a failed in-session `glmnet` check could return `FALSE` instead
+  of falling through to the subprocess path.
+- LASSO, Elastic Net, and Ridge are **never skipped** when an isolated R subprocess
+  can run `cv.glmnet` (Windows DLL lock after rebuild no longer blocks ML).
+- Shiny server modules now receive glmnet helper functions from the package namespace.
+- `runGExPipe()` prints glmnet readiness at startup.
+
+### PVCA & GitHub / `install_github` launches
+- `gexpipe_pvca_df()` is resolved via `.gexpipe_call()` and `gexp_platform_helpers.R`
+  is sourced in `global.R`, so PVCA plots work from GitHub checkout and installed runs.
+- Server modules inherit from the `GExPipe` namespace so exported helpers are visible.
+
+### UI
+- Batch confounding table: black text on white background (readable in success alert).
+- ML step: guidance for smooth glmnet runs after install or R upgrade.
+
 ## Version 0.99.8
 
 ### Mixed microarray + RNA-seq — platform covariates, caveats, and diagnostics
