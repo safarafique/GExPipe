@@ -13,10 +13,18 @@
     .GlobalEnv
   }
   env <- new.env(parent = parent_env)
-  if (exists(".gexpipe_call", envir = parent_env, inherits = FALSE, mode = "function")) {
-    assign(".gexpipe_call", get(".gexpipe_call", envir = parent_env, mode = "function"), envir = env)
-  } else if (exists(".gexpipe_call", envir = .GlobalEnv, inherits = FALSE, mode = "function")) {
-    assign(".gexpipe_call", get(".gexpipe_call", envir = .GlobalEnv, mode = "function"), envir = env)
+  for (helper in c(
+    ".gexpipe_call",
+    ".gexpipe_glmnet_cv_fit",
+    ".gexpipe_glmnet_smoke_subprocess",
+    ".gexpipe_native_session_ok",
+    ".gexpipe_get_lib"
+  )) {
+    if (exists(helper, envir = parent_env, inherits = FALSE, mode = "function")) {
+      assign(helper, get(helper, envir = parent_env, mode = "function"), envir = env)
+    } else if (exists(helper, envir = .GlobalEnv, inherits = FALSE, mode = "function")) {
+      assign(helper, get(helper, envir = .GlobalEnv, mode = "function"), envir = env)
+    }
   }
   source(p, local = env)
   if (!exists(object_name, envir = env, inherits = FALSE)) {
