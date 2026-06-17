@@ -103,8 +103,10 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
     glm_ok <- tryCatch({
       if (exists(".gexpipe_native_session_ok", mode = "function")) {
         isTRUE(.gexpipe_native_session_ok("glmnet", try_repair = TRUE))
+      } else if (exists(".gexpipe_glmnet_smoke", mode = "function")) {
+        isTRUE(.gexpipe_glmnet_smoke())
       } else {
-        tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE)
+        FALSE
       }
     }, error = function(e) FALSE)
     if (isTRUE(glm_ok)) {
