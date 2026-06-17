@@ -58,6 +58,7 @@ gexp_batch_correct <- function(
   if (!all(c("Dataset", "Condition") %in% colnames(metadata))) {
     stop("metadata must contain 'Dataset' and 'Condition' columns.")
   }
+  metadata <- .gexpipe_align_metadata_to_expr(expr, metadata)
   method <- match.arg(method)
   variance_percentile <- max(0, min(50, as.numeric(variance_percentile)))
 
@@ -174,50 +175,33 @@ gexp_batch_correct <- function(
       error = function(e) 0L
     )
     n_sv <- max(0L, min(n_sv, 10L))
-    if (n_sv > 0) {
-      svobj <- tryCatch(
+    svobj <- if (n_sv > 0) {
+      tryCatch(
         sva::sva(as.matrix(expr_filtered), mod, mod0, n.sv = n_sv),
         error = function(e) NULL
       )
-      if (!is.null(svobj) && ncol(svobj$sv) > 0) {
-        mod_sv <- cbind(mod, svobj$sv)
-        batch_corrected <- sva::ComBat(
-          expr_filtered,
-          batch = metadata$Dataset,
-          mod = mod_sv,
-          par.prior = TRUE,
-          prior.plots = FALSE
-        )
-        log_text <- paste0(
-          log_text,
-          "Batch method: SVA + ComBat (", n_sv, " SVs)\n"
-        )
-      } else {
-        batch_corrected <- sva::ComBat(
-          expr_filtered,
-          batch = metadata$Dataset,
-          mod = mod,
-          par.prior = TRUE,
-          prior.plots = FALSE
-        )
-        log_text <- paste0(
-          log_text,
-          "Batch method: SVA requested, but SV computation failed; used ComBat with Condition in mod\n"
-        )
-      }
     } else {
-      batch_corrected <- sva::ComBat(
-        expr_filtered,
-        batch = metadata$Dataset,
-        mod = mod,
-        par.prior = TRUE,
-        prior.plots = FALSE
-      )
-      log_text <- paste0(
-        log_text,
-        "Batch method: SVA requested, but num.sv returned 0; used ComBat with Condition in mod\n"
-      )
+      NULL
     }
+    sv_ok <- !is.null(svobj) && ncol(svobj$sv) > 0
+    mod_use <- if (sv_ok) cbind(mod, svobj$sv) else mod
+    batch_corrected <- sva::ComBat(
+      expr_filtered,
+      batch = metadata$Dataset,
+      mod = mod_use,
+      par.prior = TRUE,
+      prior.plots = FALSE
+    )
+    log_text <- paste0(
+      log_text,
+      if (sv_ok) {
+        paste0("Batch method: SVA + ComBat (", n_sv, " SVs)\n")
+      } else if (n_sv > 0) {
+        "Batch method: SVA requested, but SV computation failed; used ComBat with Condition in mod\n"
+      } else {
+        "Batch method: SVA requested, but num.sv returned 0; used ComBat with Condition in mod\n"
+      }
+    )
   }
 
   list(

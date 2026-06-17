@@ -279,6 +279,20 @@ gexp_app_server <- function(input, output, session) {
         duration = 6
       )
     }
+    if (identical(input$analysis_type, "merged") &&
+      !is.null(input$de_method) &&
+      input$de_method %in% c("deseq2", "edger", "limma_voom")) {
+      shiny::updateRadioButtons(session, "de_method", selected = "limma")
+      shiny::showNotification(
+        shiny::tags$div(
+          shiny::icon("info-circle"),
+          shiny::tags$strong(" DE method switched to limma."),
+          " Mixed-platform merged runs use log-expression on the common gene intersection; count-based DE (DESeq2/edgeR/voom) is not applied across platforms."
+        ),
+        type = "warning",
+        duration = 8
+      )
+    }
   })
 
   # Heavy work deferred to first flush: sourcing ~15 server modules was blocking the initial

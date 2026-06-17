@@ -4,6 +4,16 @@
 
 server_results <- function(input, output, session, rv) {
 
+  .record_de_transparency <- function(meta_used, method, formula_desc, filter_note,
+                                      total_meta = NULL) {
+    if (is.null(total_meta)) total_meta <- rv$unified_metadata
+    rv$de_design_formula <<- formula_desc
+    rv$de_gene_filter_note <<- filter_note
+    rv$de_sample_info <<- GExPipe::gexpipe_de_sample_info(
+      meta_used, total_meta = total_meta, method = method
+    )
+  }
+
   # ---------- METHOD BANNER (shows active DE method on Step 6) ----------
   output$results_process_summary_ui <- renderUI({
     if (is.null(rv$sig_genes) || nrow(rv$sig_genes) == 0) {
@@ -183,23 +193,24 @@ server_results <- function(input, output, session, rv) {
           }
           count_mat <- count_mat[, common_samples, drop = FALSE]
           meta <- meta[common_samples, , drop = FALSE]
+          total_meta <- rv$unified_metadata
           
           # Ensure Condition is a factor
           meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
           
-          # Remove any rows with all zeros
-          keep <- rowSums(count_mat) > 0
-          count_mat <- count_mat[keep, , drop = FALSE]
+          ds_design <- gexpipe_deseq2_design(meta)
+          design_mm <- stats::model.matrix(ds_design$formula, data = meta)
+          filt <- GExPipe::gexpipe_independent_filter(count_mat, design = design_mm)
+          count_mat <- filt$expr
+          .record_de_transparency(meta, "deseq2", ds_design$formula_desc, filt$note, total_meta)
           
           incProgress(0.2, detail = "Creating DESeqDataSet...")
           
-          ds_design <- gexpipe_deseq2_design(meta)
           dds <- DESeq2::DESeqDataSetFromMatrix(
             countData = count_mat,
             colData = meta,
             design = ds_design$formula
           )
-          rv$de_design_formula <- ds_design$formula_desc
           
           incProgress(0.3, detail = "Running DESeq2...")
           
@@ -271,22 +282,20 @@ server_results <- function(input, output, session, rv) {
           }
           count_mat <- count_mat[, common_samples, drop = FALSE]
           meta <- meta[common_samples, , drop = FALSE]
+          total_meta <- rv$unified_metadata
           
           meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
           
-          # Remove zero-count genes
-          keep <- rowSums(count_mat) > 0
-          count_mat <- count_mat[keep, , drop = FALSE]
+          de_design <- gexpipe_build_de_design(meta)
+          design <- de_design$design
+          filt <- GExPipe::gexpipe_independent_filter(count_mat, design = design)
+          count_mat <- filt$expr
+          .record_de_transparency(meta, "edger", de_design$formula_desc, filt$note, total_meta)
           
           incProgress(0.2, detail = "Creating DGEList...")
           
-          # Create DGEList and apply TMM normalization
           dge <- edgeR::DGEList(counts = count_mat, group = meta$Condition)
           dge <- edgeR::calcNormFactors(dge, method = "TMM")
-          
-          de_design <- gexpipe_build_de_design(meta)
-          design <- de_design$design
-          rv$de_design_formula <- de_design$formula_desc
           
           incProgress(0.2, detail = "Estimating dispersion...")
           
@@ -357,17 +366,16 @@ server_results <- function(input, output, session, rv) {
           }
           count_mat <- count_mat[, common_samples, drop = FALSE]
           meta <- meta[common_samples, , drop = FALSE]
+          total_meta <- rv$unified_metadata
           
           # Ensure Condition is a factor
           meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
           
-          # Remove genes with all zero counts
-          keep <- rowSums(count_mat) > 0
-          count_mat <- count_mat[keep, , drop = FALSE]
-          
           de_design <- gexpipe_build_de_design(meta)
           design <- de_design$design
-          rv$de_design_formula <- de_design$formula_desc
+          filt <- GExPipe::gexpipe_independent_filter(count_mat, design = design)
+          count_mat <- filt$expr
+          .record_de_transparency(meta, "limma_voom", de_design$formula_desc, filt$note, total_meta)
           
           incProgress(0.3, detail = "Estimating mean–variance with voom...")
           
@@ -439,26 +447,34 @@ server_results <- function(input, output, session, rv) {
           }
           rv$batch_corrected <- rv$batch_corrected[, common_samp, drop = FALSE]
           meta <- meta[common_samp, , drop = FALSE]
+          total_meta <- rv$unified_metadata
           
           plat_info <- gexpipe_batch_covariate_info(meta)
           use_contrast <- length(unique(meta$Dataset)) == 1L && !plat_info$include_platform_covariate
+          expr_de <- rv$batch_corrected
           
           if (use_contrast) {
             design <- model.matrix(~ 0 + Condition, data = meta)
             colnames(design) <- levels(meta$Condition)
+            filt <- GExPipe::gexpipe_independent_filter(expr_de, design = design)
+            expr_de <- filt$expr
             contrast <- limma::makeContrasts(Disease - Normal, levels = design)
-            fit <- limma::lmFit(rv$batch_corrected, design)
+            fit <- limma::lmFit(expr_de, design)
             fit2 <- limma::contrasts.fit(fit, contrast)
             fit2 <- limma::eBayes(fit2)
             de_results <- limma::topTable(fit2, number = Inf, adjust.method = "BH")
-            rv$de_design_formula <- "~ Condition (contrast: Disease vs Normal)"
+            .record_de_transparency(
+              meta, "limma", "~ Condition (contrast: Disease vs Normal)", filt$note, total_meta
+            )
           } else {
             de_design <- gexpipe_build_de_design(meta)
             design <- de_design$design
-            rv$de_design_formula <- de_design$formula_desc
-            fit <- limma::lmFit(rv$batch_corrected, design)
+            filt <- GExPipe::gexpipe_independent_filter(expr_de, design = design)
+            expr_de <- filt$expr
+            fit <- limma::lmFit(expr_de, design)
             fit2 <- limma::eBayes(fit)
             de_results <- limma::topTable(fit2, coef = de_design$coef_condition, number = Inf, adjust.method = "BH")
+            .record_de_transparency(meta, "limma", de_design$formula_desc, filt$note, total_meta)
           }
           
           incProgress(0.5)
@@ -504,7 +520,41 @@ server_results <- function(input, output, session, rv) {
             color = "blue", fill = TRUE)
   })
   
-  # Pipeline verification: confirm DESeq2 + ComBat_ref and that volcano = real DE results
+  # Pipeline verification: confirm DE method, design formula, and samples used
+  output$de_model_details <- renderUI({
+    req(rv$de_results)
+    formula_txt <- if (!is.null(rv$de_design_formula) && nzchar(rv$de_design_formula)) {
+      rv$de_design_formula
+    } else {
+      "Not recorded"
+    }
+    filter_txt <- if (!is.null(rv$de_gene_filter_note) && nzchar(rv$de_gene_filter_note)) {
+      rv$de_gene_filter_note
+    } else {
+      "Independent filtering applied at DE time"
+    }
+    info <- rv$de_sample_info
+    sample_txt <- if (!is.null(info) && !is.null(info$note)) info$note else "See unified metadata"
+    plat_txt <- if (!is.null(info) && !is.null(info$platform_summary)) info$platform_summary else ""
+    cond_txt <- if (!is.null(info) && !is.null(info$condition_summary)) info$condition_summary else ""
+    tags$div(
+      class = "alert alert-secondary",
+      style = "margin: 0 15px 12px 15px; padding: 14px 18px; border-left: 5px solid #6c757d;",
+      tags$p(style = "margin: 0 0 8px 0; font-weight: 700; font-size: 14px;",
+             icon("calculator"), " Statistical model (this DE run)"),
+      tags$p(style = "margin: 0 0 6px 0; font-size: 13px;",
+             tags$strong("Design formula:"), " ", tags$code(formula_txt)),
+      tags$p(style = "margin: 0 0 6px 0; font-size: 13px;",
+             tags$strong("Gene filter:"), " ", filter_txt),
+      tags$p(style = "margin: 0 0 6px 0; font-size: 13px;",
+             tags$strong("Samples:"), " ", sample_txt),
+      if (nzchar(plat_txt)) tags$p(style = "margin: 0 0 4px 0; font-size: 12px; color: #555;",
+             tags$strong("Platform breakdown:"), " ", plat_txt) else NULL,
+      if (nzchar(cond_txt)) tags$p(style = "margin: 0; font-size: 12px; color: #555;",
+             tags$strong("Condition breakdown:"), " ", cond_txt) else NULL
+    )
+  })
+
   output$de_pipeline_verification <- renderUI({
     req(rv$de_results)
     method <- if (is.null(rv$de_method)) "limma" else rv$de_method
@@ -929,6 +979,35 @@ server_results <- function(input, output, session, rv) {
       fn <- paste0("Significant_Genes_", Sys.Date(), ".csv")
       write.csv(rv$sig_genes, file, row.names = FALSE)
       write.csv(rv$sig_genes, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+
+  output$download_analysis_report <- downloadHandler(
+    filename = function() paste0("GExPipe_Analysis_Report_", Sys.Date(), ".txt"),
+    content = function(file) {
+      params <- list(
+        analysis_type = if (!is.null(input$analysis_type)) input$analysis_type else "n/a",
+        de_method = if (!is.null(rv$de_method)) rv$de_method else "n/a",
+        batch_method = if (!is.null(input$batch_method)) input$batch_method else "n/a",
+        logfc_cutoff = if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else "n/a",
+        padj_cutoff = if (!is.null(input$padj_cutoff)) input$padj_cutoff else "n/a",
+        variance_percentile = if (!is.null(input$variance_percentile)) input$variance_percentile else "n/a",
+        global_quantile = if (!is.null(input$apply_global_quantile)) input$apply_global_quantile else "n/a",
+        de_design_formula = if (!is.null(rv$de_design_formula)) rv$de_design_formula else "n/a",
+        de_gene_filter = if (!is.null(rv$de_gene_filter_note)) rv$de_gene_filter_note else "n/a",
+        n_genes_de = if (!is.null(rv$de_results)) nrow(rv$de_results) else 0L,
+        n_sig_genes = if (!is.null(rv$sig_genes)) nrow(rv$sig_genes) else 0L,
+        n_samples = if (!is.null(rv$unified_metadata)) nrow(rv$unified_metadata) else 0L
+      )
+      if (!is.null(rv$unified_metadata)) {
+        sm <- gexpipe_batch_confounding_summary(rv$unified_metadata)
+        params$batch_confounding <- sm$message
+      }
+      if (!is.null(rv$de_sample_info)) {
+        params$de_samples <- rv$de_sample_info$note
+      }
+      lines <- gexpipe_analysis_report_text(params, include_session = TRUE)
+      writeLines(lines, file)
     }
   )
   

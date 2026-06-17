@@ -130,6 +130,17 @@ ui_normalize <- tabItem(
             )
           ),
           hr(),
+          checkboxInput(
+            "apply_global_quantile",
+            tags$span(
+              tags$strong("Apply global quantile normalization"),
+              " after per-dataset normalization (recommended for same-platform merges; ",
+              tags$em("off by default for mixed microarray + RNA-seq"),
+              ")"
+            ),
+            value = TRUE
+          ),
+          hr(),
           tags$div(
             style = "text-align: center;",
             actionButton("apply_normalization", "Apply Normalization", 
@@ -148,12 +159,18 @@ ui_normalize <- tabItem(
           style = "padding: 10px 0;",
           tags$p(
             tags$strong(icon("info-circle"), " Visualizations:"),
-            " Multiple plots showing different aspects of normalization quality.",
-            " After normalization, distributions should be more aligned across samples and datasets.",
+            " Check ", tags$strong("within each dataset"), " (samples should align). ",
+            "For ", tags$strong("mixed microarray + RNA-seq"), " with global quantile ",
+            tags$strong("off"), ", different median blocks across platforms are ",
+            tags$em("expected"), " — alignment happens in Step 5 (batch correction), not here.",
             style = "color: #495057; font-size: 13px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;"
           )
         )
       )
+    ),
+
+    fluidRow(
+      uiOutput("normalize_mixed_scale_ui")
     ),
     
     fluidRow(
