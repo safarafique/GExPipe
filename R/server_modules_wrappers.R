@@ -16,6 +16,7 @@
   for (helper in c(
     ".gexpipe_call",
     ".gexpipe_glmnet_cv_fit",
+    ".gexpipe_glmnet_smoke",
     ".gexpipe_glmnet_smoke_subprocess",
     ".gexpipe_native_session_ok",
     ".gexpipe_get_lib"
