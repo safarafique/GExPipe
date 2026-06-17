@@ -332,7 +332,7 @@ server_results_summary <- function(input, output, session, rv) {
     if (!requireNamespace("WGCNA", quietly = TRUE)) { par(bg = "white"); plot.new(); text(0.5, 0.5, "WGCNA required", cex = 1.2); return(invisible(NULL)) }
     op <- par(bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
-    .mtc <- GExPipe::gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+    .mtc <- gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
     WGCNA::labeledHeatmap(Matrix = .mtc, xLabels = colnames(.mtc), yLabels = rownames(.mtc), ySymbols = rownames(.mtc), colorLabels = FALSE, colors = WGCNA::blueWhiteRed(50), textMatrix = NULL, main = "Module-Trait Relationships")
   }, height = 260)
 
