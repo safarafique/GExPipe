@@ -1,5 +1,14 @@
 # GExPipe NEWS
 
+## Version 0.99.10
+
+### Machine learning — glmnet 5.x compatibility (fixes LASSO / Elastic Net / Ridge)
+- **Root cause:** `glmnet` 5.0 renamed `glmnet_control()` to `glmnet.control()`. GExPipe
+  was calling the old API, so every smoke test failed and ML reported
+  *"glmnet is not available…"* even when glmnet was installed.
+- New helper `.gexpipe_glmnet_smoke()` supports glmnet 4.x and 5.x.
+- Subprocess glmnet scripts updated for the new API.
+
 ## Version 0.99.9
 
 ### Machine learning (glmnet) — no more skipped LASSO / Elastic Net / Ridge
