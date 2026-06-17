@@ -425,10 +425,30 @@
   identical(built_r[1, 1:2], cur_r[1, 1:2])
 }
 
+## Lightweight glmnet native-code check (glmnet 4.x: glmnet_control; 5.x: glmnet.control).
+.gexpipe_glmnet_smoke <- function() {
+  if (!requireNamespace("glmnet", quietly = TRUE)) {
+    return(FALSE)
+  }
+  ns <- asNamespace("glmnet")
+  tryCatch({
+    if (exists("glmnet.control", envir = ns, inherits = FALSE, mode = "function")) {
+      get("glmnet.control", envir = ns, mode = "function")()
+    } else if (exists("glmnet_control", envir = ns, inherits = FALSE, mode = "function")) {
+      get("glmnet_control", envir = ns, mode = "function")()
+    } else {
+      x <- matrix(rnorm(20), nrow = 2)
+      y <- rep(0:1, each = 10)
+      glmnet::cv.glmnet(x, y, family = "binomial", nfolds = 3)
+    }
+    TRUE
+  }, error = function(e) FALSE)
+}
+
 ## Smoke-test native code for a package loaded from a specific library.
 .gexpipe_native_smoke_test <- function(pkg) {
   switch(pkg,
-    glmnet  = { glmnet::glmnet_control(); TRUE },
+    glmnet  = .gexpipe_glmnet_smoke(),
     xgboost = { xgboost::xgb.DMatrix(matrix(0, 1, 1)); TRUE },
     Matrix  = { Matrix::Matrix(1); TRUE },
     Rcpp    = TRUE,
@@ -453,6 +473,13 @@
 
 ## Return TRUE when native code for pkg works in this R session (optional repair).
 .gexpipe_native_session_ok <- function(pkg, lib = .gexpipe_get_lib(), try_repair = FALSE) {
+  if (identical(pkg, "glmnet")) {
+    ok <- .gexpipe_glmnet_smoke()
+    if (ok || !try_repair) return(isTRUE(ok))
+    .gexpipe_detach_pkg(pkg)
+    tryCatch(.gexpipe_ensure_native_pkg(pkg, lib = lib, quiet = TRUE), error = function(e) NULL)
+    return(isTRUE(.gexpipe_glmnet_smoke()))
+  }
   ok <- tryCatch({
     if (!requireNamespace(pkg, lib.loc = lib, quietly = TRUE)) return(FALSE)
     if (!isNamespaceLoaded(pkg)) loadNamespace(pkg, lib.loc = lib)
@@ -498,8 +525,8 @@
   libs_expr <- paste0('"', libs_fwd, '"', collapse = ", ")
   res <- .gexpipe_rscript_eval(c(
     paste0(".libPaths(c(", libs_expr, "))"),
-    "suppressPackageStartupMessages(library(glmnet, lib.loc = .libPaths()[1L]))",
-    "glmnet::glmnet_control()",
+    "suppressPackageStartupMessages(library(glmnet))",
+    "if (exists('glmnet.control', mode='function')) glmnet::glmnet.control() else if (exists('glmnet_control', mode='function')) glmnet::glmnet_control() else stop('no glmnet control')",
     'cat("OK\\n")'
   ), timeout = 120L)
   isTRUE(res$ok) && any(grepl("^OK$", res$log))
@@ -521,7 +548,7 @@
   libs_expr <- paste0('"', libs_fwd, '"', collapse = ", ")
   res <- .gexpipe_rscript_eval(c(
     paste0(".libPaths(c(", libs_expr, "))"),
-    "suppressPackageStartupMessages(library(glmnet, lib.loc = .libPaths()[1L]))",
+    "suppressPackageStartupMessages(library(glmnet))",
     paste0('x <- readRDS("', tmp_x, '")'),
     paste0('y <- readRDS("', tmp_y, '")'),
     paste0('fit <- glmnet::cv.glmnet(x, y, alpha = ', as.numeric(alpha),
@@ -539,13 +566,15 @@
 .gexpipe_glmnet_cv_fit <- function(x, y, alpha = 1, family = "binomial",
                                    lib = .gexpipe_get_lib()) {
   in_session <- tryCatch({
-    if (!requireNamespace("glmnet", lib.loc = lib, quietly = TRUE)) {
-      stop("glmnet is not installed in ", lib)
+    if (!requireNamespace("glmnet", quietly = TRUE)) {
+      stop("glmnet is not installed")
     }
     if (!isNamespaceLoaded("glmnet")) {
-      loadNamespace("glmnet", lib.loc = lib)
+      loadNamespace("glmnet")
     }
-    glmnet::glmnet_control()
+    if (!isTRUE(.gexpipe_glmnet_smoke())) {
+      stop("glmnet smoke test failed")
+    }
     glmnet::cv.glmnet(x, y, alpha = alpha, family = family)
   }, error = function(e) NULL)
   if (inherits(in_session, "cv.glmnet")) {
@@ -771,7 +800,7 @@
   # Per-package lightweight DLL smoke-tests.
   # Each entry is a zero-argument function that exercises native code.
   .dll_tests <- list(
-    glmnet   = function() glmnet::glmnet_control(),
+    glmnet   = function() .gexpipe_glmnet_smoke(),
     Matrix   = function() Matrix::Matrix(1),
     Rcpp     = function() Rcpp::evalCpp("1 + 1"),
     xgboost  = function() xgboost::xgb.DMatrix(matrix(0, 1, 1)),

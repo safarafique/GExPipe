@@ -190,9 +190,13 @@ server_ml <- function(input, output, session, rv) {
     }
 
     if (any(c("lasso", "elastic", "ridge") %in% methods_sel)) {
-      .glmnet_in_session <- isTRUE(tryCatch({
-        glmnet::glmnet_control(); TRUE
-      }, error = function(e) FALSE))
+      .glmnet_in_session <- isTRUE(.gexpipe_glmnet_smoke())
+      if (!.glmnet_in_session && exists(".gexpipe_glmnet_smoke", mode = "function", inherits = TRUE)) {
+        .glmnet_in_session <- isTRUE(get(".gexpipe_glmnet_smoke", mode = "function", inherits = TRUE)())
+      } else if (!.glmnet_in_session && requireNamespace("GExPipe", quietly = TRUE)) {
+        fn <- tryCatch(utils::getFromNamespace(".gexpipe_glmnet_smoke", "GExPipe"), error = function(e) NULL)
+        if (is.function(fn)) .glmnet_in_session <- isTRUE(fn())
+      }
       if (!.glmnet_in_session) {
         showNotification(
           tags$div(
