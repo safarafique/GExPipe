@@ -273,6 +273,16 @@ server <- function(input, output, session) {
                  " DESeq2, edgeR, and limma-voom require RNA-seq count data and are not applicable to microarray."),
         type = "warning", duration = 6)
     }
+    if (input$analysis_type == "merged" &&
+        !is.null(input$de_method) &&
+        input$de_method %in% c("deseq2", "edger", "limma_voom")) {
+      updateRadioButtons(session, "de_method", selected = "limma")
+      showNotification(
+        tags$div(icon("info-circle"),
+                 tags$strong(" DE method switched to limma."),
+                 " Mixed-platform merged runs use log-expression on the common gene intersection; count-based DE is not applied across platforms."),
+        type = "warning", duration = 8)
+    }
   })
 
   # Pipeline progress UI + step-guard observers (implemented under R/).
