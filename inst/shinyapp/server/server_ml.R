@@ -169,52 +169,38 @@ server_ml <- function(input, output, session, rv) {
     prog <- 0.1
 
     # ------------------------------------------------------------------
-    # Pre-flight: glmnet DLL must work for LASSO / Elastic Net / Ridge.
-    # If the parent session has a locked DLL, .gexpipe_glmnet_cv_fit() runs
-    # cv.glmnet in a fresh R subprocess — no restart required.
+    # LASSO / Elastic Net / Ridge use .gexpipe_glmnet_cv_fit():
+    # in-session glmnet when possible, otherwise an isolated R subprocess
+    # (no Ctrl+Shift+F10 restart required on Windows).
     # ------------------------------------------------------------------
     .glmnet_cv_fit <- function(x, y, alpha) {
+      fn <- NULL
       if (exists(".gexpipe_glmnet_cv_fit", mode = "function", inherits = TRUE)) {
-        return(.gexpipe_glmnet_cv_fit(x, y, alpha = alpha, family = "binomial"))
+        fn <- get(".gexpipe_glmnet_cv_fit", mode = "function", inherits = TRUE)
+      } else if (requireNamespace("GExPipe", quietly = TRUE)) {
+        fn <- tryCatch(
+          utils::getFromNamespace(".gexpipe_glmnet_cv_fit", "GExPipe"),
+          error = function(e) NULL
+        )
+      }
+      if (is.function(fn)) {
+        return(fn(x, y, alpha = alpha, family = "binomial"))
       }
       glmnet::cv.glmnet(x, y, alpha = alpha, family = "binomial")
     }
 
     if (any(c("lasso", "elastic", "ridge") %in% methods_sel)) {
-      .glmnet_ready <- FALSE
-      if (exists(".gexpipe_native_session_ok", mode = "function", inherits = TRUE)) {
-        .glmnet_ready <- isTRUE(.gexpipe_native_session_ok("glmnet", try_repair = TRUE))
-      } else {
-        .glmnet_ready <- isTRUE(tryCatch({
-          glmnet::glmnet_control(); TRUE
-        }, error = function(e) FALSE))
-      }
-      if (!.glmnet_ready && exists(".gexpipe_glmnet_smoke_subprocess", mode = "function", inherits = TRUE)) {
-        .glmnet_ready <- isTRUE(.gexpipe_glmnet_smoke_subprocess())
-      }
-      if (!.glmnet_ready) {
-        showNotification(
-          tags$div(
-            icon("exclamation-triangle"),
-            tags$strong(" glmnet is not available."),
-            tags$br(),
-            "Restart R (", tags$kbd("Ctrl+Shift+F10"), "), then run ",
-            tags$code("GExPipe::runGExPipe()"), " again.",
-            tags$br(),
-            tags$em("LASSO / Elastic Net / Ridge skipped this run; other ML methods still work.")
-          ),
-          type = "error", duration = 20
-        )
-        methods_sel <- setdiff(methods_sel, c("lasso", "elastic", "ridge"))
-        if (length(methods_sel) == 0) return()
-      } else if (!isTRUE(tryCatch({ glmnet::glmnet_control(); TRUE }, error = function(e) FALSE))) {
+      .glmnet_in_session <- isTRUE(tryCatch({
+        glmnet::glmnet_control(); TRUE
+      }, error = function(e) FALSE))
+      if (!.glmnet_in_session) {
         showNotification(
           tags$div(
             icon("info-circle"),
-            tags$strong(" glmnet will run in an isolated R process"),
-            " (DLL was rebuilt mid-session). LASSO, Elastic Net, and Ridge will still complete."
+            tags$strong(" glmnet: using isolated R process"),
+            " for LASSO / Elastic Net / Ridge (no restart needed). This may take a few extra minutes."
           ),
-          type = "message", duration = 10
+          type = "message", duration = 12
         )
       }
     }
