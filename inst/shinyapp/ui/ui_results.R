@@ -53,6 +53,12 @@ box(
     ),
     
     fluidRow(
+      uiOutput("de_model_details"),
+      column(12, style = "text-align: right; margin-bottom: 8px;",
+        downloadButton("download_analysis_report", tagList(icon("file-alt"), " Analysis report (TXT)"),
+                       class = "btn-default btn-sm"))
+    ),
+    fluidRow(
       uiOutput("de_pipeline_verification")
     ),
     fluidRow(
