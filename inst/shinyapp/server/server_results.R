@@ -9,7 +9,8 @@ server_results <- function(input, output, session, rv) {
     if (is.null(total_meta)) total_meta <- rv$unified_metadata
     rv$de_design_formula <<- formula_desc
     rv$de_gene_filter_note <<- filter_note
-    rv$de_sample_info <<- GExPipe::gexpipe_de_sample_info(
+    rv$de_sample_info <<- .gexpipe_call(
+      "gexpipe_de_sample_info",
       meta_used, total_meta = total_meta, method = method
     )
   }
@@ -200,7 +201,7 @@ server_results <- function(input, output, session, rv) {
           
           ds_design <- gexpipe_deseq2_design(meta)
           design_mm <- stats::model.matrix(ds_design$formula, data = meta)
-          filt <- GExPipe::gexpipe_independent_filter(count_mat, design = design_mm)
+          filt <- .gexpipe_call("gexpipe_independent_filter", count_mat, design = design_mm)
           count_mat <- filt$expr
           .record_de_transparency(meta, "deseq2", ds_design$formula_desc, filt$note, total_meta)
           
@@ -288,7 +289,7 @@ server_results <- function(input, output, session, rv) {
           
           de_design <- gexpipe_build_de_design(meta)
           design <- de_design$design
-          filt <- GExPipe::gexpipe_independent_filter(count_mat, design = design)
+          filt <- .gexpipe_call("gexpipe_independent_filter", count_mat, design = design)
           count_mat <- filt$expr
           .record_de_transparency(meta, "edger", de_design$formula_desc, filt$note, total_meta)
           
@@ -373,7 +374,7 @@ server_results <- function(input, output, session, rv) {
           
           de_design <- gexpipe_build_de_design(meta)
           design <- de_design$design
-          filt <- GExPipe::gexpipe_independent_filter(count_mat, design = design)
+          filt <- .gexpipe_call("gexpipe_independent_filter", count_mat, design = design)
           count_mat <- filt$expr
           .record_de_transparency(meta, "limma_voom", de_design$formula_desc, filt$note, total_meta)
           
@@ -456,7 +457,7 @@ server_results <- function(input, output, session, rv) {
           if (use_contrast) {
             design <- model.matrix(~ 0 + Condition, data = meta)
             colnames(design) <- levels(meta$Condition)
-            filt <- GExPipe::gexpipe_independent_filter(expr_de, design = design)
+            filt <- .gexpipe_call("gexpipe_independent_filter", expr_de, design = design)
             expr_de <- filt$expr
             contrast <- limma::makeContrasts(Disease - Normal, levels = design)
             fit <- limma::lmFit(expr_de, design)
@@ -469,7 +470,7 @@ server_results <- function(input, output, session, rv) {
           } else {
             de_design <- gexpipe_build_de_design(meta)
             design <- de_design$design
-            filt <- GExPipe::gexpipe_independent_filter(expr_de, design = design)
+            filt <- .gexpipe_call("gexpipe_independent_filter", expr_de, design = design)
             expr_de <- filt$expr
             fit <- limma::lmFit(expr_de, design)
             fit2 <- limma::eBayes(fit)
