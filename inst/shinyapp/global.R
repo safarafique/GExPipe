@@ -492,6 +492,13 @@ failed_required <- .gexpipe_all_required[
     suppressPackageStartupMessages(
       library(pkg, lib.loc = .gexpipe_lib, character.only = TRUE, quietly = TRUE)
     )
+    if (pkg %in% c("glmnet", "xgboost", "Matrix", "Rcpp") &&
+        exists(".gexpipe_native_smoke_test", mode = "function")) {
+      if (!isTRUE(.gexpipe_native_smoke_test(pkg))) {
+        .gexpipe_detach_pkg(pkg)
+        return(FALSE)
+      }
+    }
     TRUE
   }, error = function(e) FALSE)
 }
@@ -688,11 +695,23 @@ tryCatch({
       "gexp_register_navigation_observers",
       "gexp_register_workspace_observers",
       "gexp_register_help_observers",
-      "gexp_user_guideline_modal_ui"
+      "gexp_user_guideline_modal_ui",
+      "gexp_normalize_and_intersect",
+      "gexp_batch_correct",
+      "gexpipe_pvca_df",
+      "gexpipe_pca_polar_df",
+      "gexpipe_has_mixed_platforms",
+      "gexpipe_batch_confounding_summary",
+      "gexpipe_batch_covariate_info",
+      "gexpipe_build_batch_mod",
+      "gexpipe_de_sample_info",
+      "gexpipe_independent_filter",
+      "gexpipe_wgcna_heatmap_cor",
+      ".gexpipe_call"
     )
     for (nm in to_pull) {
       if (exists(nm, envir = ns, inherits = FALSE))
-        assign(nm, get(nm, envir = ns, inherits = FALSE), envir = environment())
+        assign(nm, get(nm, envir = ns, inherits = FALSE), envir = .GlobalEnv)
     }
   }
 }, error = function(e) NULL)
@@ -707,6 +726,7 @@ local_r_files <- c(
   file.path(getwd(), "..", "..", "R", "gexp_batch_pipeline.R"),
   file.path(getwd(), "..", "..", "R", "gexp_de_pipeline.R"),
   file.path(getwd(), "..", "..", "R", "gexp_wgcna_pipeline.R"),
+  file.path(getwd(), "..", "..", "R", "gexp_platform_helpers.R"),
   file.path(getwd(), "..", "..", "R", "observers_pipeline.R"),
   file.path(getwd(), "..", "..", "R", "observers_navigation.R"),
   file.path(getwd(), "..", "..", "R", "observers_workspace.R"),
@@ -719,6 +739,7 @@ local_r_files <- c(
   file.path(getwd(), "R", "gexp_batch_pipeline.R"),
   file.path(getwd(), "R", "gexp_de_pipeline.R"),
   file.path(getwd(), "R", "gexp_wgcna_pipeline.R"),
+  file.path(getwd(), "R", "gexp_platform_helpers.R"),
   file.path(getwd(), "R", "observers_pipeline.R"),
   file.path(getwd(), "R", "observers_navigation.R"),
   file.path(getwd(), "R", "observers_workspace.R"),
@@ -726,6 +747,35 @@ local_r_files <- c(
 )
 for (rf in unique(local_r_files[file.exists(local_r_files)]))
   tryCatch(source(rf, local = TRUE), error = function(e) NULL)
+
+# Prefer functions sourced above over GExPipe:: (avoids corrupt lazy-load DB on reinstall).
+if (!exists("gexpipe_wgcna_heatmap_cor", mode = "function", inherits = TRUE)) {
+  gexpipe_wgcna_heatmap_cor <- function(cor_mat, combined) {
+    if (is.null(cor_mat)) return(cor_mat)
+    if (!is.null(combined) && combined %in% colnames(cor_mat) && ncol(cor_mat) > 1L) {
+      cor_mat <- cor_mat[, setdiff(colnames(cor_mat), combined), drop = FALSE]
+    }
+    cor_mat
+  }
+}
+
+.gexpipe_call <- function(name, ...) {
+  if (requireNamespace("GExPipe", quietly = TRUE)) {
+    ns <- asNamespace("GExPipe")
+    if (exists(name, envir = ns, inherits = FALSE, mode = "function")) {
+      return(get(name, envir = ns, mode = "function")(...))
+    }
+  }
+  if (exists(name, mode = "function", inherits = TRUE)) {
+    return(get(name, mode = "function", inherits = TRUE)(...))
+  }
+  stop(
+    "Function ", name, " is not available. Update GExPipe:\n",
+    "  remotes::install_github('safarafique/GExPipe')\n",
+    "Then restart R and run GExPipe::runGExPipe() again.",
+    call. = FALSE
+  )
+}
 
 # Verify core functions are present
 .gexpipe_has_core_fn <- function(nm) {

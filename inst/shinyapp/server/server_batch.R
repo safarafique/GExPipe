@@ -66,15 +66,19 @@ server_batch <- function(input, output, session, rv) {
              icon(icon_nm), " ", tags$strong(sm$message)),
       tags$table(
         class = "table table-bordered table-condensed",
-        style = "max-width: 480px; background: white; margin-bottom: 0;",
+        style = "max-width: 480px; background: #fff; color: #000; margin-bottom: 0;",
         tags$thead(tags$tr(
-          tags$th("Dataset"),
-          lapply(colnames(sm$table), function(col) tags$th(col))
+          tags$th(style = "color: #000 !important; background: #f8f9fa;", "Dataset"),
+          lapply(colnames(sm$table), function(col) {
+            tags$th(style = "color: #000 !important; background: #f8f9fa;", col)
+          })
         )),
         tags$tbody(lapply(rownames(sm$table), function(rn) {
           tags$tr(
-            tags$td(tags$strong(rn)),
-            lapply(seq_len(ncol(sm$table)), function(j) tags$td(as.character(sm$table[rn, j])))
+            tags$td(style = "color: #000 !important;", tags$strong(rn)),
+            lapply(seq_len(ncol(sm$table)), function(j) {
+              tags$td(style = "color: #000 !important;", as.character(sm$table[rn, j]))
+            })
           )
         }))
       )
@@ -643,19 +647,25 @@ server_batch <- function(input, output, session, rv) {
   }
 
   .batch_pvca_expr_for_plot <- function(before = TRUE) {
+    .pvca <- function(expr_mat, meta) {
+      if (exists(".gexpipe_call", mode = "function", inherits = TRUE)) {
+        return(.gexpipe_call("gexpipe_pvca_df", expr_mat, meta))
+      }
+      gexpipe_pvca_df(expr_mat, meta)
+    }
     if (before) {
       expr_mat <- rv$expr_filtered
       pv <- if (!is.null(expr_mat)) {
-        gexpipe_pvca_df(expr_mat, rv$unified_metadata)
+        .pvca(expr_mat, rv$unified_metadata)
       } else {
         list(ok = FALSE, data = NULL, message = "Expression before batch correction not available.")
       }
       if (!isTRUE(pv$ok) && !is.null(rv$combined_expr)) {
-        pv <- gexpipe_pvca_df(rv$combined_expr, rv$unified_metadata)
+        pv <- .pvca(rv$combined_expr, rv$unified_metadata)
       }
       pv
     } else {
-      gexpipe_pvca_df(rv$batch_corrected, rv$unified_metadata)
+      .pvca(rv$batch_corrected, rv$unified_metadata)
     }
   }
 
