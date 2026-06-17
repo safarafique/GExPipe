@@ -15,6 +15,8 @@ ui_ml <- tabItem(
       tags$p(tags$strong("Purpose:"), " Perform supervised machine learning on expression data (samples × genes) to rank genes by predictive importance for biomarker discovery. Supports LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA, and XGBoost+SHAP.", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Methods:"), " LASSO, Elastic Net, Ridge (glmnet), Random Forest, SVM-RFE, Boruta (all-relevant feature selection), sPLS-DA (sparse PLS-DA), XGBoost+SHAP (interpretable importance). Optional PPI centrality weights (from Step 9) can weight features. Labels from WGCNA sample metadata (e.g. Normal vs Disease).", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Requirements:"), " On the PPI tab, click 'Extract Data for ML' to provide expression matrix and sample labels.", style = "margin-bottom: 8px;"),
+      tags$p(tags$strong("Smooth run (LASSO / Elastic Net / Ridge):"), " After installing or updating GExPipe, restart R once (RStudio: ",
+             tags$kbd("Ctrl+Shift+F10"), "), then ", tags$code("GExPipe::runGExPipe()"), ". If glmnet was rebuilt mid-session, GExPipe runs those three methods in an isolated R process automatically — wait a few extra minutes; do not skip them.", style = "margin-bottom: 8px; font-size: 12px;"),
       tags$p(tags$strong("Caution:"), " Feature selection and ROC/nomogram in later steps use the same samples unless you run external validation (Step 11). Small class sizes (< 3 per group) or many features relative to samples increase overfitting risk — treat rankings as exploratory.", style = "margin-bottom: 0; color: #856404;")
     )
   ),
