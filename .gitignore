@@ -49,6 +49,8 @@ vignettes/saved_workspaces/
 # Old project copies / scratch folders (do not commit)
 GExpipe_1/
 GExpipe_*/
+abc/
+analysis of Gexpipe/
 
 inst/inst/
 

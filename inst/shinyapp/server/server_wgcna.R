@@ -16,13 +16,7 @@
 # of one group indicator (and the mirror image of the other), so leaving it in
 # makes the heatmap show a redundant, identical-looking column. Removing it keeps
 # the distinct per-group columns (e.g. Normal vs Disease, which are opposite).
-.wgcna_heatmap_cor <- function(cor_mat, combined) {
-  if (is.null(cor_mat)) return(cor_mat)
-  if (!is.null(combined) && combined %in% colnames(cor_mat) && ncol(cor_mat) > 1L) {
-    cor_mat <- cor_mat[, setdiff(colnames(cor_mat), combined), drop = FALSE]
-  }
-  cor_mat
-}
+# Implemented in R/gexp_wgcna_pipeline.R as gexpipe_wgcna_heatmap_cor().
 
 server_wgcna <- function(input, output, session, rv) {
   
@@ -928,7 +922,7 @@ server_wgcna <- function(input, output, session, rv) {
           # group indicator (and the mirror image of the other), so it is redundant in
           # the module-trait heatmap. We keep it in trait_data for the GS/MM trait
           # selector but record its name so the heatmap can drop it (see
-          # .wgcna_heatmap_cor() below) — otherwise the heatmap shows a duplicate column.
+          # GExPipe::gexpipe_wgcna_heatmap_cor() below) — otherwise the heatmap shows a duplicate column.
           if (length(unique_groups) == 2L) {
             ug <- as.character(unique_groups)
             if ("Normal" %in% ug && "Disease" %in% ug) {
@@ -1033,7 +1027,7 @@ server_wgcna <- function(input, output, session, rv) {
     }
     op <- par(bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
-    moduleTraitCor <- .wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+    moduleTraitCor <- GExPipe::gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
     WGCNA::labeledHeatmap(
       Matrix = moduleTraitCor,
       xLabels = colnames(moduleTraitCor),
@@ -1075,7 +1069,7 @@ server_wgcna <- function(input, output, session, rv) {
   wgcna_module_trait_to_file <- function(file, dev_fun) {
     req(rv$moduleTraitCor)
     if (!requireNamespace("WGCNA", quietly = TRUE)) stop("WGCNA package required")
-    moduleTraitCor <- .wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+    moduleTraitCor <- GExPipe::gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
     dev_fun(file)
     par(bg = "white")
     WGCNA::labeledHeatmap(
@@ -1965,7 +1959,7 @@ server_wgcna <- function(input, output, session, rv) {
       # Module-trait heatmap
       if (!is.null(rv$moduleTraitCor)) {
         par(bg = "white")
-        .mtc <- .wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+        .mtc <- GExPipe::gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
         WGCNA::labeledHeatmap(Matrix = .mtc,
                               xLabels = colnames(.mtc),
                               yLabels = rownames(.mtc),

@@ -128,6 +128,24 @@ server_ml <- function(input, output, session, rv) {
       showNotification("Need at least two classes (e.g. Disease vs Normal).", type = "error", duration = 6)
       return()
     }
+    tab_y <- table(y)
+    if (any(tab_y < 3L)) {
+      showNotification(
+        tags$div(
+          icon("exclamation-triangle"),
+          tags$strong(" Small class size:"),
+          " At least one group has fewer than 3 samples. Feature-selection results may be unstable or overfit."
+        ),
+        type = "warning", duration = 8
+      )
+    }
+    .ml_notify_fail <- function(method, e) {
+      showNotification(
+        tags$div(icon("exclamation-triangle"), tags$strong(paste(method, "failed:")), " ",
+                 conditionMessage(e)),
+        type = "warning", duration = 6
+      )
+    }
     n_rf <- max(5, min(100, as.integer(input$ml_rf_top_genes)))
     n_svm <- max(5, min(100, as.integer(input$ml_svm_top_genes)))
     n_elastic <- max(5, min(100, as.integer(input$ml_elastic_top_genes)))
@@ -308,7 +326,7 @@ server_ml <- function(input, output, session, rv) {
           x_df <- as.data.frame(x)
           boruta_fit <- tryCatch(
             Boruta::Boruta(x_df, y, maxRuns = 100, doTrace = 0),
-            error = function(e) NULL
+            error = function(e) { .ml_notify_fail("Boruta", e); NULL }
           )
           if (!is.null(boruta_fit)) {
             att <- Boruta::attStats(boruta_fit)
@@ -330,7 +348,7 @@ server_ml <- function(input, output, session, rv) {
           n_keep <- min(n_splsda, ncol(x), 50)
           splsda_fit <- tryCatch({
             mixOmics::splsda(X = x, Y = y, ncomp = 2, keepX = c(n_keep, n_keep))
-          }, error = function(e) NULL)
+          }, error = function(e) { .ml_notify_fail("sPLS-DA", e); NULL })
           if (!is.null(splsda_fit)) {
             vip_scores <- tryCatch(mixOmics::vip(splsda_fit), error = function(e) NULL)
             if (is.null(vip_scores)) {
@@ -358,7 +376,7 @@ server_ml <- function(input, output, session, rv) {
           dtrain <- xgboost::xgb.DMatrix(data = x, label = y_num)
           xgb_fit <- tryCatch(
             xgboost::xgb.train(params = list(objective = "binary:logistic", eval_metric = "auc"), data = dtrain, nrounds = 100, verbose = 0),
-            error = function(e) NULL
+            error = function(e) { .ml_notify_fail("XGBoost", e); NULL }
           )
           if (!is.null(xgb_fit)) {
             imp_df <- NULL

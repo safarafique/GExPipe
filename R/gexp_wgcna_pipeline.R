@@ -6,6 +6,23 @@
 
 utils::globalVariables(c("."))
 
+#' Drop redundant combined trait column from WGCNA module-trait correlation matrix
+#'
+#' For a two-group design, WGCNA may add a combined "X vs Y" contrast column that
+#' duplicates one group indicator. This helper removes that column before plotting.
+#'
+#' @param cor_mat Numeric matrix of module-trait correlations.
+#' @param combined Name of the combined contrast column to drop, or NULL.
+#' @return The correlation matrix with the combined column removed when appropriate.
+#' @export
+gexpipe_wgcna_heatmap_cor <- function(cor_mat, combined) {
+  if (is.null(cor_mat)) return(cor_mat)
+  if (!is.null(combined) && combined %in% colnames(cor_mat) && ncol(cor_mat) > 1L) {
+    cor_mat <- cor_mat[, setdiff(colnames(cor_mat), combined), drop = FALSE]
+  }
+  cor_mat
+}
+
 #' Prepare expression and sample data for WGCNA
 #'
 #' This helper mirrors the "Prepare WGCNA Data" step:
