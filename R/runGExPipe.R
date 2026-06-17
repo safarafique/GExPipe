@@ -154,7 +154,10 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   }
 
   if (interactive()) {
-    message("GExPipe: app object ready (UI builds on first browser load; first load can take several minutes).")
+    message(
+      "GExPipe ", utils::packageVersion("GExPipe"),
+      " — app object ready (UI builds on first browser load; first load can take several minutes)."
+    )
   }
   app <- shiny::shinyApp(
     ui = function() {

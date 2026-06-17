@@ -45,44 +45,58 @@ Dependencies are from **CRAN** and **Bioconductor** only.
 
 ## Installation & Run
 
-### Option 1 — Run directly from GitHub (simplest, no install needed)
+### Option 1 — Run directly from GitHub (always latest `main`)
 
-Paste **these 2 lines** into R or RStudio on any machine.
-Everything else — BiocManager, all Bioconductor + CRAN packages, libraries — installs and loads automatically.
+Paste into R or RStudio. Each run clones the current GitHub `main` branch.
 
 ```r
 if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
-shiny::runGitHub("GExPipe", "safarafique", destdir = tempfile())
+shiny::runGitHub("safarafique/GExPipe", destdir = tempfile())
 ```
 
-> First run on a fresh machine takes **10–30 min** (downloading **63** dependencies from `DESCRIPTION`).
-> Every run after that starts in seconds.
+> First run on a fresh machine takes **10–30 min** (downloading dependencies).
+> After an **R upgrade**, restart R once (`Ctrl+Shift+F10` in RStudio) before the first run.
 
 ---
 
-### Option 2 — Install once, run in seconds every time (Recommended)
+### Option 2 — Install once, run every session (recommended)
 
-**First time only** (installs GExPipe + all dependencies automatically):
+**Install or update** (use `force = TRUE` when updating to the latest GitHub code):
 
 ```r
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
-remotes::install_github("safarafique/GExPipe", INSTALL_opts = "--no-staged-install")
+remotes::install_github(
+  "safarafique/GExPipe",
+  force = TRUE,
+  upgrade = "always",
+  INSTALL_opts = "--no-staged-install"
+)
+```
 
-# Step 1: build the app object (installs any missing dependencies on first run)
+**Restart R once** after install or update (RStudio: **Ctrl+Shift+F10**).  
+This avoids Windows `glmnet` DLL lock issues and ensures PVCA / ML helpers load correctly.
+
+```r
+app <- GExPipe::runGExPipe()      # Step 1: build app (check console for "glmnet OK")
+shiny::runApp(app, port = 3838L)  # Step 2: start server
+```
+
+**Every later session** (no reinstall unless you want updates):
+
+```r
 app <- GExPipe::runGExPipe()
-
-# Step 2: start the server and open the app in your browser
 shiny::runApp(app, port = 3838L)
 ```
 
-**Every session after that** — just 2 lines:
+**To pull the latest fixes from GitHub** into an existing install:
 
 ```r
-app <- GExPipe::runGExPipe()   # Step 1: build the app object
-shiny::runApp(app, port = 3838L)  # Step 2: start the app
+remotes::install_github("safarafique/GExPipe", force = TRUE, upgrade = "always",
+                        INSTALL_opts = "--no-staged-install")
+# then Ctrl+Shift+F10 and runGExPipe() again
 ```
 
-Both options require **R >= 4.5.0** (stable). Bioconductor **3.21** (R 4.5) or **3.22** (R 4.6 stable) is selected automatically for your R version. R 4.4 and pre-release R builds are not supported.
+Both options require **R >= 4.5.0** (stable). Bioconductor **3.21** (R 4.5) or **3.22** (R 4.6 stable) is selected automatically.
 
 ### From Bioconductor (when accepted)
 
