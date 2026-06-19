@@ -1,5 +1,14 @@
 # GExPipe NEWS
 
+## Version 0.99.12
+
+### Bioconductor SPB revision (check clean-up)
+- Document `micro_eset_list` argument in `gexp_download_normalize_ids_for_overlap()`.
+- Satisfy R CMD check Imports usage via `dummy_imports()` (cli, lifecycle, rlang, etc.).
+- Avoid undeclared `remotes`/`stringi` namespace calls in optional repair paths.
+- Replace non-ASCII punctuation in R sources with ASCII equivalents.
+- Add `remotes` to Suggests; sync vignette formatting with GitHub.
+
 ## Version 0.99.11
 
 ### Bioconductor submission readiness

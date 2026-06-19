@@ -277,6 +277,8 @@ gexp_rebuild_all_genes_list <- function(micro_expr_list, rna_counts_list) {
 #' @param rna_counts_list Named list of RNA-seq matrices.
 #' @param platform_per_gse Optional named list/vector of GPL IDs.
 #' @param all_genes_list Optional prebuilt gene lists.
+#' @param micro_eset_list Optional named list of \code{ExpressionSet} objects for
+#'   \code{fData} fallback when probe-to-symbol mapping needs platform annotation.
 #' @return List with updated lists and appended log text.
 #'
 #' @examples
