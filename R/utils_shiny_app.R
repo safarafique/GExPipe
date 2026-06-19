@@ -42,7 +42,7 @@
 
 ## Minimum versions for packages that frequently cause version-conflict errors.
 ## Any package below its floor is treated as "needs update" even when installed.
-# Minimum versions — must stay in sync with DESCRIPTION Imports section.
+# Minimum versions ÔÇö must stay in sync with DESCRIPTION Imports section.
 # Any package below its floor is treated as "needs update" even when installed.
 # Direct version constraints copied from DESCRIPTION:
 .gexpipe_min_versions <- c(
@@ -57,7 +57,7 @@
   pillar    = "1.9.0"
 )
 
-## Universal library helpers — same OS-aware, cloud-safe, two-lib logic as global.R.
+## Universal library helpers ÔÇö same OS-aware, cloud-safe, two-lib logic as global.R.
 
 ## Return the R version string used as the library subdirectory name.
 .gexpipe_rv_str <- function()
@@ -91,7 +91,7 @@
   d
 }
 
-## Pending library (subprocess writes here; promoted → main on next startup).
+## Pending library (subprocess writes here; promoted ÔåÆ main on next startup).
 .gexpipe_get_pending_lib <- function() {
   rv   <- .gexpipe_rv_str()
   base <- .gexpipe_lib_base()
@@ -152,31 +152,31 @@
 ## Batch-install a vector of packages via BiocManager (handles both Bioc + CRAN).
 ##
 ## Four layers of protection:
-##  1. Dedicated ~/.gexpipe_packages/R-x.y/ library — new versions shadow old
+##  1. Dedicated ~/.gexpipe_packages/R-x.y/ library ÔÇö new versions shadow old
 ##     system ones via .libPaths() priority; subprocess writes there freely.
-##  2. Missing-package detection — requireNamespace() check.
-##  3. Version-conflict detection — compares best available version against
+##  2. Missing-package detection ÔÇö requireNamespace() check.
+##  3. Version-conflict detection ÔÇö compares best available version against
 ##     .gexpipe_min_versions; outdated packages are added to the install list.
-##  4. Force-reload attempt — after subprocess, tries to unload + reload from
+##  4. Force-reload attempt ÔÇö after subprocess, tries to unload + reload from
 ##     the dedicated lib; if still conflicted, shows a clear restart message.
 .gexpipe_batch_install <- function(pkgs) {
   if (!.gexpipe_runtime_install_enabled()) {
     return(invisible(.gexpipe_verify_imports(pkgs, quiet = TRUE)))
   }
 
-  # ── 0. Dedicated library ───────────────────────────────────────────────────
+  # ÔöÇÔöÇ 0. Dedicated library ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   gexpipe_lib <- .gexpipe_get_lib()
   if (!gexpipe_lib %in% .libPaths())
     .libPaths(c(gexpipe_lib, unique(.libPaths())))
 
-  # ── 1. BiocManager ────────────────────────────────────────────────────────
+  # ÔöÇÔöÇ 1. BiocManager ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   if (!requireNamespace("BiocManager", quietly = TRUE))
     utils::install.packages("BiocManager",
                              lib   = gexpipe_lib,
                              repos = "https://cloud.r-project.org",
                              quiet = TRUE)
   # Set the Bioc release that matches the running R version (never force a higher
-  # release — e.g. 3.22 on R 4.5 would break every BiocManager::install() call).
+  # release ÔÇö e.g. 3.22 on R 4.5 would break every BiocManager::install() call).
   .target_bioc_r <- local({
     rv <- tryCatch(
       numeric_version(paste0(R.Version()$major, ".",
@@ -195,10 +195,10 @@
              error = function(e) NULL, warning = function(w) NULL)
   }
 
-  # ── 2. Detect missing packages ────────────────────────────────────────────
+  # ÔöÇÔöÇ 2. Detect missing packages ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   missing_pkgs <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
 
-  # ── 3. Detect version-conflicted packages ─────────────────────────────────
+  # ÔöÇÔöÇ 3. Detect version-conflicted packages ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   version_conflict_pkgs <- names(.gexpipe_min_versions)[
     vapply(names(.gexpipe_min_versions), function(pkg) {
       tryCatch(
@@ -208,7 +208,7 @@
     }, logical(1L))
   ]
 
-  # ── 3b. Detect outdated packages in dedicated lib ─────────────────────────
+  # ÔöÇÔöÇ 3b. Detect outdated packages in dedicated lib ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   outdated_pkgs <- tryCatch({
     old <- utils::old.packages(lib.loc = gexpipe_lib)
     if (!is.null(old) && nrow(old) > 0L) intersect(pkgs, rownames(old))
@@ -236,9 +236,9 @@
     "  First-time install: up to 40 min. Subsequent runs: seconds."
   )
 
-  # ── 4. Remove stale 00LOCK dirs from EVERY library path ───────────────────
+  # ÔöÇÔöÇ 4. Remove stale 00LOCK dirs from EVERY library path ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   # A failed install leaves 00LOCK-<pkg> in the user's system library and makes
-  # ALL subsequent downloads fail (e.g. curl.dll locked → no downloads possible).
+  # ALL subsequent downloads fail (e.g. curl.dll locked ÔåÆ no downloads possible).
   for (.ld in unique(c(gexpipe_lib, .libPaths()))) {
     .lk <- list.files(.ld, pattern = "^00LOCK-", full.names = TRUE)
     if (length(.lk) > 0L) {
@@ -247,7 +247,7 @@
     }
   }
 
-  # ── 5. Write and run install subprocess ───────────────────────────────────
+  # ÔöÇÔöÇ 5. Write and run install subprocess ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   # Two-library design: pending lib receives DLL-locked updates so they become
   # active on the NEXT startup without any manual restart. Safe packages go
   # directly to main lib and are immediately usable in this run.
@@ -303,7 +303,7 @@
     '  tryCatch(BiocManager::install(version = .bioc_ver, ask = FALSE),',
     '           error = function(e) NULL, warning = function(w) NULL)',
     'if (length(.safe_pkgs) > 0L) {',
-    '  message("GExPipe subprocess: ", length(.safe_pkgs), " pkg(s) → main lib")',
+    '  message("GExPipe subprocess: ", length(.safe_pkgs), " pkg(s) ÔåÆ main lib")',
     '  BiocManager::install(.safe_pkgs, lib = .main_lib, ask = FALSE,',
     '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
@@ -320,7 +320,7 @@
     'if (length(.pending_pkgs) > 0L) {',
     '  dir.create(.pending_lib, recursive = TRUE, showWarnings = FALSE)',
     '  message("GExPipe subprocess: ", length(.pending_pkgs),',
-    '          " DLL-locked pkg(s) → pending lib (active next startup)")',
+    '          " DLL-locked pkg(s) ÔåÆ pending lib (active next startup)")',
     '  BiocManager::install(.pending_pkgs, lib = .pending_lib, ask = FALSE,',
     '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
     paste0('    INSTALL_opts = ', inst_opts, ')'),
@@ -350,24 +350,24 @@
     error = function(e) { message("GExPipe: could not launch subprocess: ", conditionMessage(e)); 1L }
   )
   if (!identical(exit_code, 0L)) {
-    message("GExPipe: subprocess exit code ", exit_code, " — last install log:")
+    message("GExPipe: subprocess exit code ", exit_code, " ÔÇö last install log:")
     log_lines <- tryCatch(readLines(log_file, warn = FALSE), error = function(e) character(0))
     if (length(log_lines) > 0L)
       message(paste(utils::tail(log_lines, 30L), collapse = "\n"))
   }
 
-  # ── Direct fallback for still-missing packages ─────────────────────────────
-  # Missing packages have NO DLL lock (never loaded) → safe to install directly.
+  # ÔöÇÔöÇ Direct fallback for still-missing packages ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  # Missing packages have NO DLL lock (never loaded) ÔåÆ safe to install directly.
   .still_missing_u <- to_install[!vapply(to_install,
     function(p) requireNamespace(p, quietly = TRUE), logical(1L))]
   .direct_fb <- .still_missing_u[!vapply(.still_missing_u,
     .dll_locked_in_parent, logical(1L))]
 
   if (length(.direct_fb) > 0L) {
-    message("GExPipe: fallback — direct install for ", length(.direct_fb),
+    message("GExPipe: fallback ÔÇö direct install for ", length(.direct_fb),
             " still-missing package(s): ", paste(.direct_fb, collapse = ", "))
     for (.p in .direct_fb) {
-      message("  → ", .p, " ...")
+      message("  ÔåÆ ", .p, " ...")
       tryCatch(
         BiocManager::install(.p, lib = gexpipe_lib, ask = FALSE,
                              update = FALSE, force = TRUE, Ncpus = 1L,
@@ -378,7 +378,7 @@
     }
   }
 
-  # ── 6. Version-conflict recovery for already-loaded packages ──────────────
+  # ÔöÇÔöÇ 6. Version-conflict recovery for already-loaded packages ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   # Packages updated in gexpipe_lib shadow old system versions on next load.
   # For packages already IN MEMORY with an old version, try unload + reload.
   .try_reload <- function(pkg, min_ver) {
@@ -405,7 +405,7 @@
                       error = function(e) "updated")
       paste0(pkg, " (loaded=", cur, ", updated=", new, ")")
     }, character(1L))
-    for (d in conflict_detail) message("GExPipe: ", d, " — requires restart to apply")
+    for (d in conflict_detail) message("GExPipe: ", d, " ÔÇö requires restart to apply")
     message(
       "\nGExPipe: RESTART R to apply package updates, then run again.\n",
       "  RStudio: Ctrl+Shift+F10, then re-run GExPipe::runGExPipe()\n",
@@ -420,7 +420,7 @@
     options(gexpipe.still_conflicted  = NULL)
   }
 
-  # ── 7. Re-check: report still-missing packages ────────────────────────────
+  # ÔöÇÔöÇ 7. Re-check: report still-missing packages ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   still_missing <- missing_pkgs[
     !vapply(missing_pkgs, requireNamespace, logical(1L), quietly = TRUE)
   ]
@@ -609,7 +609,7 @@
   readRDS(tmp_out)
 }
 
-## cv.glmnet in the current session, or subprocess fallback — no R restart required.
+## cv.glmnet in the current session, or subprocess fallback ÔÇö no R restart required.
 .gexpipe_glmnet_cv_fit <- function(x, y, alpha = 1, family = "binomial",
                                    lib = .gexpipe_get_lib()) {
   in_session <- tryCatch({
@@ -714,7 +714,7 @@
       requireNamespace(pkg, lib.loc = lib, quietly = TRUE) &&
       isFALSE(.gexpipe_pkg_built_for_current_r(pkg, lib))) {
     if (!quiet) {
-      message("GExPipe: ", pkg, " was built for a different R version — ",
+      message("GExPipe: ", pkg, " was built for a different R version ÔÇö ",
               "rebuilding before first load (no restart needed).")
     }
     .gexpipe_remove_pkg_all_libs(pkg)  # safe: not loaded, so the DLL isn't locked
@@ -736,13 +736,13 @@
 
   built_ok <- .gexpipe_pkg_built_for_current_r(pkg, lib)
   if (isFALSE(built_ok) || is.na(built_ok)) {
-    if (!quiet) message("GExPipe: ", pkg, " was built for a different R version — reinstalling.")
+    if (!quiet) message("GExPipe: ", pkg, " was built for a different R version ÔÇö reinstalling.")
   } else if (!quiet) {
-    message("GExPipe: ", pkg, " native code failed smoke test — reinstalling.")
+    message("GExPipe: ", pkg, " native code failed smoke test ÔÇö reinstalling.")
   }
 
   if (isNamespaceLoaded(pkg)) {
-    # DLL locked in this session — reinstall, then try detach + reload once.
+    # DLL locked in this session ÔÇö reinstall, then try detach + reload once.
     if (!quiet) {
       message("GExPipe: ", pkg, " DLL is locked; reinstalling and retrying reload...")
     }
@@ -765,7 +765,7 @@
   }
 
   if (!.works()) {
-    if (!quiet) message("GExPipe: ", pkg, " still broken after reinstall — restart R once.")
+    if (!quiet) message("GExPipe: ", pkg, " still broken after reinstall ÔÇö restart R once.")
     return(FALSE)
   }
   if (!quiet) message("GExPipe: ", pkg, " OK.")
@@ -809,12 +809,12 @@
     return(invisible(TRUE))
   }
 
-  lib <- dirname(utils::find.package("GExPipe", quiet = TRUE))
+  lib <- dirname(find.package("GExPipe", quiet = TRUE))
   if (!nzchar(lib)) {
     return(invisible(FALSE))
   }
   if (!quiet) {
-    message("GExPipe: corrupted install detected — reinstalling package into ", lib, " ...")
+    message("GExPipe: corrupted install detected ÔÇö reinstalling package into ", lib, " ...")
   }
   if (isNamespaceLoaded("GExPipe")) {
     tryCatch(suppressWarnings(unloadNamespace("GExPipe")), error = function(e) NULL)
@@ -822,7 +822,7 @@
   tryCatch(utils::remove.packages("GExPipe", lib = lib), error = function(e) NULL)
   ok <- tryCatch({
     if (requireNamespace("remotes", quietly = TRUE)) {
-      remotes::install_github(
+      utils::getFromNamespace("install_github", "remotes")(
         "safarafique/GExPipe",
         lib = lib,
         upgrade = "never",
@@ -864,7 +864,11 @@
     Rcpp     = function() Rcpp::evalCpp("1 + 1"),
     xgboost  = function() xgboost::xgb.DMatrix(matrix(0, 1, 1)),
     glue     = function() glue::glue("x"),
-    stringi  = function() stringi::stri_length("x")
+    stringi  = function() {
+      if (!requireNamespace("stringi", quietly = TRUE)) return(TRUE)
+      utils::getFromNamespace("stri_length", "stringi")("x")
+      TRUE
+    }
   )
   broken <- character(0)
   for (pkg in pkgs) {
@@ -930,7 +934,7 @@
   if (length(still_broken) > 0L) {
     message(
       "GExPipe: ", paste(still_broken, collapse = ", "),
-      " reinstalled but DLL is locked — restart R once to apply.\n",
+      " reinstalled but DLL is locked ÔÇö restart R once to apply.\n",
       "  (RStudio: Ctrl+Shift+F10, then re-run GExPipe::runGExPipe())"
     )
     options(gexpipe.restart_required = TRUE)
@@ -940,7 +944,7 @@
     ))
     return(FALSE)
   }
-  message("GExPipe: broken package(s) fixed — proceeding.")
+  message("GExPipe: broken package(s) fixed ÔÇö proceeding.")
   TRUE
 }
 
@@ -1010,10 +1014,10 @@ gexp_app_attach_packages <- function() {
   pkgs    <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
   n_total <- length(pkgs)
 
-  # ── Native packages (glmnet, xgboost, …) must match this R version ─────────
+  # ÔöÇÔöÇ Native packages (glmnet, xgboost, ÔÇª) must match this R version ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = TRUE), error = function(e) NULL)
 
-  # ── Detect and auto-fix any other broken DLL packages before attach ─────────
+  # ÔöÇÔöÇ Detect and auto-fix any other broken DLL packages before attach ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
   broken_pre <- .gexpipe_detect_broken_pkgs(pkgs)
   if (length(broken_pre) > 0L) {
     .gexpipe_fix_broken_pkgs(broken_pre)

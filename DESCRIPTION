@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.11
+Version: 0.99.12
 Authors@R: person("Safa", "Rafique",
            email = "safa.sandhu@gmail.com",
            role = c("aut", "cre"))
@@ -94,8 +94,10 @@ Suggests:
     pak,
     pkgload,
     rmarkdown,
+    remotes,
     rmda (>= 1.6),
     shinytest2,
+    stringi,
     testthat
 VignetteBuilder: knitr
 Config/testthat/edition: 3
