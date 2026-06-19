@@ -24,8 +24,11 @@
 ^vignettes/vignette\.htm$
 ^vignettes/vignette\.Rmd$
 ^vignettes/vignette_files/
+^vignettes/saved_workspaces
+^abc/
+^analysis of Gexpipe/
 ^PACKAGE_REVIEW\.md$
-^session_info\.txt$
+^inst/pkg_versions_installed.local.txt$
 ^scripts/
 ^vignettes/~\$
 ^vignettes/.*\.tmp$
