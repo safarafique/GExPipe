@@ -20,22 +20,42 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  collapse  = TRUE,
-  comment   = "#>",
-  warning   = FALSE,
-  message   = FALSE,
+  collapse   = TRUE,
+  comment    = "#>",
+  warning    = FALSE,
+  message    = FALSE,
   fig.width  = 7,
   fig.height = 5
 )
+
+.vig_screenshot <- function(filename) {
+  system.file("extdata", "vignette-screenshots", filename,
+              package = "GExPipe")
+}
+.vig_has_screenshot <- function(filename) {
+  path <- .vig_screenshot(filename)
+  nzchar(path) && file.exists(path)
+}
 ```
 
 # Introduction
 
-`GExPipe` is a comprehensive, Shiny-based workflow for the analysis of
-bulk RNA-seq and microarray data. By integrating a suite of Bioconductor
-tools into a single guided interface, it bridges the gap between raw
-GEO datasets and actionable biological insight — without requiring users
-to manually connect separate tools.
+`GExPipe` is a **Shiny application** for bulk RNA-seq and microarray
+analysis. The primary way to use the package is to launch the guided
+15-step interface: download GEO data, run QC and normalization, correct
+batch effects, discover differentially expressed genes, build co-expression
+networks, refine candidates with PPI and machine learning, and export a
+clinical summary report — without manually wiring separate Bioconductor
+tools together.
+
+This vignette is written for **end users** of the Shiny app. It covers
+installation, a visual pipeline overview, a step-by-step walkthrough of
+each screen, a short programmatic example with bundled data, and
+troubleshooting. Developer-oriented notes (internal module layout, CI
+testing) are **not** shipped as separate vignettes, to keep installation
+and `R CMD check` time manageable; see the
+[GitHub repository](https://github.com/safarafique/GExPipe) for
+contributor documentation.
 
 The package builds on `r BiocStyle::Biocpkg("GEOquery")` for data
 retrieval, `r BiocStyle::Biocpkg("limma")`,
@@ -44,25 +64,78 @@ retrieval, `r BiocStyle::Biocpkg("limma")`,
 `r BiocStyle::Biocpkg("WGCNA")` for co-expression networks, and
 `r BiocStyle::Biocpkg("clusterProfiler")` for functional enrichment.
 
-## Analysis Pipeline Overview
+## How the Shiny app is organised
 
-`GExPipe` organises the analysis into 15 sequential steps across four
-phases. Each step must be completed before the next becomes available.
+The sidebar lists **15 sequential steps** grouped into four phases.
+Each step unlocks only after the previous one succeeds. The welcome
+screen explains the workflow; click **Go to Analysis** to open Step 1.
 
-| Phase | Steps | What happens |
+| Phase | Steps | What you do |
 |---|---|---|
-| **Data preparation** | 1 – 5 | Download GEO data → Quality control → Normalization → Group assignment → Batch correction |
-| **Gene discovery** | 6 – 8 | Differential expression → WGCNA co-expression network → DEG ∩ hub gene intersection |
-| **Candidate refinement** | 9 – 12 | PPI network → ML feature selection → Validation → ROC analysis |
-| **Clinical translation** | 13 – 15 | Nomogram → GSEA pathway enrichment → Summary report (PDF) |
+| **Data preparation** | 1 – 5 | Download GEO data → QC → Normalization → Group assignment → Batch correction |
+| **Gene discovery** | 6 – 8 | Differential expression → WGCNA → DEG ∩ hub genes |
+| **Candidate refinement** | 9 – 12 | PPI network → ML feature selection → Validation → ROC |
+| **Clinical translation** | 13 – 15 | Nomogram → GSEA → Summary PDF report |
+
+```{r pipeline-overview, echo=FALSE, fig.cap="GExPipe 15-step pipeline. Each box corresponds to one sidebar tab in the Shiny app."}
+pipeline <- data.frame(
+  step  = 1:15,
+  phase = rep(
+    c("Data preparation", "Gene discovery",
+      "Candidate refinement", "Clinical translation"),
+    c(5, 3, 4, 3)
+  ),
+  label = c(
+    "1 Download", "2 QC", "3 Normalize", "4 Groups", "5 Batch",
+    "6 DE", "7 WGCNA", "8 Common genes",
+    "9 PPI", "10 ML", "11 Validation", "12 ROC",
+    "13 Nomogram", "14 GSEA", "15 Report"
+  ),
+  stringsAsFactors = FALSE
+)
+phase_cols <- c(
+  "Data preparation"       = "#4E79A7",
+  "Gene discovery"         = "#59A14F",
+  "Candidate refinement" = "#F28E2B",
+  "Clinical translation" = "#E15759"
+)
+pipeline$y <- rev(pipeline$step)
+ggplot2::ggplot(pipeline, ggplot2::aes(x = 1, y = y, fill = phase)) +
+  ggplot2::geom_tile(
+    ggplot2::aes(width = 0.92, height = 0.88),
+    colour = "white", linewidth = 0.4
+  ) +
+  ggplot2::geom_text(
+    ggplot2::aes(label = label),
+    colour = "white", size = 3.2, fontface = "bold"
+  ) +
+  ggplot2::scale_fill_manual(values = phase_cols, name = "Phase") +
+  ggplot2::scale_x_continuous(limits = c(0.5, 1.5), expand = c(0, 0)) +
+  ggplot2::scale_y_continuous(expand = c(0.02, 0.02)) +
+  ggplot2::labs(x = NULL, y = NULL, title = "Shiny app workflow") +
+  ggplot2::theme_void() +
+  ggplot2::theme(
+    legend.position = "bottom",
+    plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+Screenshots of key panels are included below when PNG files are bundled
+under `inst/extdata/vignette-screenshots/` (see that folder's README for
+capture instructions).
 
 # Installation
 
-## From Bioconductor (Recommended — after acceptance)
+Follow the [official Bioconductor installation
+guide](https://bioconductor.org/install/) to ensure your R version
+matches a supported Bioconductor release (e.g. Bioconductor 3.22 for
+R 4.6).
 
-Once accepted into Bioconductor, install the stable release with two
-commands. `BiocManager` automatically selects the correct Bioconductor
-release for your R version (3.21 for R 4.5, 3.22 for R 4.6, etc.):
+## From Bioconductor (recommended after acceptance)
+
+Once `GExPipe` is accepted into Bioconductor, install it with
+`BiocManager` — the standard two-line pattern from the Bioconductor
+documentation:
 
 ```{r install-bioc, eval=FALSE}
 if (!requireNamespace("BiocManager", quietly = TRUE))
@@ -71,28 +144,25 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("GExPipe")
 ```
 
-Then launch the app in two steps — `runGExPipe()` builds and returns the
-Shiny app object, and `shiny::runApp()` starts the server:
+Verify the installation:
 
-```{r launch-bioc, eval=FALSE}
-app <- GExPipe::runGExPipe()      # Step 1: build the app object
-shiny::runApp(app, port = 3838L)  # Step 2: start the server
+```{r verify-bioc, eval=FALSE}
+library(GExPipe)
+packageVersion("GExPipe")
 ```
 
-## From GitHub (Current — available now)
+## From GitHub (available before Bioconductor release)
 
-Install from [GitHub](https://github.com/safarafique/GExPipe) and open the app.
-Requires **R >= 4.5.0** (stable). Works on **Windows, macOS, and Linux**.
+Until the package is on Bioconductor, install from
+[GitHub](https://github.com/safarafique/GExPipe). Requires **R ≥ 4.5.0**.
 
 ```{r install-github, eval=FALSE}
-options(timeout = 3600)   # 1 hour — needed for slow connections
+options(timeout = 3600)
 
-# Step 1: BiocManager + repos (so remotes can install Bioconductor packages)
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 options(repos = BiocManager::repositories())
 
-# Step 2: Install GExPipe from GitHub (63 runtime dependencies from DESCRIPTION)
 if (!requireNamespace("remotes", quietly = TRUE))
     install.packages("remotes")
 remotes::install_github(
@@ -100,140 +170,230 @@ remotes::install_github(
   dependencies = TRUE,
   INSTALL_opts = "--no-staged-install"
 )
-
-# Step 3: Build the app object, then start it (runGExPipe() does not start the server by itself)
-library(GExPipe)
-app <- runGExPipe()               # build the app object (installs deps on first run)
-shiny::runApp(app, port = 3838L)  # start the server and open the app
 ```
 
-On first launch, `runGExPipe()` may also install any missing packages interactively.
-The app uses an **isolated GExPipe library** and handles dependencies automatically:
+After any install or update, **restart R** once (RStudio:
+`Ctrl+Shift+F10`) before launching the app. This avoids Windows DLL lock
+issues and ensures machine-learning helpers load correctly.
 
-- Creates an **isolated GExPipe library** on your system
-- Downloads and installs all required packages into it
-- Keeps your main R library untouched
-- On every subsequent run, opens in seconds
+# Launch the Shiny application
 
-### Isolated library location
-
-All GExPipe packages are installed into a dedicated folder, completely
-separate from your main R library:
-
-| Operating System | Path |
-|---|---|
-| **Windows** | `C:\Users\<name>\AppData\Local\GExPipe\<R-ver>\` |
-| **macOS** | `~/Library/Application Support/GExPipe/<R-ver>/` |
-| **Linux** | `~/.local/share/GExPipe/<R-ver>/` |
-
-To find the exact path on your system:
-
-```{r lib-path, eval=FALSE}
-rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
-file.path(Sys.getenv("LOCALAPPDATA"), "GExPipe", rv)   # Windows
-# ~/Library/Application Support/GExPipe/<rv>            # macOS
-# ~/.local/share/GExPipe/<rv>                           # Linux
-```
-
-> **Rtools (Windows only):** If any dependency requires compilation,
-> install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/)
-> once. R will then compile source packages automatically.
->
-> **First run time:** Downloading and installing all 63 packages takes
-> approximately 10–40 minutes depending on internet speed. Every
-> subsequent run opens in seconds.
-
-# Quick Start
-
-## Launch the App
-
-After installation, start the application in two steps. `runGExPipe()`
-builds and returns the Shiny app object (installing any missing
-dependencies on the first run); `shiny::runApp()` then starts the server:
+`runGExPipe()` builds the app object and may install missing dependencies
+on first run. `shiny::runApp()` starts the local server.
 
 ```{r launch, eval=FALSE}
-app <- GExPipe::runGExPipe()      # Step 1: build the app object
-shiny::runApp(app, port = 3838L)  # Step 2: start the server
+app <- GExPipe::runGExPipe()
+shiny::runApp(app, port = 3838L)
 ```
 
-The app opens in your default browser at **Step 1 — Download Data**.
+The browser opens at the **welcome screen**. Click **Go to Analysis**
+to begin **Step 1 — Download Data**.
 
-On **first launch** the startup sequence runs automatically:
+On first launch, `runGExPipe()` loads packages into an **isolated
+GExPipe library** (separate from your main R library). Subsequent
+launches are much faster.
 
-```
-======================================================================
-  GExPipe — loading 63 packages...
-  [ 1/63] shiny             ... ✓ 1.13.0   Ready
-  [ 2/63] shinydashboard    ... ✓ 0.7.3    Ready
-  ...
-  [63/63] xgboost           ... ✓ 3.2.1.1  Ready
-  ===============================================================
-  Loaded  : 63 / 63 packages
-  Status  : All packages ready — opening app...
-  ===============================================================
-```
+| Operating system | Isolated library path |
+|---|---|
+| Windows | `C:\Users\<name>\AppData\Local\GExPipe\<R-ver>\` |
+| macOS | `~/Library/Application Support/GExPipe/<R-ver>/` |
+| Linux | `~/.local/share/GExPipe/<R-ver>/` |
 
-On **subsequent launches** all packages are already in the isolated
-library — the app opens in seconds with no install step.
+> **Windows:** If compilation is required, install
+> [Rtools](https://cran.r-project.org/bin/windows/Rtools/) once.
+> First-run dependency installation may take 10–40 minutes depending on
+> network speed.
 
-## Launch in the Cloud (Google Colab)
+## Run in Google Colab (optional)
 
-For users without a local R environment, `GExPipe` can be run in
-Google Colab at no cost. Open a new notebook, change the runtime to R
-(**Runtime → Change runtime type → R**), then run the two cells below.
+For users without a local R installation, run the app in Google Colab
+(**Runtime → Change runtime type → R**). Use a tunnel (e.g. ngrok) to
+expose port 3838, then install and start the app with `host = "0.0.0.0"`.
+See the [GitHub README](https://github.com/safarafique/GExPipe) for
+full Colab cells.
 
-**Cell 1 — Start a public tunnel** (free token from
-<https://ngrok.com>):
+# Step-by-step Shiny walkthrough
 
-```{r colab-tunnel, eval=FALSE}
-NGROK_TOKEN <- "PASTE_YOUR_TOKEN_HERE"
+The sections below mirror the sidebar tabs. For each step:
 
-system(paste0(
-    "wget -q https://bin.equinox.io/c/bNyj1mQVY4c/",
-    "ngrok-v3-stable-linux-amd64.tgz -O ngrok.tgz",
-    " && tar xzf ngrok.tgz"
-), wait = TRUE)
-system(paste0("./ngrok config add-authtoken ", NGROK_TOKEN), wait = TRUE)
-system("./ngrok http 3838 > /dev/null 2>&1 &", wait = FALSE)
-Sys.sleep(3)
+1. Read the **goal** on the panel header.
+2. Enter the settings described under **What to do**.
+3. Click the primary action button (usually **Run** or **Next**).
+4. Confirm the **success check** before moving on.
 
-url <- system(
-    paste0(
-        "curl -s http://localhost:4040/api/tunnels | ",
-        "python3 -c \"import sys,json; t=json.load(sys.stdin)['tunnels']; ",
-        "print(t[0]['public_url'] if t else 'ngrok not ready')\""
-    ),
-    intern = TRUE
-)
-cat("Open this URL in your browser:", url, "\n")
-```
+## Phase 1 — Data preparation
 
-**Cell 2 — Run the app** (the cell blocks while the app is running —
-this is expected):
+### Step 1 — Download Data
 
-```{r colab-run, eval=FALSE}
-options(timeout = 3600)
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager", repos = "https://cloud.r-project.org",
-                     quiet = TRUE)
+**Goal:** Retrieve one or more GEO series and build a combined expression
+matrix.
 
-BiocManager::install("safarafique/GExPipe",
-                     dependencies = TRUE, ask = FALSE)
+**What to do:**
 
-# Step 1: build the app object (no local browser in Colab)
-app <- GExPipe::runGExPipe(host = "0.0.0.0", port = 3838L,
-                           launch.browser = FALSE)
+- Choose platform type: **Microarray**, **RNA-seq**, or **Merged**.
+- Enter GSE accessions (comma-separated), e.g. `GSE89076, GSE50760`.
+- Click **Download & merge**.
 
-# Step 2: start the server (this cell blocks while the app runs)
-shiny::runApp(app, host = "0.0.0.0", port = 3838L)
+**Success check:** A preview table and sample count appear; the sidebar
+unlocks Step 2.
+
+```{r step1-screenshot, echo=FALSE, fig.cap="Step 1 — Download Data panel.", out.width="100%", eval=.vig_has_screenshot("step1_download.png")}
+knitr::include_graphics(.vig_screenshot("step1_download.png"))
 ```
 
-# Workflow Example
+### Step 2 — Quality Control
 
-This section demonstrates the core programmatic API using bundled
-example data: loading an expression matrix and sample metadata,
-applying normalization and cross-dataset gene intersection, and
-visualizing results with PCA and a heatmap.
+**Goal:** Remove outlier samples before normalization.
+
+**What to do:**
+
+- Review per-sample boxplots and density curves.
+- Adjust the Mahalanobis *p*-value threshold if needed (default 0.001).
+- Exclude flagged samples; keep ≥ 3 samples per group.
+
+**Success check:** QC plots update; Step 3 unlocks.
+
+```{r step2-screenshot, echo=FALSE, fig.cap="Step 2 — Quality Control.", out.width="100%", eval=.vig_has_screenshot("step2_qc.png")}
+knitr::include_graphics(.vig_screenshot("step2_qc.png"))
+```
+
+### Step 3 — Normalize
+
+**Goal:** Make expression values comparable across samples and datasets.
+
+**What to do:**
+
+- **Auto:** quantile normalization for microarray; TMM for RNA-seq counts.
+- **Manual:** choose quantile, log~2~, VST, RLE, or upper-quantile.
+- For **merged microarray + RNA-seq**, prefer per-platform normalization;
+  disable global quantile across platforms unless you understand the
+  scale mismatch.
+
+**Success check:** Post-normalization boxplots show aligned medians within
+each platform.
+
+### Step 4 — Assign Groups
+
+**Goal:** Label each sample as **Normal**, **Disease**, or **Exclude**.
+
+**What to do:**
+
+- Select the metadata column that encodes disease status.
+- Map factor levels to Normal / Disease.
+- Confirm ≥ 3 samples per retained class.
+
+**Success check:** Group summary table shows balanced classes.
+
+### Step 5 — Batch Correction
+
+**Goal:** Remove technical variation between batches or studies.
+
+**What to do:**
+
+- Choose **ComBat** (`r BiocStyle::Biocpkg("sva")`) or
+  **removeBatchEffect** (`r BiocStyle::Biocpkg("limma")`).
+- Review PVCA plots (before / after) and the confounding table.
+- Skipped automatically when only one dataset is loaded.
+
+**Success check:** Batch-associated variance decreases in the after-PVCA
+plot without removing biological signal tied to disease.
+
+## Phase 2 — Gene discovery
+
+### Step 6 — Differential Expression
+
+**Goal:** Find genes differing between Normal and Disease.
+
+**What to do:**
+
+- Set FDR (default 0.05) and |log~2~FC| (default 1).
+- Pick method: limma, limma-voom, DESeq2, or edgeR (counts).
+- Click **Run DE analysis**.
+
+**Outputs:** Volcano plot, top-DEG heatmap, downloadable results table.
+
+```{r step6-screenshot, echo=FALSE, fig.cap="Step 6 — Differential expression volcano plot.", out.width="100%", eval=.vig_has_screenshot("step6_de.png")}
+knitr::include_graphics(.vig_screenshot("step6_de.png"))
+```
+
+### Step 7 — WGCNA
+
+**Goal:** Identify co-expression modules correlated with disease.
+
+**What to do:**
+
+- Select soft-threshold power β where scale-free R² ≥ 0.80.
+- Set minimum module size (default 30) and merge cut height (default 0.25).
+- Inspect module–trait heatmap; note hub genes in significant modules.
+
+### Step 8 — Common Genes
+
+**Goal:** Intersect DEGs (Step 6) with WGCNA hub genes (Step 7).
+
+**Outputs:** Venn diagram, GO/KEGG dot plots, candidate gene table via
+`r BiocStyle::Biocpkg("clusterProfiler")`.
+
+## Phase 3 — Candidate refinement
+
+### Step 9 — PPI Network
+
+**Goal:** Map candidates onto a STRING protein–protein interaction network.
+
+**What to do:**
+
+- Set STRING confidence score (default 400).
+- Choose layout; review hub proteins (degree, betweenness, eigenvector).
+
+```{r step9-screenshot, echo=FALSE, fig.cap="Step 9 — PPI network.", out.width="100%", eval=.vig_has_screenshot("step9_ppi.png")}
+knitr::include_graphics(.vig_screenshot("step9_ppi.png"))
+```
+
+### Step 10 — Machine Learning
+
+**Goal:** Select a compact gene panel using multiple algorithms (LASSO,
+Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA, XGBoost).
+
+**What to do:**
+
+- Run the ensemble; genes selected by ≥ 2 methods form the candidate set.
+- If glmnet reports a version mismatch, restart R and relaunch the app.
+
+### Step 11 — Validation
+
+**Goal:** Test generalization on an external GEO cohort or an internal
+70/30 train–test split. Target accuracy ≥ 70%.
+
+### Step 12 — ROC Analysis
+
+**Goal:** Per-gene AUC with 95% CI (`r BiocStyle::CRANpkg("pROC")`).
+Retain genes with AUC ≥ 0.80 in training and validation.
+
+## Phase 4 — Clinical translation
+
+### Step 13 — Nomogram
+
+**Goal:** Build a points-based clinical score (`rms::lrm()`), calibration
+curve, and decision curve analysis.
+
+### Step 14 — GSEA
+
+**Goal:** Pathway-level enrichment (GO, KEGG, MSigDB Hallmark/C2/C5)
+stratified by final gene expression.
+
+### Step 15 — Summary Report
+
+**Goal:** Download a PDF narrative covering datasets, DEGs, WGCNA, PPI,
+ML features, validation, ROC, and pathways.
+
+```{r step15-screenshot, echo=FALSE, fig.cap="Step 15 — Summary report.", out.width="100%", eval=.vig_has_screenshot("step15_summary.png")}
+knitr::include_graphics(.vig_screenshot("step15_summary.png"))
+```
+
+# Programmatic example (bundled data)
+
+The Shiny app is the recommended interface. The functions below let you
+script normalization and QC plots using the example CSV files shipped in
+`inst/extdata/`.
 
 ## Load package and example data
 
@@ -241,18 +401,14 @@ visualizing results with PCA and a heatmap.
 library(GExPipe)
 library(ggplot2)
 
-expr_path <- system.file("extdata", "vignette_expression.csv",
-                          package = "GExPipe")
-meta_path <- system.file("extdata", "vignette_sample_metadata.csv",
-                          package = "GExPipe")
-
-stopifnot(nzchar(expr_path), file.exists(expr_path))
-stopifnot(nzchar(meta_path), file.exists(meta_path))
-
-expr_tab <- read.csv(expr_path, check.names = FALSE,
-                     stringsAsFactors = FALSE)
-meta_tab <- read.csv(meta_path, check.names = FALSE,
-                     stringsAsFactors = FALSE)
+expr_tab <- read.csv(
+  system.file("extdata", "vignette_expression.csv", package = "GExPipe"),
+  check.names = FALSE, stringsAsFactors = FALSE
+)
+meta_tab <- read.csv(
+  system.file("extdata", "vignette_sample_metadata.csv", package = "GExPipe"),
+  check.names = FALSE, stringsAsFactors = FALSE
+)
 
 expr <- as.matrix(expr_tab[, -1L, drop = FALSE])
 storage.mode(expr) <- "numeric"
@@ -267,9 +423,8 @@ head(meta_tab)
 
 ## Normalize and intersect datasets
 
-`gexp_normalize_and_intersect()` accepts a named list of expression
-matrices, applies within-dataset normalization, and returns a single
-genes × samples matrix restricted to genes present across all datasets.
+`gexp_normalize_and_intersect()` normalizes each dataset, intersects
+genes, and returns a combined matrix.
 
 ```{r normalize}
 if (!"Dataset" %in% colnames(meta_tab))
@@ -341,170 +496,27 @@ if (length(top_var) > 1L) {
 }
 ```
 
-# Application Walkthrough — 15-Step Pipeline
-
-The Shiny interface enforces a linear pipeline; each step is locked
-until its predecessor is complete.
-
-## Step 1 — Download Data
-
-Retrieves one or more GEO datasets and assembles a combined expression
-matrix. The user specifies a platform type (Microarray, RNA-seq, or
-Merged) and one or more GSE accession numbers
-(e.g. `GSE89076, GSE50760`). Series-matrix files are downloaded via
-`r BiocStyle::Biocpkg("GEOquery")`, probe or Ensembl identifiers are
-mapped to HGNC symbols, duplicate probes are averaged, and only genes
-present across all datasets are retained.
-
-## Step 2 — Quality Control
-
-Identifies and removes outlier samples before normalization. Per-sample
-boxplots and kernel-density estimates are rendered; statistical outliers
-are flagged by Mahalanobis distance (*p* < 0.001 by default). A minimum
-of three samples per group must remain after exclusion.
-
-## Step 3 — Normalize
-
-Scales expression values to be comparable across samples and datasets.
-*Auto* mode applies quantile normalization to microarray data and TMM
-to RNA-seq counts. *Manual* mode offers quantile, log~2~, VST, RLE,
-and upper-quantile methods. Successful normalization is confirmed by
-aligned sample medians in the post-normalization boxplot.
-
-## Step 4 — Assign Groups
-
-Maps each sample to *Normal*, *Disease*, or *Exclude* using a selected
-metadata column. A summary panel confirms at least three samples in
-each retained class before proceeding.
-
-## Step 5 — Batch Correction
-
-Removes systematic technical variation introduced by different
-experimental batches or sequencing runs. Available methods are ComBat
-(parametric empirical Bayes, `r BiocStyle::Biocpkg("sva")`) and
-`removeBatchEffect` (`r BiocStyle::Biocpkg("limma")`). This step is
-automatically skipped when only one dataset is loaded.
-
-## Step 6 — Differential Expression
-
-Identifies genes with statistically significant expression changes
-between Normal and Disease. Default thresholds are FDR < 0.05 and
-|log~2~FC| > 1. Available methods are limma (microarray and
-log-normalized RNA-seq), limma-voom, DESeq2, and edgeR (count data).
-Outputs include a volcano plot, a heatmap of the top DEGs, and a
-downloadable results table.
-
-## Step 7 — WGCNA Co-expression Network
-
-Clusters genes into co-expression modules and correlates each module
-eigengene with the disease trait using
-`r BiocStyle::Biocpkg("WGCNA")`. The user selects the soft-threshold
-power β where the scale-free topology fit R² ≥ 0.80, sets a minimum
-module size (default 30), and a merge cut height for combining similar
-modules (default 0.25). Outputs include the scale-free topology plot,
-gene dendrogram, and module–trait correlation heatmap.
-
-## Step 8 — Common Genes
-
-Intersects the DEG list from Step 6 with hub genes from
-trait-associated modules identified in Step 7. The intersection is
-subjected to Gene Ontology and KEGG over-representation analysis via
-`r BiocStyle::Biocpkg("clusterProfiler")`. Outputs include a Venn
-diagram, GO and KEGG dot plots, and a downloadable candidate gene table.
-
-## Step 9 — PPI Network
-
-Maps the candidate gene set onto a protein–protein interaction network
-from STRINGdb and ranks proteins by graph-theoretic centrality. The
-user specifies a confidence score cutoff (default 400) and network
-layout. Outputs include an interactive network plot and a hub-protein
-table reporting degree, betweenness, and eigenvector centrality.
-
-## Step 10 — Machine-Learning Feature Selection
-
-Applies an ensemble of algorithms to identify the smallest gene panel
-that maximally discriminates Normal from Disease samples. Algorithms:
-LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA,
-and XGBoost with SHAP importance scores. Genes selected by two or more
-algorithms constitute the final candidate set.
-
-## Step 11 — Validation
-
-Confirms that the candidate gene set generalizes beyond the discovery
-cohort. *External* validation downloads an independent GEO dataset
-automatically; *internal* validation applies a stratified 70/30
-train–test split. Classification accuracy ≥ 70% in the validation set
-is the minimum acceptance criterion.
-
-## Step 12 — ROC Analysis
-
-Quantifies the individual diagnostic accuracy of each candidate gene.
-A logistic regression model is fitted per gene; the ROC curve is
-computed with `r BiocStyle::CRANpkg("pROC")` and the AUC is reported
-with a 95% confidence interval. Genes with AUC ≥ 0.80 in both the
-training and validation sets are retained.
-
-## Step 13 — Nomogram
-
-Constructs a clinically interpretable scoring model from the final gene
-panel using `rms::lrm()`. Each gene is assigned a point scale whose
-sum maps to a predicted disease probability. A calibration curve and
-decision curve analysis (DCA) are generated to assess model reliability
-and clinical utility.
-
-## Step 14 — GSEA
-
-Identifies coordinated biological pathway activity in samples
-stratified by expression of each final gene. Gene sets tested include
-Gene Ontology (BP, MF, CC), KEGG, and MSigDB collections (Hallmark,
-C2, C5). Outputs include a ridge plot, individual enrichment plots, and
-a results table with normalized enrichment scores (NES) and
-leading-edge gene lists.
-
-## Step 15 — Summary Report
-
-Generates a structured narrative and a downloadable PDF covering the
-complete analysis: dataset details, DEG counts, WGCNA module findings,
-common gene intersection, PPI hub proteins, machine-learning features,
-validation accuracy, ROC AUCs, and top enriched pathways. The report is
-rendered via `rmarkdown`.
-
 # Troubleshooting {#troubleshooting}
 
 | Problem | Solution |
 |---|---|
-| **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) and run the installation command first, before loading any other packages. |
-| **Missing C++ compiler** | Install [Rtools45](https://cran.r-project.org/bin/windows/Rtools/) (Windows only). |
-| **Version conflicts** (`namespace X loaded but >= Y required`) | Use `pak::pkg_install("safarafique/GExPipe")` for smarter dependency resolution. |
-| **Corrupt lazy-load database** | Reinstall with `BiocManager::install("safarafique/GExPipe", INSTALL_opts = "--no-staged-install")`. |
-| **Corporate proxy / firewall** | Set `Sys.setenv(https_proxy = "http://proxy:port")` before installing. |
-| **Offline environment** | Download the ZIP from GitHub and run `install.packages("GExPipe-main.zip", repos = NULL, type = "source")`. |
-
-## Windows: Persistent DLL lock errors
-
-In rare cases — typically after a failed package update — R holds a
-lock on `curl.dll` that prevents all subsequent downloads. If
-restarting R does not resolve the issue, the following block clears
-stale lock directories and switches to the Windows-native HTTP stack:
+| **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
+| **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
+| **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
+| **Version conflicts** | `remotes::install_github("safarafique/GExPipe", force = TRUE)`. |
+| **Corrupt lazy-load database** | Reinstall with `INSTALL_opts = "--no-staged-install"`. |
+| **Corporate proxy** | `Sys.setenv(https_proxy = "http://proxy:port")` before installing. |
 
 ```{r windows-fix, eval=FALSE}
-# Switch to Windows-native HTTP (bypasses curl.dll entirely)
 options(download.file.method = "wininet")
-
-# Remove stale lock directories left by the failed install
 unlink(
     list.files(.libPaths()[1], pattern = "^00LOCK-", full.names = TRUE),
     recursive = TRUE, force = TRUE
 )
-
-# Retry installation
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
-BiocManager::install("safarafique/GExPipe", dependencies = TRUE)
+if (!requireNamespace("remotes", quietly = TRUE))
+    install.packages("remotes")
+remotes::install_github("safarafique/GExPipe", dependencies = TRUE)
 ```
-
-After installation completes, restart R once more and launch normally
-with `GExPipe::runGExPipe()`.
 
 # Session Information
 

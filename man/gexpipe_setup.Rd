@@ -14,13 +14,11 @@ gexpipe_setup(
 }
 \arguments{
 \item{update}{Logical. If \code{TRUE} (default), update already-installed
-packages to the versions matching your current Bioconductor release.
-Set to \code{FALSE} to only install missing packages without updating existing ones.}
+packages when auto-install is enabled.}
 
-\item{optional}{Logical. If \code{TRUE} (default), also install optional packages
-(\code{Boruta}, \code{xgboost}, \code{SHAPforxgboost}, \code{mixOmics}, \code{rms}, \code{dcurves},
-\code{cicerone}, \code{biomaRt}). These unlock additional ML methods, the guided
-tour, the nomogram, and Ensembl ID mapping.}
+\item{optional}{Logical. Reserved for future optional feature packages.
+Currently all runtime dependencies are in \code{DESCRIPTION} Imports and are
+always installed regardless of this flag.}
 
 \item{launch}{Logical. If \code{TRUE}, launch the GExPipe Shiny app after
 setup completes. Default \code{FALSE}.}
@@ -35,14 +33,10 @@ Invisibly returns a named logical vector indicating which packages
 were successfully installed/available.
 }
 \description{
-Detects your R version, installs or updates all required packages via
-\code{BiocManager} (which automatically selects the correct Bioconductor release
-for your R version — 3.19 for R 4.4, 3.21 for R 4.5, 3.22 for R 4.6),
-and optionally installs recommended optional packages and launches the app.
-}
-\details{
-Run this once on a new system or after upgrading R to ensure all packages
-are at the correct versions.
+Detects your R version and verifies (or optionally installs) required packages.
+When \code{GExPipe} is installed from Bioconductor, dependencies are installed at
+package install time; \code{gexpipe_setup()} only checks availability unless
+\code{options(gexpipe.auto_install = TRUE)} is set.
 }
 \examples{
 # Check and install missing packages only (no updates, no launch)
