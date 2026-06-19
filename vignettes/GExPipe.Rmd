@@ -43,35 +43,35 @@ knitr::opts_chunk$set(
 `GExPipe` is a **Shiny application** for bulk RNA-seq and microarray
 analysis. The primary way to use the package is to launch the guided
 15-step interface: download GEO data, run QC and normalization, correct
-batch effects, discover differentially expressed genes, build co-expression
-networks, refine candidates with PPI and machine learning, and export a
-clinical summary report — without manually wiring separate Bioconductor
-tools together.
+batch effects, discover differentially expressed genes, build
+co-expression networks, refine candidates with PPI and machine learning,
+and export a clinical summary report — without manually wiring separate
+Bioconductor tools together.
 
 This vignette is written for **end users** of the Shiny app. It covers
 installation, a visual pipeline overview, a step-by-step walkthrough of
 each screen, a short programmatic example with bundled data, and
 troubleshooting. Developer-oriented notes (internal module layout, CI
 testing) are **not** shipped as separate vignettes, to keep installation
-and `R CMD check` time manageable; see the
-[GitHub repository](https://github.com/safarafique/GExPipe) for
-contributor documentation.
+and `R CMD check` time manageable; see the [GitHub
+repository](https://github.com/safarafique/GExPipe) for contributor
+documentation.
 
 The package builds on `r BiocStyle::Biocpkg("GEOquery")` for data
 retrieval, `r BiocStyle::Biocpkg("limma")`,
-`r BiocStyle::Biocpkg("DESeq2")`, and
-`r BiocStyle::Biocpkg("edgeR")` for differential expression,
-`r BiocStyle::Biocpkg("WGCNA")` for co-expression networks, and
-`r BiocStyle::Biocpkg("clusterProfiler")` for functional enrichment.
+`r BiocStyle::Biocpkg("DESeq2")`, and `r BiocStyle::Biocpkg("edgeR")`
+for differential expression, `r BiocStyle::Biocpkg("WGCNA")` for
+co-expression networks, and `r BiocStyle::Biocpkg("clusterProfiler")`
+for functional enrichment.
 
 ## How the Shiny app is organised
 
-The sidebar lists **15 sequential steps** grouped into four phases.
-Each step unlocks only after the previous one succeeds. The welcome
-screen explains the workflow; click **Go to Analysis** to open Step 1.
+The sidebar lists **15 sequential steps** grouped into four phases. Each
+step unlocks only after the previous one succeeds. The welcome screen
+explains the workflow; click **Go to Analysis** to open Step 1.
 
 | Phase | Steps | What you do |
-|---|---|---|
+|----|----|----|
 | **Data preparation** | 1 – 5 | Download GEO data → QC → Normalization → Group assignment → Batch correction |
 | **Gene discovery** | 6 – 8 | Differential expression → WGCNA → DEG ∩ hub genes |
 | **Candidate refinement** | 9 – 12 | PPI network → ML feature selection → Validation → ROC |
@@ -128,8 +128,8 @@ capture instructions).
 
 Follow the [official Bioconductor installation
 guide](https://bioconductor.org/install/) to ensure your R version
-matches a supported Bioconductor release (e.g. Bioconductor 3.22 for
-R 4.6).
+matches a supported Bioconductor release (e.g. Bioconductor 3.22 for R
+4.6).
 
 ## From Bioconductor (recommended after acceptance)
 
@@ -154,7 +154,8 @@ packageVersion("GExPipe")
 ## From GitHub (available before Bioconductor release)
 
 Until the package is on Bioconductor, install from
-[GitHub](https://github.com/safarafique/GExPipe). Requires **R ≥ 4.5.0**.
+[GitHub](https://github.com/safarafique/GExPipe). Requires **R ≥
+4.5.0**.
 
 ```{r install-github, eval=FALSE}
 options(timeout = 3600)
@@ -178,26 +179,26 @@ issues and ensures machine-learning helpers load correctly.
 
 # Launch the Shiny application
 
-`runGExPipe()` builds the app object and may install missing dependencies
-on first run. `shiny::runApp()` starts the local server.
+`runGExPipe()` builds the app object and may install missing
+dependencies on first run. `shiny::runApp()` starts the local server.
 
 ```{r launch, eval=FALSE}
 app <- GExPipe::runGExPipe()
 shiny::runApp(app, port = 3838L)
 ```
 
-The browser opens at the **welcome screen**. Click **Go to Analysis**
-to begin **Step 1 — Download Data**.
+The browser opens at the **welcome screen**. Click **Go to Analysis** to
+begin **Step 1 — Download Data**.
 
 On first launch, `runGExPipe()` loads packages into an **isolated
 GExPipe library** (separate from your main R library). Subsequent
 launches are much faster.
 
-| Operating system | Isolated library path |
-|---|---|
-| Windows | `C:\Users\<name>\AppData\Local\GExPipe\<R-ver>\` |
-| macOS | `~/Library/Application Support/GExPipe/<R-ver>/` |
-| Linux | `~/.local/share/GExPipe/<R-ver>/` |
+| Operating system | Isolated library path                            |
+|------------------|--------------------------------------------------|
+| Windows          | `C:\Users\<name>\AppData\Local\GExPipe\<R-ver>\` |
+| macOS            | `~/Library/Application Support/GExPipe/<R-ver>/` |
+| Linux            | `~/.local/share/GExPipe/<R-ver>/`                |
 
 > **Windows:** If compilation is required, install
 > [Rtools](https://cran.r-project.org/bin/windows/Rtools/) once.
@@ -208,25 +209,25 @@ launches are much faster.
 
 For users without a local R installation, run the app in Google Colab
 (**Runtime → Change runtime type → R**). Use a tunnel (e.g. ngrok) to
-expose port 3838, then install and start the app with `host = "0.0.0.0"`.
-See the [GitHub README](https://github.com/safarafique/GExPipe) for
-full Colab cells.
+expose port 3838, then install and start the app with
+`host = "0.0.0.0"`. See the [GitHub
+README](https://github.com/safarafique/GExPipe) for full Colab cells.
 
 # Step-by-step Shiny walkthrough
 
 The sections below mirror the sidebar tabs. For each step:
 
-1. Read the **goal** on the panel header.
-2. Enter the settings described under **What to do**.
-3. Click the primary action button (usually **Run** or **Next**).
-4. Confirm the **success check** before moving on.
+1.  Read the **goal** on the panel header.
+2.  Enter the settings described under **What to do**.
+3.  Click the primary action button (usually **Run** or **Next**).
+4.  Confirm the **success check** before moving on.
 
 ## Phase 1 — Data preparation
 
 ### Step 1 — Download Data
 
-**Goal:** Retrieve one or more GEO series and build a combined expression
-matrix.
+**Goal:** Retrieve one or more GEO series and build a combined
+expression matrix.
 
 **What to do:**
 
@@ -237,8 +238,10 @@ matrix.
 **Success check:** A preview table and sample count appear; the sidebar
 unlocks Step 2.
 
-```{r step1-screenshot, echo=FALSE, fig.cap="Step 1 — Download Data panel.", out.width="100%", eval=.vig_has_screenshot("step1_download.png")}
-knitr::include_graphics(.vig_screenshot("step1_download.png"))
+```{r step1-screenshot, echo=FALSE, fig.cap="Step 1 - Download Data panel.", out.width="100%"}
+if (.vig_has_screenshot("step1_download.png")) {
+  knitr::include_graphics(.vig_screenshot("step1_download.png"))
+}
 ```
 
 ### Step 2 — Quality Control
@@ -253,8 +256,10 @@ knitr::include_graphics(.vig_screenshot("step1_download.png"))
 
 **Success check:** QC plots update; Step 3 unlocks.
 
-```{r step2-screenshot, echo=FALSE, fig.cap="Step 2 — Quality Control.", out.width="100%", eval=.vig_has_screenshot("step2_qc.png")}
-knitr::include_graphics(.vig_screenshot("step2_qc.png"))
+```{r step2-screenshot, echo=FALSE, fig.cap="Step 2 - Quality Control.", out.width="100%"}
+if (.vig_has_screenshot("step2_qc.png")) {
+  knitr::include_graphics(.vig_screenshot("step2_qc.png"))
+}
 ```
 
 ### Step 3 — Normalize
@@ -263,14 +268,15 @@ knitr::include_graphics(.vig_screenshot("step2_qc.png"))
 
 **What to do:**
 
-- **Auto:** quantile normalization for microarray; TMM for RNA-seq counts.
+- **Auto:** quantile normalization for microarray; TMM for RNA-seq
+  counts.
 - **Manual:** choose quantile, log~2~, VST, RLE, or upper-quantile.
-- For **merged microarray + RNA-seq**, prefer per-platform normalization;
-  disable global quantile across platforms unless you understand the
-  scale mismatch.
+- For **merged microarray + RNA-seq**, prefer per-platform
+  normalization; disable global quantile across platforms unless you
+  understand the scale mismatch.
 
-**Success check:** Post-normalization boxplots show aligned medians within
-each platform.
+**Success check:** Post-normalization boxplots show aligned medians
+within each platform.
 
 ### Step 4 — Assign Groups
 
@@ -306,14 +312,16 @@ plot without removing biological signal tied to disease.
 
 **What to do:**
 
-- Set FDR (default 0.05) and |log~2~FC| (default 1).
+- Set FDR (default 0.05) and \|log~2~FC\| (default 1).
 - Pick method: limma, limma-voom, DESeq2, or edgeR (counts).
 - Click **Run DE analysis**.
 
 **Outputs:** Volcano plot, top-DEG heatmap, downloadable results table.
 
-```{r step6-screenshot, echo=FALSE, fig.cap="Step 6 — Differential expression volcano plot.", out.width="100%", eval=.vig_has_screenshot("step6_de.png")}
-knitr::include_graphics(.vig_screenshot("step6_de.png"))
+```{r step6-screenshot, echo=FALSE, fig.cap="Step 6 - Differential expression volcano plot.", out.width="100%"}
+if (.vig_has_screenshot("step6_de.png")) {
+  knitr::include_graphics(.vig_screenshot("step6_de.png"))
+}
 ```
 
 ### Step 7 — WGCNA
@@ -323,7 +331,8 @@ knitr::include_graphics(.vig_screenshot("step6_de.png"))
 **What to do:**
 
 - Select soft-threshold power β where scale-free R² ≥ 0.80.
-- Set minimum module size (default 30) and merge cut height (default 0.25).
+- Set minimum module size (default 30) and merge cut height (default
+  0.25).
 - Inspect module–trait heatmap; note hub genes in significant modules.
 
 ### Step 8 — Common Genes
@@ -337,15 +346,18 @@ knitr::include_graphics(.vig_screenshot("step6_de.png"))
 
 ### Step 9 — PPI Network
 
-**Goal:** Map candidates onto a STRING protein–protein interaction network.
+**Goal:** Map candidates onto a STRING protein–protein interaction
+network.
 
 **What to do:**
 
 - Set STRING confidence score (default 400).
 - Choose layout; review hub proteins (degree, betweenness, eigenvector).
 
-```{r step9-screenshot, echo=FALSE, fig.cap="Step 9 — PPI network.", out.width="100%", eval=.vig_has_screenshot("step9_ppi.png")}
-knitr::include_graphics(.vig_screenshot("step9_ppi.png"))
+```{r step9-screenshot, echo=FALSE, fig.cap="Step 9 - PPI network.", out.width="100%"}
+if (.vig_has_screenshot("step9_ppi.png")) {
+  knitr::include_graphics(.vig_screenshot("step9_ppi.png"))
+}
 ```
 
 ### Step 10 — Machine Learning
@@ -355,7 +367,8 @@ Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA, XGBoost).
 
 **What to do:**
 
-- Run the ensemble; genes selected by ≥ 2 methods form the candidate set.
+- Run the ensemble; genes selected by ≥ 2 methods form the candidate
+  set.
 - If glmnet reports a version mismatch, restart R and relaunch the app.
 
 ### Step 11 — Validation
@@ -372,8 +385,8 @@ Retain genes with AUC ≥ 0.80 in training and validation.
 
 ### Step 13 — Nomogram
 
-**Goal:** Build a points-based clinical score (`rms::lrm()`), calibration
-curve, and decision curve analysis.
+**Goal:** Build a points-based clinical score (`rms::lrm()`),
+calibration curve, and decision curve analysis.
 
 ### Step 14 — GSEA
 
@@ -385,8 +398,10 @@ stratified by final gene expression.
 **Goal:** Download a PDF narrative covering datasets, DEGs, WGCNA, PPI,
 ML features, validation, ROC, and pathways.
 
-```{r step15-screenshot, echo=FALSE, fig.cap="Step 15 — Summary report.", out.width="100%", eval=.vig_has_screenshot("step15_summary.png")}
-knitr::include_graphics(.vig_screenshot("step15_summary.png"))
+```{r step15-screenshot, echo=FALSE, fig.cap="Step 15 - Summary report.", out.width="100%"}
+if (.vig_has_screenshot("step15_summary.png")) {
+  knitr::include_graphics(.vig_screenshot("step15_summary.png"))
+}
 ```
 
 # Programmatic example (bundled data)
@@ -499,7 +514,7 @@ if (length(top_var) > 1L) {
 # Troubleshooting {#troubleshooting}
 
 | Problem | Solution |
-|---|---|
+|----|----|
 | **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
 | **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
