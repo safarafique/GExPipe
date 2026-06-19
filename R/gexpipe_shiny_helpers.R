@@ -210,13 +210,21 @@ detect_gene_id_format <- function(ids) {
 
 .gexpipe_hs_db <- function() {
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
-    message("org.Hs.eg.db not found — attempting auto-install...")
-    tryCatch(
-      BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
-                           update = FALSE, lib = .libPaths()[1]),
-      error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
-      warning = function(w) NULL
+    can_install <- tryCatch(
+      utils::getFromNamespace(".gexpipe_runtime_install_enabled", "GExPipe")(),
+      error = function(e) isTRUE(getOption("gexpipe.auto_install", FALSE))
     )
+    if (isTRUE(can_install)) {
+      message("org.Hs.eg.db not found — attempting auto-install...")
+      tryCatch(
+        BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
+                             update = FALSE, lib = .libPaths()[1]),
+        error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
+        warning = function(w) NULL
+      )
+    } else {
+      message("org.Hs.eg.db not found — install with BiocManager::install('org.Hs.eg.db').")
+    }
   }
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
     return(NULL)   # graceful fallback — caller must handle NULL
@@ -956,13 +964,21 @@ run_gse_annotation_and_download <- function(gse_id, dest_dir = getwd(), save_ann
 # Reused here so the Shiny app and manual script give identical results.
 convert_ids_to_symbols_simple <- function(gene_ids) {
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
-    message("org.Hs.eg.db not found — attempting auto-install...")
-    tryCatch(
-      BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
-                           update = FALSE, lib = .libPaths()[1]),
-      error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
-      warning = function(w) NULL
+    can_install <- tryCatch(
+      utils::getFromNamespace(".gexpipe_runtime_install_enabled", "GExPipe")(),
+      error = function(e) isTRUE(getOption("gexpipe.auto_install", FALSE))
     )
+    if (isTRUE(can_install)) {
+      message("org.Hs.eg.db not found — attempting auto-install...")
+      tryCatch(
+        BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
+                             update = FALSE, lib = .libPaths()[1]),
+        error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
+        warning = function(w) NULL
+      )
+    } else {
+      message("org.Hs.eg.db not found — install with BiocManager::install('org.Hs.eg.db').")
+    }
   }
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
     warning("org.Hs.eg.db unavailable (network issue?) — gene IDs returned as-is without symbol conversion.")

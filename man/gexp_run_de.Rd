@@ -16,36 +16,17 @@ gexp_run_de(
 \item{expr}{Matrix of (batch-corrected, normalized) expression values
 with genes in rows and samples in columns.}
 
-\item{metadata}{Data.frame with at least a \code{Condition} column taking
-values "Normal" and "Disease", and optionally \code{Dataset} for batches.}
+\item{metadata}{Data.frame with at least a \code{Condition} column.}
 
-\item{method}{Character string, one of "limma", "limma_voom",
-"deseq2", or "edger". Currently only "limma" is implemented here.}
+\item{method}{Currently only \code{"limma"} is implemented.}
 
-\item{logfc_cutoff}{Numeric log2 fold-change cutoff (e.g. 0.5).}
+\item{logfc_cutoff}{Numeric log2 fold-change cutoff.}
 
-\item{padj_cutoff}{Numeric adjusted P-value cutoff (e.g. 0.05).}
+\item{padj_cutoff}{Numeric adjusted P-value cutoff.}
 }
 \value{
-A list with elements:
-\item{de_results}{data.frame with columns Gene, logFC, AveExpr,
-P.Value, adj.P.Val, Significance}
-\item{sig_genes}{subset of de_results with Significance != "Not Significant"}
+list with de_results, sig_genes, filter_note, sample_info, formula_desc
 }
 \description{
-Wrapper for the limma-based DE pipeline used in Step 6. This version
-currently implements the limma path; other methods can be added later.
-}
-\examples{
-expr <- matrix(rnorm(240), nrow = 24)
-rownames(expr) <- paste0("Gene", seq_len(nrow(expr)))
-colnames(expr) <- paste0("S", seq_len(ncol(expr)))
-metadata <- data.frame(
-  Dataset = rep(c("D1", "D2"), each = 5),
-  Condition = rep(c("Normal", "Disease"), times = 5),
-  row.names = colnames(expr),
-  stringsAsFactors = FALSE
-)
-de <- gexp_run_de(expr, metadata, method = "limma", logfc_cutoff = 0.1, padj_cutoff = 0.5)
-head(de$de_results$Gene)
+Run differential expression analysis
 }

@@ -11,7 +11,9 @@ gexp_normalize_and_intersect(
   rnaseq_norm_method = "TMM",
   micro_cel_paths = NULL,
   platform_per_gse = NULL,
-  de_method = "limma"
+  micro_eset_list = NULL,
+  de_method = "limma",
+  apply_global_quantile = TRUE
 )
 }
 \arguments{
@@ -27,9 +29,13 @@ gexp_normalize_and_intersect(
 
 \item{platform_per_gse}{optional named vector giving platform IDs per GSE.}
 
+\item{micro_eset_list}{optional named list of ExpressionSet objects per GSE (for RMA ID mapping).}
+
 \item{de_method}{differential expression method (used to decide whether to
 save raw counts for DESeq2/edgeR/limma-voom); one of "limma",
 "limma_voom", "deseq2", "edger".}
+
+\item{apply_global_quantile}{logical; if TRUE, apply limma quantile normalization across all samples.}
 }
 \value{
 A list with elements:
