@@ -20,6 +20,9 @@ gexp_download_normalize_ids_for_overlap(
 \item{platform_per_gse}{Optional named list/vector of GPL IDs.}
 
 \item{all_genes_list}{Optional prebuilt gene lists.}
+
+\item{micro_eset_list}{Optional named list of \code{ExpressionSet} objects for
+\code{fData} fallback when probe-to-symbol mapping needs platform annotation.}
 }
 \value{
 List with updated lists and appended log text.
