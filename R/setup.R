@@ -1,16 +1,12 @@
 #' Set up GExPipe dependencies and optionally launch the app
 #'
-#' Detects your R version, installs or updates all required packages via
-#' `BiocManager` (which automatically selects the correct Bioconductor release
-#' for your R version — 3.19 for R 4.4, 3.21 for R 4.5, 3.22 for R 4.6),
-#' and optionally installs recommended optional packages and launches the app.
-#'
-#' Run this once on a new system or after upgrading R to ensure all packages
-#' are at the correct versions.
+#' Detects your R version and verifies (or optionally installs) required packages.
+#' When `GExPipe` is installed from Bioconductor, dependencies are installed at
+#' package install time; `gexpipe_setup()` only checks availability unless
+#' `options(gexpipe.auto_install = TRUE)` is set.
 #'
 #' @param update Logical. If `TRUE` (default), update already-installed
-#'   packages to the versions matching your current Bioconductor release.
-#'   Set to `FALSE` to only install missing packages without updating existing ones.
+#'   packages when auto-install is enabled.
 #' @param optional Logical. Reserved for future optional feature packages.
 #'   Currently all runtime dependencies are in `DESCRIPTION` Imports and are
 #'   always installed regardless of this flag.
@@ -134,7 +130,11 @@ gexpipe_setup <- function(update   = TRUE,
   ))
 
   message("\nInstalling missing packages via background process...")
-  .gexpipe_batch_install(all_pkgs)
+  if (.gexpipe_runtime_install_enabled()) {
+    .gexpipe_batch_install(all_pkgs)
+  } else {
+    .gexpipe_verify_imports(all_pkgs, quiet = FALSE)
+  }
 
   ## ── 6. Verify ─────────────────────────────────────────────────────────────
   status  <- vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
