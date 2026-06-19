@@ -1,5 +1,19 @@
 # GExPipe NEWS
 
+## Version 0.99.11
+
+### Bioconductor submission readiness
+- Runtime `BiocManager::install()` is **disabled by default** when `GExPipe` is
+  installed in a normal R library (Bioconductor / CRAN path). Dependencies must
+  be installed at package install time via `BiocManager::install("GExPipe",
+  dependencies = TRUE)`.
+- GitHub / first-run workflow: `options(gexpipe.auto_install = TRUE)` before
+  `runGExPipe()` or `gexpipe_setup()` to restore background dependency installation.
+- Regenerated documentation for 13 previously exported but undocumented helpers.
+- Vignette revised for end users (Shiny walkthrough, Bioconductor install, `system.file`
+  for bundled data). Developer vignettes remain excluded from the package.
+- `.Rbuildignore` excludes `inst/pkg_versions_installed.local.txt`.
+
 ## Version 0.99.10
 
 ### Machine learning — glmnet 5.x compatibility (fixes LASSO / Elastic Net / Ridge)

@@ -98,6 +98,46 @@
   file.path(base, "GExPipe", paste0(rv, "-pending"))
 }
 
+## TRUE when launch-time package installation is allowed (GitHub / runGitHub workflow).
+## FALSE when GExPipe is installed in a normal R library (Bioconductor / CRAN path).
+.gexpipe_runtime_install_enabled <- function() {
+  if (!interactive()) return(FALSE)
+  if (isTRUE(getOption("shiny.testmode"))) return(FALSE)
+  explicit <- getOption("gexpipe.auto_install", NULL)
+  if (!is.null(explicit)) return(isTRUE(explicit))
+
+  pkg_path <- tryCatch(
+    normalizePath(system.file(package = "GExPipe"), winslash = "/", mustWork = FALSE),
+    error = function(e) ""
+  )
+  if (!nzchar(pkg_path) || !dir.exists(pkg_path)) return(TRUE)
+
+  isolated_root <- normalizePath(
+    file.path(.gexpipe_lib_base(), "GExPipe"),
+    winslash = "/", mustWork = FALSE
+  )
+  pkg_norm <- normalizePath(pkg_path, winslash = "/", mustWork = FALSE)
+  if (startsWith(pkg_norm, paste0(isolated_root, "/"))) return(TRUE)
+  FALSE
+}
+
+## Report missing Imports without installing (Bioconductor default).
+.gexpipe_verify_imports <- function(
+    pkgs = .gexpipe_all_pkgs(include_optional = TRUE),
+    quiet = FALSE) {
+  missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
+  if (length(missing) == 0L) return(invisible(character(0L)))
+  msg <- paste0(
+    "GExPipe: missing required package(s): ",
+    paste(missing, collapse = ", "),
+    "\n  Install with full dependencies:\n",
+    "    BiocManager::install(\"GExPipe\", dependencies = TRUE)\n",
+    "  GitHub auto-install: options(gexpipe.auto_install = TRUE) before runGExPipe()."
+  )
+  if (isTRUE(quiet)) message(msg) else warning(msg, call. = FALSE)
+  invisible(missing)
+}
+
 ## Best version of pkg available across all libPaths (not just what is loaded).
 .gexpipe_best_version <- function(pkg) {
   vers <- vapply(.libPaths(), function(lib) {
@@ -120,6 +160,9 @@
 ##  4. Force-reload attempt — after subprocess, tries to unload + reload from
 ##     the dedicated lib; if still conflicted, shows a clear restart message.
 .gexpipe_batch_install <- function(pkgs) {
+  if (!.gexpipe_runtime_install_enabled()) {
+    return(invisible(.gexpipe_verify_imports(pkgs, quiet = TRUE)))
+  }
 
   # ── 0. Dedicated library ───────────────────────────────────────────────────
   gexpipe_lib <- .gexpipe_get_lib()
@@ -395,6 +438,10 @@
 ## Single-package helper kept for backwards compatibility.
 .gexpipe_ensure_pkg <- function(pkg) {
   if (requireNamespace(pkg, quietly = TRUE)) return(TRUE)
+  if (!.gexpipe_runtime_install_enabled()) {
+    .gexpipe_verify_imports(pkg, quiet = TRUE)
+    return(FALSE)
+  }
   .gexpipe_batch_install(pkg)
   requireNamespace(pkg, quietly = TRUE)
 }
@@ -437,7 +484,7 @@
     } else if (exists("glmnet_control", envir = ns, inherits = FALSE, mode = "function")) {
       get("glmnet_control", envir = ns, mode = "function")()
     } else {
-      x <- matrix(rnorm(20), nrow = 2)
+      x <- matrix(stats::rnorm(20), nrow = 2)
       y <- rep(0:1, each = 10)
       glmnet::cv.glmnet(x, y, family = "binomial", nfolds = 3)
     }
@@ -662,7 +709,8 @@
   }
 
   # Reinstall before first load: avoids Windows DLL-lock requiring a restart.
-  if (!isNamespaceLoaded(pkg) &&
+  if (.gexpipe_runtime_install_enabled() &&
+      !isNamespaceLoaded(pkg) &&
       requireNamespace(pkg, lib.loc = lib, quietly = TRUE) &&
       isFALSE(.gexpipe_pkg_built_for_current_r(pkg, lib))) {
     if (!quiet) {
@@ -677,6 +725,14 @@
   }
 
   if (.works()) return(TRUE)
+
+  if (!.gexpipe_runtime_install_enabled()) {
+    if (!quiet && !.works()) {
+      message("GExPipe: ", pkg, " native code is not usable. Restart R or reinstall ",
+              pkg, " for this R version.")
+    }
+    return(.works())
+  }
 
   built_ok <- .gexpipe_pkg_built_for_current_r(pkg, lib)
   if (isFALSE(built_ok) || is.na(built_ok)) {
@@ -733,6 +789,9 @@
 
 ## Detect and repair a corrupted GExPipe lazy-load database (common after in-session reinstall).
 .gexpipe_ensure_self <- function(quiet = FALSE) {
+  if (!.gexpipe_runtime_install_enabled()) {
+    return(invisible(requireNamespace("GExPipe", quietly = TRUE)))
+  }
   if (!requireNamespace("GExPipe", quietly = TRUE)) {
     return(invisible(TRUE))
   }
@@ -838,6 +897,15 @@
 ## Returns TRUE if all were fixed, FALSE if a restart is still required.
 .gexpipe_fix_broken_pkgs <- function(broken_pkgs) {
   if (length(broken_pkgs) == 0L) return(TRUE)
+  if (!.gexpipe_runtime_install_enabled()) {
+    warning(
+      "GExPipe: package(s) with broken native code detected: ",
+      paste(broken_pkgs, collapse = ", "),
+      ". Restart R and reinstall GExPipe dependencies.",
+      call. = FALSE
+    )
+    return(FALSE)
+  }
   message("GExPipe: ", length(broken_pkgs),
           " package(s) have broken native code (compiled for a different R version): ",
           paste(broken_pkgs, collapse = ", "))

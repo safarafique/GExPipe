@@ -33,11 +33,14 @@ WGCNA, pathway enrichment, PPI, machine learning, and more).
 }
 \section{Startup time}{
 
-\code{runGExPipe()} checks for missing packages \strong{before} the browser opens and
-installs them in a single \code{BiocManager::install()} call.  On a machine where
-all packages are already present the check takes under one second.  On a
-fresh machine (no Bioconductor packages) expect \strong{10–30 minutes} for the
-initial download; every subsequent call takes only seconds.
+When \code{GExPipe} is installed from Bioconductor (or any normal R library),
+dependencies must be installed at package install time via
+\code{BiocManager::install("GExPipe", dependencies = TRUE)}. \code{runGExPipe()}
+then verifies imports and opens the app without downloading packages.
+
+For the GitHub / first-run workflow, set
+\code{options(gexpipe.auto_install = TRUE)} before \code{runGExPipe()} to enable
+background dependency installation (10–30 minutes on a fresh machine).
 
 The welcome screen loads first; the full 15-tab dashboard is built only
 after the user clicks \strong{Go to Analysis}, so the initial browser response is

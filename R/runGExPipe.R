@@ -12,11 +12,14 @@
 #'   browser - then use `launch.browser = TRUE` or `port = 3838`.
 #' @param host The host to bind. Use "0.0.0.0" in Google Colab so port forwarding works.
 #' @section Startup time:
-#' `runGExPipe()` checks for missing packages **before** the browser opens and
-#' installs them in a single `BiocManager::install()` call.  On a machine where
-#' all packages are already present the check takes under one second.  On a
-#' fresh machine (no Bioconductor packages) expect **10–30 minutes** for the
-#' initial download; every subsequent call takes only seconds.
+#' When `GExPipe` is installed from Bioconductor (or any normal R library),
+#' dependencies must be installed at package install time via
+#' `BiocManager::install("GExPipe", dependencies = TRUE)`. `runGExPipe()`
+#' then verifies imports and opens the app without downloading packages.
+#'
+#' For the GitHub / first-run workflow, set
+#' `options(gexpipe.auto_install = TRUE)` before `runGExPipe()` to enable
+#' background dependency installation (10–30 minutes on a fresh machine).
 #'
 #' The welcome screen loads first; the full 15-tab dashboard is built only
 #' after the user clicks **Go to Analysis**, so the initial browser response is
@@ -72,34 +75,58 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   if (interactive() && !isTRUE(getOption("shiny.testmode"))) {
     all_pkgs <- .gexpipe_all_pkgs(include_optional = TRUE)
 
-    # ── Detect missing packages ───────────────────────────────────────────────
-    missing_now <- all_pkgs[
-      !vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
-    ]
+    if (.gexpipe_runtime_install_enabled()) {
+      # ── GitHub / auto-install workflow ───────────────────────────────────────
+      missing_now <- all_pkgs[
+        !vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+      ]
 
-    # ── Detect version-conflicted packages ────────────────────────────────────
-    # A package may be present but below its minimum required version.
-    # These cause "namespace X loaded but >= Y required" errors at runtime.
-    # The background subprocess can update them even when their DLL is locked
-    # in the current session, because it starts with nothing loaded.
-    version_conflict_now <- names(.gexpipe_min_versions)[
-      vapply(names(.gexpipe_min_versions), function(pkg) {
-        tryCatch(
-          .gexpipe_best_version(pkg) < package_version(.gexpipe_min_versions[[pkg]]),
-          error = function(e) FALSE
+      version_conflict_now <- names(.gexpipe_min_versions)[
+        vapply(names(.gexpipe_min_versions), function(pkg) {
+          tryCatch(
+            .gexpipe_best_version(pkg) < package_version(.gexpipe_min_versions[[pkg]]),
+            error = function(e) FALSE
+          )
+        }, logical(1L))
+      ]
+
+      needs_install <- length(missing_now) > 0L || length(version_conflict_now) > 0L
+
+      tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = FALSE), error = function(e) {
+        message("GExPipe: native package check note: ", conditionMessage(e))
+      })
+      tryCatch(.gexpipe_ensure_self(quiet = FALSE), error = function(e) {
+        message("GExPipe: package integrity check note: ", conditionMessage(e))
+      })
+
+      if (needs_install) {
+        if (length(missing_now) > 0L)
+          message("\nGExPipe: ", length(missing_now), " missing package(s):\n",
+                  "  ", paste(missing_now, collapse = ", "))
+        if (length(version_conflict_now) > 0L)
+          message("GExPipe: ", length(version_conflict_now),
+                  " version-conflict(s) (below minimum required version):\n",
+                  "  ", paste(version_conflict_now, collapse = ", "))
+        message(
+          "\nGExPipe: updating via background subprocess ",
+          "(bypasses DLL locks — no session restart needed).\n",
+          "  First run: up to 40 min.  Subsequent runs: seconds.\n"
         )
-      }, logical(1L))
-    ]
+        .gexpipe_batch_install(all_pkgs)
+        still_missing <- all_pkgs[
+          !vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
+        ]
+        if (length(still_missing) > 0L) {
+          message("GExPipe: could not install: ", paste(still_missing, collapse = ", "),
+                  "\n  Run  gexpipe_setup()  for a detailed install log.")
+        } else {
+          message("GExPipe: all packages ready.\n")
+        }
+      }
+    } else {
+      .gexpipe_verify_imports(all_pkgs, quiet = FALSE)
+    }
 
-    needs_install <- length(missing_now) > 0L || length(version_conflict_now) > 0L
-
-    # Always verify native packages (glmnet etc.) — version checks miss DLL mismatches.
-    tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = FALSE), error = function(e) {
-      message("GExPipe: native package check note: ", conditionMessage(e))
-    })
-    tryCatch(.gexpipe_ensure_self(quiet = FALSE), error = function(e) {
-      message("GExPipe: package integrity check note: ", conditionMessage(e))
-    })
     glm_ok <- tryCatch({
       if (exists(".gexpipe_native_session_ok", mode = "function")) {
         isTRUE(.gexpipe_native_session_ok("glmnet", try_repair = TRUE))
@@ -116,31 +143,6 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
       message("GExPipe: glmnet will use an isolated R process for LASSO / Elastic Net / Ridge (no restart needed).")
     } else {
       message("GExPipe: glmnet not ready — restart R (Ctrl+Shift+F10), then run GExPipe::runGExPipe() before ML.")
-    }
-
-    if (needs_install) {
-      if (length(missing_now) > 0L)
-        message("\nGExPipe: ", length(missing_now), " missing package(s):\n",
-                "  ", paste(missing_now, collapse = ", "))
-      if (length(version_conflict_now) > 0L)
-        message("GExPipe: ", length(version_conflict_now),
-                " version-conflict(s) (below minimum required version):\n",
-                "  ", paste(version_conflict_now, collapse = ", "))
-      message(
-        "\nGExPipe: updating via background subprocess ",
-        "(bypasses DLL locks — no session restart needed).\n",
-        "  First run: up to 40 min.  Subsequent runs: seconds.\n"
-      )
-      .gexpipe_batch_install(all_pkgs)
-      still_missing <- all_pkgs[
-        !vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
-      ]
-      if (length(still_missing) > 0L) {
-        message("GExPipe: could not install: ", paste(still_missing, collapse = ", "),
-                "\n  Run  gexpipe_setup()  for a detailed install log.")
-      } else {
-        message("GExPipe: all packages ready.\n")
-      }
     }
   }
   # Signal to gexp_app_attach_packages() that install already ran — skip repeat.

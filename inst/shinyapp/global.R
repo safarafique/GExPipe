@@ -262,8 +262,34 @@ if (exists(".gexpipe_pkg_built_for_current_r", mode = "function")) {
 }
 
 # ==============================================================================
-# STEP 4  \u2014  Install / update packages with per-package visible progress
+# STEP 4  —  Install / update packages with per-package visible progress
 # ==============================================================================
+# Skipped when GExPipe is installed via Bioconductor (normal R library).
+._gexpipe_should_auto_install <- function() {
+  if (!interactive()) return(FALSE)
+  if (isTRUE(getOption("shiny.testmode"))) return(FALSE)
+  explicit <- getOption("gexpipe.auto_install", NULL)
+  if (!is.null(explicit)) return(isTRUE(explicit))
+  if (requireNamespace("GExPipe", quietly = TRUE)) {
+    pkg_path <- tryCatch(
+      normalizePath(system.file(package = "GExPipe"), winslash = "/", mustWork = FALSE),
+      error = function(e) ""
+    )
+    if (nzchar(pkg_path) && dir.exists(pkg_path)) {
+      isolated_root <- normalizePath(
+        file.path(.gexpipe_lib_base, "GExPipe"), winslash = "/", mustWork = FALSE
+      )
+      if (!startsWith(
+        normalizePath(pkg_path, winslash = "/", mustWork = FALSE),
+        paste0(isolated_root, "/")
+      )) {
+        return(FALSE)
+      }
+    }
+  }
+  TRUE
+}
+
 # Logic per package:
 #   NOT installed at all  → install directly (no DLL possible on a missing pkg)
 #   Installed, old version, NOT loaded → update directly
@@ -301,6 +327,12 @@ else character(0L)
 if (length(.to_install) == 0L) {
   cat("  \u2713 All", length(.gexpipe_all_required),
       "required packages present and up to date \u2014 skipping install.\n\n")
+
+} else if (!._gexpipe_should_auto_install()) {
+  cat("  Auto-install skipped (GExPipe installed via Bioconductor / normal R library).\n")
+  cat("  Missing or outdated:", paste(.to_install, collapse = ", "), "\n")
+  cat("  Install dependencies with:\n")
+  cat("    BiocManager::install(\"GExPipe\", dependencies = TRUE)\n\n")
 
 } else {
   n_miss  <- length(.missing_pkgs)
