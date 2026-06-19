@@ -60,5 +60,14 @@ dummy_imports <- function() {
   VennDiagram::venn.diagram
   WGCNA::blockwiseModules
   xgboost::xgb.train
+  cli::cli_bullets
+  glue::glue
+  lifecycle::deprecate_warn
+  Matrix::Matrix
+  pillar::new_pillar
+  Rcpp::evalCpp
+  rlang::is_character
+  vctrs::vec_size
+  withr::with_options
   invisible(NULL)
 }
