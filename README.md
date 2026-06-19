@@ -171,7 +171,7 @@ The vignette is R Markdown and requires **Pandoc**. If Pandoc is not installed, 
 R CMD build . --no-build-vignettes
 ```
 
-The resulting `GExPipe_0.99.11.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
+The resulting `GExPipe_0.99.12.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
 
 ### Package check
 
@@ -179,10 +179,10 @@ From the package root:
 
 ```bash
 R CMD build . --no-build-vignettes
-R CMD check GExPipe_0.99.11.tar.gz --no-build-vignettes --no-manual
+R CMD check GExPipe_0.99.12.tar.gz --no-build-vignettes --no-manual
 ```
 
-Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.11.tar.gz")` and address any reported issues.
+Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.12.tar.gz")` and address any reported issues.
 
 ---
 
