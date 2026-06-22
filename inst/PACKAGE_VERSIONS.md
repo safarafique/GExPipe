@@ -1,4 +1,4 @@
-# GExPipe Package Versions (v0.99.16)
+# GExPipe Package Versions (v0.99.17)
 
 ## Supported R versions
 

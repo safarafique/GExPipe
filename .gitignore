@@ -12,6 +12,7 @@ inst/pkg_versions_installed.local.txt
 
 # Build and check artifacts
 GExPipe/
+dev/
 OmniVerse.Rcheck/
 OmniVerse.BiocCheck/
 GExPipe.Rcheck/
