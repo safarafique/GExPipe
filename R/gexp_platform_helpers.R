@@ -51,10 +51,10 @@ gexpipe_platform_dataset_confounded <- function(metadata) {
   n_ds <- length(unique(as.character(metadata$Dataset)))
   n_combo <- nrow(combos)
 
-  # Each dataset maps to exactly one platform → Platform is a function of Dataset
+  # Each dataset maps to exactly one platform -> Platform is a function of Dataset
   if (n_combo == n_ds) return(TRUE)
 
-  # Platform varies within at least one dataset — check estimability with Condition
+  # Platform varies within at least one dataset - check estimability with Condition
   meta <- .gexpipe_factor_meta(metadata)
   design <- tryCatch(
     if ("Condition" %in% colnames(meta)) {
@@ -118,7 +118,7 @@ gexpipe_batch_covariate_info <- function(metadata) {
     if (info$mixed_platforms && info$platform_dataset_confounded) {
       desc <- paste0(
         desc,
-        " (Platform confounded with Dataset — platform effect absorbed by Dataset)"
+        " (Platform confounded with Dataset - platform effect absorbed by Dataset)"
       )
     }
     list(formula_str = "~ Dataset + Condition", formula_desc = desc, info = info, multi_ds = multi_ds)
@@ -211,7 +211,7 @@ gexpipe_pca_polar_df <- function(expr, metadata, color_by = "Dataset") {
   df
 }
 
-#' Simplified PVCA variance bar-chart data (PCA + per-factor R² on top PCs)
+#' Simplified PVCA variance bar-chart data (PCA + per-factor R^2 on top PCs)
 #'
 #' Aligns metadata to expression columns, runs PCA on samples, and estimates
 #' the mean fraction of variance in the top PCs explained by Dataset, Platform,
@@ -263,7 +263,7 @@ gexpipe_pvca_df <- function(expr, metadata, max_samples = 100L, max_pcs = 10L) {
     return(list(
       ok = FALSE,
       data = NULL,
-      message = "PCA failed — expression may be constant or non-numeric."
+      message = "PCA failed - expression may be constant or non-numeric."
     ))
   }
 
@@ -369,7 +369,7 @@ gexpipe_batch_confounding_summary <- function(metadata) {
   msg <- if (confounded) {
     "Dataset and Condition are confounded (empty cells in the table below). DE and batch correction may not separate batch from biology."
   } else {
-    "Dataset and Condition are crossed — each dataset has both groups (no perfect confounding)."
+    "Dataset and Condition are crossed - each dataset has both groups (no perfect confounding)."
   }
   list(confounded = confounded, table = tbl, message = msg)
 }

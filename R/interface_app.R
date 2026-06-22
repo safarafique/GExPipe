@@ -253,7 +253,7 @@ gexp_app_head <- function() {
         .box, .box-body, .tab-content, .content-wrapper {
           overflow: visible !important;
         }
-        /* DE method radio wrapper — plain list, no borders */
+        /* DE method radio wrapper - plain list, no borders */
         #de_method_wrapper .shiny-input-radiogroup {
           padding: 8px 0;
           background: transparent;
