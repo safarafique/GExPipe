@@ -1,5 +1,11 @@
 # GExPipe NEWS
 
+## Version 0.99.16
+
+### SPB build fix
+- Move developer scripts to `dev/scripts/` (excluded from tarball) to eliminate
+  R CMD build WARNING: empty `scripts/` directory.
+
 ## Version 0.99.15
 
 ### BiocCheck / SPB fixes
