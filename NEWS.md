@@ -1,5 +1,11 @@
 # GExPipe NEWS
 
+## Version 0.99.17
+
+### SPB build fix
+- Remove `dev/` from the package source tree (developer utilities kept local via
+  `.gitignore`) to eliminate R CMD build WARNING: empty `dev/` directory.
+
 ## Version 0.99.16
 
 ### SPB build fix
