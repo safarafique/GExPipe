@@ -15,3 +15,7 @@ logical
 \description{
 Detect microarray + RNA-seq in the same analysis
 }
+\examples{
+meta <- data.frame(Platform = c("Microarray", "RNAseq"))
+gexpipe_has_mixed_platforms(meta)
+}

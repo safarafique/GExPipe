@@ -14,6 +14,9 @@ utils::globalVariables(c("."))
 #' @param cor_mat Numeric matrix of module-trait correlations.
 #' @param combined Name of the combined contrast column to drop, or NULL.
 #' @return The correlation matrix with the combined column removed when appropriate.
+#' @examples
+#' cor_mat <- matrix(runif(6), 2, 3, dimnames = list(c("ME1", "ME2"), c("A", "B", "A vs B")))
+#' gexpipe_wgcna_heatmap_cor(cor_mat, "A vs B")
 #' @export
 gexpipe_wgcna_heatmap_cor <- function(cor_mat, combined) {
   if (is.null(cor_mat)) return(cor_mat)
