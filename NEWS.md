@@ -1,5 +1,12 @@
 # GExPipe NEWS
 
+## Version 0.99.13
+
+### Bioconductor SPB revision (vignette + check clean-up)
+- Bundle first vignette screenshot (`step1_download.png`) under `inst/extdata/vignette-screenshots/`.
+- Remove non-portable filename from `vignettes/`; fix remaining non-ASCII in R sources (including `utils_shiny_app.R` comment encoding).
+- Vignette reviewer response: structure, Shiny walkthrough, Bioconductor install, `system.file()` for bundled data.
+
 ## Version 0.99.12
 
 ### Bioconductor SPB revision (check clean-up)
