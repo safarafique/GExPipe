@@ -29,7 +29,6 @@
 ^analysis of Gexpipe/
 ^PACKAGE_REVIEW\.md$
 ^inst/pkg_versions_installed.local.txt$
-^dev/
 ^vignettes/~\$
 ^vignettes/.*\.tmp$
 ^doc$
