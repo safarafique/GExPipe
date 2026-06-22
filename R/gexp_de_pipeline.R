@@ -15,6 +15,10 @@ utils::globalVariables(c("."))
 #' @param design Model matrix for the DE analysis.
 #' @param group Optional factor when design is NULL (single-factor designs).
 #' @return list with expr (filtered), keep (logical vector), n_before, n_after, note
+#' @examples
+#' expr <- matrix(stats::rpois(5000, lambda = 50), nrow = 500, ncol = 10)
+#' design <- stats::model.matrix(~ factor(rep(c("A", "B"), each = 5)))
+#' gexpipe_independent_filter(expr, design = design)
 #' @export
 gexpipe_independent_filter <- function(expr, design = NULL, group = NULL) {
   if (is.null(expr) || !is.matrix(expr) || nrow(expr) == 0L || ncol(expr) == 0L) {
@@ -41,7 +45,7 @@ gexpipe_independent_filter <- function(expr, design = NULL, group = NULL) {
   }
   note <- paste0(
     "Independent filtering (filterByExpr): ",
-    format(n_before, big.mark = ","), " \u2192 ",
+    format(n_before, big.mark = ","), " -> ",
     format(n_after, big.mark = ","), " genes"
   )
   list(
@@ -59,6 +63,14 @@ gexpipe_independent_filter <- function(expr, design = NULL, group = NULL) {
 #' @param total_meta Full unified metadata before subsetting (optional).
 #' @param method DE method name.
 #' @return list with human-readable fields for the Shiny UI.
+#' @examples
+#' meta <- data.frame(
+#'   Condition = rep(c("Normal", "Disease"), each = 3),
+#'   Platform = "RNAseq",
+#'   row.names = paste0("S", 1:6),
+#'   stringsAsFactors = FALSE
+#' )
+#' gexpipe_de_sample_info(meta)
 #' @export
 gexpipe_de_sample_info <- function(meta_used, total_meta = NULL, method = "limma") {
   n_used <- nrow(meta_used)
@@ -80,7 +92,7 @@ gexpipe_de_sample_info <- function(meta_used, total_meta = NULL, method = "limma
   note <- if (excluded > 0L && count_methods) {
     paste0(
       n_used, " of ", n_total, " samples used in ", method,
-      " (", excluded, " excluded \u2014 count-based DE uses RNA-seq samples only)."
+      " (", excluded, " excluded - count-based DE uses RNA-seq samples only)."
     )
   } else if (excluded > 0L) {
     paste0(n_used, " of ", n_total, " samples used (", excluded, " excluded after alignment).")
@@ -103,6 +115,8 @@ gexpipe_de_sample_info <- function(meta_used, total_meta = NULL, method = "limma
 #' @param params Named list of scalar analysis parameters (character or numeric).
 #' @param include_session Include \code{sessionInfo()} block (default TRUE).
 #' @return Character vector of report lines.
+#' @examples
+#' gexpipe_analysis_report_text(list(method = "limma"), include_session = FALSE)
 #' @export
 gexpipe_analysis_report_text <- function(params = list(), include_session = TRUE) {
   lines <- c(
@@ -135,6 +149,16 @@ gexpipe_analysis_report_text <- function(params = list(), include_session = TRUE
 #' @param logfc_cutoff Numeric log2 fold-change cutoff.
 #' @param padj_cutoff Numeric adjusted P-value cutoff.
 #' @return list with de_results, sig_genes, filter_note, sample_info, formula_desc
+#' @examples
+#' expr <- matrix(rnorm(200), nrow = 20)
+#' rownames(expr) <- paste0("G", seq_len(nrow(expr)))
+#' colnames(expr) <- paste0("S", seq_len(ncol(expr)))
+#' meta <- data.frame(
+#'   Condition = rep(c("Normal", "Disease"), each = 5),
+#'   row.names = colnames(expr),
+#'   stringsAsFactors = FALSE
+#' )
+#' gexp_run_de(expr, meta)
 #' @export
 gexp_run_de <- function(
   expr,

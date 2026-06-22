@@ -15,3 +15,10 @@ list with mixed_platforms, platform_dataset_confounded, include_platform_covaria
 \description{
 Summarise how Platform should enter batch/DE models
 }
+\examples{
+meta <- data.frame(
+  Dataset = rep(c("GSE1", "GSE2"), each = 2),
+  Platform = rep(c("Microarray", "RNAseq"), each = 2)
+)
+gexpipe_batch_covariate_info(meta)
+}

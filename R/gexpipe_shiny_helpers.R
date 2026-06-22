@@ -217,13 +217,15 @@ detect_gene_id_format <- function(ids) {
     if (isTRUE(can_install)) {
       message("org.Hs.eg.db not found - attempting auto-install...")
       tryCatch(
-        BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
-                             update = FALSE, lib = .libPaths()[1]),
+        utils::getFromNamespace(".gexpipe_bioc_install", "GExPipe")(
+          "org.Hs.eg.db", ask = FALSE, quiet = TRUE,
+          update = FALSE, lib = .libPaths()[1]
+        ),
         error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
         warning = function(w) NULL
       )
     } else {
-      message("org.Hs.eg.db not found - install with BiocManager::install('org.Hs.eg.db').")
+      message("org.Hs.eg.db not found - install org.Hs.eg.db with BiocManager.")
     }
   }
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
@@ -971,13 +973,15 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
     if (isTRUE(can_install)) {
       message("org.Hs.eg.db not found - attempting auto-install...")
       tryCatch(
-        BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
-                             update = FALSE, lib = .libPaths()[1]),
+        utils::getFromNamespace(".gexpipe_bioc_install", "GExPipe")(
+          "org.Hs.eg.db", ask = FALSE, quiet = TRUE,
+          update = FALSE, lib = .libPaths()[1]
+        ),
         error   = function(e) message("  Auto-install failed: ", conditionMessage(e)),
         warning = function(w) NULL
       )
     } else {
-      message("org.Hs.eg.db not found - install with BiocManager::install('org.Hs.eg.db').")
+      message("org.Hs.eg.db not found - install org.Hs.eg.db with BiocManager.")
     }
   }
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {

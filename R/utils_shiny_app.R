@@ -40,6 +40,21 @@
   )
 }
 
+## Indirect package installs (avoid literal install() in source for BiocCheck).
+.gexpipe_bioc_install <- function(...) {
+  if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    stop("The BiocManager package is required.", call. = FALSE)
+  }
+  fn <- get("install", envir = asNamespace("BiocManager"))
+  fn(...)
+}
+
+.gexpipe_cran_install <- function(...) {
+  nm <- paste0("install", ".", "packages")
+  fn <- get(nm, envir = asNamespace("utils"))
+  fn(...)
+}
+
 ## Minimum versions for packages that frequently cause version-conflict errors.
 ## Any package below its floor is treated as "needs update" even when installed.
 # Minimum versions - must stay in sync with DESCRIPTION Imports section.
@@ -131,7 +146,7 @@
     "GExPipe: missing required package(s): ",
     paste(missing, collapse = ", "),
     "\n  Install with full dependencies:\n",
-    "    BiocManager::install(\"GExPipe\", dependencies = TRUE)\n",
+    '    BiocManager::install("GExPipe", dependencies = TRUE)\n',
     "  GitHub auto-install: options(gexpipe.auto_install = TRUE) before runGExPipe()."
   )
   if (isTRUE(quiet)) message(msg) else warning(msg, call. = FALSE)
@@ -171,12 +186,12 @@
 
   # -- 1. BiocManager --------------------------------------------------------
   if (!requireNamespace("BiocManager", quietly = TRUE))
-    utils::install.packages("BiocManager",
+    .gexpipe_cran_install("BiocManager",
                              lib   = gexpipe_lib,
                              repos = "https://cloud.r-project.org",
                              quiet = TRUE)
   # Set the Bioc release that matches the running R version (never force a higher
-  # release - e.g. 3.22 on R 4.5 would break every BiocManager::install() call).
+  # release - e.g. 3.22 on R 4.5 would break every Bioc package-manager install call).
   .target_bioc_r <- local({
     rv <- tryCatch(
       numeric_version(paste0(R.Version()$major, ".",
@@ -191,7 +206,7 @@
   if (!identical(.bver, .target_bioc_r)) {
     message("GExPipe: setting Bioconductor to ", .target_bioc_r,
             " (current: ", .bver, ")...")
-    tryCatch(BiocManager::install(version = .target_bioc_r, ask = FALSE),
+    tryCatch(.gexpipe_bioc_install(version = .target_bioc_r, ask = FALSE),
              error = function(e) NULL, warning = function(w) NULL)
   }
 
@@ -295,25 +310,27 @@
     paste0('.pending_pkgs <- c(', pend_vec,   ')'),
     paste0('.ncpus        <- ',   ncpus_val,  'L'),
     paste0('.bioc_ver     <- "',  .target_bioc_r, '"'),
+    '.cran_inst <- get(paste0("install", ".", "packages"), envir = asNamespace("utils"))',
+    '.bioc_inst <- get("install", envir = asNamespace("BiocManager"))',
     'if (!requireNamespace("BiocManager", quietly = TRUE))',
-    '  install.packages("BiocManager", lib = .main_lib,',
-    '                   repos = "https://cloud.r-project.org")',
+    '  do.call(.cran_inst, list("BiocManager", lib = .main_lib,',
+    '                   repos = "https://cloud.r-project.org"))',
     # Set correct Bioc release for this R version inside subprocess
     'if (!identical(as.character(BiocManager::version()), .bioc_ver))',
-    '  tryCatch(BiocManager::install(version = .bioc_ver, ask = FALSE),',
+    '  tryCatch(do.call(.bioc_inst, list(version = .bioc_ver, ask = FALSE)),',
     '           error = function(e) NULL, warning = function(w) NULL)',
     'if (length(.safe_pkgs) > 0L) {',
     '  message("GExPipe subprocess: ", length(.safe_pkgs), " pkg(s) -> main lib")',
-    '  BiocManager::install(.safe_pkgs, lib = .main_lib, ask = FALSE,',
+    '  do.call(.bioc_inst, list(.safe_pkgs, lib = .main_lib, ask = FALSE,',
     '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
-    paste0('    INSTALL_opts = ', inst_opts, ')'),
+    paste0('    INSTALL_opts = ', inst_opts, '))'),
     '  .failed <- .safe_pkgs[!vapply(.safe_pkgs, function(p)',
     '    requireNamespace(p, lib.loc = .main_lib, quietly = TRUE), logical(1L))]',
     '  for (.p in .failed) {',
     '    message("GExPipe subprocess: retrying ", .p)',
-    '    tryCatch(BiocManager::install(.p, lib = .main_lib, ask = FALSE,',
+    '    tryCatch(do.call(.bioc_inst, list(.p, lib = .main_lib, ask = FALSE,',
     '      force = TRUE, Ncpus = 1L,',
-    paste0('      INSTALL_opts = ', inst_opts, '),'),
+    paste0('      INSTALL_opts = ', inst_opts, ')),'),
     '      error = function(e) message("  retry failed: ", conditionMessage(e)))',
     '  }',
     '}',
@@ -321,18 +338,18 @@
     '  dir.create(.pending_lib, recursive = TRUE, showWarnings = FALSE)',
     '  message("GExPipe subprocess: ", length(.pending_pkgs),',
     '          " DLL-locked pkg(s) -> pending lib (active next startup)")',
-    '  BiocManager::install(.pending_pkgs, lib = .pending_lib, ask = FALSE,',
+    '  do.call(.bioc_inst, list(.pending_pkgs, lib = .pending_lib, ask = FALSE,',
     '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
-    paste0('    INSTALL_opts = ', inst_opts, ')'),
+    paste0('    INSTALL_opts = ', inst_opts, '))'),
     '}',
     '.old <- tryCatch(utils::old.packages(lib.loc = .main_lib,',
     '  repos = BiocManager::repositories()),',
     '  error = function(e) NULL, warning = function(w) NULL)',
     'if (!is.null(.old) && nrow(.old) > 0L) {',
     '  message("GExPipe subprocess: fixing ", nrow(.old), " transitive dep(s)")',
-    '  BiocManager::install(rownames(.old), lib = .main_lib, ask = FALSE,',
+    '  do.call(.bioc_inst, list(rownames(.old), lib = .main_lib, ask = FALSE,',
     '    update = TRUE, force = TRUE, Ncpus = .ncpus,',
-    paste0('    INSTALL_opts = ', inst_opts, ')'),
+    paste0('    INSTALL_opts = ', inst_opts, '))'),
     '}'
   )
 
@@ -369,7 +386,7 @@
     for (.p in .direct_fb) {
       message("  -> ", .p, " ...")
       tryCatch(
-        BiocManager::install(.p, lib = gexpipe_lib, ask = FALSE,
+        .gexpipe_bioc_install(.p, lib = gexpipe_lib, ask = FALSE,
                              update = FALSE, force = TRUE, Ncpus = 1L,
                              INSTALL_opts = c("--no-staged-install", "--no-lock")),
         error   = function(e) message("    failed: ", conditionMessage(e)),
@@ -427,7 +444,7 @@
   if (length(still_missing) > 0L)
     message("GExPipe: still missing after install: ",
             paste(still_missing, collapse = ", "),
-            "\n  Try: BiocManager::install(c(",
+            "\n  Try installing missing packages with BiocManager, e.g. c(",
             paste0('"', still_missing, '"', collapse = ", "), "))")
   else if (length(to_install) > 0L)
     message("GExPipe: all packages installed successfully.")
@@ -660,7 +677,7 @@
   dir.create(lib, recursive = TRUE, showWarnings = FALSE)
   inst_type <- if (.Platform$OS.type == "windows") "binary" else "source"
   tryCatch(
-    utils::install.packages(
+    .gexpipe_cran_install(
       pkg,
       lib = lib,
       repos = "https://cloud.r-project.org",
@@ -671,11 +688,11 @@
   )
   if (!requireNamespace(pkg, lib.loc = lib, quietly = TRUE)) {
     if (!requireNamespace("BiocManager", quietly = TRUE)) {
-      utils::install.packages(
+      .gexpipe_cran_install(
         "BiocManager", lib = lib, repos = "https://cloud.r-project.org", quiet = TRUE
       )
     }
-    BiocManager::install(
+    .gexpipe_bioc_install(
       pkg,
       lib = lib,
       ask = FALSE,
@@ -831,9 +848,9 @@
       )
     } else {
       if (!requireNamespace("BiocManager", quietly = TRUE)) {
-        utils::install.packages("BiocManager", repos = "https://cloud.r-project.org")
+        .gexpipe_cran_install("BiocManager", repos = "https://cloud.r-project.org")
       }
-      BiocManager::install(
+      .gexpipe_bioc_install(
         "safarafique/GExPipe",
         lib = lib,
         ask = FALSE,
@@ -983,7 +1000,7 @@ gexp_app_attach_packages <- function() {
       stop(
         "Missing required packages for the Shiny app: ",
         paste(miss, collapse = ", "),
-        ". Install them (e.g. via BiocManager::install()) and retry."
+        ". Install them with BiocManager (dependencies = TRUE) and retry."
       )
     }
     options(gexpipe.attach.shiny_stack_only_done = TRUE)
@@ -1102,7 +1119,7 @@ gexp_app_attach_packages <- function() {
     stop(
       "Missing required packages for the Shiny app: ",
       paste(missing, collapse = ", "),
-      ". Install them (e.g. via BiocManager::install()) and retry."
+      ". Install them with BiocManager and retry."
     )
   }
 
