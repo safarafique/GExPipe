@@ -17,3 +17,6 @@ Character vector of report lines.
 \description{
 Build reproducibility report text for export
 }
+\examples{
+gexpipe_analysis_report_text(list(method = "limma"), include_session = FALSE)
+}

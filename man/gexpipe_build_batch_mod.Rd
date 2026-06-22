@@ -15,3 +15,11 @@ model matrix
 \description{
 Build ComBat / removeBatchEffect model matrix (biology to preserve)
 }
+\examples{
+meta <- data.frame(
+  Condition = rep(c("Normal", "Disease"), each = 3),
+  row.names = paste0("S", 1:6),
+  stringsAsFactors = FALSE
+)
+gexpipe_build_batch_mod(meta)
+}

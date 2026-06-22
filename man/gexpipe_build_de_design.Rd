@@ -15,3 +15,12 @@ list with design, coef_condition, formula_desc, info
 \description{
 Build a model matrix for DE (limma / edgeR / voom)
 }
+\examples{
+meta <- data.frame(
+  Dataset = rep(c("GSE1", "GSE2"), each = 3),
+  Condition = rep(c("Normal", "Disease"), times = 3),
+  row.names = paste0("S", 1:6),
+  stringsAsFactors = FALSE
+)
+gexpipe_build_de_design(meta)
+}

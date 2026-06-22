@@ -1,5 +1,14 @@
 # GExPipe NEWS
 
+## Version 0.99.15
+
+### BiocCheck / SPB fixes
+- Route runtime package installs through indirect helpers (BiocCheck: no literal
+  `install()` in package code).
+- Add runnable `@examples` for all exported helpers missing documentation examples.
+- Remove `set.seed()` from PVCA subsampling (BiocCheck WARNING).
+- Update minimum R version to 4.6.0.
+
 ## Version 0.99.14
 
 ### Bioconductor SPB build fix

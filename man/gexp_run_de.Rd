@@ -30,3 +30,14 @@ list with de_results, sig_genes, filter_note, sample_info, formula_desc
 \description{
 Run differential expression analysis
 }
+\examples{
+expr <- matrix(rnorm(200), nrow = 20)
+rownames(expr) <- paste0("G", seq_len(nrow(expr)))
+colnames(expr) <- paste0("S", seq_len(ncol(expr)))
+meta <- data.frame(
+  Condition = rep(c("Normal", "Disease"), each = 5),
+  row.names = colnames(expr),
+  stringsAsFactors = FALSE
+)
+gexp_run_de(expr, meta)
+}

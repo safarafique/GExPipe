@@ -40,7 +40,7 @@ then verifies imports and opens the app without downloading packages.
 
 For the GitHub / first-run workflow, set
 \code{options(gexpipe.auto_install = TRUE)} before \code{runGExPipe()} to enable
-background dependency installation (10–30 minutes on a fresh machine).
+background dependency installation (10-30 minutes on a fresh machine).
 
 The welcome screen loads first; the full 15-tab dashboard is built only
 after the user clicks \strong{Go to Analysis}, so the initial browser response is

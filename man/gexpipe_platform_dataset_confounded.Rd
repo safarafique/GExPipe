@@ -16,3 +16,10 @@ logical
 Returns TRUE when Platform is nested within Dataset (each GSE has one technology)
 or when a tentative \code{~ Dataset + Platform (+ Condition)} design is rank-deficient.
 }
+\examples{
+meta <- data.frame(
+  Dataset = c("GSE1", "GSE1", "GSE2", "GSE2"),
+  Platform = c("Microarray", "Microarray", "RNAseq", "RNAseq")
+)
+gexpipe_platform_dataset_confounded(meta)
+}
