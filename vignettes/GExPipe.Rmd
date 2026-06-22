@@ -48,14 +48,27 @@ co-expression networks, refine candidates with PPI and machine learning,
 and export a clinical summary report — without manually wiring separate
 Bioconductor tools together.
 
-This vignette is written for **end users** of the Shiny app. It covers
-installation, a visual pipeline overview, a step-by-step walkthrough of
-each screen, a short programmatic example with bundled data, and
-troubleshooting. Developer-oriented notes (internal module layout, CI
-testing) are **not** shipped as separate vignettes, to keep installation
-and `R CMD check` time manageable; see the [GitHub
-repository](https://github.com/safarafique/GExPipe) for contributor
-documentation.
+This vignette is written for **end users** of the Shiny app (not package
+developers). Developer-oriented vignettes (`gexpipe-workflow`,
+`gexpipe-shiny-testing-ci`, `gexpipe-shiny-architecture`) are **not**
+included in the package; they were removed to reduce installation and
+check time. Maintainer notes live in the [GitHub
+repository](https://github.com/safarafique/GExPipe).
+
+## Vignette outline
+
+| Section | Purpose |
+|------------------------------------|------------------------------------|
+| [How the Shiny app is organised](#how-the-shiny-app-is-organised) | Pipeline overview figure |
+| [Installation](#installation) | Bioconductor and GitHub install |
+| [Launch the Shiny application](#launch-the-shiny-application) | Start the app (`runGExPipe()` + `shiny::runApp()`) |
+| [Step-by-step Shiny walkthrough](#step-by-step-shiny-walkthrough) | Screenshots and actions for all 15 steps |
+| [Programmatic example](#programmatic-example-bundled-data) | Optional scripting with bundled CSV data |
+| [Troubleshooting](#troubleshooting) | Common install and runtime issues |
+
+For Shiny-app documentation conventions, see the [Bioconductor Shiny
+apps
+guide](https://contributions.bioconductor.org/shiny.html#documentation).
 
 The package builds on `r BiocStyle::Biocpkg("GEOquery")` for data
 retrieval, `r BiocStyle::Biocpkg("limma")`,
@@ -64,14 +77,14 @@ for differential expression, `r BiocStyle::Biocpkg("WGCNA")` for
 co-expression networks, and `r BiocStyle::Biocpkg("clusterProfiler")`
 for functional enrichment.
 
-## How the Shiny app is organised
+## How the Shiny app is organised {#how-the-shiny-app-is-organised}
 
 The sidebar lists **15 sequential steps** grouped into four phases. Each
 step unlocks only after the previous one succeeds. The welcome screen
 explains the workflow; click **Go to Analysis** to open Step 1.
 
 | Phase | Steps | What you do |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | **Data preparation** | 1 – 5 | Download GEO data → QC → Normalization → Group assignment → Batch correction |
 | **Gene discovery** | 6 – 8 | Differential expression → WGCNA → DEG ∩ hub genes |
 | **Candidate refinement** | 9 – 12 | PPI network → ML feature selection → Validation → ROC |
@@ -120,28 +133,33 @@ ggplot2::ggplot(pipeline, ggplot2::aes(x = 1, y = y, fill = phase)) +
   )
 ```
 
-Screenshots of key panels are included below when PNG files are bundled
-under `inst/extdata/vignette-screenshots/` (see that folder's README for
-capture instructions).
+Screenshots of key app panels are embedded below using
+`knitr::include_graphics()` and PNG files under
+`inst/extdata/vignette-screenshots/`, following the [Bioconductor Shiny
+documentation
+pattern](https://contributions.bioconductor.org/shiny.html#documentation).
+When PNGs are not bundled, the walkthrough text still describes each
+step; add files named `step1_download.png`, `step2_qc.png`,
+`step6_de.png`, `step9_ppi.png`, and `step15_summary.png` to show
+figures in the HTML vignette.
 
-# Installation
+# Installation {#installation}
 
-Follow the [official Bioconductor installation
-guide](https://bioconductor.org/install/) to ensure your R version
-matches a supported Bioconductor release (e.g. Bioconductor 3.22 for R
-4.6).
+Follow the [Bioconductor installation
+instructions](https://contributions.bioconductor.org/docs.html#installation)
+and the [official install guide](https://bioconductor.org/install/) to
+ensure your R version matches a supported Bioconductor release (e.g.
+Bioconductor 3.22 for R 4.6).
 
-## From Bioconductor (recommended after acceptance)
+## From Bioconductor (recommended)
 
-Once `GExPipe` is accepted into Bioconductor, install it with
-`BiocManager` — the standard two-line pattern from the Bioconductor
-documentation:
+Install `GExPipe` and all runtime dependencies with `BiocManager`:
 
 ```{r install-bioc, eval=FALSE}
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
 
-BiocManager::install("GExPipe")
+BiocManager::install("GExPipe", dependencies = TRUE)
 ```
 
 Verify the installation:
@@ -150,6 +168,9 @@ Verify the installation:
 library(GExPipe)
 packageVersion("GExPipe")
 ```
+
+When installed from Bioconductor, dependencies are resolved at **install
+time**; `runGExPipe()` does not download packages at launch.
 
 ## From GitHub (available before Bioconductor release)
 
@@ -177,10 +198,11 @@ After any install or update, **restart R** once (RStudio:
 `Ctrl+Shift+F10`) before launching the app. This avoids Windows DLL lock
 issues and ensures machine-learning helpers load correctly.
 
-# Launch the Shiny application
+# Launch the Shiny application {#launch-the-shiny-application}
 
-`runGExPipe()` builds the app object and may install missing
-dependencies on first run. `shiny::runApp()` starts the local server.
+Bioconductor Shiny apps return an app object from the package; users
+start the server with `shiny::runApp()` ([Bioconductor Shiny
+guide](https://contributions.bioconductor.org/shiny.html#documentation)):
 
 ```{r launch, eval=FALSE}
 app <- GExPipe::runGExPipe()
@@ -188,22 +210,12 @@ shiny::runApp(app, port = 3838L)
 ```
 
 The browser opens at the **welcome screen**. Click **Go to Analysis** to
-begin **Step 1 — Download Data**.
+begin **Step 1 - Download Data**.
 
-On first launch, `runGExPipe()` loads packages into an **isolated
-GExPipe library** (separate from your main R library). Subsequent
-launches are much faster.
-
-| Operating system | Isolated library path                            |
-|------------------|--------------------------------------------------|
-| Windows          | `C:\Users\<name>\AppData\Local\GExPipe\<R-ver>\` |
-| macOS            | `~/Library/Application Support/GExPipe/<R-ver>/` |
-| Linux            | `~/.local/share/GExPipe/<R-ver>/`                |
-
-> **Windows:** If compilation is required, install
-> [Rtools](https://cran.r-project.org/bin/windows/Rtools/) once.
-> First-run dependency installation may take 10–40 minutes depending on
-> network speed.
+> **GitHub installs only:** If you installed from GitHub before
+> Bioconductor acceptance and want automatic dependency installation on
+> first launch, run `options(gexpipe.auto_install = TRUE)` once before
+> `runGExPipe()`. Bioconductor installs do not need this option.
 
 ## Run in Google Colab (optional)
 
@@ -213,7 +225,7 @@ expose port 3838, then install and start the app with
 `host = "0.0.0.0"`. See the [GitHub
 README](https://github.com/safarafique/GExPipe) for full Colab cells.
 
-# Step-by-step Shiny walkthrough
+# Step-by-step Shiny walkthrough {#step-by-step-shiny-walkthrough}
 
 The sections below mirror the sidebar tabs. For each step:
 
@@ -404,13 +416,16 @@ if (.vig_has_screenshot("step15_summary.png")) {
 }
 ```
 
-# Programmatic example (bundled data)
+# Programmatic example (bundled data) {#programmatic-example-bundled-data}
 
 The Shiny app is the recommended interface. The functions below let you
 script normalization and QC plots using the example CSV files shipped in
 `inst/extdata/`.
 
 ## Load package and example data
+
+Bundled CSV files in `inst/extdata/` are loaded with `system.file()` (no
+path guessing or multiple fallbacks):
 
 ```{r load-data}
 library(GExPipe)
@@ -485,7 +500,7 @@ ggplot(pca_df, aes(PC1, PC2, colour = Dataset)) +
     geom_point(size = 3) +
     theme_minimal() +
     labs(
-        title    = "PCA — bundled example data",
+        title    = "PCA - bundled example data",
         subtitle = "After quantile normalization and gene intersection",
         x        = paste0("PC1 (", var_pct[1L], "% variance)"),
         y        = paste0("PC2 (", var_pct[2L], "% variance)")
@@ -506,7 +521,7 @@ if (length(top_var) > 1L) {
         norm_res$combined_expr[top_var, , drop = FALSE],
         scale         = "row",
         show_rownames = length(top_var) <= 30L,
-        main          = "Top 30 most variable genes — bundled example data"
+        main          = "Top 30 most variable genes - bundled example data"
     )
 }
 ```
@@ -514,7 +529,7 @@ if (length(top_var) > 1L) {
 # Troubleshooting {#troubleshooting}
 
 | Problem | Solution |
-|----|----|
+|------------------------------------|------------------------------------|
 | **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
 | **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |

@@ -102,7 +102,7 @@ gexp_batch_correct <- function(
       if (plat_info$include_platform_covariate) {
         "  Platform included as covariate in batch model (not confounded with Dataset).\n"
       } else {
-        "  Platform is confounded with Dataset — Dataset batch term absorbs platform effect.\n"
+        "  Platform is confounded with Dataset - Dataset batch term absorbs platform effect.\n"
       }
     )
   }

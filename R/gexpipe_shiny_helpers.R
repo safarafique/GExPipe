@@ -215,7 +215,7 @@ detect_gene_id_format <- function(ids) {
       error = function(e) isTRUE(getOption("gexpipe.auto_install", FALSE))
     )
     if (isTRUE(can_install)) {
-      message("org.Hs.eg.db not found — attempting auto-install...")
+      message("org.Hs.eg.db not found - attempting auto-install...")
       tryCatch(
         BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
                              update = FALSE, lib = .libPaths()[1]),
@@ -223,11 +223,11 @@ detect_gene_id_format <- function(ids) {
         warning = function(w) NULL
       )
     } else {
-      message("org.Hs.eg.db not found — install with BiocManager::install('org.Hs.eg.db').")
+      message("org.Hs.eg.db not found - install with BiocManager::install('org.Hs.eg.db').")
     }
   }
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
-    return(NULL)   # graceful fallback — caller must handle NULL
+    return(NULL)   # graceful fallback - caller must handle NULL
   }
   org.Hs.eg.db::org.Hs.eg.db
 }
@@ -864,7 +864,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
     return(as.character(sym))
   }
 
-  # Probe IDs — try Bioconductor .db, then GPL annotation table, then biomaRt.
+  # Probe IDs - try Bioconductor .db, then GPL annotation table, then biomaRt.
   # GPL annotation is tried for ALL probe-like formats (not just _at/_st),
   # so CodeLink, Illumina BEADCHIP, and other non-Affymetrix arrays are handled.
   if (mean(probe_like, na.rm = TRUE) > 0.2 || (!is.null(gpl_id) && nzchar(gpl_id))) {
@@ -960,7 +960,7 @@ run_gse_annotation_and_download <- function(gse_id, dest_dir = getwd(), save_ann
 # CORE ID MAPPING / DOWNLOAD / NORMALIZATION HELPERS
 # ==============================================================================
 
-# Manual-style ID → symbol conversion used in pipeline_download_to_batch.R
+# Manual-style ID -> symbol conversion used in pipeline_download_to_batch.R
 # Reused here so the Shiny app and manual script give identical results.
 convert_ids_to_symbols_simple <- function(gene_ids) {
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
@@ -969,7 +969,7 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
       error = function(e) isTRUE(getOption("gexpipe.auto_install", FALSE))
     )
     if (isTRUE(can_install)) {
-      message("org.Hs.eg.db not found — attempting auto-install...")
+      message("org.Hs.eg.db not found - attempting auto-install...")
       tryCatch(
         BiocManager::install("org.Hs.eg.db", ask = FALSE, quiet = TRUE,
                              update = FALSE, lib = .libPaths()[1]),
@@ -977,11 +977,11 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
         warning = function(w) NULL
       )
     } else {
-      message("org.Hs.eg.db not found — install with BiocManager::install('org.Hs.eg.db').")
+      message("org.Hs.eg.db not found - install with BiocManager::install('org.Hs.eg.db').")
     }
   }
   if (!requireNamespace("org.Hs.eg.db", quietly = TRUE)) {
-    warning("org.Hs.eg.db unavailable (network issue?) — gene IDs returned as-is without symbol conversion.")
+    warning("org.Hs.eg.db unavailable (network issue?) - gene IDs returned as-is without symbol conversion.")
     return(gene_ids)   # graceful fallback: keep original IDs, don't crash
   }
   db <- org.Hs.eg.db::org.Hs.eg.db
@@ -1026,7 +1026,7 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
   gene_ids
 }
 
-# Convert RNA-seq IDs to symbols – wrapper so app == manual script
+# Convert RNA-seq IDs to symbols - wrapper so app == manual script
 convert_rnaseq_ids <- function(gene_ids, gse_id = NULL) {
   convert_ids_to_symbols_simple(gene_ids)
 }
