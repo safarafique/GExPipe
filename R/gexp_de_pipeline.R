@@ -106,7 +106,7 @@ gexpipe_de_sample_info <- function(meta_used, total_meta = NULL, method = "limma
 #' @export
 gexpipe_analysis_report_text <- function(params = list(), include_session = TRUE) {
   lines <- c(
-    paste("GExPipe analysis report —", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
+    paste("GExPipe analysis report -", format(Sys.time(), "%Y-%m-%d %H:%M:%S")),
     strrep("=", 60L),
     ""
   )

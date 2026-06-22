@@ -89,7 +89,7 @@ gexp_normalize_and_intersect <- function(
           if (length(gene_symbols) != nrow(probe_mat)) {
             log_text <- paste0(
               log_text, "  ", gse, ": symbol length mismatch (", length(gene_symbols),
-              " vs ", nrow(probe_mat), " rows) — keeping probe IDs\n"
+              " vs ", nrow(probe_mat), " rows) - keeping probe IDs\n"
             )
             gene_symbols <- rownames(probe_mat)
           }
