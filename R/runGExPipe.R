@@ -19,7 +19,7 @@
 #'
 #' For the GitHub / first-run workflow, set
 #' `options(gexpipe.auto_install = TRUE)` before `runGExPipe()` to enable
-#' background dependency installation (10–30 minutes on a fresh machine).
+#' background dependency installation (10-30 minutes on a fresh machine).
 #'
 #' The welcome screen loads first; the full 15-tab dashboard is built only
 #' after the user clicks **Go to Analysis**, so the initial browser response is
@@ -68,7 +68,7 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   options(gexpipe.attach.allow_full_now = NULL)
   options(gexpipe.prelaunch_install_done = NULL)
 
-  # ── Auto-install all missing dependencies BEFORE the app opens ──────────────
+  # -- Auto-install all missing dependencies BEFORE the app opens --------------
   # This runs only in interactive sessions (not during R CMD check or vignette
   # build, where interactive() is FALSE). The user sees a progress log in the
   # console; the browser only opens once everything is ready.
@@ -76,7 +76,7 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
     all_pkgs <- .gexpipe_all_pkgs(include_optional = TRUE)
 
     if (.gexpipe_runtime_install_enabled()) {
-      # ── GitHub / auto-install workflow ───────────────────────────────────────
+      # -- GitHub / auto-install workflow ---------------------------------------
       missing_now <- all_pkgs[
         !vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
       ]
@@ -109,7 +109,7 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
                   "  ", paste(version_conflict_now, collapse = ", "))
         message(
           "\nGExPipe: updating via background subprocess ",
-          "(bypasses DLL locks — no session restart needed).\n",
+          "(bypasses DLL locks - no session restart needed).\n",
           "  First run: up to 40 min.  Subsequent runs: seconds.\n"
         )
         .gexpipe_batch_install(all_pkgs)
@@ -142,12 +142,12 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
                isTRUE(.gexpipe_glmnet_smoke_subprocess())) {
       message("GExPipe: glmnet will use an isolated R process for LASSO / Elastic Net / Ridge (no restart needed).")
     } else {
-      message("GExPipe: glmnet not ready — restart R (Ctrl+Shift+F10), then run GExPipe::runGExPipe() before ML.")
+      message("GExPipe: glmnet not ready - restart R (Ctrl+Shift+F10), then run GExPipe::runGExPipe() before ML.")
     }
   }
-  # Signal to gexp_app_attach_packages() that install already ran — skip repeat.
+  # Signal to gexp_app_attach_packages() that install already ran - skip repeat.
   options(gexpipe.prelaunch_install_done = TRUE)
-  # ────────────────────────────────────────────────────────────────────────────
+  # ----------------------------------------------------------------------------
 
   if (interactive() && identical(port, 0L) && !isTRUE(launch.browser)) {
     message(
@@ -160,7 +160,7 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   if (interactive()) {
     message(
       "GExPipe ", utils::packageVersion("GExPipe"),
-      " — app object ready (UI builds on first browser load; first load can take several minutes)."
+      " - app object ready (UI builds on first browser load; first load can take several minutes)."
     )
   }
   app <- shiny::shinyApp(

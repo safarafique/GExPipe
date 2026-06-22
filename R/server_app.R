@@ -1,6 +1,6 @@
 gexp_app_server <- function(input, output, session) {
 
-  # ── In-app restart notification ─────────────────────────────────────────────
+  # -- In-app restart notification ---------------------------------------------
   # Shown when the pre-launch subprocess updated packages that were DLL-locked
   # and could not be reloaded in the running session.
   # The user sees a full-screen modal instead of just a console message.
@@ -30,12 +30,12 @@ gexp_app_server <- function(input, output, session) {
           shiny::tags$hr(),
           shiny::tags$p(shiny::tags$strong("To fix:")),
           shiny::tags$ol(
-            shiny::tags$li("Stop the app  —  press the ", shiny::tags$strong("Stop"),
+            shiny::tags$li("Stop the app  -  press the ", shiny::tags$strong("Stop"),
                            " button in RStudio, or press ", shiny::tags$kbd("Ctrl+C"),
                            " in the console."),
-            shiny::tags$li("Restart R  —  ", shiny::tags$strong("RStudio: Ctrl+Shift+F10"),
-                           "  (or Session → Restart R)."),
-            shiny::tags$li("Run again  —  ",
+            shiny::tags$li("Restart R  -  ", shiny::tags$strong("RStudio: Ctrl+Shift+F10"),
+                           "  (or Session -> Restart R)."),
+            shiny::tags$li("Run again  -  ",
                            shiny::tags$code("GExPipe::runGExPipe()"),
                            ". The app will open immediately; no reinstall needed.")
           ),
@@ -55,7 +55,7 @@ gexp_app_server <- function(input, output, session) {
     }, error = function(e) NULL)
   }
 
-  # ── Soft notification for packages that failed to load (non-blocking) ───────
+  # -- Soft notification for packages that failed to load (non-blocking) -------
   missing_pkgs <- getOption("gexpipe.failed_pkgs", character(0))
   if (length(missing_pkgs) > 0L) {
     tryCatch(
