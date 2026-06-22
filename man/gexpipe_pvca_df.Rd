@@ -2,7 +2,7 @@
 % Please edit documentation in R/gexp_platform_helpers.R
 \name{gexpipe_pvca_df}
 \alias{gexpipe_pvca_df}
-\title{Simplified PVCA variance bar-chart data (PCA + per-factor R² on top PCs)}
+\title{Simplified PVCA variance bar-chart data (PCA + per-factor R^2 on top PCs)}
 \usage{
 gexpipe_pvca_df(expr, metadata, max_samples = 100L, max_pcs = 10L)
 }
@@ -24,4 +24,14 @@ and \code{message} (character, empty on success).
 Aligns metadata to expression columns, runs PCA on samples, and estimates
 the mean fraction of variance in the top PCs explained by Dataset, Platform,
 and Condition. Residual is \code{1 - sum(factor fractions)} (approximate).
+}
+\examples{
+expr <- matrix(rnorm(120), 20, 6, dimnames = list(paste0("G", 1:20), paste0("S", 1:6)))
+meta <- data.frame(
+  Dataset = rep(c("GSE1", "GSE2"), each = 3),
+  Condition = rep(c("Normal", "Disease"), times = 3),
+  row.names = colnames(expr),
+  stringsAsFactors = FALSE
+)
+gexpipe_pvca_df(expr, meta)
 }

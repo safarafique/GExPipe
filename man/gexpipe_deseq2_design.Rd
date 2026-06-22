@@ -15,3 +15,11 @@ list with formula (formula object) and formula_desc (character)
 \description{
 DESeq2 design formula for count-based DE
 }
+\examples{
+meta <- data.frame(
+  Condition = rep(c("Normal", "Disease"), each = 3),
+  row.names = paste0("S", 1:6),
+  stringsAsFactors = FALSE
+)
+gexpipe_deseq2_design(meta)
+}

@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.14
+Version: 0.99.15
 Authors@R: person("Safa", "Rafique",
            email = "safa.sandhu@gmail.com",
            role = c("aut", "cre"))
@@ -15,7 +15,7 @@ Description: Shiny application (GExPipe) for high-throughput genomic analysis of
     Microarray CEL normalization uses affy and/or oligo when supplementary CEL files are available.
 License: MIT + file LICENSE
 Encoding: UTF-8
-Depends: R (>= 4.5.0)
+Depends: R (>= 4.6.0)
 biocViews: Software, ShinyApps, GeneExpression, RNASeq, Microarray,
     DifferentialExpression, Pathways, Network, Visualization
 URL: https://github.com/safarafique/GExPipe

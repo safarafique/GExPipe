@@ -21,3 +21,8 @@ Removes lowly expressed genes using a design-aware filter so filtering is
 not tied to differential expression statistics (avoids FDR bias from
 variance-percentile pre-filtering).
 }
+\examples{
+expr <- matrix(stats::rpois(5000, lambda = 50), nrow = 500, ncol = 10)
+design <- stats::model.matrix(~ factor(rep(c("A", "B"), each = 5)))
+gexpipe_independent_filter(expr, design = design)
+}

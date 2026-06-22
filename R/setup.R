@@ -55,7 +55,7 @@ gexpipe_setup <- function(update   = TRUE,
   ## -- 2. Detect and report Bioconductor version -----------------------------
   if (!requireNamespace("BiocManager", quietly = TRUE)) {
     message("Installing BiocManager...")
-    utils::install.packages("BiocManager", quiet = TRUE)
+    .gexpipe_cran_install("BiocManager", quiet = TRUE)
   }
 
   bioc_ver <- tryCatch(BiocManager::version(), error = function(e) NA)
@@ -76,7 +76,7 @@ gexpipe_setup <- function(update   = TRUE,
             " (current: ", bioc_ver, ", R: ", R.version$major, ".",
             sub("\\..*", "", R.version$minor), ")...")
     tryCatch(
-      BiocManager::install(version = .target_bioc_setup, ask = FALSE),
+      .gexpipe_bioc_install(version = .target_bioc_setup, ask = FALSE),
       error   = function(e) message("  BiocManager upgrade note: ", conditionMessage(e)),
       warning = function(w) NULL
     )

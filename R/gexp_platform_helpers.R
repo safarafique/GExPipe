@@ -28,6 +28,9 @@ utils::globalVariables(c("."))
 #' Detect microarray + RNA-seq in the same analysis
 #' @param metadata data.frame with optional `Platform` column.
 #' @return logical
+#' @examples
+#' meta <- data.frame(Platform = c("Microarray", "RNAseq"))
+#' gexpipe_has_mixed_platforms(meta)
 #' @export
 gexpipe_has_mixed_platforms <- function(metadata) {
   if (is.null(metadata) || !"Platform" %in% colnames(metadata)) return(FALSE)
@@ -42,6 +45,12 @@ gexpipe_has_mixed_platforms <- function(metadata) {
 #' or when a tentative \code{~ Dataset + Platform (+ Condition)} design is rank-deficient.
 #' @param metadata data.frame with `Dataset` and `Platform` columns.
 #' @return logical
+#' @examples
+#' meta <- data.frame(
+#'   Dataset = c("GSE1", "GSE1", "GSE2", "GSE2"),
+#'   Platform = c("Microarray", "Microarray", "RNAseq", "RNAseq")
+#' )
+#' gexpipe_platform_dataset_confounded(meta)
 #' @export
 gexpipe_platform_dataset_confounded <- function(metadata) {
   if (!gexpipe_has_mixed_platforms(metadata)) return(FALSE)
@@ -77,6 +86,12 @@ gexpipe_platform_dataset_confounded <- function(metadata) {
 #' Summarise how Platform should enter batch/DE models
 #' @param metadata sample metadata data.frame.
 #' @return list with mixed_platforms, platform_dataset_confounded, include_platform_covariate
+#' @examples
+#' meta <- data.frame(
+#'   Dataset = rep(c("GSE1", "GSE2"), each = 2),
+#'   Platform = rep(c("Microarray", "RNAseq"), each = 2)
+#' )
+#' gexpipe_batch_covariate_info(meta)
 #' @export
 gexpipe_batch_covariate_info <- function(metadata) {
   mixed <- gexpipe_has_mixed_platforms(metadata)
@@ -142,6 +157,14 @@ gexpipe_batch_covariate_info <- function(metadata) {
 #' Build a model matrix for DE (limma / edgeR / voom)
 #' @param metadata data.frame with Dataset, Platform, Condition columns.
 #' @return list with design, coef_condition, formula_desc, info
+#' @examples
+#' meta <- data.frame(
+#'   Dataset = rep(c("GSE1", "GSE2"), each = 3),
+#'   Condition = rep(c("Normal", "Disease"), times = 3),
+#'   row.names = paste0("S", 1:6),
+#'   stringsAsFactors = FALSE
+#' )
+#' gexpipe_build_de_design(meta)
 #' @export
 gexpipe_build_de_design <- function(metadata) {
   meta <- .gexpipe_factor_meta(metadata)
@@ -166,6 +189,13 @@ gexpipe_build_de_design <- function(metadata) {
 #' Build ComBat / removeBatchEffect model matrix (biology to preserve)
 #' @param metadata sample metadata data.frame.
 #' @return model matrix
+#' @examples
+#' meta <- data.frame(
+#'   Condition = rep(c("Normal", "Disease"), each = 3),
+#'   row.names = paste0("S", 1:6),
+#'   stringsAsFactors = FALSE
+#' )
+#' gexpipe_build_batch_mod(meta)
 #' @export
 gexpipe_build_batch_mod <- function(metadata) {
   meta <- .gexpipe_factor_meta(metadata, cols = c("Condition", "Platform"))
@@ -180,6 +210,13 @@ gexpipe_build_batch_mod <- function(metadata) {
 #' DESeq2 design formula for count-based DE
 #' @param metadata sample metadata data.frame.
 #' @return list with formula (formula object) and formula_desc (character)
+#' @examples
+#' meta <- data.frame(
+#'   Condition = rep(c("Normal", "Disease"), each = 3),
+#'   row.names = paste0("S", 1:6),
+#'   stringsAsFactors = FALSE
+#' )
+#' gexpipe_deseq2_design(meta)
 #' @export
 gexpipe_deseq2_design <- function(metadata) {
   meta <- .gexpipe_factor_meta(metadata)
@@ -195,6 +232,10 @@ gexpipe_deseq2_design <- function(metadata) {
 #' @param metadata sample metadata aligned to expr columns.
 #' @param color_by column name in metadata to colour points.
 #' @return data.frame with theta, r, and colour column.
+#' @examples
+#' expr <- matrix(rnorm(120), 20, 6, dimnames = list(paste0("G", 1:20), paste0("S", 1:6)))
+#' meta <- data.frame(Dataset = rep(c("A", "B"), each = 3), row.names = colnames(expr))
+#' gexpipe_pca_polar_df(expr, meta)
 #' @export
 gexpipe_pca_polar_df <- function(expr, metadata, color_by = "Dataset") {
   metadata <- .gexpipe_align_metadata_to_expr(expr, metadata)
@@ -224,6 +265,15 @@ gexpipe_pca_polar_df <- function(expr, metadata, color_by = "Dataset") {
 #' @param max_pcs Use at most this many principal components (default 10).
 #' @return A list with \code{ok} (logical), \code{data} (data.frame or \code{NULL}),
 #'   and \code{message} (character, empty on success).
+#' @examples
+#' expr <- matrix(rnorm(120), 20, 6, dimnames = list(paste0("G", 1:20), paste0("S", 1:6)))
+#' meta <- data.frame(
+#'   Dataset = rep(c("GSE1", "GSE2"), each = 3),
+#'   Condition = rep(c("Normal", "Disease"), times = 3),
+#'   row.names = colnames(expr),
+#'   stringsAsFactors = FALSE
+#' )
+#' gexpipe_pvca_df(expr, meta)
 #' @export
 gexpipe_pvca_df <- function(expr, metadata, max_samples = 100L, max_pcs = 10L) {
   if (is.null(expr) || is.null(metadata)) {
@@ -252,8 +302,7 @@ gexpipe_pvca_df <- function(expr, metadata, max_samples = 100L, max_pcs = 10L) {
 
   n_samples <- min(as.integer(max_samples), ncol(expr))
   if (ncol(expr) > n_samples) {
-    set.seed(123)
-    sample_idx <- sample(seq_len(ncol(expr)), n_samples)
+    sample_idx <- seq_len(n_samples)
     expr <- expr[, sample_idx, drop = FALSE]
     metadata <- metadata[colnames(expr), , drop = FALSE]
   }
@@ -349,6 +398,12 @@ gexpipe_pvca_df <- function(expr, metadata, max_samples = 100L, max_pcs = 10L) {
 #' Summarise Dataset x Condition confounding for batch/DE guidance
 #' @param metadata data.frame with Dataset and Condition columns.
 #' @return list with confounded (logical), table (matrix), message (character)
+#' @examples
+#' meta <- data.frame(
+#'   Dataset = rep(c("GSE1", "GSE2"), each = 3),
+#'   Condition = rep(c("Normal", "Disease"), times = 3)
+#' )
+#' gexpipe_batch_confounding_summary(meta)
 #' @export
 gexpipe_batch_confounding_summary <- function(metadata) {
   if (is.null(metadata) || !is.data.frame(metadata)) {

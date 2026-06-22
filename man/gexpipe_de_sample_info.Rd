@@ -19,3 +19,12 @@ list with human-readable fields for the Shiny UI.
 \description{
 Summarise samples used in a DE run (transparency for mixed-platform runs)
 }
+\examples{
+meta <- data.frame(
+  Condition = rep(c("Normal", "Disease"), each = 3),
+  Platform = "RNAseq",
+  row.names = paste0("S", 1:6),
+  stringsAsFactors = FALSE
+)
+gexpipe_de_sample_info(meta)
+}
