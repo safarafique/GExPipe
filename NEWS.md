@@ -1,5 +1,11 @@
 # GExPipe NEWS
 
+## Version 0.99.14
+
+### Bioconductor SPB build fix
+- Remove empty `inst/scripts/` directory (dev scripts moved to top-level `scripts/`,
+  excluded from the package tarball) to eliminate R CMD build WARNING.
+
 ## Version 0.99.13
 
 ### Bioconductor SPB revision (vignette + check clean-up)
