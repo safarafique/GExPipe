@@ -413,7 +413,7 @@ gexp_download_normalize_ids_for_overlap <- function(
       micro_expr_list <- .gse_result$micro_expr_list
       all_genes_list  <- .gse_result$all_genes_list
     } else {
-      log_text <- paste0(log_text, "  ", gse, ": ID conversion error (", .gse_result$msg, ") — kept original IDs\n")
+      log_text <- paste0(log_text, "  ", gse, ": ID conversion error (", .gse_result$msg, ") - kept original IDs\n")
     }
   }
 
@@ -464,7 +464,7 @@ gexp_download_normalize_ids_for_overlap <- function(
       rna_counts_list <- .gse_result$rna_counts_list
       all_genes_list  <- .gse_result$all_genes_list
     } else {
-      log_text <- paste0(log_text, "  ", gse, ": ID conversion error (", .gse_result$msg, ") — kept original IDs\n")
+      log_text <- paste0(log_text, "  ", gse, ": ID conversion error (", .gse_result$msg, ") - kept original IDs\n")
     }
   }
 
@@ -497,7 +497,7 @@ gexp_download_normalize_ids_for_overlap <- function(
       rna_counts_list <- .gse_result$rna_counts_list
       all_genes_list  <- .gse_result$all_genes_list
     } else {
-      log_text <- paste0(log_text, "  ", gse, ": biomaRt Entrez->symbol error (", .gse_result$msg, ") — kept original IDs\n")
+      log_text <- paste0(log_text, "  ", gse, ": biomaRt Entrez->symbol error (", .gse_result$msg, ") - kept original IDs\n")
     }
   }
 
@@ -546,7 +546,7 @@ gexp_download_normalize_ids_for_overlap <- function(
       rna_counts_list <- .gse_result$rna_counts_list
       all_genes_list  <- .gse_result$all_genes_list
     } else {
-      log_text <- paste0(log_text, "  ", gse, ": _st conversion error (", .gse_result$msg, ") — kept original IDs\n")
+      log_text <- paste0(log_text, "  ", gse, ": _st conversion error (", .gse_result$msg, ") - kept original IDs\n")
     }
   }
 
@@ -618,7 +618,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
       # (e.g. _series_matrix-1.txt.gz, _series_matrix-2.txt.gz).
       # Each file becomes one ExpressionSet in the returned list, all
       # sharing the same platform.  The old code used which.max(n_feat)
-      # which picked only the first file → missing samples.
+      # which picked only the first file -> missing samples.
       #
       # Fix: group ExpressionSets by platform; for groups that share the
       # same probe set, cbind expression matrices and rbind pData so ALL
@@ -677,7 +677,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
             comb_pd  <- do.call(rbind, grp_pds)
             n_used   <- length(grp_mats)
           } else {
-            # Rows differ — fall back to the single largest matrix
+            # Rows differ - fall back to the single largest matrix
             nf       <- vapply(grp_mats, nrow, integer(1))
             best_k   <- which.max(nf)
             comb_mat <- grp_mats[[best_k]]
@@ -826,7 +826,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
     pdata      <- pdata[intersect(rownames(pdata), good_samples), , drop = FALSE]
   }
 
-  # Also count & report partially-NA samples (10–90% NA) for user awareness
+  # Also count & report partially-NA samples (10-90% NA) for user awareness
   if (ncol(micro_expr) > 0) {
     partial_na <- colMeans(is.na(micro_expr) | !is.finite(micro_expr))
     partial_bad <- names(which(partial_na > 0.10 & partial_na <= 0.90))
@@ -840,7 +840,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   }
 
   if (ncol(micro_expr) == 0) {
-    out$reason <- "all samples were NA — no usable data"
+    out$reason <- "all samples were NA - no usable data"
     return(out)
   }
 
@@ -1050,7 +1050,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
     }
   }
   if (ncol(count_matrix) == 0) {
-    out$reason <- "all samples were NA — no usable data"
+    out$reason <- "all samples were NA - no usable data"
     return(out)
   }
   out$log <- paste0(out$log, rna_na_log)

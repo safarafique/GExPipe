@@ -30,6 +30,7 @@
 ^PACKAGE_REVIEW\.md$
 ^inst/pkg_versions_installed.local.txt$
 ^scripts/
+^inst/scripts/
 ^vignettes/~\$
 ^vignettes/.*\.tmp$
 ^doc$

@@ -32,7 +32,7 @@ gexpipe_setup <- function(update   = TRUE,
                            port     = 3838L,
                            ...) {
 
-  ## ── 1. R version check ────────────────────────────────────────────────────
+  ## -- 1. R version check ----------------------------------------------------
   r_ver    <- getRversion()
   r_status <- R.version$status   # "" for stable; "alpha"/"beta"/"RC" for pre-release
 
@@ -46,13 +46,13 @@ gexpipe_setup <- function(update   = TRUE,
   if (nzchar(r_status)) {
     warning(
       "You are using a pre-release R (", r_ver, " ", r_status, ").\n",
-      "Pre-release R has no pre-built package binaries — installation may fail.\n",
+      "Pre-release R has no pre-built package binaries - installation may fail.\n",
       "Use a stable R release: https://cran.r-project.org/bin/windows/base/",
       call. = FALSE
     )
   }
 
-  ## ── 2. Detect and report Bioconductor version ─────────────────────────────
+  ## -- 2. Detect and report Bioconductor version -----------------------------
   if (!requireNamespace("BiocManager", quietly = TRUE)) {
     message("Installing BiocManager...")
     utils::install.packages("BiocManager", quiet = TRUE)
@@ -83,15 +83,15 @@ gexpipe_setup <- function(update   = TRUE,
     bioc_ver <- tryCatch(BiocManager::version(), error = function(e) NA)
   }
   message(
-    "\n── GExPipe setup ──────────────────────────────────────────────────────\n",
+    "\n-- GExPipe setup ------------------------------------------------------\n",
     "  R version          : ", r_ver, "\n",
     "  Bioconductor       : ", if (is.na(bioc_ver)) "unknown" else bioc_ver, "\n",
     "  update existing    : ", update, "\n",
     "  install optional   : ", optional, "\n",
-    "──────────────────────────────────────────────────────────────────────"
+    "----------------------------------------------------------------------"
   )
 
-  ## ── 3. Required packages ──────────────────────────────────────────────────
+  ## -- 3. Required packages --------------------------------------------------
   # BiocManager::install() automatically selects versions matching your
   # Bioconductor release, so no hardcoded version numbers are needed here.
   bioc_required <- c(
@@ -114,16 +114,16 @@ gexpipe_setup <- function(update   = TRUE,
     "Matrix", "Rcpp", "withr", "pillar"
   )
 
-  ## ── 4. Optional packages (dev / extended checks only) ─────────────────────
+  ## -- 4. Optional packages (dev / extended checks only) ---------------------
   bioc_optional  <- character(0)
   cran_optional  <- character(0)
 
-  ## ── 5. Install via subprocess (prevents BiocManager session restarts) ───────
+  ## -- 5. Install via subprocess (prevents BiocManager session restarts) -------
   # Direct BiocManager::install() calls in the parent session can trigger an
   # automatic R session restart when loaded packages need updating. After that
   # restart all local variables are gone, causing "object not found" errors.
   # Using .gexpipe_batch_install() runs BiocManager inside a fresh Rscript
-  # subprocess — no restart ever happens in the parent session.
+  # subprocess - no restart ever happens in the parent session.
   all_pkgs <- unique(c(
     if (optional) c(bioc_required, bioc_optional, cran_required, cran_optional)
     else          c(bioc_required, cran_required)
@@ -136,7 +136,7 @@ gexpipe_setup <- function(update   = TRUE,
     .gexpipe_verify_imports(all_pkgs, quiet = FALSE)
   }
 
-  ## ── 6. Verify ─────────────────────────────────────────────────────────────
+  ## -- 6. Verify -------------------------------------------------------------
   status  <- vapply(all_pkgs, requireNamespace, logical(1L), quietly = TRUE)
   missing <- names(status)[!status]
 
@@ -150,16 +150,16 @@ gexpipe_setup <- function(update   = TRUE,
     message("\n  All packages installed successfully.")
   }
 
-  ## ── 7. Summary ────────────────────────────────────────────────────────────
+  ## -- 7. Summary ------------------------------------------------------------
   message(
-    "\n── Setup complete ─────────────────────────────────────────────────────\n",
+    "\n-- Setup complete -----------------------------------------------------\n",
     "  Packages checked   : ", length(all_pkgs), "\n",
     "  Ready              : ", sum(status), "\n",
     "  Missing            : ", length(missing), "\n",
-    "──────────────────────────────────────────────────────────────────────"
+    "----------------------------------------------------------------------"
   )
 
-  ## ── 8. Optionally launch ──────────────────────────────────────────────────
+  ## -- 8. Optionally launch --------------------------------------------------
   if (isTRUE(launch) && length(missing) == 0L) {
     message("Launching GExPipe app on port ", port, "...")
     app <- runGExPipe(launch.browser = TRUE, port = as.integer(port))
