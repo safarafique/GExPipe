@@ -18,3 +18,7 @@ The correlation matrix with the combined column removed when appropriate.
 For a two-group design, WGCNA may add a combined "X vs Y" contrast column that
 duplicates one group indicator. This helper removes that column before plotting.
 }
+\examples{
+cor_mat <- matrix(runif(6), 2, 3, dimnames = list(c("ME1", "ME2"), c("A", "B", "A vs B")))
+gexpipe_wgcna_heatmap_cor(cor_mat, "A vs B")
+}

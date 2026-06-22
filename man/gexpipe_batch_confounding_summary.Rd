@@ -15,3 +15,10 @@ list with confounded (logical), table (matrix), message (character)
 \description{
 Summarise Dataset x Condition confounding for batch/DE guidance
 }
+\examples{
+meta <- data.frame(
+  Dataset = rep(c("GSE1", "GSE2"), each = 3),
+  Condition = rep(c("Normal", "Disease"), times = 3)
+)
+gexpipe_batch_confounding_summary(meta)
+}

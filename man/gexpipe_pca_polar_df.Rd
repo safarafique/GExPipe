@@ -19,3 +19,8 @@ data.frame with theta, r, and colour column.
 \description{
 Polar PCA coordinates for batch/platform diagnostic plots
 }
+\examples{
+expr <- matrix(rnorm(120), 20, 6, dimnames = list(paste0("G", 1:20), paste0("S", 1:6)))
+meta <- data.frame(Dataset = rep(c("A", "B"), each = 3), row.names = colnames(expr))
+gexpipe_pca_polar_df(expr, meta)
+}
