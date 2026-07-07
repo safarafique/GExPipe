@@ -131,6 +131,41 @@ gexp_ggsave_from_file <- function(file, plot, width, height, dpi = IMAGE_DPI) {
 # ML METHODS VENN / UPSET (selected methods; common count includes zeros)
 # ==============================================================================
 
+#' Suggest a phenotype column for group assignment
+#'
+#' Prefers explicit condition columns; falls back to \code{title} for GEO
+#' series where treatment is only described in sample titles (e.g. GSE108413).
+#'
+#' @param col_names Character vector of pData column names.
+#' @return Column name or empty string.
+#' @keywords internal
+gexp_suggest_group_column <- function(col_names) {
+  col_names <- unique(as.character(col_names[!is.na(col_names) & nzchar(trimws(col_names))]))
+  if (length(col_names) == 0L) {
+    return("")
+  }
+  cond <- col_names[grepl(
+    "condition|disease|treatment|group|status|type|characteristics.*ch1",
+    col_names,
+    ignore.case = TRUE
+  )]
+  if (length(cond) > 0L) {
+    return(cond[[1L]])
+  }
+  if ("title" %in% col_names) {
+    return("title")
+  }
+  likely <- col_names[grepl(
+    "characteristics|tissue|source|description|sample",
+    col_names,
+    ignore.case = TRUE
+  )]
+  if (length(likely) > 0L) {
+    return(likely[[1L]])
+  }
+  col_names[[1L]]
+}
+
 # Display names for ML method keys (checkbox values in Step 10).
 #' @noRd
 gexp_ml_method_display_names <- function() {
