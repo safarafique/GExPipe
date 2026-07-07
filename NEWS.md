@@ -1,5 +1,12 @@
 # GExPipe NEWS
 
+## Version 0.99.19
+
+### BiocCheck / SPB
+- Add suggested `biocViews`: `Normalization`, `NetworkEnrichment`.
+- Address BiocCheck coding notes in `utils_shiny_app.R`: `seq_len()` indexing,
+  `sprintf()` instead of `paste()` in signals, remove `<<-` in package attach loop.
+
 ## Version 0.99.18
 
 ### Shiny UI
