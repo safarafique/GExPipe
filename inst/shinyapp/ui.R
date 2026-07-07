@@ -12,6 +12,7 @@
 # ==============================================================================
 
 # Source all UI modules (local = FALSE so variables are available in this scope)
+source("ui/ui_plot_helpers.R", local = FALSE)
 source("ui/ui_welcome.R", local = FALSE)
 source("ui/ui_download.R", local = FALSE)
 source("ui/ui_qc.R", local = FALSE)
@@ -550,6 +551,16 @@ ui_analysis <- dashboardPage(
           border-radius: 8px;
           background: #fafafa;
           max-width: 100%;
+        }
+        .gexp-plot-download-bar {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          align-items: center;
+          margin-top: 8px;
+        }
+        .gexp-plot-download-bar .btn {
+          margin-right: 0 !important;
         }
         .content-wrapper { padding: 20px; }
         
