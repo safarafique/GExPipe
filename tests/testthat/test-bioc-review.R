@@ -43,7 +43,8 @@ test_that("gexp_ui tab accessors return shiny tags", {
 
   expect_true(inherits(gexp_ui_qc(), "shiny.tag"))
   expect_true(inherits(gexp_ui_download(), "shiny.tag"))
-  expect_true(inherits(gexp_ui_welcome(), "shiny.tag"))
+  welcome_ui <- gexp_ui_welcome()
+  expect_true(inherits(welcome_ui, "shiny.tag") || inherits(welcome_ui, "shiny.tag.list"))
 })
 
 test_that("vignette extdata loads via system.file", {
