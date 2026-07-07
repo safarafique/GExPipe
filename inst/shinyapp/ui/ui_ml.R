@@ -94,7 +94,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("circle"), " Venn Diagram (Selected Methods)"),
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         uiOutput("ml_venn_message"),
-        plotOutput("ml_venn_plot", height = "380px"),
+        plotOutput("ml_venn_plot", height = "520px"),
         gexp_ui_plot_download_bar("download_ml_venn", "download_ml_venn_jpg", "download_ml_venn_pdf", "btn-primary btn-sm")
       )
     ),

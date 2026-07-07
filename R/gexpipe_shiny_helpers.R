@@ -109,11 +109,11 @@ gexp_plot_device_open <- function(file, width, height, bg = "white", type = NULL
   }
   type <- match.arg(type, c("png", "jpg", "pdf"))
   if (type == "png") {
-    png(file, width = width * IMAGE_DPI, height = height * IMAGE_DPI, res = IMAGE_DPI, bg = bg)
+    grDevices::png(file, width = width * IMAGE_DPI, height = height * IMAGE_DPI, res = IMAGE_DPI, bg = bg)
   } else if (type == "jpg") {
-    jpeg(file, width = width, height = height, res = IMAGE_DPI, units = "in", bg = bg, quality = 95)
+    grDevices::jpeg(file, width = width, height = height, res = IMAGE_DPI, units = "in", bg = bg, quality = 95)
   } else {
-    pdf(file, width = width, height = height, bg = bg)
+    grDevices::pdf(file, width = width, height = height, bg = bg)
   }
   invisible(NULL)
 }
@@ -124,6 +124,229 @@ gexp_ggsave_from_file <- function(file, plot, width, height, dpi = IMAGE_DPI) {
   ext <- tolower(sub(".*\\.", "", basename(file)))
   device <- if (ext %in% c("jpg", "jpeg")) "jpeg" else if (ext == "pdf") "pdf" else "png"
   ggplot2::ggsave(file, plot = plot, width = width, height = height, dpi = dpi, units = "in", bg = "white", device = device)
+  invisible(NULL)
+}
+
+# ==============================================================================
+# ML METHODS VENN / UPSET (selected methods; common count includes zeros)
+# ==============================================================================
+
+# Display names for ML method keys (checkbox values in Step 10).
+#' @noRd
+gexp_ml_method_display_names <- function() {
+  c(
+    lasso = "LASSO",
+    elastic = "Elastic Net",
+    ridge = "Ridge",
+    rf = "Random Forest",
+    svm = "SVM-RFE",
+    boruta = "Boruta",
+    splsda = "sPLS-DA",
+    xgboost = "XGBoost+SHAP"
+  )
+}
+
+# Build Venn/UpSet gene lists for every selected ML method (empty if method failed).
+#' @noRd
+gexp_ml_venn_sets_for_selected <- function(gene_lists, methods_sel) {
+  if (is.null(methods_sel) || length(methods_sel) == 0) return(list())
+  display <- gexp_ml_method_display_names()
+  out <- vector("list", length(methods_sel))
+  names(out) <- vapply(methods_sel, function(key) {
+    nm <- unname(display[[key]])
+    if (is.na(nm) || !nzchar(nm)) key else nm
+  }, character(1))
+  for (i in seq_along(methods_sel)) {
+    nm <- names(out)[[i]]
+    genes <- gene_lists[[nm]]
+    out[[i]] <- if (is.null(genes)) character(0) else unique(as.character(genes))
+  }
+  out
+}
+
+# Count genes common to all selected ML methods (0 when no overlap).
+#' @noRd
+gexp_ml_common_gene_count <- function(sets) {
+  if (is.null(sets) || length(sets) == 0) return(0L)
+  sets <- sets[vapply(sets, function(x) !is.null(x), logical(1))]
+  if (length(sets) == 0) return(0L)
+  if (length(sets) == 1L) return(length(sets[[1]]))
+  length(Reduce(intersect, sets))
+}
+
+# Color palette for ML method Venn / UpSet plots (up to 8 methods).
+#' @noRd
+gexp_ml_venn_palette <- function(n) {
+  base <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#009688", "#795548", "#607D8B")
+  if (n <= length(base)) base[seq_len(n)] else rep(base, length.out = n)
+}
+
+# Prepare UpSet binary matrix for ML method gene lists.
+#' @noRd
+gexp_ml_prepare_upset_df <- function(sets) {
+  if (is.null(sets) || length(sets) == 0) return(NULL)
+  all_genes <- unique(unlist(sets, use.names = FALSE))
+  if (length(all_genes) == 0) {
+    upset_matrix <- matrix(0L, nrow = 0L, ncol = length(sets))
+    colnames(upset_matrix) <- names(sets)
+    return(as.data.frame(upset_matrix))
+  }
+  upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = length(sets))
+  rownames(upset_matrix) <- all_genes
+  colnames(upset_matrix) <- names(sets)
+  for (i in seq_along(sets)) {
+    g <- sets[[i]]
+    if (length(g) > 0) upset_matrix[intersect(all_genes, g), i] <- 1L
+  }
+  as.data.frame(upset_matrix)
+}
+
+# Draw ML methods overlap plot (Venn for 2–5 non-empty sets; UpSet otherwise).
+#' @noRd
+gexp_draw_ml_methods_venn <- function(sets,
+                                      title = "Common Genes Across Selected ML Methods",
+                                      text_scale = 1,
+                                      show_footer = TRUE) {
+  if (is.null(sets) || length(sets) < 2L) {
+    graphics::plot.new()
+    graphics::text(0.5, 0.5, "Select and run 2+ ML methods to view overlap.", cex = 1.1 * text_scale, col = "gray40")
+    return(invisible(NULL))
+  }
+
+  n_common <- gexp_ml_common_gene_count(sets)
+  n_sets <- length(sets)
+  fill_colors <- gexp_ml_venn_palette(n_sets)
+  set_sizes <- vapply(sets, length, integer(1))
+  any_empty <- any(set_sizes == 0L)
+  non_empty <- set_sizes > 0L
+
+  .draw_footer <- function() {
+    if (!isTRUE(show_footer)) return(invisible(NULL))
+    size_txt <- paste(sprintf("%s (%d)", names(sets), set_sizes), collapse = "  |  ")
+    common_col <- if (n_common == 0L) "#C0392B" else "#1B5E20"
+    grid::grid.text(
+      size_txt,
+      x = 0.5, y = 0.055,
+      gp = grid::gpar(fontsize = 9 * text_scale, col = "gray30", fontface = "plain")
+    )
+    grid::grid.text(
+      sprintf("Common to all selected methods: %d", n_common),
+      x = 0.5, y = 0.025,
+      gp = grid::gpar(fontsize = 11 * text_scale, col = common_col, fontface = "bold")
+    )
+    invisible(NULL)
+  }
+
+  use_upset <- n_sets > 5L || any_empty || sum(non_empty) < 2L
+  if (use_upset) {
+    upset_df <- gexp_ml_prepare_upset_df(sets)
+    if (is.null(upset_df) || ncol(upset_df) == 0L) {
+      graphics::plot.new()
+      graphics::text(0.5, 0.5, "No genes returned by selected ML methods.", cex = 1.1 * text_scale, col = "gray40")
+      return(invisible(NULL))
+    }
+    if (nrow(upset_df) == 0L) {
+      graphics::plot.new()
+      graphics::par(mar = c(7, 4, 4, 2))
+      graphics::barplot(
+        set_sizes,
+        names.arg = rep("", length(set_sizes)),
+        col = fill_colors,
+        border = NA,
+        main = title,
+        ylab = "Genes selected",
+        ylim = c(0, max(1, max(set_sizes) * 1.2))
+      )
+      graphics::mtext(paste(names(sets), collapse = "  |  "), side = 1, line = 3.5, cex = 0.75 * text_scale)
+      .draw_footer()
+      return(invisible(NULL))
+    }
+    max_set_size <- max(c(set_sizes, 1L))
+    all_query <- list(list(
+      query = UpSetR::intersects,
+      params = colnames(upset_df),
+      color = if (n_common == 0L) "#C0392B" else "#1B5E20",
+      active = TRUE,
+      query.name = "All methods"
+    ))
+    ts <- c(1.45, 1.15, 1.15, 1.05, 1.45, 1.15) * text_scale
+    tryCatch({
+      UpSetR::upset(
+        upset_df,
+        sets = colnames(upset_df),
+        keep.order = TRUE,
+        order.by = "freq",
+        empty.intersections = "on",
+        queries = all_query,
+        main.bar.color = if (n_common == 0L) "#BDC3C7" else "#3498db",
+        sets.bar.color = fill_colors,
+        matrix.color = "#27AE60",
+        point.size = 3.2 * text_scale,
+        line.size = 0.9,
+        text.scale = ts,
+        mb.ratio = c(0.62, 0.38),
+        set_size.show = TRUE,
+        set_size.scale_max = max(1L, as.integer(ceiling(max_set_size * 1.15))),
+        mainbar.y.label = "Intersection size",
+        sets.x.label = "Genes per method"
+      )
+      .draw_footer()
+    }, error = function(e) {
+      graphics::plot.new()
+      graphics::text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1 * text_scale, col = "red")
+    })
+    return(invisible(NULL))
+  }
+
+  sets_draw <- lapply(sets, function(g) unique(as.character(g)))
+  cat_names <- names(sets_draw)
+  grid::grid.newpage()
+  vp <- tryCatch(
+    VennDiagram::venn.diagram(
+      x = sets_draw,
+      category.names = cat_names,
+      filename = NULL,
+      output = TRUE,
+      disable.logging = TRUE,
+      print.mode = "raw",
+      scaled = TRUE,
+      euler.d = TRUE,
+      lwd = 2.2,
+      lty = "solid",
+      col = grDevices::adjustcolor("white", alpha.f = 0.85),
+      fill = fill_colors,
+      alpha = 0.58,
+      cex = 1.35 * text_scale,
+      fontface = "bold",
+      fontfamily = "sans",
+      cat.cex = 1.12 * text_scale,
+      cat.fontface = "bold",
+      cat.fontfamily = "sans",
+      cat.col = fill_colors,
+      cat.default.pos = "outer",
+      margin = 0.11,
+      rotation = -12,
+      main = title,
+      main.cex = 1.25 * text_scale,
+      main.fontface = "bold",
+      main.dist = 0.06
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(vp)) {
+    graphics::plot.new()
+    graphics::text(0.5, 0.5, "Could not draw Venn diagram for these gene sets.", cex = 1.1 * text_scale, col = "gray40")
+    return(invisible(NULL))
+  }
+  grid::grid.draw(vp)
+  if (n_common == 0L) {
+    grid::grid.text(
+      "0",
+      x = 0.5, y = 0.5,
+      gp = grid::gpar(fontsize = 22 * text_scale, fontface = "bold", col = "#C0392B")
+    )
+  }
+  .draw_footer()
   invisible(NULL)
 }
 

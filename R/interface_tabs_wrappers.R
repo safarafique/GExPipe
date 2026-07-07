@@ -12,6 +12,11 @@
   )
   if (requireNamespace("GExPipe", quietly = TRUE)) {
     pkg_ns <- asNamespace("GExPipe")
+    ml_funs <- c(
+      "gexp_ml_venn_sets_for_selected", "gexp_ml_common_gene_count",
+      "gexp_draw_ml_methods_venn", "gexp_ml_method_display_names"
+    )
+    ns_funs <- c(ns_funs, ml_funs)
     for (nm in ns_funs) {
       if (exists(nm, envir = pkg_ns, inherits = FALSE, mode = "function")) {
         env[[nm]] <- get(nm, envir = pkg_ns, mode = "function")
