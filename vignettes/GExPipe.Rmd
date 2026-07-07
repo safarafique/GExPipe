@@ -27,15 +27,6 @@ knitr::opts_chunk$set(
   fig.width  = 7,
   fig.height = 5
 )
-
-.vig_screenshot <- function(filename) {
-  system.file("extdata", "vignette-screenshots", filename,
-              package = "GExPipe")
-}
-.vig_has_screenshot <- function(filename) {
-  path <- .vig_screenshot(filename)
-  nzchar(path) && file.exists(path)
-}
 ```
 
 # Introduction
@@ -48,12 +39,11 @@ co-expression networks, refine candidates with PPI and machine learning,
 and export a clinical summary report — without manually wiring separate
 Bioconductor tools together.
 
-This vignette is written for **end users** of the Shiny app (not package
-developers). Developer-oriented vignettes (`gexpipe-workflow`,
-`gexpipe-shiny-testing-ci`, `gexpipe-shiny-architecture`) are **not**
-included in the package; they were removed to reduce installation and
-check time. Maintainer notes live in the [GitHub
-repository](https://github.com/safarafique/GExPipe).
+This vignette walks through the **GExPipe Shiny application**: download
+GEO data, run QC and normalization, correct batch effects, discover
+differentially expressed genes, build co-expression networks, refine
+candidates with PPI and machine learning, and export a clinical summary
+report.
 
 ## Vignette outline
 
@@ -65,10 +55,6 @@ repository](https://github.com/safarafique/GExPipe).
 | [Step-by-step Shiny walkthrough](#step-by-step-shiny-walkthrough) | Screenshots and actions for all 15 steps |
 | [Programmatic example](#programmatic-example-bundled-data) | Optional scripting with bundled CSV data |
 | [Troubleshooting](#troubleshooting) | Common install and runtime issues |
-
-For Shiny-app documentation conventions, see the [Bioconductor Shiny
-apps
-guide](https://contributions.bioconductor.org/shiny.html#documentation).
 
 The package builds on `r BiocStyle::Biocpkg("GEOquery")` for data
 retrieval, `r BiocStyle::Biocpkg("limma")`,
@@ -132,16 +118,6 @@ ggplot2::ggplot(pipeline, ggplot2::aes(x = 1, y = y, fill = phase)) +
     plot.title = ggplot2::element_text(hjust = 0.5, face = "bold")
   )
 ```
-
-Screenshots of key app panels are embedded below using
-`knitr::include_graphics()` and PNG files under
-`inst/extdata/vignette-screenshots/`, following the [Bioconductor Shiny
-documentation
-pattern](https://contributions.bioconductor.org/shiny.html#documentation).
-When PNGs are not bundled, the walkthrough text still describes each
-step; add files named `step1_download.png`, `step2_qc.png`,
-`step6_de.png`, `step9_ppi.png`, and `step15_summary.png` to show
-figures in the HTML vignette.
 
 # Installation {#installation}
 
@@ -251,9 +227,7 @@ expression matrix.
 unlocks Step 2.
 
 ```{r step1-screenshot, echo=FALSE, fig.cap="Step 1 - Download Data panel.", out.width="100%"}
-if (.vig_has_screenshot("step1_download.png")) {
-  knitr::include_graphics(.vig_screenshot("step1_download.png"))
-}
+knitr::include_graphics("images/step1_download.png")
 ```
 
 ### Step 2 — Quality Control
@@ -269,9 +243,7 @@ if (.vig_has_screenshot("step1_download.png")) {
 **Success check:** QC plots update; Step 3 unlocks.
 
 ```{r step2-screenshot, echo=FALSE, fig.cap="Step 2 - Quality Control.", out.width="100%"}
-if (.vig_has_screenshot("step2_qc.png")) {
-  knitr::include_graphics(.vig_screenshot("step2_qc.png"))
-}
+knitr::include_graphics("images/step2_qc.png")
 ```
 
 ### Step 3 — Normalize
@@ -331,9 +303,7 @@ plot without removing biological signal tied to disease.
 **Outputs:** Volcano plot, top-DEG heatmap, downloadable results table.
 
 ```{r step6-screenshot, echo=FALSE, fig.cap="Step 6 - Differential expression volcano plot.", out.width="100%"}
-if (.vig_has_screenshot("step6_de.png")) {
-  knitr::include_graphics(.vig_screenshot("step6_de.png"))
-}
+knitr::include_graphics("images/step6_de.png")
 ```
 
 ### Step 7 — WGCNA
@@ -367,9 +337,7 @@ network.
 - Choose layout; review hub proteins (degree, betweenness, eigenvector).
 
 ```{r step9-screenshot, echo=FALSE, fig.cap="Step 9 - PPI network.", out.width="100%"}
-if (.vig_has_screenshot("step9_ppi.png")) {
-  knitr::include_graphics(.vig_screenshot("step9_ppi.png"))
-}
+knitr::include_graphics("images/step9_ppi.png")
 ```
 
 ### Step 10 — Machine Learning
@@ -411,21 +379,16 @@ stratified by final gene expression.
 ML features, validation, ROC, and pathways.
 
 ```{r step15-screenshot, echo=FALSE, fig.cap="Step 15 - Summary report.", out.width="100%"}
-if (.vig_has_screenshot("step15_summary.png")) {
-  knitr::include_graphics(.vig_screenshot("step15_summary.png"))
-}
+knitr::include_graphics("images/step15_summary.png")
 ```
 
 # Programmatic example (bundled data) {#programmatic-example-bundled-data}
 
 The Shiny app is the recommended interface. The functions below let you
-script normalization and QC plots using the example CSV files shipped in
-`inst/extdata/`.
+script normalization and QC plots using the **example data** bundled with
+the package.
 
 ## Load package and example data
-
-Bundled CSV files in `inst/extdata/` are loaded with `system.file()` (no
-path guessing or multiple fallbacks):
 
 ```{r load-data}
 library(GExPipe)

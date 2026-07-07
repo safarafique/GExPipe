@@ -94,6 +94,41 @@ test_that("observers register without error when shiny is available", {
   expect_true(is.function(reg_help))
 })
 
+test_that("legacy inst/shinyapp entry files delegate to package namespace", {
+  skip_if_not_installed("GExPipe")
+  app_dir <- system.file("shinyapp", package = "GExPipe")
+  skip_if_not(nzchar(app_dir))
+  srv_txt <- readLines(file.path(app_dir, "server.R"), warn = FALSE)
+  ui_txt <- readLines(file.path(app_dir, "ui.R"), warn = FALSE)
+  expect_false(any(grepl("source\\(", srv_txt)))
+  expect_false(any(grepl("source\\(", ui_txt)))
+  expect_true(any(grepl("gexp_app_server", srv_txt, fixed = TRUE)))
+  expect_true(any(grepl("gexp_app_ui", ui_txt, fixed = TRUE)))
+  srv_env <- new.env(parent = globalenv())
+  ui_env <- new.env(parent = globalenv())
+  expect_no_error(source(file.path(app_dir, "server.R"), local = srv_env))
+  expect_no_error(source(file.path(app_dir, "ui.R"), local = ui_env))
+  expect_true(is.function(srv_env$server))
+  expect_true(is.function(ui_env$ui))
+})
+
+test_that("vignette screenshots exist under vignettes/images", {
+  skip_if_not_installed("GExPipe")
+  pkg_root <- system.file(package = "GExPipe")
+  skip_if_not(nzchar(pkg_root))
+  vig_dir <- normalizePath(file.path(dirname(pkg_root), "vignettes"), mustWork = FALSE)
+  if (!dir.exists(vig_dir)) {
+    vig_dir <- normalizePath(file.path(testthat::test_path(), "..", "..", "vignettes"), mustWork = TRUE)
+  }
+  imgs <- c(
+    "step1_download.png", "step2_qc.png", "step6_de.png",
+    "step9_ppi.png", "step15_summary.png"
+  )
+  for (img in imgs) {
+    expect_true(file.exists(file.path(vig_dir, "images", img)), info = img)
+  }
+})
+
 test_that("DESCRIPTION BugReports points to GitHub issues", {
   desc <- read.dcf(system.file("DESCRIPTION", package = "GExPipe"))
   bug <- desc[1, "BugReports"]
