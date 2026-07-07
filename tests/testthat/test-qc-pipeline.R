@@ -42,3 +42,37 @@ test_that("gexp_qc_exclude_samples excludes samples consistently", {
   expect_false("S1" %in% out$unified_metadata$SampleID)
   expect_false("S7" %in% out$unified_metadata$SampleID)
 })
+
+test_that("gexp_align_rnaseq_sample_names replaces fread V2/V3 headers", {
+  mat <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("V2", "V3")))
+  meta <- data.frame(title = c("s1", "s2"), row.names = c("GSM1", "GSM2"))
+  out <- gexp_align_rnaseq_sample_names(mat, meta, "GSE137136")
+  expect_equal(colnames(out), c("GSM1", "GSM2"))
+})
+
+test_that("gexp_qc_build_sample_dataset_map maps samples to GSE IDs", {
+  m1 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
+  m2 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S3", "S4")))
+  mp <- gexp_qc_build_sample_dataset_map(list(GSE1 = m1), list(GSE2 = m2))
+  expect_equal(unname(mp), c("GSE1", "GSE1", "GSE2", "GSE2"))
+  expect_equal(names(mp), c("S1", "S2", "S3", "S4"))
+})
+
+test_that("gexp_orient_count_dataframe transposes samples-as-rows layout", {
+  df <- data.frame(
+    sample = c("GSM1", "GSM2"),
+    G1 = c(10L, 12L),
+    G2 = c(20L, 22L),
+    G3 = c(1L, 2L),
+    G4 = c(3L, 4L),
+    G5 = c(5L, 6L),
+    G6 = c(7L, 8L),
+    G7 = c(9L, 10L),
+    stringsAsFactors = FALSE
+  )
+  meta <- data.frame(title = c("s1", "s2"), row.names = c("GSM1", "GSM2"))
+  out <- gexp_orient_count_dataframe(df, metadata = meta)
+  expect_equal(dim(out$matrix), c(7L, 2L))
+  expect_equal(colnames(out$matrix), c("GSM1", "GSM2"))
+  expect_equal(rownames(out$matrix)[1:2], c("G1", "G2"))
+})
