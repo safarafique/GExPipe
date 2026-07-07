@@ -324,6 +324,36 @@ gexp_qc_prepare_boxplot_data <- function(
   df
 }
 
+#' Map combined-expression sample IDs to source GSE datasets
+#'
+#' Used by QC outlier plots before normalization builds unified metadata.
+#'
+#' @param micro_expr_list Named list of microarray matrices.
+#' @param rna_counts_list Named list of RNA-seq matrices.
+#' @return Named character vector: sample ID -> GSE accession.
+#'
+#' @examples
+#' m <- matrix(1:6, nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
+#' r <- matrix(1:6, nrow = 2, dimnames = list(c("A", "B"), c("S3", "S4")))
+#' gexp_qc_build_sample_dataset_map(list(GSE1 = m), list(GSE2 = r))
+#' @export
+gexp_qc_build_sample_dataset_map <- function(micro_expr_list, rna_counts_list) {
+  out <- character(0)
+  for (gse in names(micro_expr_list)) {
+    cols <- colnames(micro_expr_list[[gse]])
+    if (!is.null(cols) && length(cols) > 0L) {
+      out[cols] <- gse
+    }
+  }
+  for (gse in names(rna_counts_list)) {
+    cols <- colnames(rna_counts_list[[gse]])
+    if (!is.null(cols) && length(cols) > 0L) {
+      out[cols] <- gse
+    }
+  }
+  out
+}
+
 #' Prepare density curves for QC density plot
 #'
 #' @param combined_expr_raw Matrix genes x samples.
