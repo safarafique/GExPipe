@@ -1,6 +1,8 @@
 # ==============================================================================
 # SERVER_COMMON_GENES.R - Common Genes (DEG vs WGCNA) + GO & KEGG
 # ==============================================================================
+#' @importFrom methods slot slotNames
+NULL
 
 server_common_genes <- function(input, output, session, rv) {
   
@@ -625,7 +627,7 @@ server_common_genes <- function(input, output, session, rv) {
         dat <- kegg_chord_data()
         if (is.null(dat)) {
           plot.new()
-          text(0.5, 0.5, "Run KEGG enrichment first or no pathway–gene links.", cex = 1.1)
+          text(0.5, 0.5, "Run KEGG enrichment first or no pathway-gene links.", cex = 1.1)
           return(invisible(NULL))
         }
         chord_df <- dat$chord_df
@@ -635,7 +637,7 @@ server_common_genes <- function(input, output, session, rv) {
         n_genes <- length(genes)
         if (n_path < 1 || n_genes < 1) {
           plot.new()
-          text(0.5, 0.5, "No pathway–gene links to draw.", cex = 1.1)
+          text(0.5, 0.5, "No pathway-gene links to draw.", cex = 1.1)
           return(invisible(NULL))
         }
         pathway_colors <- grDevices::colorRampPalette(RColorBrewer::brewer.pal(min(8, max(3, n_path)), "Set2"))(n_path)
@@ -755,7 +757,7 @@ server_common_genes <- function(input, output, session, rv) {
       return()
     }
     if (is.null(rv$datExpr)) {
-      showNotification("WGCNA data (Step 7 → Data Preparation) required. Run WGCNA first.", type = "warning", duration = 6)
+      showNotification("WGCNA data (Step 7 -> Data Preparation) required. Run WGCNA first.", type = "warning", duration = 6)
       return()
     }
     datExpr <- as.matrix(rv$datExpr)
@@ -767,7 +769,7 @@ server_common_genes <- function(input, output, session, rv) {
       return()
     }
     rv$extracted_data_ml <- datExpr[, keep, drop = FALSE]
-    showNotification(paste("Extracted", nrow(rv$extracted_data_ml), "samples ×", ncol(rv$extracted_data_ml), "genes for ML."), type = "message", duration = 5)
+    showNotification(paste("Extracted", nrow(rv$extracted_data_ml), "samples x", ncol(rv$extracted_data_ml), "genes for ML."), type = "message", duration = 5)
   })
 
   output$common_genes_extracted_ml_status_ui <- renderUI({
@@ -775,7 +777,7 @@ server_common_genes <- function(input, output, session, rv) {
     tags$div(
       class = "alert alert-success",
       icon("check-circle"),
-      " Extracted data ready for ML: ", nrow(rv$extracted_data_ml), " samples × ", ncol(rv$extracted_data_ml), " genes."
+      " Extracted data ready for ML: ", nrow(rv$extracted_data_ml), " samples x ", ncol(rv$extracted_data_ml), " genes."
     )
   })
 

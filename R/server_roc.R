@@ -577,7 +577,7 @@ server_roc <- function(input, output, session, rv) {
   )
 
   # ============================================================================
-  # EXTERNAL VALIDATION ROC — Per-gene ROC on external dataset
+  # EXTERNAL VALIDATION ROC - Per-gene ROC on external dataset
   # ============================================================================
   roc_external_results <- reactive({
     req(rv$external_validation_expr, rv$external_validation_outcome, rv$ml_common_genes)
@@ -625,7 +625,7 @@ server_roc <- function(input, output, session, rv) {
     if (is.null(ext) || nrow(ext$df) == 0) return(NULL)
     fluidRow(
       box(
-        title = tags$span(icon("balance-scale"), " AUC: Training vs Validation — Clear Comparison"),
+        title = tags$span(icon("balance-scale"), " AUC: Training vs Validation - Clear Comparison"),
         width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         tags$p(
           icon("info-circle"),

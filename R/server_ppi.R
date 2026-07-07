@@ -5,7 +5,7 @@
 gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
   versions <- getOption("gexpipe.stringdb_try_versions", NULL)
   if (!is.character(versions) || length(versions) < 1L) {
-    versions <- c("12.0", "11.5", "11")   # latest first — most likely to succeed
+    versions <- c("12.0", "11.5", "11")   # latest first - most likely to succeed
   }
   n_retry <- 3L
   errs    <- character(0)
@@ -61,7 +61,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     if (is.null(string_db)) next
 
     # suppressWarnings: STRINGdb prints "couldn't map X% of identifiers" to console
-    # for every call — we show this info cleanly in the app UI instead
+    # for every call - we show this info cleanly in the app UI instead
     mapped <- tryCatch(
       suppressWarnings(
         string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE)
@@ -79,7 +79,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     n_mapped   <- nrow(mapped)
     n_total    <- length(valid_genes)
     pct_mapped <- round(100 * n_mapped / n_total)
-    cat(sprintf("  STRINGdb v%s: %d / %d genes mapped (%d%% mapped, %d%% unmapped — normal)\n",
+    cat(sprintf("  STRINGdb v%s: %d / %d genes mapped (%d%% mapped, %d%% unmapped - normal)\n",
                 sv, n_mapped, n_total, pct_mapped, 100L - pct_mapped))
 
     id_col <- if ("STRING_id" %in% colnames(mapped)) {
@@ -107,7 +107,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     }
     if (!is.data.frame(interactions)) interactions <- as.data.frame(interactions, stringsAsFactors = FALSE)
     if (nrow(interactions) == 0) {
-      errs <- c(errs, paste0("STRING v", sv, ": 0 interactions found — score threshold may be too high"))
+      errs <- c(errs, paste0("STRING v", sv, ": 0 interactions found - score threshold may be too high"))
       next
     }
 
@@ -216,13 +216,13 @@ server_ppi <- function(input, output, session, rv) {
           errs <- ppi_data$try_errors
 
           reason <- if (any(grepl("timeout|timed out", errs, ignore.case = TRUE))) {
-            "Network timeout — STRING server did not respond in time."
+            "Network timeout - STRING server did not respond in time."
           } else if (any(grepl("cannot open|cannot download|404|URL", errs, ignore.case = TRUE))) {
-            "Cannot reach STRING server — check your internet connection."
+            "Cannot reach STRING server - check your internet connection."
           } else if (any(grepl("alias|protein\\.aliases", errs, ignore.case = TRUE))) {
-            "STRING alias file unavailable — the version may have changed. Try again later."
+            "STRING alias file unavailable - the version may have changed. Try again later."
           } else if (any(grepl("no mapped", errs, ignore.case = TRUE))) {
-            "None of your genes could be mapped to STRING identifiers — check gene symbols."
+            "None of your genes could be mapped to STRING identifiers - check gene symbols."
           } else {
             paste("STRING connection failed:", paste(errs, collapse = " | "))
           }
@@ -366,7 +366,7 @@ server_ppi <- function(input, output, session, rv) {
         n_int <- length(interactive_genes)
         n_non <- length(non_interactive_genes)
         map_note <- if (!is.null(pct_mapped))
-          paste0(" (", pct_mapped, "% genes mapped to STRING — ", 100L - pct_mapped, "% unmapped is normal)")
+          paste0(" (", pct_mapped, "% genes mapped to STRING - ", 100L - pct_mapped, "% unmapped is normal)")
         else ""
         showNotification(
           paste0("PPI complete: ", n_int, " interacting, ", n_non, " non-interacting.", map_note),
@@ -376,7 +376,7 @@ server_ppi <- function(input, output, session, rv) {
         msg <- conditionMessage(e)
 
         reason <- if (grepl("timeout|timed out", msg, ignore.case = TRUE)) {
-          "Network timeout — STRING server did not respond. Check your internet connection and try again."
+          "Network timeout - STRING server did not respond. Check your internet connection and try again."
         } else if (grepl("protein\\.aliases|alias", msg, ignore.case = TRUE)) {
           "STRING alias file could not be downloaded. The STRING version may have changed. Try again later or update STRINGdb."
         } else if (grepl("cannot open|cannot download|404|URL|curl", msg, ignore.case = TRUE)) {
@@ -654,7 +654,7 @@ server_ppi <- function(input, output, session, rv) {
           return()
         }
         sel <- ppi_applied_mode_n()
-        main_title <- ppi_plot_title("1. Fruchterman–Reingold", sel$mode, sel$n_val)
+        main_title <- ppi_plot_title("1. Fruchterman-Reingold", sel$mode, sel$n_val)
         layout_fr <- ppi_safe_layout(g_sub, "fr")
         if (is.null(layout_fr) || nrow(layout_fr) != igraph::vcount(g_sub)) { plot.new(); text(0.5, 0.5, "Layout failed.", cex = 1.2); return() }
         op <- par(mar = c(1.5, 1.5, 2.5, 1.5), bg = "#FAFAFA", cex.main = 1.1, col.main = "#37474F", xpd = NA)
@@ -755,7 +755,7 @@ server_ppi <- function(input, output, session, rv) {
         cm <- ppi_plot_common(g_sub)
         if (is.null(cm)) { plot.new(); text(0.5, 0.5, ppi_plot_placeholder_msg(), cex = 0.95, col = "gray40"); return() }
         sel <- ppi_applied_mode_n()
-        main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
+        main_title <- ppi_plot_title("4. Kamada-Kawai", sel$mode, sel$n_val)
         layout_kk <- ppi_safe_layout(g_sub, "kk")
         if (is.null(layout_kk) || nrow(layout_kk) != igraph::vcount(g_sub)) { plot.new(); text(0.5, 0.5, "Layout failed.", cex = 1.2); return() }
         op <- par(mar = c(1.5, 1.5, 2.5, 1.5), bg = "#FAFAFA", cex.main = 1.1, col.main = "#37474F", xpd = NA)
@@ -852,7 +852,7 @@ server_ppi <- function(input, output, session, rv) {
       cm <- ppi_plot_common(g_sub)
       if (is.null(cm)) return()
       sel <- ppi_applied_mode_n()
-      main_title <- ppi_plot_title("1. Fruchterman–Reingold", sel$mode, sel$n_val)
+      main_title <- ppi_plot_title("1. Fruchterman-Reingold", sel$mode, sel$n_val)
       png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
       draw_ppi_traditional(g_sub, cm, main_title)
       dev.off()
@@ -865,7 +865,7 @@ server_ppi <- function(input, output, session, rv) {
       cm <- ppi_plot_common(g_sub)
       if (is.null(cm)) return()
       sel <- ppi_applied_mode_n()
-      main_title <- ppi_plot_title("1. Fruchterman–Reingold", sel$mode, sel$n_val)
+      main_title <- ppi_plot_title("1. Fruchterman-Reingold", sel$mode, sel$n_val)
       jpeg(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
       draw_ppi_traditional(g_sub, cm, main_title)
       dev.off()
@@ -878,7 +878,7 @@ server_ppi <- function(input, output, session, rv) {
       cm <- ppi_plot_common(g_sub)
       if (is.null(cm)) return()
       sel <- ppi_applied_mode_n()
-      main_title <- ppi_plot_title("1. Fruchterman–Reingold", sel$mode, sel$n_val)
+      main_title <- ppi_plot_title("1. Fruchterman-Reingold", sel$mode, sel$n_val)
       pdf(file, width = 7, height = 6.5, bg = "#FAFAFA")
       draw_ppi_traditional(g_sub, cm, main_title)
       dev.off()
@@ -960,7 +960,7 @@ server_ppi <- function(input, output, session, rv) {
       cm <- ppi_plot_common(g_sub)
       if (is.null(cm)) return()
       sel <- ppi_applied_mode_n()
-      main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
+      main_title <- ppi_plot_title("4. Kamada-Kawai", sel$mode, sel$n_val)
       png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
       draw_ppi_kamada(g_sub, cm, main_title)
       dev.off()
@@ -973,7 +973,7 @@ server_ppi <- function(input, output, session, rv) {
       cm <- ppi_plot_common(g_sub)
       if (is.null(cm)) return()
       sel <- ppi_applied_mode_n()
-      main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
+      main_title <- ppi_plot_title("4. Kamada-Kawai", sel$mode, sel$n_val)
       jpeg(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
       draw_ppi_kamada(g_sub, cm, main_title)
       dev.off()
@@ -986,7 +986,7 @@ server_ppi <- function(input, output, session, rv) {
       cm <- ppi_plot_common(g_sub)
       if (is.null(cm)) return()
       sel <- ppi_applied_mode_n()
-      main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
+      main_title <- ppi_plot_title("4. Kamada-Kawai", sel$mode, sel$n_val)
       pdf(file, width = 7, height = 6.5, bg = "#FAFAFA")
       draw_ppi_kamada(g_sub, cm, main_title)
       dev.off()
@@ -1120,7 +1120,7 @@ server_ppi <- function(input, output, session, rv) {
     }
   )
 
-  # ---------- Interactive gene list (end of page, for ML / downstream) — uses selected set (hub or top N) ----------
+  # ---------- Interactive gene list (end of page, for ML / downstream) - uses selected set (hub or top N) ----------
   ppi_interactive_list_df <- reactive({
     req(rv$ppi_hub_scores)
     sel <- ppi_selected_genes()
@@ -1135,12 +1135,12 @@ server_ppi <- function(input, output, session, rv) {
     sel <- ppi_selected_genes()
     n <- length(sel)
     mode <- app_ppi$applied_mode
-    mode_txt <- if (mode == "hub") "Hub genes" else if (mode == "topn") "Top N by degree" else if (mode == "manual") "Manual selection" else "—"
+    mode_txt <- if (mode == "hub") "Hub genes" else if (mode == "topn") "Top N by degree" else if (mode == "manual") "Manual selection" else "-"
     tags$div(
       class = "alert alert-success",
       icon("link"),
       tags$strong(" Genes for next step (", mode_txt, "): ", n),
-      " — This list is used for Extract Data for ML and downstream. Graphs above show the same set."
+      " - This list is used for Extract Data for ML and downstream. Graphs above show the same set."
     )
   })
 
@@ -1170,7 +1170,7 @@ server_ppi <- function(input, output, session, rv) {
     if (is.null(rv$datExpr)) {
       return(tags$span(
         style = "margin-left: 10px; color: #6c757d;",
-        tags$small("(Run Step 7 (WGCNA) → Data Preparation to get expression data, then you can extract samples × genes matrix here.)")
+        tags$small("(Run Step 7 (WGCNA) -> Data Preparation to get expression data, then you can extract samples x genes matrix here.)")
       ))
     }
     datExpr <- as.matrix(rv$datExpr)
@@ -1184,7 +1184,7 @@ server_ppi <- function(input, output, session, rv) {
     tags$span(
       style = "margin-left: 10px;",
       downloadButton("download_ppi_extracted_expr",
-                     tagList(icon("download"), " Expression data (interacting genes, ", n_found, " genes × samples)"),
+                     tagList(icon("download"), " Expression data (interacting genes, ", n_found, " genes x samples)"),
                      class = "btn-info")
     )
   })
@@ -1211,7 +1211,7 @@ server_ppi <- function(input, output, session, rv) {
     }
   )
 
-  # ---------- Network Centrality–Weighted ML ----------
+  # ---------- Network Centrality-Weighted ML ----------
   observeEvent(input$ppi_apply_centrality, {
     req(rv$ppi_hub_scores)
     df <- rv$ppi_hub_scores
@@ -1318,7 +1318,7 @@ server_ppi <- function(input, output, session, rv) {
       return()
     }
     rv$extracted_data_ml <- datExpr[, keep, drop = FALSE]
-    showNotification(paste("Extracted", nrow(rv$extracted_data_ml), "samples ×", ncol(rv$extracted_data_ml), "genes for ML."), type = "message", duration = 5)
+    showNotification(paste("Extracted", nrow(rv$extracted_data_ml), "samples x", ncol(rv$extracted_data_ml), "genes for ML."), type = "message", duration = 5)
   })
 
   output$ppi_extracted_ml_status_ui <- renderUI({
@@ -1326,7 +1326,7 @@ server_ppi <- function(input, output, session, rv) {
     tags$div(
       class = "alert alert-success",
       icon("check-circle"),
-      " Extracted data ready: ", nrow(rv$extracted_data_ml), " samples × ", ncol(rv$extracted_data_ml), " genes."
+      " Extracted data ready: ", nrow(rv$extracted_data_ml), " samples x ", ncol(rv$extracted_data_ml), " genes."
     )
   })
 
