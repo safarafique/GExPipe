@@ -95,6 +95,134 @@ gexp_prepare_download_dirs <- function(base_dir = getwd(), has_micro = FALSE, ha
   logs
 }
 
+#' Detect fread-style generic column names (V1, V2, X1, ...)
+#'
+#' @param nms Character vector of sample/column names.
+#' @return Logical scalar.
+#' @keywords internal
+gexp_is_generic_sample_names <- function(nms) {
+  if (length(nms) == 0L) {
+    return(FALSE)
+  }
+  mean(grepl("^(V|X)[0-9]+$", nms, ignore.case = TRUE)) >= 0.5
+}
+
+#' Orient an RNA-seq count table to a genes x samples matrix
+#'
+#' Some GEO supplementary files store samples as rows and genes as columns.
+#' This helper transposes when dimensions and optional metadata suggest that layout.
+#'
+#' @param count_df data.frame read from a count file.
+#' @param metadata Optional GEO pData used to hint expected sample count.
+#' @return List with `matrix` (genes x samples) and `log` (character).
+#' @keywords internal
+gexp_orient_count_dataframe <- function(count_df, metadata = NULL) {
+  if (is.null(count_df) || ncol(count_df) < 2L || nrow(count_df) < 2L) {
+    return(list(matrix = NULL, log = "invalid count table"))
+  }
+
+  n_meta <- if (!is.null(metadata) && nrow(metadata) > 0L) nrow(metadata) else NA_integer_
+  likely_transposed <- (nrow(count_df) <= 200L && ncol(count_df) >= 500L) ||
+    (!is.na(n_meta) && nrow(count_df) == n_meta && ncol(count_df) > nrow(count_df) * 3L)
+
+  if (isTRUE(likely_transposed)) {
+    sample_ids <- as.character(count_df[[1]])
+    gene_mat <- as.matrix(count_df[, -1, drop = FALSE])
+    mode(gene_mat) <- "numeric"
+    rownames(gene_mat) <- sample_ids
+    count_matrix <- t(gene_mat)
+    return(list(matrix = count_matrix, log = "transposed count table (samples were rows)"))
+  }
+
+  gene_ids <- as.character(count_df[[1]])
+  count_matrix <- as.matrix(count_df[, -1, drop = FALSE])
+  mode(count_matrix) <- "numeric"
+  rownames(count_matrix) <- gene_ids
+  list(matrix = count_matrix, log = "")
+}
+
+#' Align RNA-seq count-matrix column names with GEO sample metadata
+#'
+#' When count files lack headers, data.table::fread assigns V1, V2, ... which
+#' breaks QC outlier plots and downstream sample matching. This renames columns
+#' using GEO pData row names (GSM IDs) in sample order.
+#'
+#' @param count_matrix Numeric matrix (genes x samples).
+#' @param metadata Optional GEO pData with sample IDs as row names.
+#' @param gse_id GEO series accession (used for fallback naming).
+#' @return Matrix with improved column names.
+#' @examples
+#' mat <- matrix(1:20, nrow = 2, dimnames = list(c("A", "B"), c("V2", "V3")))
+#' meta <- data.frame(title = c("s1", "s2"), row.names = c("GSM1", "GSM2"))
+#' out <- gexp_align_rnaseq_sample_names(mat, meta, "GSE1")
+#' colnames(out)
+#' @export
+gexp_align_rnaseq_sample_names <- function(count_matrix, metadata = NULL, gse_id = NULL) {
+  if (is.null(count_matrix) || ncol(count_matrix) < 1L) {
+    return(count_matrix)
+  }
+
+  nms <- colnames(count_matrix)
+  meta_ids <- character(0)
+  if (!is.null(metadata) && nrow(metadata) > 0L && !is.null(rownames(metadata))) {
+    meta_ids <- rownames(metadata)
+  }
+
+  direct <- 0L
+  if (length(meta_ids) > 0L) {
+    direct <- sum(nms %in% meta_ids)
+    if (direct >= max(2L, floor(0.5 * ncol(count_matrix)))) {
+      return(count_matrix)
+    }
+  }
+
+  need_rename <- gexp_is_generic_sample_names(nms) ||
+    (length(meta_ids) > 0L && direct < max(2L, floor(0.2 * ncol(count_matrix))))
+
+  if (isTRUE(need_rename) && length(meta_ids) > 0L) {
+    n <- min(ncol(count_matrix), length(meta_ids))
+    new_nms <- meta_ids[seq_len(n)]
+    if (ncol(count_matrix) > n) {
+      extra <- seq_len(ncol(count_matrix) - n) + n
+      prefix <- if (!is.null(gse_id) && nzchar(gse_id)) gse_id else "Sample"
+      new_nms <- c(new_nms, paste0(prefix, "_", extra))
+    }
+    colnames(count_matrix) <- new_nms
+  } else if (gexp_is_generic_sample_names(nms) && !is.null(gse_id) && nzchar(gse_id)) {
+    colnames(count_matrix) <- paste0(gse_id, "_", seq_len(ncol(count_matrix)))
+  }
+
+  if (any(duplicated(colnames(count_matrix)))) {
+    colnames(count_matrix) <- make.unique(colnames(count_matrix), sep = "_")
+  }
+
+  count_matrix
+}
+
+#' Prefix duplicate sample column names across multiple datasets
+#'
+#' @param expr_lists Named list of expression/count matrices.
+#' @return Updated list with unique column names where needed.
+#' @keywords internal
+gexp_ensure_unique_colnames_across_datasets <- function(expr_lists) {
+  if (length(expr_lists) < 2L) {
+    return(expr_lists)
+  }
+  all_cols <- unlist(lapply(expr_lists, colnames), use.names = FALSE)
+  dup <- unique(all_cols[duplicated(all_cols)])
+  if (length(dup) == 0L) {
+    return(expr_lists)
+  }
+  for (nm in names(expr_lists)) {
+    cn <- colnames(expr_lists[[nm]])
+    hit <- cn %in% dup
+    if (any(hit)) {
+      colnames(expr_lists[[nm]])[hit] <- paste0(nm, "_", cn[hit])
+    }
+  }
+  expr_lists
+}
+
 #' Finalize common genes and combined matrix after download/mapping
 #'
 #' @param micro_expr_list Named list of microarray matrices (genes x samples).
@@ -159,6 +287,11 @@ gexp_download_finalize_common_genes <- function(
   }
   for (gse in names(rna_counts_list)) {
     rna_counts_list[[gse]] <- rna_counts_list[[gse]][common_genes, , drop = FALSE]
+  }
+
+  if (length(micro_expr_list) + length(rna_counts_list) > 1L) {
+    micro_expr_list <- gexp_ensure_unique_colnames_across_datasets(micro_expr_list)
+    rna_counts_list <- gexp_ensure_unique_colnames_across_datasets(rna_counts_list)
   }
 
   combined_expr_raw <- do.call(cbind, c(micro_expr_list, rna_counts_list))
@@ -1021,10 +1154,41 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
     return(out)
   }
 
-  gene_ids <- as.character(count_df[[1]])
-  count_matrix <- as.matrix(count_df[, -1, drop = FALSE])
-  mode(count_matrix) <- "numeric"
-  rownames(count_matrix) <- gene_ids
+  # Fetch metadata early so we can orient/rename samples before QC merge
+  rna_metadata <- tryCatch(
+    {
+      suppressMessages(invisible(capture.output(
+        gse_list <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE),
+        file = nullfile()
+      )))
+      gse <- if (inherits(gse_list, "list") && length(gse_list) >= 1) {
+        gse_list[[1]]
+      } else {
+        gse_list
+      }
+      pheno <- Biobase::pData(gse)
+      if (is.null(pheno) || nrow(pheno) == 0) stop("empty pData")
+      pheno
+    },
+    error = function(e) {
+      gexp_fetch_geo_series_matrix_metadata(gse_id)
+    }
+  )
+
+  oriented <- gexp_orient_count_dataframe(count_df, metadata = rna_metadata)
+  count_matrix <- oriented$matrix
+  if (is.null(count_matrix) || ncol(count_matrix) < 1L || nrow(count_matrix) < 10L) {
+    out$reason <- "count file format invalid or too small"
+    return(out)
+  }
+  if (nzchar(oriented$log)) {
+    out$log <- paste0(out$log, oriented$log, " ")
+  }
+
+  count_matrix <- gexp_align_rnaseq_sample_names(count_matrix, rna_metadata, gse_id)
+  if (gexp_is_generic_sample_names(colnames(count_matrix))) {
+    out$log <- paste0(out$log, "(generic sample names; limited GEO metadata) ")
+  }
 
   # ---- NA-sample detection and removal (RNA-seq) ----
   n_total_samp_rna <- ncol(count_matrix)
@@ -1055,36 +1219,34 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   }
   out$log <- paste0(out$log, rna_na_log)
 
-  rna_metadata <- tryCatch(
-    {
-      suppressMessages(invisible(capture.output(
-        gse_list <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE),
-        file = nullfile()
-      )))
-      gse <- if (inherits(gse_list, "list") && length(gse_list) >= 1) {
-        gse_list[[1]]
+  if (is.null(rna_metadata) || nrow(rna_metadata) == 0L) {
+    count_cols <- colnames(count_matrix)
+    rna_metadata <- data.frame(
+      title = count_cols,
+      row.names = count_cols,
+      stringsAsFactors = FALSE
+    )
+  } else {
+    count_cols <- colnames(count_matrix)
+    if (!all(count_cols %in% rownames(rna_metadata))) {
+      outm <- as.data.frame(
+        matrix(NA_character_, nrow = length(count_cols), ncol = ncol(rna_metadata)),
+        stringsAsFactors = FALSE
+      )
+      colnames(outm) <- colnames(rna_metadata)
+      rownames(outm) <- count_cols
+      common_meta <- intersect(count_cols, rownames(rna_metadata))
+      if (length(common_meta) > 0L) {
+        outm[common_meta, ] <- rna_metadata[common_meta, , drop = FALSE]
       } else {
-        gse_list
-      }
-      pheno <- Biobase::pData(gse)
-      if (is.null(pheno) || nrow(pheno) == 0) stop("empty pData")
-      pheno
-    },
-    error = function(e) {
-      sm <- gexp_fetch_geo_series_matrix_metadata(gse_id)
-      count_cols <- colnames(count_matrix)
-      if (!is.null(sm) && nrow(sm) > 0 && ncol(sm) > 0) {
-        outm <- as.data.frame(matrix(NA_character_, nrow = length(count_cols), ncol = ncol(sm)), stringsAsFactors = FALSE)
-        colnames(outm) <- colnames(sm)
-        rownames(outm) <- count_cols
-        for (sid in count_cols) {
-          if (sid %in% rownames(sm)) outm[sid, ] <- sm[sid, , drop = TRUE]
+        n <- min(length(count_cols), nrow(rna_metadata))
+        if (n > 0L) {
+          outm[seq_len(n), ] <- rna_metadata[seq_len(n), , drop = FALSE]
         }
-        return(outm)
       }
-      data.frame(title = colnames(count_matrix), row.names = colnames(count_matrix), stringsAsFactors = FALSE)
+      rna_metadata <- outm
     }
-  )
+  }
 
   if (!is.null(rna_metadata) && nrow(rna_metadata) > 0) {
     common_samples <- intersect(colnames(count_matrix), rownames(rna_metadata))
@@ -1093,6 +1255,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
     }
   }
 
+  gene_ids <- rownames(count_matrix)
   gene_symbols <- suppressMessages(convert_rnaseq_ids(gene_ids, gse_id))
   rownames(count_matrix) <- gene_symbols
   valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
