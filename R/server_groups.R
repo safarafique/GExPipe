@@ -301,7 +301,11 @@ server_groups <- function(input, output, session, rv) {
       choices_list <- list("-- Select Column --" = "")
       for (col in group_cols) choices_list[[col]] <- col
       choices_vec <- unlist(choices_list, use.names = TRUE)
-      
+      default_col <- gexp_suggest_group_column(col_names)
+      if (!default_col %in% choices_vec) {
+        default_col <- ""
+      }
+
       box(
         title = tags$span(
           icon("database", style = "margin-right: 8px; color: #3498db;"),
@@ -315,7 +319,7 @@ server_groups <- function(input, output, session, rv) {
             inputId = paste0("group_col_", gse),
             label = tags$span(icon("list"), " Select phenotype column:"),
             choices = choices_vec,
-            selected = "",
+            selected = default_col,
             width = "100%"
           ),
           tags$div(

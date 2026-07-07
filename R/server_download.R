@@ -352,6 +352,26 @@ server_download <- function(input, output, session, rv) {
           }
           log_text <- paste0(log_text, "Proceed to QC tab.\n")
 
+          generic_rna <- any(vapply(
+            rv$rna_counts_list,
+            function(m) is.matrix(m) && gexp_is_generic_sample_names(colnames(m)),
+            logical(1)
+          ), na.rm = TRUE)
+          if (isTRUE(generic_rna)) {
+            showNotification(
+              tags$div(
+                icon("exclamation-triangle"),
+                tags$strong(" Generic sample names detected (e.g. V2, V3)."),
+                tags$p(
+                  "Some RNA-seq count files lacked headers. Sample IDs were inferred from GEO metadata when possible. If QC outlier plots look wrong, check the download log or try re-downloading.",
+                  style = "margin-top: 6px; font-size: 12px;"
+                )
+              ),
+              type = "warning",
+              duration = 12
+            )
+          }
+
           rv$download_complete <- TRUE
           if (is.null(rv$download_complete_at)) rv$download_complete_at <- Sys.time()
         }
