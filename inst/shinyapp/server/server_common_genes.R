@@ -170,6 +170,45 @@ server_common_genes <- function(input, output, session, rv) {
     }
   )
 
+  output$download_common_genes_venn_jpg <- downloadHandler(
+    filename = function() "common_genes_venn_DEG_WGCNA.jpg",
+    content = function(file) {
+      req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
+      deg_set <- rv$common_genes_deg_list
+      wgcna_set <- rv$common_genes_wgcna_list
+      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
+      jpeg(file, width = 8 * 150, height = 8 * 150, res = 150, bg = "white", quality = 95)
+      grid::grid.newpage()
+      vp <- VennDiagram::venn.diagram(
+        x = list(DEG = deg_set, WGCNA = wgcna_set),
+        category.names = c("DEG", "WGCNA"),
+        filename = NULL,
+        output = TRUE,
+        disable.logging = TRUE,
+        imagetype = "png",
+        height = 8 * 150,
+        width = 8 * 150,
+        resolution = 150,
+        compression = "lzw",
+        lwd = 2.5,
+        lty = "blank",
+        fill = c("#E41A1C", "#377EB8"),
+        alpha = 0.65,
+        cex = 1.4,
+        fontface = "bold",
+        cat.cex = 1.3,
+        cat.fontface = "bold",
+        cat.col = c("#E41A1C", "#377EB8"),
+        margin = 0.08,
+        main = "Common Genes (DEG \u2229 WGCNA)",
+        main.cex = 1.4,
+        main.fontface = "bold"
+      )
+      grid::grid.draw(vp)
+      dev.off()
+    }
+  )
+
   output$download_common_genes_venn_pdf <- downloadHandler(
     filename = function() "common_genes_venn_DEG_WGCNA.pdf",
     content = function(file) {
@@ -322,12 +361,18 @@ server_common_genes <- function(input, output, session, rv) {
     if (is.null(p)) return()
     if (device == "png")
       ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    else if (device %in% c("jpeg", "jpg"))
+      ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     else
       ggplot2::ggsave(file, plot = p, width = 9, height = 6, device = "pdf", bg = "white")
   }
   output$download_go_bp_png <- downloadHandler(
     filename = function() "GO_Enrichment_Biological_Process.png",
     content = function(file) { go_plot_to_file(rv$go_bp, "GO Biological Process", file, "png") }
+  )
+  output$download_go_bp_jpg <- downloadHandler(
+    filename = function() "GO_Enrichment_Biological_Process.jpg",
+    content = function(file) { go_plot_to_file(rv$go_bp, "GO Biological Process", file, "jpeg") }
   )
   output$download_go_bp_pdf <- downloadHandler(
     filename = function() "GO_Enrichment_Biological_Process.pdf",
@@ -337,6 +382,10 @@ server_common_genes <- function(input, output, session, rv) {
     filename = function() "GO_Enrichment_Molecular_Function.png",
     content = function(file) { go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "png") }
   )
+  output$download_go_mf_jpg <- downloadHandler(
+    filename = function() "GO_Enrichment_Molecular_Function.jpg",
+    content = function(file) { go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "jpeg") }
+  )
   output$download_go_mf_pdf <- downloadHandler(
     filename = function() "GO_Enrichment_Molecular_Function.pdf",
     content = function(file) { go_plot_to_file(rv$go_mf, "GO Molecular Function", file, "pdf") }
@@ -344,6 +393,10 @@ server_common_genes <- function(input, output, session, rv) {
   output$download_go_cc_png <- downloadHandler(
     filename = function() "GO_Enrichment_Cellular_Component.png",
     content = function(file) { go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "png") }
+  )
+  output$download_go_cc_jpg <- downloadHandler(
+    filename = function() "GO_Enrichment_Cellular_Component.jpg",
+    content = function(file) { go_plot_to_file(rv$go_cc, "GO Cellular Component", file, "jpeg") }
   )
   output$download_go_cc_pdf <- downloadHandler(
     filename = function() "GO_Enrichment_Cellular_Component.pdf",
@@ -491,6 +544,13 @@ server_common_genes <- function(input, output, session, rv) {
     content = function(file) {
       p <- make_kegg_barplot()
       if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_kegg_barplot_jpg <- downloadHandler(
+    filename = function() "KEGG_Enrichment_Barplot.jpg",
+    content = function(file) {
+      p <- make_kegg_barplot()
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     }
   )
   output$download_kegg_barplot_pdf <- downloadHandler(

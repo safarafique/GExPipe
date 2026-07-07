@@ -489,6 +489,13 @@ server_batch <- function(input, output, session, rv) {
       if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
     }
   )
+  output$download_gene_variance_jpg <- downloadHandler(
+    filename = function() "Batch_Gene_Variance.jpg",
+    content = function(file) {
+      p <- batch_gene_variance_plot()
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 9, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+    }
+  )
   output$download_gene_variance_pdf <- downloadHandler(
     filename = function() "Batch_Gene_Variance.pdf",
     content = function(file) {
@@ -768,6 +775,7 @@ server_batch <- function(input, output, session, rv) {
         plotOutput("pca_before_platform", height = "400px"),
         tags$div(style = "margin-top: 6px;",
           downloadButton("download_pca_before_platform_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"),
+          downloadButton("download_pca_before_platform_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"),
           downloadButton("download_pca_before_platform_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
       ),
       box(
@@ -776,6 +784,7 @@ server_batch <- function(input, output, session, rv) {
         plotOutput("pca_after_platform", height = "400px"),
         tags$div(style = "margin-top: 6px;",
           downloadButton("download_pca_after_platform_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+          downloadButton("download_pca_after_platform_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
           downloadButton("download_pca_after_platform_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
       )
     )
@@ -984,6 +993,7 @@ server_batch <- function(input, output, session, rv) {
   batch_save_ggplot <- function(p, file, device = "png") {
     if (is.null(p)) return()
     if (device == "png") ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    else if (device %in% c("jpeg", "jpg")) ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     else ggplot2::ggsave(file, plot = p, width = 7, height = 5, device = "pdf", bg = "white")
   }
 
@@ -1037,6 +1047,10 @@ server_batch <- function(input, output, session, rv) {
     filename = function() "Batch_PCA_Before_Dataset.png",
     content = function(file) .batch_download_pca(file, rv$expr_filtered, rv$unified_metadata, "Dataset", "before", "png")
   )
+  output$download_pca_before_dataset_jpg <- downloadHandler(
+    filename = function() "Batch_PCA_Before_Dataset.jpg",
+    content = function(file) .batch_download_pca(file, rv$expr_filtered, rv$unified_metadata, "Dataset", "before", "jpeg")
+  )
   output$download_pca_before_dataset_pdf <- downloadHandler(
     filename = function() "Batch_PCA_Before_Dataset.pdf",
     content = function(file) .batch_download_pca(file, rv$expr_filtered, rv$unified_metadata, "Dataset", "before", "pdf")
@@ -1044,6 +1058,10 @@ server_batch <- function(input, output, session, rv) {
   output$download_pca_after_dataset_png <- downloadHandler(
     filename = function() "Batch_PCA_After_Dataset.png",
     content = function(file) .batch_download_pca(file, rv$batch_corrected, rv$unified_metadata, "Dataset", "after", "png")
+  )
+  output$download_pca_after_dataset_jpg <- downloadHandler(
+    filename = function() "Batch_PCA_After_Dataset.jpg",
+    content = function(file) .batch_download_pca(file, rv$batch_corrected, rv$unified_metadata, "Dataset", "after", "jpeg")
   )
   output$download_pca_after_dataset_pdf <- downloadHandler(
     filename = function() "Batch_PCA_After_Dataset.pdf",
@@ -1053,6 +1071,10 @@ server_batch <- function(input, output, session, rv) {
     filename = function() "Batch_PCA_Before_Condition.png",
     content = function(file) .batch_download_pca(file, rv$expr_filtered, rv$unified_metadata, "Condition", "before", "png")
   )
+  output$download_pca_before_condition_jpg <- downloadHandler(
+    filename = function() "Batch_PCA_Before_Condition.jpg",
+    content = function(file) .batch_download_pca(file, rv$expr_filtered, rv$unified_metadata, "Condition", "before", "jpeg")
+  )
   output$download_pca_before_condition_pdf <- downloadHandler(
     filename = function() "Batch_PCA_Before_Condition.pdf",
     content = function(file) .batch_download_pca(file, rv$expr_filtered, rv$unified_metadata, "Condition", "before", "pdf")
@@ -1060,6 +1082,10 @@ server_batch <- function(input, output, session, rv) {
   output$download_pca_after_condition_png <- downloadHandler(
     filename = function() "Batch_PCA_After_Condition.png",
     content = function(file) .batch_download_pca(file, rv$batch_corrected, rv$unified_metadata, "Condition", "after", "png")
+  )
+  output$download_pca_after_condition_jpg <- downloadHandler(
+    filename = function() "Batch_PCA_After_Condition.jpg",
+    content = function(file) .batch_download_pca(file, rv$batch_corrected, rv$unified_metadata, "Condition", "after", "jpeg")
   )
   output$download_pca_after_condition_pdf <- downloadHandler(
     filename = function() "Batch_PCA_After_Condition.pdf",
@@ -1069,6 +1095,10 @@ server_batch <- function(input, output, session, rv) {
     filename = function() "Batch_PCA_Before_Platform.png",
     content = function(file) .batch_download_pca_platform(file, rv$expr_filtered, rv$unified_metadata, "before", "png")
   )
+  output$download_pca_before_platform_jpg <- downloadHandler(
+    filename = function() "Batch_PCA_Before_Platform.jpg",
+    content = function(file) .batch_download_pca_platform(file, rv$expr_filtered, rv$unified_metadata, "before", "jpeg")
+  )
   output$download_pca_before_platform_pdf <- downloadHandler(
     filename = function() "Batch_PCA_Before_Platform.pdf",
     content = function(file) .batch_download_pca_platform(file, rv$expr_filtered, rv$unified_metadata, "before", "pdf")
@@ -1076,6 +1106,10 @@ server_batch <- function(input, output, session, rv) {
   output$download_pca_after_platform_png <- downloadHandler(
     filename = function() "Batch_PCA_After_Platform.png",
     content = function(file) .batch_download_pca_platform(file, rv$batch_corrected, rv$unified_metadata, "after", "png")
+  )
+  output$download_pca_after_platform_jpg <- downloadHandler(
+    filename = function() "Batch_PCA_After_Platform.jpg",
+    content = function(file) .batch_download_pca_platform(file, rv$batch_corrected, rv$unified_metadata, "after", "jpeg")
   )
   output$download_pca_after_platform_pdf <- downloadHandler(
     filename = function() "Batch_PCA_After_Platform.pdf",
@@ -1109,6 +1143,10 @@ server_batch <- function(input, output, session, rv) {
     filename = function() "Batch_Hclust_Before.png",
     content = function(file) batch_hclust_to_file(file, function(f) png(f, width = 10, height = 8, res = IMAGE_DPI, units = "in", bg = "white"), before = TRUE)
   )
+  output$download_hclust_before_jpg <- downloadHandler(
+    filename = function() "Batch_Hclust_Before.jpg",
+    content = function(file) batch_hclust_to_file(file, function(f) jpeg(f, width = 10, height = 8, res = IMAGE_DPI, units = "in", bg = "white", quality = 95), before = TRUE)
+  )
   output$download_hclust_before_pdf <- downloadHandler(
     filename = function() "Batch_Hclust_Before.pdf",
     content = function(file) batch_hclust_to_file(file, function(f) pdf(f, width = 10, height = 8, bg = "white"), before = TRUE)
@@ -1116,6 +1154,10 @@ server_batch <- function(input, output, session, rv) {
   output$download_hclust_after_png <- downloadHandler(
     filename = function() "Batch_Hclust_After.png",
     content = function(file) batch_hclust_to_file(file, function(f) png(f, width = 10, height = 8, res = IMAGE_DPI, units = "in", bg = "white"), before = FALSE)
+  )
+  output$download_hclust_after_jpg <- downloadHandler(
+    filename = function() "Batch_Hclust_After.jpg",
+    content = function(file) batch_hclust_to_file(file, function(f) jpeg(f, width = 10, height = 8, res = IMAGE_DPI, units = "in", bg = "white", quality = 95), before = FALSE)
   )
   output$download_hclust_after_pdf <- downloadHandler(
     filename = function() "Batch_Hclust_After.pdf",
@@ -1138,6 +1180,10 @@ server_batch <- function(input, output, session, rv) {
     filename = function() "Batch_PVCA_Before.png",
     content = function(file) { p <- batch_pvca_to_plot(before = TRUE); if (!is.null(p)) batch_save_ggplot(p, file, "png") }
   )
+  output$download_pvca_before_jpg <- downloadHandler(
+    filename = function() "Batch_PVCA_Before.jpg",
+    content = function(file) { p <- batch_pvca_to_plot(before = TRUE); if (!is.null(p)) batch_save_ggplot(p, file, "jpeg") }
+  )
   output$download_pvca_before_pdf <- downloadHandler(
     filename = function() "Batch_PVCA_Before.pdf",
     content = function(file) { p <- batch_pvca_to_plot(before = TRUE); if (!is.null(p)) batch_save_ggplot(p, file, "pdf") }
@@ -1145,6 +1191,10 @@ server_batch <- function(input, output, session, rv) {
   output$download_pvca_after_png <- downloadHandler(
     filename = function() "Batch_PVCA_After.png",
     content = function(file) { p <- batch_pvca_to_plot(before = FALSE); if (!is.null(p)) batch_save_ggplot(p, file, "png") }
+  )
+  output$download_pvca_after_jpg <- downloadHandler(
+    filename = function() "Batch_PVCA_After.jpg",
+    content = function(file) { p <- batch_pvca_to_plot(before = FALSE); if (!is.null(p)) batch_save_ggplot(p, file, "jpeg") }
   )
   output$download_pvca_after_pdf <- downloadHandler(
     filename = function() "Batch_PVCA_After.pdf",

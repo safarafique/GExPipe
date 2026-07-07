@@ -786,6 +786,45 @@ server_results <- function(input, output, session, rv) {
     }
   )
 
+  output$download_volcano_jpg <- downloadHandler(
+    filename = function() "Volcano_Plot.jpg",
+    content = function(file) {
+      req(rv$de_results)
+      volcano_data <- as.data.frame(rv$de_results, stringsAsFactors = FALSE)
+      if (!"Gene" %in% names(volcano_data)) volcano_data$Gene <- rownames(rv$de_results)
+      volcano_data$Gene <- as.character(volcano_data$Gene)
+      if (!"Significance" %in% names(volcano_data)) volcano_data$Significance <- "Not Significant"
+      volcano_data$Significance <- as.character(volcano_data$Significance)
+      volcano_data$Significance[!volcano_data$Significance %in% c("Up-regulated", "Down-regulated", "Not Significant")] <- "Not Significant"
+      volcano_data$Significance <- factor(volcano_data$Significance, levels = c("Not Significant", "Down-regulated", "Up-regulated"))
+      min_padj <- min(volcano_data$adj.P.Val[volcano_data$adj.P.Val > 0], na.rm = TRUE)
+      if (is.infinite(min_padj) || is.na(min_padj)) min_padj <- 1e-300
+      volcano_data$adj.P.Val[volcano_data$adj.P.Val == 0] <- min_padj
+      volcano_data$neg_log10_padj <- -log10(volcano_data$adj.P.Val)
+      max_finite <- max(volcano_data$neg_log10_padj[is.finite(volcano_data$neg_log10_padj)], na.rm = TRUE)
+      if (is.finite(max_finite)) volcano_data$neg_log10_padj[!is.finite(volcano_data$neg_log10_padj)] <- max_finite + 1
+      volcano_data <- volcano_data[is.finite(volcano_data$logFC) & is.finite(volcano_data$neg_log10_padj), ]
+      volcano_data$Label <- ""
+      top_genes_to_label <- rbind(head(volcano_data[order(volcano_data$adj.P.Val), ], 15), head(volcano_data[order(-abs(volcano_data$logFC)), ], 15))
+      volcano_data$Label[volcano_data$Gene %in% top_genes_to_label$Gene] <- volcano_data$Gene[volcano_data$Gene %in% top_genes_to_label$Gene]
+      n_up <- sum(volcano_data$Significance == "Up-regulated", na.rm = TRUE)
+      n_down <- sum(volcano_data$Significance == "Down-regulated", na.rm = TRUE)
+      n_sig <- n_up + n_down
+      logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
+      padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
+      p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
+        ggplot2::geom_point(alpha = 0.6, size = 2) +
+        ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
+        ggplot2::theme_bw(base_size = 14) +
+        ggplot2::labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
+        ggrepel::geom_text_repel(ggplot2::aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
+        ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 16), plot.subtitle = ggplot2::element_text(size = 12), legend.position = "right")
+      ggplot2::ggsave(file, plot = p, device = "jpeg", width = 10, height = 7, dpi = IMAGE_DPI, bg = "white")
+    }
+  )
+
   # Download volcano plot (PDF)
   output$download_volcano_pdf <- downloadHandler(
     filename = function() "Volcano_Plot.pdf",
@@ -854,6 +893,41 @@ server_results <- function(input, output, session, rv) {
       annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
       annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
       png(file, width = 1200, height = 800, res = 150, bg = "white")
+      pheatmap::pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
+               color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
+               show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
+               main = paste0("Top ", nrow(expr), " DE Genes (of ", input$top_genes, " requested)"), border_color = NA)
+      dev.off()
+    }
+  )
+
+  output$download_heatmap_jpg <- downloadHandler(
+    filename = function() "DE_Heatmap_Top_Genes.jpg",
+    content = function(file) {
+      req(rv$de_results, rv$batch_corrected)
+      top <- head(rv$de_results[order(rv$de_results$adj.P.Val), ], input$top_genes)
+      valid_genes <- intersect(top$Gene, rownames(rv$batch_corrected))
+      if (length(valid_genes) == 0) {
+        bc_genes_upper <- toupper(rownames(rv$batch_corrected)); names(bc_genes_upper) <- rownames(rv$batch_corrected)
+        top_upper <- toupper(top$Gene); matched <- bc_genes_upper[bc_genes_upper %in% top_upper]; valid_genes <- names(matched)
+      }
+      if (length(valid_genes) < 2) return()
+      expr <- rv$batch_corrected[valid_genes, , drop = FALSE]
+      row_vars <- apply(expr, 1, var, na.rm = TRUE)
+      expr <- expr[!is.na(row_vars) & row_vars > 0, , drop = FALSE]
+      if (nrow(expr) < 2) return()
+      expr_scaled <- t(scale(t(expr)))
+      samp <- colnames(expr_scaled)
+      meta <- rv$unified_metadata
+      idx <- match(samp, rownames(meta))
+      if (any(is.na(idx)) && "SampleID" %in% names(meta)) idx <- match(samp, as.character(meta$SampleID))
+      cond <- if ("Condition" %in% names(meta) && all(!is.na(idx))) meta$Condition[idx] else rep(NA_character_, length(samp))
+      dset <- if ("Dataset" %in% names(meta) && all(!is.na(idx))) meta$Dataset[idx] else rep(NA_character_, length(samp))
+      if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
+      if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
+      annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
+      annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
+      jpeg(file, width = 8, height = 5.33, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
       pheatmap::pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
                color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
                show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),

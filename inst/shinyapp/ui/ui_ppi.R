@@ -92,12 +92,14 @@ ui_ppi <- tabItem(
                plotOutput("ppi_plot_traditional", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
                  downloadButton("download_ppi_traditional_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_traditional_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
                  downloadButton("download_ppi_traditional_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
         column(6,
                tags$h5(icon("circle"), " 2. Circular layout (by degree)", style = "margin-top: 8px; margin-bottom: 6px; color: #388E3C; font-size: 13px;"),
                plotOutput("ppi_plot_circular", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
                  downloadButton("download_ppi_circular_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_circular_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
                  downloadButton("download_ppi_circular_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
       fluidRow(
         column(6,
@@ -105,12 +107,14 @@ ui_ppi <- tabItem(
                plotOutput("ppi_plot_ggraph", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
                  downloadButton("download_ppi_ggraph_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_ggraph_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
                  downloadButton("download_ppi_ggraph_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
         column(6,
                tags$h5(icon("project-diagram"), " 4. Kamada–Kawai (stress-minimization)", style = "margin-top: 8px; margin-bottom: 6px; color: #E65100; font-size: 13px;"),
                plotOutput("ppi_plot_kamada", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
                  downloadButton("download_ppi_kamada_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_kamada_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
                  downloadButton("download_ppi_kamada_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
       )
     )
@@ -125,6 +129,7 @@ ui_ppi <- tabItem(
       plotOutput("ppi_plot_hub_or_other", height = "520px", width = "100%"),
       tags$div(style = "margin-top: 6px;",
         downloadButton("download_ppi_hub_or_other_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
+        downloadButton("download_ppi_hub_or_other_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
         downloadButton("download_ppi_hub_or_other_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))
     )
   ),

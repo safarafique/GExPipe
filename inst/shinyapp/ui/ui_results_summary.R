@@ -88,6 +88,7 @@ ui_results_summary <- tabItem(
     "3–5", "chart-area", "Batch effect: Before vs After",
     "PCA of expression before and after batch correction. Samples should mix better after correction.",
     "primary",
+    gexp_ui_plot_download_jpg_pdf("dl_rs_batch_before_after_jpg", "dl_rs_batch_before_after_pdf", "btn-primary btn-sm"),
     plotOutput("results_summary_batch_before_after", height = RESULTS_PLOT_HEIGHT)
   ),
 
@@ -99,8 +100,14 @@ ui_results_summary <- tabItem(
     uiOutput("results_summary_de"),
     tags$div(style = "margin-top: 12px;",
       fluidRow(
-        column(6, plotOutput("results_summary_volcano", height = RESULTS_PLOT_HEIGHT)),
-        column(6, plotOutput("results_summary_de_heatmap", height = RESULTS_PLOT_HEIGHT))
+        column(6,
+          gexp_ui_plot_download_jpg_pdf("dl_rs_volcano_jpg", "dl_rs_volcano_pdf", "btn-success btn-sm"),
+          plotOutput("results_summary_volcano", height = RESULTS_PLOT_HEIGHT)
+        ),
+        column(6,
+          gexp_ui_plot_download_jpg_pdf("dl_rs_de_heatmap_jpg", "dl_rs_de_heatmap_pdf", "btn-success btn-sm"),
+          plotOutput("results_summary_de_heatmap", height = RESULTS_PLOT_HEIGHT)
+        )
       )
     )
   ),
@@ -112,12 +119,24 @@ ui_results_summary <- tabItem(
     "primary",
     uiOutput("results_summary_wgcna"),
     fluidRow(
-      column(6, plotOutput("results_summary_soft_threshold", height = RESULTS_PLOT_HEIGHT)),
-      column(6, plotOutput("results_summary_sample_tree", height = RESULTS_PLOT_HEIGHT))
+      column(6,
+        gexp_ui_plot_download_jpg_pdf("dl_rs_soft_threshold_jpg", "dl_rs_soft_threshold_pdf", "btn-primary btn-sm"),
+        plotOutput("results_summary_soft_threshold", height = RESULTS_PLOT_HEIGHT)
+      ),
+      column(6,
+        gexp_ui_plot_download_jpg_pdf("dl_rs_sample_tree_jpg", "dl_rs_sample_tree_pdf", "btn-primary btn-sm"),
+        plotOutput("results_summary_sample_tree", height = RESULTS_PLOT_HEIGHT)
+      )
     ),
     fluidRow(
-      column(6, plotOutput("results_summary_wgcna_dendro", height = RESULTS_PLOT_HEIGHT)),
-      column(6, plotOutput("results_summary_module_trait", height = RESULTS_PLOT_HEIGHT))
+      column(6,
+        gexp_ui_plot_download_jpg_pdf("dl_rs_wgcna_dendro_jpg", "dl_rs_wgcna_dendro_pdf", "btn-primary btn-sm"),
+        plotOutput("results_summary_wgcna_dendro", height = RESULTS_PLOT_HEIGHT)
+      ),
+      column(6,
+        gexp_ui_plot_download_jpg_pdf("dl_rs_module_trait_jpg", "dl_rs_module_trait_pdf", "btn-primary btn-sm"),
+        plotOutput("results_summary_module_trait", height = RESULTS_PLOT_HEIGHT)
+      )
     )
   ),
 
@@ -135,8 +154,14 @@ ui_results_summary <- tabItem(
     "info",
     uiOutput("results_summary_go_kegg"),
     fluidRow(
-      column(6, plotOutput("results_summary_go_plot", height = RESULTS_PLOT_HEIGHT)),
-      column(6, plotOutput("results_summary_kegg_plot", height = RESULTS_PLOT_HEIGHT))
+      column(6,
+        gexp_ui_plot_download_jpg_pdf("dl_rs_go_plot_jpg", "dl_rs_go_plot_pdf", "btn-info btn-sm"),
+        plotOutput("results_summary_go_plot", height = RESULTS_PLOT_HEIGHT)
+      ),
+      column(6,
+        gexp_ui_plot_download_jpg_pdf("dl_rs_kegg_plot_jpg", "dl_rs_kegg_plot_pdf", "btn-info btn-sm"),
+        plotOutput("results_summary_kegg_plot", height = RESULTS_PLOT_HEIGHT)
+      )
     )
   ),
 
@@ -146,6 +171,7 @@ ui_results_summary <- tabItem(
     "Protein–protein interaction network from common genes (STRINGdb). Hub genes by degree.",
     "info",
     uiOutput("results_summary_ppi"),
+    gexp_ui_plot_download_jpg_pdf("dl_rs_ppi_plot_jpg", "dl_rs_ppi_plot_pdf", "btn-info btn-sm"),
     plotOutput("results_summary_ppi_plot", height = RESULTS_PLOT_HEIGHT)
   ),
 
@@ -155,6 +181,7 @@ ui_results_summary <- tabItem(
     "Overlap of gene lists across selected ML methods. Common genes used for ROC and validation.",
     "warning",
     uiOutput("results_summary_ml"),
+    gexp_ui_plot_download_jpg_pdf("dl_rs_ml_venn_jpg", "dl_rs_ml_venn_pdf", "btn-warning btn-sm"),
     plotOutput("results_summary_ml_venn", height = RESULTS_PLOT_HEIGHT)
   ),
 
@@ -162,6 +189,7 @@ ui_results_summary <- tabItem(
     "12", "chart-line", "ROC curve",
     "ROC/AUC for mean signature of ML common genes (training data).",
     "success",
+    gexp_ui_plot_download_jpg_pdf("dl_rs_roc_plot_jpg", "dl_rs_roc_plot_pdf", "btn-success btn-sm"),
     plotOutput("results_summary_roc_plot", height = RESULTS_PLOT_HEIGHT)
   ),
 
@@ -171,6 +199,7 @@ ui_results_summary <- tabItem(
     "Nomogram model and 70/30 validation. Training and validation AUC.",
     "danger",
     uiOutput("results_summary_nomogram_ui"),
+    gexp_ui_plot_download_jpg_pdf("dl_rs_nomogram_plot_jpg", "dl_rs_nomogram_plot_pdf", "btn-danger btn-sm"),
     plotOutput("results_summary_nomogram_plot", height = RESULTS_PLOT_HEIGHT)
   ),
 
@@ -180,6 +209,7 @@ ui_results_summary <- tabItem(
     "Gene Set Enrichment Analysis for target genes. Enrichment plot and pathways.",
     "info",
     uiOutput("results_summary_gsea"),
+    gexp_ui_plot_download_jpg_pdf("dl_rs_gsea_plot_jpg", "dl_rs_gsea_plot_pdf", "btn-info btn-sm"),
     plotOutput("results_summary_gsea_plot", height = RESULTS_PLOT_HEIGHT)
   ),
 

@@ -580,5 +580,276 @@ server_results_summary <- function(input, output, session, rv) {
       }
     )
   }, height = 260)
+
+  # ----- Plot download handlers (JPG + PDF) -----
+  rs_plot_to_file <- function(file, draw_fun, width = 8, height = 5.2) {
+    ext <- tolower(sub(".*\\.", "", basename(file)))
+    if (ext == "pdf") pdf(file, width = width, height = height, bg = "white")
+    else if (ext %in% c("jpg", "jpeg")) jpeg(file, width = width, height = height, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
+    else png(file, width = width * IMAGE_DPI, height = height * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+    on.exit(dev.off(), add = TRUE)
+    draw_fun()
+  }
+
+  add_rs_jpg_pdf <- function(stem, draw_fun, prefix, width = 8, height = 5.2) {
+    output[[paste0("dl_rs_", stem, "_jpg")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".jpg"),
+      content = function(file) rs_plot_to_file(file, draw_fun, width, height)
+    )
+    output[[paste0("dl_rs_", stem, "_pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".pdf"),
+      content = function(file) rs_plot_to_file(file, draw_fun, width, height)
+    )
+  }
+
+  add_rs_gg_jpg_pdf <- function(stem, draw_fun, prefix, width = 8, height = 5.2) {
+    save_gg <- function(file) {
+      p <- draw_fun()
+      if (is.null(p)) return()
+      if (exists("gexp_ggsave_from_file", mode = "function")) {
+        gexp_ggsave_from_file(file, p, width, height)
+      } else {
+        ext <- tolower(sub(".*\\.", "", basename(file)))
+        dev <- if (ext %in% c("jpg", "jpeg")) "jpeg" else if (ext == "pdf") "pdf" else "png"
+        ggplot2::ggsave(file, plot = p, width = width, height = height, dpi = IMAGE_DPI, units = "in", bg = "white", device = dev)
+      }
+    }
+    output[[paste0("dl_rs_", stem, "_jpg")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".jpg"),
+      content = save_gg
+    )
+    output[[paste0("dl_rs_", stem, "_pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".pdf"),
+      content = save_gg
+    )
+  }
+
+  draw_rs_batch_before_after <- function() {
+    before <- rv$expr_filtered; after <- rv$batch_corrected; meta <- rv$unified_metadata
+    if (is.null(before) || is.null(after) || is.null(meta)) { plot.new(); text(0.5, 0.5, "Batch correction data needed (Step 5).", cex = 1, col = "gray40"); return() }
+    common <- intersect(intersect(colnames(before), colnames(after)), rownames(meta))
+    if (length(common) < 3) { plot.new(); text(0.5, 0.5, "Too few common samples.", cex = 1); return() }
+    before <- before[, common]; after <- after[, common]; meta <- meta[common, , drop = FALSE]
+    cond <- if ("Condition" %in% names(meta)) meta$Condition else meta[[1]]
+    par(mfrow = c(1, 2), mar = c(3, 3, 2, 1))
+    pca_b <- prcomp(t(before), scale. = TRUE, center = TRUE)
+    plot(pca_b$x[, 1], pca_b$x[, 2], col = as.numeric(factor(cond)), pch = 19, main = "Before batch correction", xlab = "PC1", ylab = "PC2")
+    pca_a <- prcomp(t(after), scale. = TRUE, center = TRUE)
+    plot(pca_a$x[, 1], pca_a$x[, 2], col = as.numeric(factor(cond)), pch = 19, main = "After batch correction", xlab = "PC1", ylab = "PC2")
+  }
+
+  draw_rs_volcano <- function() {
+    if (is.null(rv$de_results)) return(NULL)
+    volcano_data <- as.data.frame(rv$de_results, stringsAsFactors = FALSE)
+    if (!"Gene" %in% names(volcano_data)) volcano_data$Gene <- rownames(rv$de_results)
+    if (!"Significance" %in% names(volcano_data)) volcano_data$Significance <- "Not Significant"
+    volcano_data$Significance <- factor(as.character(volcano_data$Significance), levels = c("Not Significant", "Down-regulated", "Up-regulated"))
+    min_p <- min(volcano_data$adj.P.Val[volcano_data$adj.P.Val > 0], na.rm = TRUE)
+    volcano_data$adj.P.Val[volcano_data$adj.P.Val == 0] <- if (length(min_p) && is.finite(min_p)) min_p else 1e-300
+    volcano_data$neg_log10_padj <- -log10(volcano_data$adj.P.Val)
+    volcano_data <- volcano_data[is.finite(volcano_data$logFC) & is.finite(volcano_data$neg_log10_padj), ]
+    logfc_cut <- if (is.numeric(input$logfc_cutoff)) input$logfc_cutoff else 1
+    padj_cut <- if (is.numeric(input$padj_cutoff)) input$padj_cutoff else 0.05
+    n_up <- sum(volcano_data$Significance == "Up-regulated", na.rm = TRUE)
+    n_down <- sum(volcano_data$Significance == "Down-regulated", na.rm = TRUE)
+    ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
+      ggplot2::geom_point(alpha = 0.6, size = 2) +
+      ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
+      ggplot2::theme_bw(base_size = 12) +
+      ggplot2::labs(title = "Volcano Plot", subtitle = paste0("DEGs: ", n_up + n_down, " (Up: ", n_up, ", Down: ", n_down), x = "Log2 FC", y = "-Log10 adj.P.Val") +
+      ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40") +
+      ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40")
+  }
+
+  draw_rs_de_heatmap <- function() {
+    if (is.null(rv$de_results) || is.null(rv$batch_corrected)) { plot.new(); text(0.5, 0.5, "Run DE analysis to see heatmap.", cex = 1.1); return() }
+    top_n <- min(20, nrow(rv$de_results))
+    top <- head(rv$de_results[order(rv$de_results$adj.P.Val), ], top_n)
+    genes <- if ("Gene" %in% names(top)) top$Gene else rownames(top)
+    expr <- rv$batch_corrected[genes, , drop = FALSE]
+    expr_scaled <- t(scale(t(expr)))
+    samp <- colnames(expr_scaled)
+    meta <- rv$unified_metadata
+    idx <- match(samp, rownames(meta))
+    if (any(is.na(idx)) && "SampleID" %in% names(meta)) idx <- match(samp, as.character(meta$SampleID))
+    cond <- if ("Condition" %in% names(meta) && all(!is.na(idx))) meta$Condition[idx] else rep(NA_character_, length(samp))
+    if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
+    annot <- data.frame(Condition = cond, row.names = samp)
+    pheatmap::pheatmap(expr_scaled, annotation_col = annot, color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
+                       show_colnames = FALSE, fontsize_row = 8, main = paste0("Top ", top_n, " DE Genes"), border_color = NA)
+  }
+
+  draw_rs_soft_threshold <- function() {
+    if (is.null(rv$soft_threshold)) { plot.new(); text(0.5, 0.5, "Run soft threshold (Step 7) to see plot.", cex = 1.1); return() }
+    sft <- rv$soft_threshold
+    powers <- if (!is.null(rv$soft_threshold_powers)) rv$soft_threshold_powers else sft$fitIndices[, 1]
+    x1 <- sft$fitIndices[, 1]; y1 <- -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2]; y2 <- sft$fitIndices[, 5]
+    op <- par(mfrow = c(1, 2), bg = "#f8fafb", fg = "#2c3e50", col.main = "#1a252f", col.axis = "#34495e", col.lab = "#34495e")
+    on.exit(par(op), add = TRUE)
+    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "signed R²", type = "n", main = "Scale independence")
+    points(x1, y1, pch = 19, col = "#2980b9", cex = 1); text(x1, y1, labels = powers, cex = 0.75, col = "#1a252f", pos = 4, offset = 0.2)
+    abline(h = 0.8, col = "#e74c3c", lty = 2, lwd = 1.2); box(col = "#dfe6e9", lwd = 1)
+    plot(x1, y2, xlab = "Soft Threshold (power)", ylab = "Mean Connectivity", type = "n", main = "Mean connectivity")
+    points(x1, y2, pch = 19, col = "#27ae60", cex = 1); text(x1, y2, labels = powers, cex = 0.75, col = "#1a252f", pos = 4, offset = 0.2); box(col = "#dfe6e9", lwd = 1)
+  }
+
+  draw_rs_sample_tree <- function() {
+    if (is.null(rv$wgcna_sample_tree)) { plot.new(); text(0.5, 0.5, "Prepare WGCNA data to see sample tree.", cex = 1.1); return() }
+    ht <- rv$wgcna_sample_tree
+    d <- as.dendrogram(ht)
+    set_edge_par <- function(node) { if (is.leaf(node)) return(node); attr(node, "edgePar") <- list(col = "#2980b9", lwd = 1.2); node }
+    d <- dendrapply(d, set_edge_par)
+    op <- par(mar = c(2, 3.5, 3, 1), bg = "#f8fafb", fg = "#2c3e50", xpd = NA, plt = c(0.12, 0.98, 0.15, 0.88))
+    on.exit(par(op), add = TRUE)
+    plot(d, main = "Sample Clustering Tree", xlab = "", ylab = "Height", leaflab = "none", axes = FALSE)
+    axis(2, at = pretty(c(0, max(ht$height)), n = 5), col = "#5d6d7e", col.axis = "#2c3e50", cex.axis = 0.85, las = 1)
+    box(col = "#dfe6e9", lwd = 1)
+  }
+
+  draw_rs_wgcna_dendro <- function() {
+    if (is.null(rv$geneTree) || is.null(rv$moduleColors)) { plot.new(); text(0.5, 0.5, "Build WGCNA network to see dendrogram.", cex = 1.1); return() }
+    if (!requireNamespace("WGCNA", quietly = TRUE)) { plot.new(); text(0.5, 0.5, "WGCNA required", cex = 1.2); return() }
+    op <- par(bg = "white", fg = "#2c3e50"); on.exit(par(op), add = TRUE)
+    WGCNA::plotDendroAndColors(rv$geneTree, rv$moduleColors, "Module Colors", main = "Gene Dendrogram and Module Colors", dendroLabels = FALSE, hang = 0.03, addGuide = TRUE, guideHang = 0.05)
+  }
+
+  draw_rs_module_trait <- function() {
+    if (is.null(rv$moduleTraitCor) || is.null(rv$trait_data)) { plot.new(); text(0.5, 0.5, "Calculate module-trait (Step 7) to see heatmap.", cex = 1); return() }
+    if (!requireNamespace("WGCNA", quietly = TRUE)) { plot.new(); text(0.5, 0.5, "WGCNA required", cex = 1.2); return() }
+    op <- par(bg = "white", fg = "#2c3e50"); on.exit(par(op), add = TRUE)
+    .mtc <- gexpipe_wgcna_heatmap_cor(rv$moduleTraitCor, rv$wgcna_combined_trait)
+    WGCNA::labeledHeatmap(Matrix = .mtc, xLabels = colnames(.mtc), yLabels = rownames(.mtc), ySymbols = rownames(.mtc),
+                          colorLabels = FALSE, colors = WGCNA::blueWhiteRed(50), textMatrix = NULL, main = "Module-Trait Relationships")
+  }
+
+  draw_rs_go_plot <- function() {
+    go_obj <- rv$go_bp; if (is.null(go_obj)) go_obj <- rv$go_mf; if (is.null(go_obj)) go_obj <- rv$go_cc
+    if (is.null(go_obj) || !inherits(go_obj, "enrichResult")) return(NULL)
+    df <- as.data.frame(go_obj)
+    if (nrow(df) == 0) return(NULL)
+    enrichplot::dotplot(go_obj, showCategory = min(15, nrow(df)), x = "GeneRatio", color = "p.adjust", size = "Count") +
+      ggplot2::theme_minimal(base_size = 11) + ggplot2::ggtitle("GO Enrichment (Representative)")
+  }
+
+  draw_rs_kegg_plot <- function() {
+    k <- rv$kegg_enrichment
+    if (is.null(k)) return(NULL)
+    df <- as.data.frame(k)
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    n_show <- min(15, nrow(df))
+    o <- order(as.numeric(df$p.adjust))
+    df <- df[o, ][seq_len(n_show), , drop = FALSE]
+    df$Description <- factor(df$Description, levels = rev(unique(as.character(df$Description))))
+    if (!"Count" %in% names(df) && "geneID" %in% names(df)) df$Count <- lengths(strsplit(as.character(df$geneID), "/", fixed = TRUE))
+    if (!"Count" %in% names(df)) df$Count <- 1L
+    ggplot2::ggplot(df, ggplot2::aes(x = Description, y = Count, fill = p.adjust)) +
+      ggplot2::geom_col() + ggplot2::coord_flip() +
+      ggplot2::scale_fill_continuous(low = "#E64B35", high = "#4DBBD5", name = "p.adjust") +
+      ggplot2::theme_minimal(base_size = 11) + ggplot2::labs(title = "KEGG Enrichment", x = NULL, y = "Count")
+  }
+
+  draw_rs_ppi_plot <- function() {
+    if (is.null(rv$ppi_graph)) { plot.new(); text(0.5, 0.5, "Run PPI (Step 9) to see network.", cex = 1.1); return() }
+    g <- rv$ppi_graph
+    n_max <- min(40, igraph::vcount(g))
+    if (n_max < 2) { plot.new(); text(0.5, 0.5, "Too few nodes for PPI plot.", cex = 1.1); return() }
+    if (!"degree" %in% names(igraph::vertex_attr(g))) igraph::V(g)$degree <- igraph::degree(g)
+    ord <- order(igraph::V(g)$degree, decreasing = TRUE)[seq_len(n_max)]
+    g_sub <- igraph::induced_subgraph(g, ord)
+    layout_fr <- igraph::layout_with_fr(g_sub, niter = 500)
+    op <- par(mar = c(2, 2, 3, 2), bg = "#FAFAFA"); on.exit(par(op), add = TRUE)
+    vlab <- igraph::V(g_sub)$SYMBOL; if (is.null(vlab)) vlab <- igraph::V(g_sub)$name
+    igraph::plot.igraph(g_sub, layout = layout_fr, vertex.label = vlab, vertex.label.cex = 0.8, vertex.size = 8,
+                        vertex.color = "#4DBBD5", edge.color = "gray70", main = "PPI network (top genes by degree)")
+  }
+
+  draw_rs_ml_venn <- function() {
+    if (is.null(rv$ml_venn_sets) || length(rv$ml_venn_sets) < 2) { plot.new(); text(0.5, 0.5, "Run ML (Step 10) with 2+ methods.", cex = 1, col = "gray40"); return() }
+    sets <- rv$ml_venn_sets; n_sets <- length(sets)
+    ml_venn_fill <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#009688", "#795548", "#607D8B")
+    if (n_sets > 5) {
+      all_genes <- unique(unlist(sets, use.names = FALSE))
+      if (length(all_genes) == 0) { plot.new(); text(0.5, 0.5, "No genes", cex = 1); return() }
+      upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
+      rownames(upset_matrix) <- all_genes; colnames(upset_matrix) <- names(sets)
+      for (i in seq_len(n_sets)) upset_matrix[intersect(all_genes, sets[[i]]), i] <- 1L
+      upset_df <- as.data.frame(upset_matrix)
+      max_set_size <- max(sapply(sets, length))
+      UpSetR::upset(upset_df, sets = colnames(upset_df), keep.order = TRUE, order.by = "freq",
+                    main.bar.color = "#3498db", sets.bar.color = ml_venn_fill[seq_len(n_sets)],
+                    matrix.color = "#2ecc71", point.size = 3, line.size = 0.8,
+                    text.scale = c(1.3, 1.1, 1.1, 1, 1.3, 1.1), mb.ratio = c(0.6, 0.4),
+                    set_size.show = TRUE, set_size.scale_max = max(1, max_set_size * 1.1))
+    } else {
+      fill_colors <- ml_venn_fill[seq_len(n_sets)]
+      cat_names <- names(sets)
+      if (is.null(cat_names)) cat_names <- c("LASSO", "Elastic Net", "Ridge", "Random Forest", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost+SHAP")[seq_len(n_sets)]
+      grid::grid.newpage()
+      vp <- VennDiagram::venn.diagram(x = sets, category.names = cat_names, filename = NULL, output = TRUE,
+                                      disable.logging = TRUE, fill = fill_colors, alpha = 0.65, cex = 1,
+                                      main = "ML methods Venn", main.cex = 1.2)
+      grid::grid.draw(vp)
+    }
+  }
+
+  draw_rs_roc_plot <- function() {
+    if (is.null(rv$ml_common_genes) || length(rv$ml_common_genes) == 0 || is.null(rv$extracted_data_ml) || is.null(rv$wgcna_sample_info)) {
+      plot.new(); text(0.5, 0.5, "Run ML and ROC for AUC curves.", cex = 1, col = "gray40"); return()
+    }
+    expr_mat <- as.matrix(rv$extracted_data_ml); sample_info <- rv$wgcna_sample_info
+    common_samples <- intersect(rownames(expr_mat), rownames(sample_info))
+    if (length(common_samples) < 3) { plot.new(); text(0.5, 0.5, "Too few samples.", cex = 1); return() }
+    expr_mat <- expr_mat[common_samples, , drop = FALSE]; sample_info <- sample_info[common_samples, , drop = FALSE]
+    cond_col <- if ("Condition" %in% names(sample_info)) "Condition" else names(sample_info)[1]
+    y_binary <- as.integer(sample_info[[cond_col]] %in% c("Disease", "disease", "2"))
+    genes_avail <- intersect(rv$ml_common_genes, colnames(expr_mat))
+    if (length(genes_avail) == 0) { plot.new(); text(0.5, 0.5, "No common genes in data.", cex = 1); return() }
+    sig_expr <- rowMeans(expr_mat[, genes_avail, drop = FALSE])
+    roc_obj <- tryCatch(pROC::roc(y_binary, sig_expr, quiet = TRUE), error = function(e) NULL)
+    if (is.null(roc_obj)) { plot.new(); text(0.5, 0.5, "ROC failed.", cex = 1); return() }
+    plot(roc_obj, col = "#3498db", lwd = 2, main = "ROC (mean signature of common ML genes)", legacy.axes = TRUE)
+    abline(0, 1, lty = 2, col = "grey60")
+    text(0.6, 0.3, sprintf("AUC = %s", round(as.numeric(pROC::auc(roc_obj)), 3)), cex = 1.2, col = "#3498db", font = 2)
+  }
+
+  draw_rs_nomogram_plot <- function() {
+    if (!isTRUE(rv$nomogram_complete) || is.null(rv$nomogram_model) || is.null(rv$nomogram_train_data) || is.null(rv$nomogram_available_genes) || length(rv$nomogram_available_genes) == 0) {
+      plot.new(); text(0.5, 0.5, "Run Nomogram (Step 12) to see plot.", cex = 1, col = "gray40"); return()
+    }
+    genes <- rv$nomogram_available_genes
+    train_df <- rv$nomogram_train_data[, c(genes, "Outcome"), drop = FALSE]
+    dd <- rms::datadist(train_df)
+    options(datadist = "dd"); on.exit(options(datadist = NULL), add = TRUE)
+    np <- rms::nomogram(rv$nomogram_model, fun = plogis, fun.at = c(0.2, 0.5, 0.8), funlabel = "Risk", lp = FALSE)
+    plot(np); title(main = "Diagnostic Nomogram", cex.main = 1, font.main = 2)
+  }
+
+  draw_rs_gsea_plot <- function() {
+    by_gene <- rv$gsea_results_by_gene
+    if (is.null(by_gene) || length(by_gene) == 0) { plot.new(); text(0.5, 0.5, "Run GSEA (Step 12) to see enrichment plot.", cex = 1); return() }
+    result <- by_gene[[1]]
+    if (!inherits(result, c("gseaResult", "enrichResult"))) { plot.new(); text(0.5, 0.5, "No GSEA result for first gene.", cex = 1); return() }
+    df <- as.data.frame(result)
+    if (is.null(df) || nrow(df) == 0) { plot.new(); text(0.5, 0.5, "No pathways for first gene.", cex = 1); return() }
+    gene_name <- names(by_gene)[1]
+    top_id <- if ("p.adjust" %in% names(df)) df$ID[order(df$p.adjust)][1] else df$ID[1]
+    p <- enrichplot::gseaplot2(result, geneSetID = top_id, title = paste0("GSEA: ", gene_name))
+    if (inherits(p, "ggplot")) print(p) else if (inherits(p, "list")) do.call(gridExtra::grid.arrange, p) else grid::grid.draw(p)
+  }
+
+  add_rs_jpg_pdf("batch_before_after", draw_rs_batch_before_after, "ResultsSummary_Batch_Before_After", 9, 4.5)
+  add_rs_gg_jpg_pdf("volcano", draw_rs_volcano, "ResultsSummary_Volcano")
+  add_rs_jpg_pdf("de_heatmap", draw_rs_de_heatmap, "ResultsSummary_DE_Heatmap", 9, 6)
+  add_rs_jpg_pdf("soft_threshold", draw_rs_soft_threshold, "ResultsSummary_Soft_Threshold", 9, 4.5)
+  add_rs_jpg_pdf("sample_tree", draw_rs_sample_tree, "ResultsSummary_Sample_Tree", 8, 4.5)
+  add_rs_jpg_pdf("wgcna_dendro", draw_rs_wgcna_dendro, "ResultsSummary_WGCNA_Dendro", 9, 5)
+  add_rs_jpg_pdf("module_trait", draw_rs_module_trait, "ResultsSummary_Module_Trait", 8, 6)
+  add_rs_gg_jpg_pdf("go_plot", draw_rs_go_plot, "ResultsSummary_GO")
+  add_rs_gg_jpg_pdf("kegg_plot", draw_rs_kegg_plot, "ResultsSummary_KEGG")
+  add_rs_jpg_pdf("ppi_plot", draw_rs_ppi_plot, "ResultsSummary_PPI", 8, 5)
+  add_rs_jpg_pdf("ml_venn", draw_rs_ml_venn, "ResultsSummary_ML_Venn", 9, 5)
+  add_rs_jpg_pdf("roc_plot", draw_rs_roc_plot, "ResultsSummary_ROC", 7, 5)
+  add_rs_jpg_pdf("nomogram_plot", draw_rs_nomogram_plot, "ResultsSummary_Nomogram", 9, 5)
+  add_rs_jpg_pdf("gsea_plot", draw_rs_gsea_plot, "ResultsSummary_GSEA", 9, 5)
 }
 
