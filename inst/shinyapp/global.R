@@ -34,7 +34,9 @@ options(timeout = 3600)   # 1 hour — covers slow connections and large Bioc pa
 
 .gexpipe_rv <- paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
 
-.gexpipe_lib_base <- {
+# Character path only — kept in _path so sourcing utils_shiny_app.R cannot clobber it
+# (legacy versions assigned .gexpipe_lib_base as a function with the same name).
+.gexpipe_lib_base_path <- {
   sysname <- Sys.info()[["sysname"]]
   if (.Platform$OS.type == "windows") {
     la <- Sys.getenv("LOCALAPPDATA", unset = "")
@@ -48,8 +50,10 @@ options(timeout = 3600)   # 1 hour — covers slow connections and large Bioc pa
   }
 }
 
-.gexpipe_lib         <- file.path(.gexpipe_lib_base, "GExPipe", .gexpipe_rv)
-.gexpipe_pending_lib <- file.path(.gexpipe_lib_base, "GExPipe",
+.gexpipe_lib_base <- .gexpipe_lib_base_path
+
+.gexpipe_lib         <- file.path(.gexpipe_lib_base_path, "GExPipe", .gexpipe_rv)
+.gexpipe_pending_lib <- file.path(.gexpipe_lib_base_path, "GExPipe",
                                    paste0(.gexpipe_rv, "-pending"))
 dir.create(.gexpipe_lib, recursive = TRUE, showWarnings = FALSE)
 
@@ -182,7 +186,8 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
 # Load shared helpers early (native-package fix must run before package attach).
 for (.helper in list(
   c(file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"), file.path(getwd(), "R", "utils_shiny_app.R")),
-  c(file.path(getwd(), "..", "..", "R", "gexp_platform_helpers.R"), file.path(getwd(), "R", "gexp_platform_helpers.R"))
+  c(file.path(getwd(), "..", "..", "R", "gexp_platform_helpers.R"), file.path(getwd(), "R", "gexp_platform_helpers.R")),
+  c(file.path(getwd(), "..", "..", "R", "gexpipe_shiny_helpers.R"), file.path(getwd(), "R", "gexpipe_shiny_helpers.R"))
 )) {
   for (.rf in .helper) {
     if (file.exists(.rf)) {
@@ -191,6 +196,8 @@ for (.helper in list(
     }
   }
 }
+# Restore character path if a sourced helper overwrote .gexpipe_lib_base with a function.
+.gexpipe_lib_base <- .gexpipe_lib_base_path
 options(gexpipe.lib = .gexpipe_lib)
 
 # ==============================================================================
@@ -277,7 +284,7 @@ if (exists(".gexpipe_pkg_built_for_current_r", mode = "function")) {
     )
     if (nzchar(pkg_path) && dir.exists(pkg_path)) {
       isolated_root <- normalizePath(
-        file.path(.gexpipe_lib_base, "GExPipe"), winslash = "/", mustWork = FALSE
+        file.path(.gexpipe_lib_base_path, "GExPipe"), winslash = "/", mustWork = FALSE
       )
       if (!startsWith(
         normalizePath(pkg_path, winslash = "/", mustWork = FALSE),
@@ -739,7 +746,9 @@ tryCatch({
       "gexpipe_de_sample_info",
       "gexpipe_independent_filter",
       "gexpipe_wgcna_heatmap_cor",
-      ".gexpipe_call"
+      ".gexpipe_call",
+      "gexp_ui_plot_download_jpg_pdf", "gexp_ui_plot_download_bar",
+      "gexp_plot_device_open", "gexp_ggsave_from_file"
     )
     for (nm in to_pull) {
       if (exists(nm, envir = ns, inherits = FALSE))

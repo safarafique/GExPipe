@@ -43,10 +43,7 @@ ui_nomogram <- tabItem(
       title = tags$span(icon("chart-bar"), " Panel A: Nomogram"),
       width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       plotOutput("nomogram_plot_panel_a", height = "500px"),
-      tags$div(style = "margin-top: 8px;",
-        downloadButton("download_nomogram_panel_a", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_nomogram_panel_a_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_nomogram_panel_a_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))
+      gexp_ui_plot_download_bar("download_nomogram_panel_a", "download_nomogram_panel_a_jpg", "download_nomogram_panel_a_pdf", "btn-success btn-sm")
     )
   ),
 
@@ -55,6 +52,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel B: Training ROC",
         width = NULL, status = "danger", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_roc_train_png", "download_nomogram_roc_train_jpg", "download_nomogram_roc_train_pdf", "btn-danger btn-sm"),
         plotOutput("nomogram_plot_roc_train", height = "360px")
       )
     ),
@@ -62,6 +60,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel B: Validation ROC",
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_roc_val_png", "download_nomogram_roc_val_jpg", "download_nomogram_roc_val_pdf", "btn-primary btn-sm"),
         plotOutput("nomogram_plot_roc_val", height = "360px")
       )
     )
@@ -72,6 +71,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel C: Training Calibration",
         width = NULL, status = "warning", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_cal_train_png", "download_nomogram_cal_train_jpg", "download_nomogram_cal_train_pdf", "btn-warning btn-sm"),
         plotOutput("nomogram_plot_cal_train", height = "320px")
       )
     ),
@@ -79,6 +79,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel C: Validation Calibration",
         width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_cal_val_png", "download_nomogram_cal_val_jpg", "download_nomogram_cal_val_pdf", "btn-info btn-sm"),
         plotOutput("nomogram_plot_cal_val", height = "320px")
       )
     )
@@ -89,6 +90,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel D: Training DCA",
         width = NULL, status = "warning", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_dca_train_png", "download_nomogram_dca_train_jpg", "download_nomogram_dca_train_pdf", "btn-warning btn-sm"),
         plotOutput("nomogram_plot_dca_train", height = "320px")
       )
     ),
@@ -96,6 +98,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel D: Validation DCA",
         width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_dca_val_png", "download_nomogram_dca_val_jpg", "download_nomogram_dca_val_pdf", "btn-info btn-sm"),
         plotOutput("nomogram_plot_dca_val", height = "320px")
       )
     )
@@ -106,6 +109,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel E: Training Clinical Impact",
         width = NULL, status = "warning", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_impact_train_png", "download_nomogram_impact_train_jpg", "download_nomogram_impact_train_pdf", "btn-warning btn-sm"),
         plotOutput("nomogram_plot_impact_train", height = "320px")
       )
     ),
@@ -113,6 +117,7 @@ ui_nomogram <- tabItem(
       box(
         title = "Panel E: Validation Clinical Impact",
         width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE,
+        gexp_ui_plot_download_bar("download_nomogram_impact_val_png", "download_nomogram_impact_val_jpg", "download_nomogram_impact_val_pdf", "btn-info btn-sm"),
         plotOutput("nomogram_plot_impact_val", height = "320px")
       )
     )

@@ -81,6 +81,52 @@ safe_run <- function(expr, step_name = "this step", session = NULL) {
 # Image export: all downloaded plot images use this DPI (publication quality)
 IMAGE_DPI <- 300L
 
+# Reusable Shiny UI download button groups for plot exports (PNG/JPG/PDF).
+gexp_ui_plot_download_jpg_pdf <- function(jpg_id, pdf_id, btn_class = "btn-success btn-sm") {
+  shiny::tags$div(
+    class = "gexp-plot-download-bar",
+    style = "margin-top: 8px;",
+    shiny::downloadButton(jpg_id, shiny::tagList(shiny::icon("download"), " JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+    shiny::downloadButton(pdf_id, shiny::tagList(shiny::icon("download"), " PDF"), class = btn_class)
+  )
+}
+
+gexp_ui_plot_download_bar <- function(png_id, jpg_id, pdf_id, btn_class = "btn-success btn-sm") {
+  shiny::tags$div(
+    class = "gexp-plot-download-bar",
+    style = "margin-top: 8px;",
+    shiny::downloadButton(png_id, shiny::tagList(shiny::icon("download"), " PNG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+    shiny::downloadButton(jpg_id, shiny::tagList(shiny::icon("download"), " JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+    shiny::downloadButton(pdf_id, shiny::tagList(shiny::icon("download"), " PDF"), class = btn_class)
+  )
+}
+
+# Open a graphics device for plot export (png/jpg/pdf inferred from file extension).
+gexp_plot_device_open <- function(file, width, height, bg = "white", type = NULL) {
+  if (is.null(type)) {
+    ext <- tolower(sub(".*\\.", "", basename(file)))
+    type <- if (ext %in% c("jpg", "jpeg")) "jpg" else ext
+  }
+  type <- match.arg(type, c("png", "jpg", "pdf"))
+  if (type == "png") {
+    png(file, width = width * IMAGE_DPI, height = height * IMAGE_DPI, res = IMAGE_DPI, bg = bg)
+  } else if (type == "jpg") {
+    jpeg(file, width = width, height = height, res = IMAGE_DPI, units = "in", bg = bg, quality = 95)
+  } else {
+    pdf(file, width = width, height = height, bg = bg)
+  }
+  invisible(NULL)
+}
+
+# Save a ggplot object using file extension to pick device.
+gexp_ggsave_from_file <- function(file, plot, width, height, dpi = IMAGE_DPI) {
+  if (is.null(plot)) return(invisible(NULL))
+  ext <- tolower(sub(".*\\.", "", basename(file)))
+  device <- if (ext %in% c("jpg", "jpeg")) "jpeg" else if (ext == "pdf") "pdf" else "png"
+  ggplot2::ggsave(file, plot = plot, width = width, height = height, dpi = dpi, units = "in", bg = "white", device = device)
+  invisible(NULL)
+}
+
 # CSV export directory: all CSV downloads are also written here (app working directory)
 CSV_EXPORT_DIR <- function() {
   d <- file.path(getwd(), "csv_exports")

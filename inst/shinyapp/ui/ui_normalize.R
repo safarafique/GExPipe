@@ -178,9 +178,8 @@ ui_normalize <- tabItem(
         title = tags$span(icon("chart-bar"), " Expression Distribution by Dataset"), 
         width = 12, status = "info", solidHeader = TRUE,
         plotOutput("normalization_plot", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_plot_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_plot_png", "dl_norm_plot_jpg", "dl_norm_plot_pdf", "btn-default btn-xs"))
       )
     ),
     
@@ -189,17 +188,15 @@ ui_normalize <- tabItem(
         title = tags$span(icon("wave-square"), " Overall Expression Distribution"), 
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("normalization_density", height = "350px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_density_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_density_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_density_png", "dl_norm_density_jpg", "dl_norm_density_pdf", "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("chart-line"), " Quantile-Quantile (Q-Q) Plot"), 
         width = 6, status = "warning", solidHeader = TRUE,
         plotOutput("normalization_qq", height = "350px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_qq_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_qq_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_qq_png", "dl_norm_qq_jpg", "dl_norm_qq_pdf", "btn-default btn-xs"))
       )
     ),
     
@@ -208,17 +205,15 @@ ui_normalize <- tabItem(
         title = tags$span(icon("chart-bar"), " Median & Range Alignment"), 
         width = 6, status = "info", solidHeader = TRUE,
         plotOutput("normalization_median_range", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_median_range_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_median_range_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_median_range_png", "dl_norm_median_range_jpg", "dl_norm_median_range_pdf", "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("wave-square"), " Distribution Overlap"), 
         width = 6, status = "primary", solidHeader = TRUE,
         plotOutput("normalization_distribution_overlap", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_dist_overlap_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_dist_overlap_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_dist_overlap_png", "dl_norm_dist_overlap_jpg", "dl_norm_dist_overlap_pdf", "btn-default btn-xs"))
       )
     ),
     
@@ -227,17 +222,15 @@ ui_normalize <- tabItem(
         title = tags$span(icon("chart-area"), " Intensity Bias - MA Plot"), 
         width = 6, status = "warning", solidHeader = TRUE,
         plotOutput("normalization_ma_plot", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_ma_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_ma_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_ma_png", "dl_norm_ma_jpg", "dl_norm_ma_pdf", "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("dot-circle"), " Variance Stability - Mean-Variance Plot"), 
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("normalization_mean_variance", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_mv_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_mv_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_mv_png", "dl_norm_mv_jpg", "dl_norm_mv_pdf", "btn-default btn-xs"))
       )
     ),
     
@@ -246,17 +239,15 @@ ui_normalize <- tabItem(
         title = tags$span(icon("th"), " Sample Correlation - Before Normalization"), 
         width = 6, status = "danger", solidHeader = TRUE,
         plotOutput("normalization_corr_before", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_corr_before_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_corr_before_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_corr_before_png", "dl_norm_corr_before_jpg", "dl_norm_corr_before_pdf", "btn-default btn-xs"))
       ),
       box(
         title = tags$span(icon("th"), " Sample Correlation - After Normalization"), 
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("normalization_corr_after", height = "400px"),
-        tags$div(style = "margin-top: 6px;",
-          downloadButton("dl_norm_corr_after_png", tagList(icon("download"), " PNG"), class = "btn-default btn-xs", style = "margin-right: 4px;"),
-          downloadButton("dl_norm_corr_after_pdf", tagList(icon("download"), " PDF"), class = "btn-default btn-xs"))
+          tags$div(style = "margin-top: 6px;",
+            gexp_ui_plot_download_bar("dl_norm_corr_after_png", "dl_norm_corr_after_jpg", "dl_norm_corr_after_pdf", "btn-default btn-xs"))
       )
     ),
     

@@ -95,9 +95,7 @@ ui_ml <- tabItem(
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         uiOutput("ml_venn_message"),
         plotOutput("ml_venn_plot", height = "380px"),
-        tags$div(style = "margin-top: 8px;",
-        downloadButton("download_ml_venn", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_ml_venn_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-sm"))
+        gexp_ui_plot_download_bar("download_ml_venn", "download_ml_venn_jpg", "download_ml_venn_pdf", "btn-primary btn-sm")
       )
     ),
     column(6,
@@ -125,10 +123,12 @@ ui_ml <- tabItem(
       fluidRow(
         column(6,
           tags$p(tags$strong("Gene–gene Spearman correlation heatmap"), style = "margin-bottom: 6px;"),
+          gexp_ui_plot_download_bar("download_ml_biomarker_cor_heatmap_png", "download_ml_biomarker_cor_heatmap_jpg", "download_ml_biomarker_cor_heatmap_pdf", "btn-danger btn-sm"),
           plotOutput("ml_biomarker_cor_heatmap", height = "380px")
         ),
         column(6,
           tags$p(tags$strong("Co-expression network (|Spearman| \u2265 0.7)"), style = "margin-bottom: 6px;"),
+          gexp_ui_plot_download_bar("download_ml_biomarker_coexp_network_png", "download_ml_biomarker_coexp_network_jpg", "download_ml_biomarker_coexp_network_pdf", "btn-danger btn-sm"),
           plotOutput("ml_biomarker_coexp_network", height = "380px")
         )
       )

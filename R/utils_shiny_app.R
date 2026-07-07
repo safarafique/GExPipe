@@ -79,7 +79,8 @@
   paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
 
 ## OS-aware base directory (never inside a cloud-sync folder).
-.gexpipe_lib_base <- function() {
+## Named _dir() to avoid clobbering the character path set in inst/shinyapp/global.R.
+.gexpipe_lib_base_dir <- function() {
   sysname <- Sys.info()[["sysname"]]
   if (.Platform$OS.type == "windows") {
     la <- Sys.getenv("LOCALAPPDATA", unset = "")
@@ -97,7 +98,7 @@
 ## Main library (parent session loads from here).
 .gexpipe_get_lib <- function() {
   rv   <- .gexpipe_rv_str()
-  base <- .gexpipe_lib_base()
+  base <- .gexpipe_lib_base_dir()
   d    <- file.path(base, "GExPipe", rv)
   dir.create(d, recursive = TRUE, showWarnings = FALSE)
   old_d <- file.path(path.expand("~"), ".gexpipe_packages", rv)
@@ -109,7 +110,7 @@
 ## Pending library (subprocess writes here; promoted -> main on next startup).
 .gexpipe_get_pending_lib <- function() {
   rv   <- .gexpipe_rv_str()
-  base <- .gexpipe_lib_base()
+  base <- .gexpipe_lib_base_dir()
   file.path(base, "GExPipe", paste0(rv, "-pending"))
 }
 
@@ -128,7 +129,7 @@
   if (!nzchar(pkg_path) || !dir.exists(pkg_path)) return(TRUE)
 
   isolated_root <- normalizePath(
-    file.path(.gexpipe_lib_base(), "GExPipe"),
+    file.path(.gexpipe_lib_base_dir(), "GExPipe"),
     winslash = "/", mustWork = FALSE
   )
   pkg_norm <- normalizePath(pkg_path, winslash = "/", mustWork = FALSE)
