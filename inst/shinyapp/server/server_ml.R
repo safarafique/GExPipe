@@ -379,10 +379,12 @@ server_ml <- function(input, output, session, rv) {
           prog <- prog + step_inc
         }
 
-        # Common genes = intersection of selected methods' gene lists
-        common_all <- if (length(gene_lists) == 0) character(0) else Reduce(intersect, gene_lists)
+        # Common genes = intersection of all selected methods (0 when no overlap)
+        venn_sets <- gexp_ml_venn_sets_for_selected(gene_lists, methods_sel)
+        common_all <- if (length(venn_sets) == 0) character(0) else Reduce(intersect, venn_sets)
         rv$ml_common_genes <- common_all
-        rv$ml_venn_sets <- gene_lists
+        rv$ml_venn_sets <- venn_sets
+        rv$ml_methods_selected <- methods_sel
         rv$ml_methods_run <- method_names
         # Keep per-method top genes for combined list / display
         rv$ml_lasso_genes <- if (!is.null(rv$ml_lasso_df)) rv$ml_lasso_df$Gene else character(0)
@@ -960,330 +962,82 @@ server_ml <- function(input, output, session, rv) {
     sets <- rv$ml_venn_sets
     if (is.null(sets)) return(NULL)
     n_sets <- length(sets)
+    n_common <- gexp_ml_common_gene_count(sets)
     if (n_sets == 1) {
       return(tags$p(icon("info-circle"), " Venn/UpSet needs 2 or more methods. You ran 1 method; Final List shows that method's genes.", style = "margin-bottom: 10px; font-size: 12px; color: #555;"))
     }
-    if (n_sets > 5) {
-      return(tags$p(icon("info-circle"), " Showing UpSet plot for all ", n_sets, " selected methods (Venn supports up to 5 sets).", style = "margin-bottom: 10px; font-size: 12px; color: #555;"))
+    set_sizes <- vapply(sets, length, integer(1))
+    use_upset <- n_sets > 5 || any(set_sizes == 0L)
+    msg <- if (use_upset) {
+      sprintf(" UpSet plot for all %d selected methods (includes zero-gene methods).", n_sets)
+    } else {
+      sprintf(" Venn diagram for all %d selected methods.", n_sets)
     }
-    NULL
+    common_style <- if (n_common == 0L) "color: #C0392B; font-weight: 600;" else "color: #1B5E20; font-weight: 600;"
+    tags$div(
+      tags$p(icon("info-circle"), msg, style = "margin-bottom: 4px; font-size: 12px; color: #555;"),
+      tags$p(
+        icon(if (n_common == 0L) "times-circle" else "check-circle"),
+        sprintf(" Common to all selected methods: %d", n_common),
+        style = paste0("margin-bottom: 10px; font-size: 12px;", common_style)
+      )
+    )
   })
 
-  # Bright colors for Venn (up to 8 methods)
-  ml_venn_fill <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#009688", "#795548", "#607D8B")
-  ml_venn_cats <- c("LASSO", "Elastic Net", "Ridge", "Random Forest", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost+SHAP")
+  .ml_venn_uses_upset <- function(sets) {
+    if (is.null(sets) || length(sets) < 2L) return(FALSE)
+    set_sizes <- vapply(sets, length, integer(1))
+    length(sets) > 5L || any(set_sizes == 0L) || sum(set_sizes > 0L) < 2L
+  }
+
+  .ml_venn_plot_to_file <- function(file, sets) {
+    ext <- tolower(sub(".*\\.", "", basename(file)))
+    if (ext == "pdf") {
+      gexp_plot_device_open(file, width = 10, height = if (.ml_venn_uses_upset(sets)) 6.8 else 8.5, type = "pdf")
+    } else if (ext %in% c("jpg", "jpeg")) {
+      gexp_plot_device_open(file, width = 10, height = if (.ml_venn_uses_upset(sets)) 6.8 else 8.5, type = "jpg")
+    } else {
+      gexp_plot_device_open(file, width = 10, height = if (.ml_venn_uses_upset(sets)) 6.8 else 8.5, type = "png")
+    }
+    on.exit(grDevices::dev.off(), add = TRUE)
+    gexp_draw_ml_methods_venn(sets, text_scale = 1.05)
+  }
 
   output$ml_venn_plot <- renderPlot({
     req(rv$ml_venn_sets)
-    sets <- rv$ml_venn_sets
-    n_sets <- length(sets)
-    if (n_sets < 2) return()
-    if (n_sets > 5) {
-      # UpSet plot for 6+ methods (shows all selected methods)
-      all_genes <- unique(unlist(sets, use.names = FALSE))
-      if (length(all_genes) == 0) return()
-      upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
-      rownames(upset_matrix) <- all_genes
-      colnames(upset_matrix) <- names(sets)
-      for (i in seq_len(n_sets)) {
-        g <- sets[[i]]
-        upset_matrix[intersect(all_genes, g), i] <- 1L
-      }
-      upset_df <- as.data.frame(upset_matrix)
-      max_set_size <- max(sapply(sets, length))
-      tryCatch({
-        UpSetR::upset(upset_df,
-                      sets = colnames(upset_df),
-                      keep.order = TRUE,
-                      order.by = "freq",
-                      main.bar.color = "#3498db",
-                      sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                      matrix.color = "#2ecc71",
-                      point.size = 3.5,
-                      line.size = 1,
-                      text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
-                      mb.ratio = c(0.6, 0.4),
-                      set_size.show = TRUE,
-                      set_size.scale_max = max(1, max_set_size * 1.1),
-                      mainbar.y.label = "Gene set intersections",
-                      sets.x.label = "Genes per method")
-      }, error = function(e) {
-        plot.new()
-        text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
-      })
-      return(invisible(NULL))
-    }
-    grid::grid.newpage()
-    fill_colors <- if (n_sets <= 8) ml_venn_fill[seq_len(n_sets)] else rep(ml_venn_fill, length.out = n_sets)
-    cat_names <- names(sets)
-    if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
-    vp <- VennDiagram::venn.diagram(
-      x = sets,
-      category.names = cat_names,
-      filename = NULL,
-      output = TRUE,
-      disable.logging = TRUE,
-      imagetype = "png",
-      height = 2200,
-      width = 2200,
-      resolution = 200,
-      compression = "lzw",
-      lwd = 2.5,
-      lty = "blank",
-      fill = fill_colors,
-      alpha = 0.65,
-      cex = 1.4,
-      fontface = "bold",
-      cat.cex = 1.3,
-      cat.fontface = "bold",
-      cat.col = fill_colors,
-      margin = 0.08,
-      main = "Common Genes Across ML Methods",
-      main.cex = 1.4,
-      main.fontface = "bold"
-    )
-    grid::grid.draw(vp)
-  }, height = 500)
+    gexp_draw_ml_methods_venn(rv$ml_venn_sets, text_scale = 0.95)
+  }, height = 520)
+
   output$download_ml_venn <- downloadHandler(
     filename = function() {
       sets <- rv$ml_venn_sets
-      n <- if (is.null(sets)) 0 else length(sets)
-      if (n > 5) "upset_plot_ML_methods.png" else "venn_diagram_ML_methods.png"
+      if (.ml_venn_uses_upset(sets)) "upset_plot_ML_methods.png" else "venn_diagram_ML_methods.png"
     },
     content = function(file) {
       req(rv$ml_venn_sets)
-      sets <- rv$ml_venn_sets
-      n_sets <- length(sets)
-      if (n_sets < 2) return()
-      if (n_sets > 5) {
-        all_genes <- unique(unlist(sets, use.names = FALSE))
-        if (length(all_genes) == 0) return()
-        upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
-        rownames(upset_matrix) <- all_genes
-        colnames(upset_matrix) <- names(sets)
-        for (i in seq_len(n_sets)) {
-          g <- sets[[i]]
-          upset_matrix[intersect(all_genes, g), i] <- 1L
-        }
-        upset_df <- as.data.frame(upset_matrix)
-        max_set_size <- max(sapply(sets, length))
-        png(file, width = 10 * IMAGE_DPI, height = 6.67 * IMAGE_DPI, res = IMAGE_DPI)
-        tryCatch({
-          UpSetR::upset(upset_df,
-                        sets = colnames(upset_df),
-                        keep.order = TRUE,
-                        order.by = "freq",
-                        main.bar.color = "#3498db",
-                        sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                        matrix.color = "#2ecc71",
-                        point.size = 3.5,
-                        line.size = 1,
-                        text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
-                        mb.ratio = c(0.6, 0.4),
-                        set_size.show = TRUE,
-                        set_size.scale_max = max(1, max_set_size * 1.1),
-                        mainbar.y.label = "Gene set intersections",
-                        sets.x.label = "Genes per method")
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
-        })
-        dev.off()
-        return()
-      }
-      fill_colors <- if (n_sets <= 8) ml_venn_fill[seq_len(n_sets)] else rep(ml_venn_fill, length.out = n_sets)
-      cat_names <- names(sets)
-      if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
-      png(file, width = 8 * IMAGE_DPI, height = 8 * IMAGE_DPI, res = IMAGE_DPI)
-      grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(
-        x = sets,
-        category.names = cat_names,
-        filename = NULL,
-        output = TRUE,
-        disable.logging = TRUE,
-        imagetype = "png",
-        height = 8 * IMAGE_DPI,
-        width = 8 * IMAGE_DPI,
-        resolution = IMAGE_DPI,
-        compression = "lzw",
-        lwd = 2.5,
-        lty = "blank",
-        fill = fill_colors,
-        alpha = 0.65,
-        cex = 1.4,
-        fontface = "bold",
-        cat.cex = 1.3,
-        cat.fontface = "bold",
-        cat.col = fill_colors,
-        margin = 0.08,
-        main = "Common Genes Across ML Methods",
-        main.cex = 1.4,
-        main.fontface = "bold"
-      )
-      grid::grid.draw(vp)
-      dev.off()
+      .ml_venn_plot_to_file(file, rv$ml_venn_sets)
     }
   )
 
   output$download_ml_venn_jpg <- downloadHandler(
     filename = function() {
       sets <- rv$ml_venn_sets
-      n <- if (is.null(sets)) 0 else length(sets)
-      if (n > 5) "upset_plot_ML_methods.jpg" else "venn_diagram_ML_methods.jpg"
+      if (.ml_venn_uses_upset(sets)) "upset_plot_ML_methods.jpg" else "venn_diagram_ML_methods.jpg"
     },
     content = function(file) {
       req(rv$ml_venn_sets)
-      sets <- rv$ml_venn_sets
-      n_sets <- length(sets)
-      if (n_sets < 2) return()
-      if (n_sets > 5) {
-        all_genes <- unique(unlist(sets, use.names = FALSE))
-        if (length(all_genes) == 0) return()
-        upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
-        rownames(upset_matrix) <- all_genes
-        colnames(upset_matrix) <- names(sets)
-        for (i in seq_len(n_sets)) {
-          g <- sets[[i]]
-          upset_matrix[intersect(all_genes, g), i] <- 1L
-        }
-        upset_df <- as.data.frame(upset_matrix)
-        max_set_size <- max(sapply(sets, length))
-        jpeg(file, width = 10, height = 6.67, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
-        tryCatch({
-          UpSetR::upset(upset_df,
-                        sets = colnames(upset_df),
-                        keep.order = TRUE,
-                        order.by = "freq",
-                        main.bar.color = "#3498db",
-                        sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                        matrix.color = "#2ecc71",
-                        point.size = 3.5,
-                        line.size = 1,
-                        text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
-                        mb.ratio = c(0.6, 0.4),
-                        set_size.show = TRUE,
-                        set_size.scale_max = max(1, max_set_size * 1.1),
-                        mainbar.y.label = "Gene set intersections",
-                        sets.x.label = "Genes per method")
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
-        })
-        dev.off()
-        return()
-      }
-      fill_colors <- if (n_sets <= 8) ml_venn_fill[seq_len(n_sets)] else rep(ml_venn_fill, length.out = n_sets)
-      cat_names <- names(sets)
-      if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
-      jpeg(file, width = 8, height = 8, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
-      grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(
-        x = sets,
-        category.names = cat_names,
-        filename = NULL,
-        output = TRUE,
-        disable.logging = TRUE,
-        imagetype = "png",
-        height = 8 * IMAGE_DPI,
-        width = 8 * IMAGE_DPI,
-        resolution = IMAGE_DPI,
-        compression = "lzw",
-        lwd = 2.5,
-        lty = "blank",
-        fill = fill_colors,
-        alpha = 0.65,
-        cex = 1.4,
-        fontface = "bold",
-        cat.cex = 1.3,
-        cat.fontface = "bold",
-        cat.col = fill_colors,
-        margin = 0.08,
-        main = "Common Genes Across ML Methods",
-        main.cex = 1.4,
-        main.fontface = "bold"
-      )
-      grid::grid.draw(vp)
-      dev.off()
+      .ml_venn_plot_to_file(file, rv$ml_venn_sets)
     }
   )
 
   output$download_ml_venn_pdf <- downloadHandler(
     filename = function() {
       sets <- rv$ml_venn_sets
-      n <- if (is.null(sets)) 0 else length(sets)
-      if (n > 5) "upset_plot_ML_methods.pdf" else "venn_diagram_ML_methods.pdf"
+      if (.ml_venn_uses_upset(sets)) "upset_plot_ML_methods.pdf" else "venn_diagram_ML_methods.pdf"
     },
     content = function(file) {
       req(rv$ml_venn_sets)
-      sets <- rv$ml_venn_sets
-      n_sets <- length(sets)
-      if (n_sets < 2) return()
-      if (n_sets > 5) {
-        all_genes <- unique(unlist(sets, use.names = FALSE))
-        if (length(all_genes) == 0) return()
-        upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
-        rownames(upset_matrix) <- all_genes
-        colnames(upset_matrix) <- names(sets)
-        for (i in seq_len(n_sets)) {
-          g <- sets[[i]]
-          upset_matrix[intersect(all_genes, g), i] <- 1L
-        }
-        upset_df <- as.data.frame(upset_matrix)
-        max_set_size <- max(sapply(sets, length))
-        pdf(file, width = 10, height = 6.67)
-        tryCatch({
-          UpSetR::upset(upset_df,
-                        sets = colnames(upset_df),
-                        keep.order = TRUE,
-                        order.by = "freq",
-                        main.bar.color = "#3498db",
-                        sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                        matrix.color = "#2ecc71",
-                        point.size = 3.5,
-                        line.size = 1,
-                        text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
-                        mb.ratio = c(0.6, 0.4),
-                        set_size.show = TRUE,
-                        set_size.scale_max = max(1, max_set_size * 1.1),
-                        mainbar.y.label = "Gene set intersections",
-                        sets.x.label = "Genes per method")
-        }, error = function(e) {
-          plot.new()
-          text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
-        })
-        dev.off()
-        return()
-      }
-      fill_colors <- if (n_sets <= 8) ml_venn_fill[seq_len(n_sets)] else rep(ml_venn_fill, length.out = n_sets)
-      cat_names <- names(sets)
-      if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
-      pdf(file, width = 8, height = 8)
-      grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(
-        x = sets,
-        category.names = cat_names,
-        filename = NULL,
-        output = TRUE,
-        disable.logging = TRUE,
-        imagetype = "png",
-        height = 8,
-        width = 8,
-        resolution = 72,
-        fill = fill_colors,
-        alpha = 0.65,
-        cex = 1.4,
-        fontface = "bold",
-        cat.cex = 1.3,
-        cat.fontface = "bold",
-        cat.col = fill_colors,
-        margin = 0.08,
-        main = "Common Genes Across ML Methods",
-        main.cex = 1.4,
-        main.fontface = "bold"
-      )
-      grid::grid.draw(vp)
-      dev.off()
+      .ml_venn_plot_to_file(file, rv$ml_venn_sets)
     }
   )
 }

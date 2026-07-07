@@ -447,38 +447,8 @@ server_results_summary <- function(input, output, session, rv) {
       text(0.5, 0.5, "Run ML (Step 10) with 2+ methods to see Venn/UpSet here.", cex = 1, col = "gray40")
       return(invisible())
     }
-    sets <- rv$ml_venn_sets
-    n_sets <- length(sets)
-    ml_venn_fill <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#009688", "#795548", "#607D8B")
-    if (n_sets > 5) {
-      all_genes <- unique(unlist(sets, use.names = FALSE))
-      if (length(all_genes) == 0) { plot.new(); text(0.5, 0.5, "No genes", cex = 1, col = "gray40"); return(invisible()) }
-      upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
-      rownames(upset_matrix) <- all_genes
-      colnames(upset_matrix) <- names(sets)
-      for (i in seq_len(n_sets)) {
-        g <- sets[[i]]
-        upset_matrix[intersect(all_genes, g), i] <- 1L
-      }
-      upset_df <- as.data.frame(upset_matrix)
-      max_set_size <- max(sapply(sets, length))
-      tryCatch({
-        UpSetR::upset(upset_df, sets = colnames(upset_df), keep.order = TRUE, order.by = "freq",
-                      main.bar.color = "#3498db", sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                      matrix.color = "#2ecc71", point.size = 3, line.size = 0.8,
-                      text.scale = c(1.3, 1.1, 1.1, 1, 1.3, 1.1), mb.ratio = c(0.6, 0.4),
-                      set_size.show = TRUE, set_size.scale_max = max(1, max_set_size * 1.1))
-      }, error = function(e) { plot.new(); text(0.5, 0.5, "UpSet error", cex = 1, col = "red") })
-    } else {
-      fill_colors <- ml_venn_fill[seq_len(n_sets)]
-      cat_names <- names(sets)
-      if (is.null(cat_names)) cat_names <- c("LASSO", "Elastic Net", "Ridge", "Random Forest", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost+SHAP")[seq_len(n_sets)]
-      grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(x = sets, category.names = cat_names, filename = NULL, output = TRUE,
-                                      disable.logging = TRUE, fill = fill_colors, alpha = 0.65, cex = 1, main = "ML methods Venn", main.cex = 1.2)
-      grid::grid.draw(vp)
-    }
-  }, height = 260)
+    gexp_draw_ml_methods_venn(rv$ml_venn_sets, title = "ML Methods Overlap", text_scale = 0.85)
+  }, height = 280)
 
   # ----- 9. GSEA -----
   output$results_summary_gsea <- renderUI({
@@ -764,32 +734,12 @@ server_results_summary <- function(input, output, session, rv) {
   }
 
   draw_rs_ml_venn <- function() {
-    if (is.null(rv$ml_venn_sets) || length(rv$ml_venn_sets) < 2) { plot.new(); text(0.5, 0.5, "Run ML (Step 10) with 2+ methods.", cex = 1, col = "gray40"); return() }
-    sets <- rv$ml_venn_sets; n_sets <- length(sets)
-    ml_venn_fill <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#009688", "#795548", "#607D8B")
-    if (n_sets > 5) {
-      all_genes <- unique(unlist(sets, use.names = FALSE))
-      if (length(all_genes) == 0) { plot.new(); text(0.5, 0.5, "No genes", cex = 1); return() }
-      upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
-      rownames(upset_matrix) <- all_genes; colnames(upset_matrix) <- names(sets)
-      for (i in seq_len(n_sets)) upset_matrix[intersect(all_genes, sets[[i]]), i] <- 1L
-      upset_df <- as.data.frame(upset_matrix)
-      max_set_size <- max(sapply(sets, length))
-      UpSetR::upset(upset_df, sets = colnames(upset_df), keep.order = TRUE, order.by = "freq",
-                    main.bar.color = "#3498db", sets.bar.color = ml_venn_fill[seq_len(n_sets)],
-                    matrix.color = "#2ecc71", point.size = 3, line.size = 0.8,
-                    text.scale = c(1.3, 1.1, 1.1, 1, 1.3, 1.1), mb.ratio = c(0.6, 0.4),
-                    set_size.show = TRUE, set_size.scale_max = max(1, max_set_size * 1.1))
-    } else {
-      fill_colors <- ml_venn_fill[seq_len(n_sets)]
-      cat_names <- names(sets)
-      if (is.null(cat_names)) cat_names <- c("LASSO", "Elastic Net", "Ridge", "Random Forest", "SVM-RFE", "Boruta", "sPLS-DA", "XGBoost+SHAP")[seq_len(n_sets)]
-      grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(x = sets, category.names = cat_names, filename = NULL, output = TRUE,
-                                      disable.logging = TRUE, fill = fill_colors, alpha = 0.65, cex = 1,
-                                      main = "ML methods Venn", main.cex = 1.2)
-      grid::grid.draw(vp)
+    if (is.null(rv$ml_venn_sets) || length(rv$ml_venn_sets) < 2) {
+      plot.new()
+      text(0.5, 0.5, "Run ML (Step 10) with 2+ methods.", cex = 1, col = "gray40")
+      return(invisible())
     }
+    gexp_draw_ml_methods_venn(rv$ml_venn_sets, title = "ML Methods Overlap", text_scale = 0.95)
   }
 
   draw_rs_roc_plot <- function() {
