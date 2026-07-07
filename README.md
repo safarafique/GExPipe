@@ -137,29 +137,18 @@ Open port **3838** via Colab’s port-forwarding panel, or run a tunnel (`ngrok 
 
 ## Package versions
 
-Runtime dependencies are declared in **`DESCRIPTION`** (`Imports`, minimum versions). The app also installs **affy** and **oligo** for microarray CEL RMA (see `DESCRIPTION`).
+Runtime dependencies are declared in **`DESCRIPTION`** (`Imports` / `Suggests`, with minimum versions where specified). The app also uses **affy** and **oligo** for microarray CEL RMA when supplementary CEL files are available.
 
-Shipped reference files:
-
-| File | Contents |
-|------|----------|
-| **`inst/pkg_versions.txt`** | Tab-separated **minimum** versions (`package`, `min_version`) — mirrors `DESCRIPTION` |
-| **`inst/PACKAGE_VERSIONS.md`** | Human-readable summary and R/Bioconductor notes |
-
-After install, list **your** installed versions (GExPipe library on Windows: `%LOCALAPPDATA%\GExPipe\<R-major.minor>\`):
+To list installed versions for packages declared in `DESCRIPTION`:
 
 ```r
-read.delim(system.file("pkg_versions.txt", package = "GExPipe"))
-# Installed versions on this machine:
-pkgs <- sub("\\s*\\(.*", "", strsplit(read.dcf(system.file("DESCRIPTION", package = "GExPipe"))[1, "Imports"], ",\\s*")[[1]])
+desc <- read.dcf(system.file("DESCRIPTION", package = "GExPipe"))
+pkgs <- sub("\\s*\\(.*", "", strsplit(desc[1, "Imports"], ",\\s*")[[1]])
 pkgs <- pkgs[pkgs != "parallel"]
-lib <- file.path(Sys.getenv("LOCALAPPDATA"), "GExPipe", paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor)))
-sapply(pkgs, function(p) as.character(packageVersion(p, lib.loc = lib)))
+sapply(pkgs, function(p) as.character(packageVersion(p)))
 ```
 
-From a package checkout, `Rscript inst/scripts/check_pkg_alignment.R` verifies that `DESCRIPTION`, `pkg_versions.txt`, and the install lists in `R/utils_shiny_app.R` / `inst/shinyapp/global.R` match.
-
-Use `sessionInfo()` and the tables above when reporting issues.
+Use `sessionInfo()` when reporting issues.
 
 ---
 

@@ -1369,7 +1369,7 @@ download_ncbi_raw_counts_best <- function(gse_id, dest_dir) {
     if (file.exists(dest_file) && file.info(dest_file)$size > 1000) {
       n <- tryCatch(
         {
-          df <- suppressWarnings(data.table::fread(dest_file, data.table = FALSE, nrows = 500000L))
+          df <- .gexpipe_fread_counts(dest_file, nrows = 500000L)
           nrow(df)
         },
         error = function(e) 0L
@@ -1383,10 +1383,45 @@ download_ncbi_raw_counts_best <- function(gse_id, dest_dir) {
   best_path
 }
 
+#' Capture verbose GEOquery console output without suppressMessages()
+#' @keywords internal
+.gexpipe_geo_quiet <- function(expr) {
+  res <- NULL
+  err <- NULL
+  tryCatch(
+    {
+      invisible(utils::capture.output(
+        res <- force(expr),
+        file = nullfile()
+      ))
+    },
+    error = function(e) {
+      err <<- e
+    }
+  )
+  if (!is.null(err)) {
+    stop(err)
+  }
+  res
+}
+
+#' Read tabular count files (GEO supplementary files are often messy)
+#' @keywords internal
+.gexpipe_fread_counts <- function(path, ...) {
+  withCallingHandlers(
+    data.table::fread(path, data.table = FALSE, ...),
+    warning = function(w) {
+      if (grepl("Column name|EOF|stopped early", conditionMessage(w), ignore.case = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
 # Read count matrix (handles .gz)
 read_count_matrix <- function(file_path) {
   read_with_suppress <- function(path) {
-    suppressWarnings(data.table::fread(path, data.table = FALSE))
+    .gexpipe_fread_counts(path)
   }
   if (grepl("\\.gz$", file_path, ignore.case = TRUE)) {
     df <- tryCatch(
@@ -1397,7 +1432,7 @@ read_count_matrix <- function(file_path) {
         }
         R.utils::gunzip(file_path, remove = FALSE, overwrite = TRUE)
         tmp <- gsub("\\.gz$", "", file_path, ignore.case = TRUE)
-        out <- suppressWarnings(data.table::fread(tmp, data.table = FALSE))
+        out <- .gexpipe_fread_counts(tmp)
         if (file.exists(tmp)) file.remove(tmp)
         out
       }
