@@ -265,7 +265,7 @@ server_qc <- function(input, output, session, rv) {
         text(0.5, 0.7, paste("Total Datasets:", length(sets)), cex = 2, font = 2)
         text(0.5, 0.5, paste("Common Genes:", format(length(rv$common_genes), big.mark = ",")), 
              cex = 3, col = "#2ecc71", font = 2)
-        text(0.5, 0.3, "See UpSet plot for detailed intersections →", 
+        text(0.5, 0.3, "See UpSet plot for detailed intersections ->", 
              cex = 1.3, col = "gray40")
       }
     }

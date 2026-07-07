@@ -129,9 +129,9 @@ server_results_summary <- function(input, output, session, rv) {
     n_pred <- length(if (!is.null(rv$nomogram_available_genes)) rv$nomogram_available_genes else character(0))
     thresh <- rv$nomogram_optimal_threshold
     tags$div(
-      tags$p(tags$strong("Predictors:"), n_pred, " | ", tags$strong("Threshold:"), if (!is.null(thresh)) round(thresh, 3) else "—"),
-      tags$p(tags$strong("Training AUC:"), if (!is.null(train_m$AUC)) round(train_m$AUC, 3) else "—", " | ", tags$strong("Validation AUC:"), if (!is.null(val_m$AUC)) round(val_m$AUC, 3) else "—"),
-      tags$p(tags$strong("Training Accuracy:"), if (!is.null(train_m$Accuracy)) round(train_m$Accuracy, 3) else "—", " | ", tags$strong("Validation Accuracy:"), if (!is.null(val_m$Accuracy)) round(val_m$Accuracy, 3) else "—")
+      tags$p(tags$strong("Predictors:"), n_pred, " | ", tags$strong("Threshold:"), if (!is.null(thresh)) round(thresh, 3) else "-"),
+      tags$p(tags$strong("Training AUC:"), if (!is.null(train_m$AUC)) round(train_m$AUC, 3) else "-", " | ", tags$strong("Validation AUC:"), if (!is.null(val_m$AUC)) round(val_m$AUC, 3) else "-"),
+      tags$p(tags$strong("Training Accuracy:"), if (!is.null(train_m$Accuracy)) round(train_m$Accuracy, 3) else "-", " | ", tags$strong("Validation Accuracy:"), if (!is.null(val_m$Accuracy)) round(val_m$Accuracy, 3) else "-")
     )
   })
 
@@ -160,8 +160,8 @@ server_results_summary <- function(input, output, session, rv) {
     n_genes_expr <- if (!is.null(expr)) nrow(expr) else 0L
     tags$div(
       tags$p(tags$strong("Common input genes (after pipeline):"), format(n_genes, big.mark = ",")),
-      tags$p(tags$strong("Expression matrix:"), sprintf("%s genes × %s samples", format(n_genes_expr, big.mark = ","), format(n_samp, big.mark = ","))),
-      if (n_genes == 0 && n_genes_expr == 0) tags$p(style = "color: #7f8c8d;", "Complete Steps 1–5 to see input summary here.")
+      tags$p(tags$strong("Expression matrix:"), sprintf("%s genes x %s samples", format(n_genes_expr, big.mark = ","), format(n_samp, big.mark = ","))),
+      if (n_genes == 0 && n_genes_expr == 0) tags$p(style = "color: #7f8c8d;", "Complete Steps 1-5 to see input summary here.")
     )
   })
 
@@ -270,7 +270,7 @@ server_results_summary <- function(input, output, session, rv) {
             r <- df[i, ]
             mod_name <- if ("Module" %in% names(r)) as.character(r$Module) else names(mods)[i]
             n_g <- if ("N_genes" %in% names(r)) r$N_genes else if ("Size" %in% names(r)) r$Size else NA_integer_
-            n_str <- if (is.na(n_g)) "—" else format(as.integer(n_g), big.mark = ",")
+            n_str <- if (is.na(n_g)) "-" else format(as.integer(n_g), big.mark = ",")
             tags$tr(tags$td(mod_name), tags$td(n_str))
           })
         )
