@@ -1112,6 +1112,14 @@ server_wgcna <- function(input, output, session, rv) {
       dev.off()
     }
   )
+  output$download_wgcna_sample_tree_jpg <- downloadHandler(
+    filename = function() "wgcna_sample_tree.jpg",
+    content = function(file) {
+      jpeg(file, width = 7 * IMAGE_DPI, height = 4.4 * IMAGE_DPI, res = IMAGE_DPI, bg = "white", quality = 95)
+      draw_wgcna_sample_tree()
+      dev.off()
+    }
+  )
   output$download_wgcna_sample_tree_pdf <- downloadHandler(
     filename = function() "wgcna_sample_tree.pdf",
     content = function(file) {
@@ -1129,6 +1137,14 @@ server_wgcna <- function(input, output, session, rv) {
       dev.off()
     }
   )
+  output$download_soft_threshold_jpg <- downloadHandler(
+    filename = function() "wgcna_soft_threshold.jpg",
+    content = function(file) {
+      jpeg(file, width = 10 * IMAGE_DPI, height = 5 * IMAGE_DPI, res = IMAGE_DPI, bg = "white", quality = 95)
+      draw_soft_threshold_plot()
+      dev.off()
+    }
+  )
   output$download_soft_threshold_pdf <- downloadHandler(
     filename = function() "wgcna_soft_threshold.pdf",
     content = function(file) {
@@ -1142,6 +1158,14 @@ server_wgcna <- function(input, output, session, rv) {
     filename = function() "wgcna_dendrogram.png",
     content = function(file) {
       png(file, width = 12 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      draw_wgcna_dendrogram()
+      dev.off()
+    }
+  )
+  output$download_wgcna_dendrogram_jpg <- downloadHandler(
+    filename = function() "wgcna_dendrogram.jpg",
+    content = function(file) {
+      jpeg(file, width = 12 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white", quality = 95)
       draw_wgcna_dendrogram()
       dev.off()
     }
@@ -1324,6 +1348,15 @@ server_wgcna <- function(input, output, session, rv) {
       dev.off()
     }
   )
+  output$download_me_correlation_heatmap_jpg <- downloadHandler(
+    filename = function() "wgcna_me_correlation_heatmap.jpg",
+    content = function(file) {
+      req(rv$ME_correlation)
+      jpeg(file, width = 8 * IMAGE_DPI, height = 7 * IMAGE_DPI, res = IMAGE_DPI, bg = "white", quality = 95)
+      make_me_correlation_plot()
+      dev.off()
+    }
+  )
   output$download_me_correlation_heatmap_pdf <- downloadHandler(
     filename = function() "wgcna_me_correlation_heatmap.pdf",
     content = function(file) {
@@ -1353,6 +1386,14 @@ server_wgcna <- function(input, output, session, rv) {
     filename = function() "wgcna_me_dendrogram.png",
     content = function(file) {
       png(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      draw_me_dendrogram()
+      dev.off()
+    }
+  )
+  output$download_me_dendrogram_jpg <- downloadHandler(
+    filename = function() "wgcna_me_dendrogram.jpg",
+    content = function(file) {
+      jpeg(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white", quality = 95)
       draw_me_dendrogram()
       dev.off()
     }
@@ -1395,6 +1436,13 @@ server_wgcna <- function(input, output, session, rv) {
       ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
     }
   )
+  output$download_me_scatter_jpg <- downloadHandler(
+    filename = function() "wgcna_me_scatter.jpg",
+    content = function(file) {
+      p <- make_me_scatter_plot()
+      ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+    }
+  )
   output$download_me_scatter_pdf <- downloadHandler(
     filename = function() "wgcna_me_scatter.pdf",
     content = function(file) {
@@ -1421,6 +1469,14 @@ server_wgcna <- function(input, output, session, rv) {
     filename = function() "wgcna_eigengene_distance_heatmap.png",
     content = function(file) {
       png(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      make_eigengene_distance_heatmap()
+      dev.off()
+    }
+  )
+  output$download_eigengene_distance_jpg <- downloadHandler(
+    filename = function() "wgcna_eigengene_distance_heatmap.jpg",
+    content = function(file) {
+      jpeg(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "white", quality = 95)
       make_eigengene_distance_heatmap()
       dev.off()
     }
@@ -1582,6 +1638,13 @@ server_wgcna <- function(input, output, session, rv) {
       ggplot2::ggsave(file, plot = p, width = 8, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
     }
   )
+  output$download_module_significance_barplot_jpg <- downloadHandler(
+    filename = function() "wgcna_module_significance_barplot.jpg",
+    content = function(file) {
+      p <- make_module_significance_barplot()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+    }
+  )
   output$download_module_significance_barplot_pdf <- downloadHandler(
     filename = function() "wgcna_module_significance_barplot.pdf",
     content = function(file) {
@@ -1621,6 +1684,13 @@ server_wgcna <- function(input, output, session, rv) {
     content = function(file) {
       p <- make_module_size_correlation_plot()
       ggplot2::ggsave(file, plot = p, width = 8, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_module_size_correlation_jpg <- downloadHandler(
+    filename = function() "wgcna_module_size_correlation.jpg",
+    content = function(file) {
+      p <- make_module_size_correlation_plot()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     }
   )
   output$download_module_size_correlation_pdf <- downloadHandler(
@@ -1784,6 +1854,18 @@ server_wgcna <- function(input, output, session, rv) {
       mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
       p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
       if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+  output$download_gs_mm_plot_jpg <- downloadHandler(
+    filename = function() paste0("wgcna_gs_vs_mm_", input$select_module, ".jpg"),
+    content = function(file) {
+      req(input$select_module, rv$gene_metrics, rv$trait_data, rv$datExpr)
+      trait_col <- wgcna_gs_mm_trait_selected()
+      if (is.null(trait_col)) return()
+      gs_pval <- if (is.null(input$gs_pval_threshold)) 0.05 else input$gs_pval_threshold
+      mm_cor <- if (is.null(input$mm_cor_threshold)) 0.5 else input$mm_cor_threshold
+      p <- make_gs_mm_plot(input$select_module, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     }
   )
   output$download_gs_mm_plot_pdf <- downloadHandler(

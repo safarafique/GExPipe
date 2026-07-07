@@ -5,9 +5,57 @@
 
 .gexp_ui_cache <- new.env(parent = emptyenv())
 
+.gexp_inject_ui_plot_helpers <- function(env) {
+  ns_funs <- c(
+    "gexp_ui_plot_download_jpg_pdf", "gexp_ui_plot_download_bar",
+    "gexp_plot_device_open", "gexp_ggsave_from_file"
+  )
+  if (requireNamespace("GExPipe", quietly = TRUE)) {
+    pkg_ns <- asNamespace("GExPipe")
+    for (nm in ns_funs) {
+      if (exists(nm, envir = pkg_ns, inherits = FALSE, mode = "function")) {
+        env[[nm]] <- get(nm, envir = pkg_ns, mode = "function")
+      }
+    }
+  }
+  for (nm in ns_funs) {
+    if (!exists(nm, envir = env, inherits = FALSE) &&
+        exists(nm, mode = "function", inherits = TRUE)) {
+      env[[nm]] <- get(nm, mode = "function", inherits = TRUE)
+    }
+  }
+  helper_file <- .gexp_inst_file("shiny_src/ui/ui_plot_helpers.R")
+  if (file.exists(helper_file)) {
+    tryCatch(source(helper_file, local = env), error = function(e) NULL)
+  }
+  if (!exists("gexp_ui_plot_download_jpg_pdf", envir = env, inherits = FALSE)) {
+    assign("gexp_ui_plot_download_jpg_pdf", function(jpg_id, pdf_id, btn_class = "btn-success btn-sm") {
+      shiny::tags$div(
+        class = "gexp-plot-download-bar",
+        style = "margin-top: 8px;",
+        shiny::downloadButton(jpg_id, shiny::tagList(shiny::icon("download"), " JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+        shiny::downloadButton(pdf_id, shiny::tagList(shiny::icon("download"), " PDF"), class = btn_class)
+      )
+    }, envir = env)
+  }
+  if (!exists("gexp_ui_plot_download_bar", envir = env, inherits = FALSE)) {
+    assign("gexp_ui_plot_download_bar", function(png_id, jpg_id, pdf_id, btn_class = "btn-success btn-sm") {
+      shiny::tags$div(
+        class = "gexp-plot-download-bar",
+        style = "margin-top: 8px;",
+        shiny::downloadButton(png_id, shiny::tagList(shiny::icon("download"), " PNG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+        shiny::downloadButton(jpg_id, shiny::tagList(shiny::icon("download"), " JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+        shiny::downloadButton(pdf_id, shiny::tagList(shiny::icon("download"), " PDF"), class = btn_class)
+      )
+    }, envir = env)
+  }
+  invisible(env)
+}
+
 .gexp_load_inst_ui_tab <- function(inst_rel_file, object_name) {
   p <- .gexp_inst_file(inst_rel_file)
   env <- new.env(parent = parent.frame())
+  .gexp_inject_ui_plot_helpers(env)
   source(p, local = env)
   if (!exists(object_name, envir = env, inherits = FALSE)) {
     stop("GExPipe: expected UI object '", object_name, "' not found in ", inst_rel_file)

@@ -28,6 +28,7 @@ ui_batch <- tabItem(
           plotOutput("gene_variance_plot", height = "300px"),
           tags$div(style = "margin-top: 6px;",
             downloadButton("download_gene_variance_png", tagList(icon("download"), " PNG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
+            downloadButton("download_gene_variance_jpg", tagList(icon("download"), " JPG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
             downloadButton("download_gene_variance_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm"))
     ),
     
@@ -237,13 +238,13 @@ ui_batch <- tabItem(
         title = tags$span(icon("exclamation-triangle"), " Before Batch Correction - By Dataset"), 
         width = 6, status = "warning", solidHeader = TRUE,
         plotOutput("pca_before_dataset", height = "400px"),
-        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_before_dataset_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_dataset_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_before_dataset_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_dataset_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_dataset_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
       ),
       box(
         title = tags$span(icon("check-circle"), " After Batch Correction - By Dataset"), 
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("pca_after_dataset", height = "400px"),
-        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_after_dataset_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_dataset_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_after_dataset_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_dataset_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_dataset_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
       )
     ),
     
@@ -252,13 +253,13 @@ ui_batch <- tabItem(
         title = tags$span(icon("exclamation-triangle"), " Before Batch Correction - By Condition"), 
         width = 6, status = "warning", solidHeader = TRUE,
         plotOutput("pca_before_condition", height = "400px"),
-        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_before_condition_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_condition_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_before_condition_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_condition_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_pca_before_condition_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
       ),
       box(
         title = tags$span(icon("check-circle"), " After Batch Correction - By Condition"), 
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("pca_after_condition", height = "400px"),
-        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_after_condition_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_condition_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
+        tags$div(style = "margin-top: 6px;", downloadButton("download_pca_after_condition_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_condition_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_pca_after_condition_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
       )
     ),
     
@@ -281,7 +282,7 @@ ui_batch <- tabItem(
             style = "color: #495057; font-size: 12px; margin-bottom: 10px; padding: 8px; background: #fff3cd; border-radius: 5px;"
           ),
           plotOutput("hclust_before", height = "500px"),
-          tags$div(style = "margin-top: 6px;", downloadButton("download_hclust_before_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_hclust_before_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
+          tags$div(style = "margin-top: 6px;", downloadButton("download_hclust_before_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_hclust_before_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"), downloadButton("download_hclust_before_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
         )
       )
     ),
@@ -299,7 +300,7 @@ ui_batch <- tabItem(
             style = "color: #495057; font-size: 12px; margin-bottom: 10px; padding: 8px; background: #d4edda; border-radius: 5px;"
           ),
           plotOutput("hclust_after", height = "500px"),
-          tags$div(style = "margin-top: 6px;", downloadButton("download_hclust_after_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_hclust_after_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
+          tags$div(style = "margin-top: 6px;", downloadButton("download_hclust_after_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_hclust_after_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"), downloadButton("download_hclust_after_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
         )
       )
     ),
@@ -320,11 +321,11 @@ ui_batch <- tabItem(
           fluidRow(
             column(6,
               plotOutput("pvca_before", height = "350px"),
-              tags$div(style = "margin-top: 6px;", downloadButton("download_pvca_before_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_before_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-info"))
+              tags$div(style = "margin-top: 6px;", downloadButton("download_pvca_before_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_before_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_before_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-info"))
             ),
             column(6,
               plotOutput("pvca_after", height = "350px"),
-              tags$div(style = "margin-top: 6px;", downloadButton("download_pvca_after_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_after_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-info"))
+              tags$div(style = "margin-top: 6px;", downloadButton("download_pvca_after_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_after_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-info", style = "margin-right: 4px;"), downloadButton("download_pvca_after_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-info"))
             )
           )
         )
