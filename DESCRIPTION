@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.20
+Version: 0.99.21
 Authors@R: person("Safa", "Rafique",
            email = "safa.sandhu@gmail.com",
            role = c("aut", "cre"))
@@ -20,7 +20,7 @@ biocViews: Software, ShinyApps, GeneExpression, RNASeq, Microarray,
     DifferentialExpression, Normalization, Pathways, Network,
     NetworkEnrichment, Visualization
 URL: https://github.com/safarafique/GExPipe
-BugReports: https://github.com/Bioconductor/Contributions/issues/4162
+BugReports: https://github.com/safarafique/GExPipe/issues
 Imports:
     affy (>= 1.84.0),
     AnnotationDbi (>= 1.64.0),
@@ -59,6 +59,7 @@ Imports:
     oligo (>= 1.66.0),
     org.Hs.eg.db (>= 3.17.0),
     parallel,
+    methods,
     pheatmap (>= 1.0.12),
     pillar (>= 1.9.0),
     pROC (>= 1.18.0),

@@ -11,7 +11,7 @@ ui_common_genes <- tabItem(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       tags$p(tags$strong("Purpose:"), " Intersect differentially expressed genes (DEG) with genes in significant WGCNA modules to obtain a high-confidence gene set, then perform GO and KEGG pathway enrichment for biological interpretation.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Workflow:"), " 1) Compute Common Genes (DEG ∩ WGCNA) → 2) Run GO and optionally KEGG enrichment → 3) Choose next step: Path 1 = PPI then ML, or Path 2 = direct to ML.", style = "margin-bottom: 8px;"),
+      tags$p(tags$strong("Workflow:"), " 1) Compute Common Genes (DEG ∩ WGCNA) -> 2) Run GO and optionally KEGG enrichment -> 3) Choose next step: Path 1 = PPI then ML, or Path 2 = direct to ML.", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Requirements:"), " Step 6 (DE Analysis) and Step 7 (WGCNA, including Identify Significant Modules) must be completed.", style = "margin-bottom: 0;")
     )
   ),
@@ -135,11 +135,11 @@ ui_common_genes <- tabItem(
         uiOutput("kegg_enrichment_status_ui"),
         tags$p("If KEGG times out or returns no pathways, you can still go to PPI or ML using the \"Go to next step\" box at the end of this tab.", style = "margin-top: 8px; color: #6c757d; font-size: 13px;"),
         tags$hr(),
-        tags$h5(icon("chart-bar"), " KEGG graphs – Bar plot & Chord side by side", style = "margin-top: 10px; margin-bottom: 12px; color: #5a6268; font-weight: 600;"),
+        tags$h5(icon("chart-bar"), " KEGG graphs - Bar plot & Chord side by side", style = "margin-top: 10px; margin-bottom: 12px; color: #5a6268; font-weight: 600;"),
         fluidRow(
           column(6,
                  tags$div(style = "background: #fafbfc; border-radius: 8px; padding: 12px; border: 1px solid #e9ecef;",
-                          tags$p(icon("chart-bar"), " Bar plot – pathway count and p.adjust", style = "color: #495057; margin-bottom: 8px; font-size: 13px;"),
+                          tags$p(icon("chart-bar"), " Bar plot - pathway count and p.adjust", style = "color: #495057; margin-bottom: 8px; font-size: 13px;"),
                           plotOutput("kegg_barplot", height = "480px"),
                           tags$div(style = "margin-top: 6px;",
                             downloadButton("download_kegg_barplot_png", tagList(icon("download"), " PNG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
@@ -147,7 +147,7 @@ ui_common_genes <- tabItem(
                             downloadButton("download_kegg_barplot_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm")))),
           column(6,
                  tags$div(style = "background: #fafbfc; border-radius: 8px; padding: 12px; border: 1px solid #e9ecef;",
-                          tags$p(icon("circle"), " Chord – pathway IDs on circle, genes as ribbons", style = "color: #495057; margin-bottom: 8px; font-size: 13px;"),
+                          tags$p(icon("circle"), " Chord - pathway IDs on circle, genes as ribbons", style = "color: #495057; margin-bottom: 8px; font-size: 13px;"),
                           plotOutput("kegg_chord_plot", height = "480px"),
                           tags$div(style = "margin-top: 6px;",
                             downloadButton("download_kegg_chord", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
@@ -159,9 +159,9 @@ ui_common_genes <- tabItem(
         tags$hr(style = "margin: 18px 0; border-color: #dee2e6;"),
         tags$h5(icon("table"), " Pathway list table (expand to view)", style = "margin-bottom: 8px; color: #5a6268; font-weight: 600;"),
         box(
-          title = tags$span(icon("list"), " Pathway list – same pathways as chord diagram"),
+          title = tags$span(icon("list"), " Pathway list - same pathways as chord diagram"),
           width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-          tags$p("Open this box to view or download the pathway–gene table.", style = "margin-bottom: 10px; color: #6c757d; font-size: 12px;"),
+          tags$p("Open this box to view or download the pathway-gene table.", style = "margin-bottom: 10px; color: #6c757d; font-size: 12px;"),
           DT::dataTableOutput("kegg_pathway_list_table"),
           tags$div(style = "margin-top: 10px;",
             downloadButton("download_kegg_pathway_list_csv", tagList(icon("download"), " Pathway list (CSV)"), class = "btn-warning btn-sm"))
@@ -177,7 +177,7 @@ ui_common_genes <- tabItem(
       width = 12, status = "primary", solidHeader = TRUE,
       tags$div(
         class = "alert alert-info",
-        "If you plan to go to Machine Learning, extract expression data (samples × common genes) from WGCNA datExpr here. ",
+        "If you plan to go to Machine Learning, extract expression data (samples x common genes) from WGCNA datExpr here. ",
         "This makes the data ready for the ML tab. If you go to PPI first, you can also extract from the PPI page (interacting genes)."
       ),
       tags$div(style = "margin-bottom: 15px;",
@@ -203,13 +203,13 @@ ui_common_genes <- tabItem(
       tags$p("You have two options. Pick one:", style = "margin-bottom: 10px; color: #2c3e50; font-weight: 600;"),
       tags$ul(
         style = "margin-bottom: 14px; padding-left: 20px; color: #495057;",
-        tags$li(tags$strong("Path 1 – PPI then Machine Learning:"), " Build a protein–protein interaction network from common genes, then go to ML (e.g. with hub or interacting genes)."),
-        tags$li(tags$strong("Path 2 – Direct to Machine Learning:"), " Skip PPI and go straight to ML using common genes (or extracted data from above).")
+        tags$li(tags$strong("Path 1 - PPI then Machine Learning:"), " Build a protein-protein interaction network from common genes, then go to ML (e.g. with hub or interacting genes)."),
+        tags$li(tags$strong("Path 2 - Direct to Machine Learning:"), " Skip PPI and go straight to ML using common genes (or extracted data from above).")
       ),
       tags$div(
         style = "display: flex; flex-wrap: wrap; gap: 15px; align-items: center;",
         actionButton("next_page_common_genes_end",
-                    tagList(icon("project-diagram"), " Path 1: PPI Interaction → then ML"),
+                    tagList(icon("project-diagram"), " Path 1: PPI Interaction -> then ML"),
                     class = "btn-success btn-lg",
                     style = "font-size: 16px; padding: 12px 28px; border-radius: 25px;"),
         actionButton("next_page_common_genes_to_ml",

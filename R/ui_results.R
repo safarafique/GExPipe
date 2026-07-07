@@ -11,9 +11,9 @@ ui_results <- tabItem(
         title = tags$span(icon("info-circle"), " About this step"),
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         tags$p(tags$strong("Purpose:"), " Identify genes that are differentially expressed between groups (e.g. disease vs control). The method you selected in Step 1 determines the statistical approach.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("limma:"), " Empirical Bayes moderated t-statistics — uses batch-corrected, normalized expression.", style = "margin-bottom: 4px;"),
-        tags$p(tags$strong("DESeq2:"), " Negative binomial GLM — uses raw integer counts with batch as covariate. DESeq2 applies its own internal normalization (median-of-ratios), so it bypasses the app's normalization for DE.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("Parameters:"), " LogFC cutoff (fold-change threshold), adjusted p-value cutoff (Benjamini–Hochberg), and number of top genes for heatmap. Results include volcano plot, top-DEG table, and heatmap.", style = "margin-bottom: 0;")
+        tags$p(tags$strong("limma:"), " Empirical Bayes moderated t-statistics - uses batch-corrected, normalized expression.", style = "margin-bottom: 4px;"),
+        tags$p(tags$strong("DESeq2:"), " Negative binomial GLM - uses raw integer counts with batch as covariate. DESeq2 applies its own internal normalization (median-of-ratios), so it bypasses the app's normalization for DE.", style = "margin-bottom: 8px;"),
+        tags$p(tags$strong("Parameters:"), " LogFC cutoff (fold-change threshold), adjusted p-value cutoff (Benjamini-Hochberg), and number of top genes for heatmap. Results include volcano plot, top-DEG table, and heatmap.", style = "margin-bottom: 0;")
       )
     ),
     # Show which method is active
@@ -22,7 +22,7 @@ ui_results <- tabItem(
     ),
     fluidRow(
 box(
-        title = tags$span(icon("sliders-h"), " DE Parameters — choose any threshold"),
+        title = tags$span(icon("sliders-h"), " DE Parameters - choose any threshold"),
         width = 12, status = "primary", solidHeader = TRUE,
         tags$div(
           style = "padding: 14px 18px; margin-bottom: 16px; border-radius: 10px; background: linear-gradient(135deg, #e8f4f8 0%, #e8f0ff 100%); border-left: 4px solid #3498db;",
@@ -68,16 +68,16 @@ box(
         tags$p(tags$strong("Volcano & DE results (this step):"), style = "margin-bottom: 6px;"),
         tags$ul(
           style = "margin: 0 0 12px 0; padding-left: 20px;",
-          tags$li("Confirm groups in ", tags$strong("Step 3 (Define Groups)"), " — Disease vs Normal (or your contrast) are correctly assigned. Wrong labels will flip or invalidate DEGs."),
+          tags$li("Confirm groups in ", tags$strong("Step 3 (Define Groups)"), " - Disease vs Normal (or your contrast) are correctly assigned. Wrong labels will flip or invalidate DEGs."),
           tags$li("Check the ", tags$strong("Pipeline verification"), " box above: it shows which DE method and batch correction were used. The volcano uses the actual statistics from that model."),
           tags$li("Sample size: ensure you have enough samples per group (e.g. ≥ 3 per group for DESeq2). Small n can give unstable estimates."),
           tags$li("Optional: compare top DEGs with published results for the same disease or GSE to spot-check.")
         ),
-        tags$p(tags$strong("ML / prediction (Steps 10–12):"), style = "margin-bottom: 6px;"),
+        tags$p(tags$strong("ML / prediction (Steps 10-12):"), style = "margin-bottom: 6px;"),
         tags$ul(
           style = "margin: 0; padding-left: 20px;",
-          tags$li(tags$strong("Step 12 (ROC):"), " AUC ≥ 0.8 suggests good discrimination. Use ", tags$strong("Step 11 (Validation)"), " to load an external dataset — ROC and Nomogram then show training vs external AUC; similar values suggest the model generalizes."),
-          tags$li(tags$strong("Step 12 (Nomogram):"), " Training vs validation AUC (70/30 split) — if validation AUC is much lower than training, the model may be overfitting. External validation (Step 11) is the strongest check.")
+          tags$li(tags$strong("Step 12 (ROC):"), " AUC ≥ 0.8 suggests good discrimination. Use ", tags$strong("Step 11 (Validation)"), " to load an external dataset - ROC and Nomogram then show training vs external AUC; similar values suggest the model generalizes."),
+          tags$li(tags$strong("Step 12 (Nomogram):"), " Training vs validation AUC (70/30 split) - if validation AUC is much lower than training, the model may be overfitting. External validation (Step 11) is the strongest check.")
         )
       )
     ),

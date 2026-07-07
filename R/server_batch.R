@@ -27,9 +27,9 @@ server_batch <- function(input, output, session, rv) {
                 if (info$include_platform_covariate) {
                   "Platform is included as an explicit covariate (not confounded with Dataset)."
                 } else {
-                  "Platform is confounded with Dataset (e.g. one microarray GSE + one RNA-seq GSE) — the Dataset term absorbs the platform effect."
+                  "Platform is confounded with Dataset (e.g. one microarray GSE + one RNA-seq GSE) - the Dataset term absorbs the platform effect."
                 }),
-        tags$li(tags$strong("Check:"), " review the ", tags$strong("Platform PCA"), " plots below — samples should intermingle by platform after batch correction.")
+        tags$li(tags$strong("Check:"), " review the ", tags$strong("Platform PCA"), " plots below - samples should intermingle by platform after batch correction.")
       )
     )
   })
@@ -209,7 +209,7 @@ server_batch <- function(input, output, session, rv) {
       ),
       tags$ul(
         style = "margin: 0; padding-left: 20px; font-size: 12px; line-height: 1.75; color: #333;",
-        tags$li(tags$strong("By Dataset (after):"), " GSE/study colors should ", tags$strong("mix"), " — not separate clusters."),
+        tags$li(tags$strong("By Dataset (after):"), " GSE/study colors should ", tags$strong("mix"), " - not separate clusters."),
         tags$li(tags$strong("By Condition (after):"), " Normal vs Disease should be ", tags$strong("separated"), " and clearer than before."),
         tags$li(tags$strong("Hclust (after):"), " branches should follow ", tags$strong("Condition"), " more than Dataset."),
         tags$li(tags$strong("PVCA (after):"), " Dataset variance should ", tags$strong("drop"), "; Condition variance should rise."),
@@ -222,7 +222,7 @@ server_batch <- function(input, output, session, rv) {
         column(
           12,
           box(
-            title = tags$span(icon("search"), " Is batch correction OK? — check after you apply"),
+            title = tags$span(icon("search"), " Is batch correction OK? - check after you apply"),
             width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
             tags$p(
               "Apply batch correction, then use this panel and the PCA plots to decide whether to proceed or re-run with another method.",
@@ -239,14 +239,14 @@ server_batch <- function(input, output, session, rv) {
         column(
           12,
           box(
-            title = tags$span(icon("check-circle"), " Batch correction — not required"),
+            title = tags$span(icon("check-circle"), " Batch correction - not required"),
             width = 12, status = "success", solidHeader = TRUE,
             tags$div(
               class = "alert alert-success",
               style = "margin: 0; font-size: 13px;",
               icon("check-circle"),
               tags$strong(" Proceed to Step 6."),
-              " Only one dataset was selected — between-study batch correction was skipped."
+              " Only one dataset was selected - between-study batch correction was skipped."
             )
           )
         )
@@ -279,7 +279,7 @@ server_batch <- function(input, output, session, rv) {
       verdict <- "proceed"
       status <- "success"
       title_icon <- "check-circle"
-      headline <- "Batch correction looks OK — proceed to Step 6"
+      headline <- "Batch correction looks OK - proceed to Step 6"
       body <- paste0(
         "If your PCA plots match the checklist (datasets mixed, conditions separated), ",
         "you do ", tags$strong("not"), " need to change Step 5. Continue to ",
@@ -310,7 +310,7 @@ server_batch <- function(input, output, session, rv) {
             tags$p(
               style = "margin: 10px 0 0 0;",
               tags$span(class = "label label-success", style = "font-size: 12px;",
-                        "Next: Step 6 — Differential Expression")
+                        "Next: Step 6 - Differential Expression")
             )
           } else {
             tags$p(
@@ -345,7 +345,7 @@ server_batch <- function(input, output, session, rv) {
 
     output$batch_log <- renderText({
       paste0(
-        "✓ Batch correction skipped (single dataset)\n\n",
+        "OK Batch correction skipped (single dataset)\n\n",
         "Reason: Only 1 dataset was selected, so there is no between-study batch to remove.\n",
         "Downstream steps will use the current expression matrix.\n"
       )
@@ -373,7 +373,7 @@ server_batch <- function(input, output, session, rv) {
       tags$p(format(n_genes, big.mark = ","), " genes \u00d7 ", format(n_samp, big.mark = ","), " samples ready for DE."))
   })
 
-  # Expression BEFORE batch correction (genes x samples) — in batch step
+  # Expression BEFORE batch correction (genes x samples) - in batch step
   output$download_expr_before_batch <- downloadHandler(
     filename = function() paste0("Expression_before_batch_", Sys.Date(), ".csv"),
     content = function(file) {
@@ -389,7 +389,7 @@ server_batch <- function(input, output, session, rv) {
     }
   )
 
-  # Expression AFTER batch correction (genes x samples) — in batch step
+  # Expression AFTER batch correction (genes x samples) - in batch step
   output$download_expr_after_batch <- downloadHandler(
     filename = function() paste0("Expression_after_batch_", Sys.Date(), ".csv"),
     content = function(file) {
@@ -524,7 +524,7 @@ server_batch <- function(input, output, session, rv) {
       rv$batch_running <- FALSE
       output$batch_log <- renderText({
         paste0(
-          "✓ Batch correction skipped (single dataset)\n\n",
+          "OK Batch correction skipped (single dataset)\n\n",
           "Reason: Only 1 dataset was selected, so there is no between-study batch to remove.\n",
           "Downstream steps will use the current expression matrix.\n"
         )
@@ -584,7 +584,7 @@ server_batch <- function(input, output, session, rv) {
       
       output$batch_log <- renderText({
         paste0(
-          "✓ Batch correction complete\n",
+          "OK Batch correction complete\n",
           "Method: ", input$batch_method, "\n\n",
           res$log_text,
           "\nFinal Dataset:\n",
@@ -604,11 +604,11 @@ server_batch <- function(input, output, session, rv) {
       # Show notification with gene count change
       showNotification(
         tags$div(
-          tags$strong("✓ Batch correction complete!"),
+          tags$strong("OK Batch correction complete!"),
           tags$br(),
           tags$span(
             "Genes filtered: ",
-            format(genes_before, big.mark = ","), " → ",
+            format(genes_before, big.mark = ","), " -> ",
             format(genes_after, big.mark = ","), " (", filter_percent, "% removed)"
           ),
           tags$br(),
@@ -716,10 +716,10 @@ server_batch <- function(input, output, session, rv) {
     base <- ggplot(df, aes(x = theta, y = r)) +
       coord_polar(theta = "x", start = -pi / 2, direction = 1) +
       scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
-                        labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+                        labels = c("-180 deg", "-90 deg", "0 deg", "90 deg", "180 deg")) +
       scale_y_continuous(limits = c(0, NA)) +
       theme_bw(base_size = 14) +
-      labs(title = title, subtitle = subtitle, x = "Angle (PC1–PC2)", y = "Radius") +
+      labs(title = title, subtitle = subtitle, x = "Angle (PC1-PC2)", y = "Radius") +
       .batch_pca_polar_theme()
 
     if (color_by == "Condition" &&
@@ -763,7 +763,7 @@ server_batch <- function(input, output, session, rv) {
     )
   })
   
-  # PCA Before / After — coloured by Platform (mixed microarray + RNA-seq only)
+  # PCA Before / After - coloured by Platform (mixed microarray + RNA-seq only)
   output$batch_platform_pca_row <- renderUI({
     if (is.null(rv$unified_metadata) || !gexpipe_has_mixed_platforms(rv$unified_metadata)) {
       return(NULL)
@@ -808,10 +808,10 @@ server_batch <- function(input, output, session, rv) {
       scale_color_manual(values = c("Microarray" = "#e67e22", "RNAseq" = "#9b59b6")) +
       coord_polar(theta = "x", start = -pi / 2, direction = 1) +
       scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
-                        labels = c("-180°", "-90°", "0°", "90°", "180°")) +
+                        labels = c("-180 deg", "-90 deg", "0 deg", "90 deg", "180 deg")) +
       scale_y_continuous(limits = c(0, NA)) +
       theme_bw(base_size = 14) +
-      labs(title = ttl, subtitle = sub, x = "Angle (PC1–PC2)", y = "Radius", color = "Platform") +
+      labs(title = ttl, subtitle = sub, x = "Angle (PC1-PC2)", y = "Radius", color = "Platform") +
       theme(
         plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
         plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),

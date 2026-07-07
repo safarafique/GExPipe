@@ -11,24 +11,43 @@
 #   - ui_results.R: Step 6 - Differential Gene Expression Analysis tab
 # ==============================================================================
 
-# Source all UI modules (local = FALSE so variables are available in this scope)
-source("ui/ui_plot_helpers.R", local = FALSE)
-source("ui/ui_welcome.R", local = FALSE)
-source("ui/ui_download.R", local = FALSE)
-source("ui/ui_qc.R", local = FALSE)
-source("ui/ui_normalize.R", local = FALSE)
-source("ui/ui_groups.R", local = FALSE)
-source("ui/ui_batch.R", local = FALSE)
-source("ui/ui_results.R", local = FALSE)
-source("ui/ui_wgcna.R", local = FALSE)
-source("ui/ui_common_genes.R", local = FALSE)
-source("ui/ui_ppi.R", local = FALSE)
-source("ui/ui_ml.R", local = FALSE)
-source("ui/ui_validation.R", local = FALSE)
-source("ui/ui_roc.R", local = FALSE)
-source("ui/ui_nomogram.R", local = FALSE)
-source("ui/ui_gsea.R", local = FALSE)
-source("ui/ui_results_summary.R", local = FALSE)
+# UI tab modules are installed in R/ui_*.R (package namespace).
+.gexpipe_ui_obj <- function(name) {
+  if (requireNamespace("GExPipe", quietly = TRUE)) {
+    ns <- asNamespace("GExPipe")
+    if (exists(name, envir = ns, inherits = FALSE)) {
+      return(get(name, envir = ns, inherits = FALSE))
+    }
+  }
+  stop("GExPipe UI object '", name, "' not found. Install/load GExPipe and retry.", call. = FALSE)
+}
+
+ui_welcome <- .gexpipe_ui_obj("ui_welcome")
+ui_download <- GExPipe::gexp_ui_download()
+ui_qc <- .gexpipe_ui_obj("ui_qc")
+ui_normalize <- .gexpipe_ui_obj("ui_normalize")
+ui_groups <- .gexpipe_ui_obj("ui_groups")
+ui_batch <- .gexpipe_ui_obj("ui_batch")
+ui_results <- .gexpipe_ui_obj("ui_results")
+ui_wgcna <- .gexpipe_ui_obj("ui_wgcna")
+ui_common_genes <- .gexpipe_ui_obj("ui_common_genes")
+ui_ppi <- .gexpipe_ui_obj("ui_ppi")
+ui_ml <- .gexpipe_ui_obj("ui_ml")
+ui_validation <- .gexpipe_ui_obj("ui_validation")
+ui_roc <- .gexpipe_ui_obj("ui_roc")
+ui_nomogram <- .gexpipe_ui_obj("ui_nomogram")
+ui_gsea <- .gexpipe_ui_obj("ui_gsea")
+ui_results_summary <- .gexpipe_ui_obj("ui_results_summary")
+
+for (nm in c(
+  "gexp_ui_plot_download_jpg_pdf", "gexp_ui_plot_download_bar",
+  "gexp_plot_device_open", "gexp_ggsave_from_file"
+)) {
+  if (requireNamespace("GExPipe", quietly = TRUE) &&
+      exists(nm, envir = asNamespace("GExPipe"), inherits = FALSE)) {
+    assign(nm, get(nm, envir = asNamespace("GExPipe"), inherits = FALSE), envir = .GlobalEnv)
+  }
+}
 
 # Main analysis dashboard (shown after user clicks "Go to Analysis" on welcome page)
 ui_analysis <- dashboardPage(
