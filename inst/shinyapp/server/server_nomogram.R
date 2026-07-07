@@ -592,4 +592,102 @@ server_nomogram <- function(input, output, session, rv) {
       write.csv(rv$nomogram_performance_comparison, file.path(CSV_EXPORT_DIR(), "Nomogram_Performance_Comparison.csv"), row.names = FALSE)
     }
   )
+
+  nomogram_panel_to_file <- function(file, plotfun, width, height) {
+    ext <- tolower(sub(".*\\.", "", basename(file)))
+    if (ext == "pdf") {
+      pdf(file, width = width, height = height, bg = "white")
+    } else if (ext %in% c("jpg", "jpeg")) {
+      jpeg(file, width = width, height = height, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
+    } else {
+      png(file, width = width * IMAGE_DPI, height = height * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+    }
+    on.exit(dev.off(), add = TRUE)
+    plotfun()
+  }
+
+  plot_nomogram_roc_train <- function() {
+    req(rv$nomogram_train_roc, rv$nomogram_train_metrics)
+    plot(rv$nomogram_train_roc, col = "#E74C3C", lwd = 2, main = "Training ROC", legacy.axes = TRUE)
+    abline(0, 1, lty = 2, col = "grey60")
+    m <- rv$nomogram_train_metrics
+    text(0.6, 0.25, sprintf("AUC = %.3f\n(95%% CI: %.3f-%.3f)", m$AUC, m$AUC_Lower, m$AUC_Upper), cex = 1, col = "#E74C3C", font = 2)
+  }
+  plot_nomogram_roc_val <- function() {
+    req(rv$nomogram_val_roc, rv$nomogram_val_metrics)
+    mode <- rv$validation_mode; if (is.null(mode)) mode <- "internal"
+    col <- if (mode == "external") "#27AE60" else "#3498DB"
+    label <- if (mode == "external") "External Validation ROC" else "Validation ROC"
+    plot(rv$nomogram_val_roc, col = col, lwd = 2, main = label, legacy.axes = TRUE)
+    abline(0, 1, lty = 2, col = "grey60")
+    m <- rv$nomogram_val_metrics
+    text(0.6, 0.25, sprintf("AUC = %.3f\n(95%% CI: %.3f-%.3f)", m$AUC, m$AUC_Lower, m$AUC_Upper), cex = 1, col = col, font = 2)
+  }
+  plot_nomogram_cal_train <- function() {
+    req(rv$nomogram_cal_train)
+    plot(rv$nomogram_cal_train, lwd = 2, col = "#E74C3C", xlab = "Predicted", ylab = "Observed")
+  }
+  plot_nomogram_cal_val <- function() {
+    req(rv$nomogram_cal_validation)
+    mode <- rv$validation_mode; if (is.null(mode)) mode <- "internal"
+    col <- if (mode == "external") "#27AE60" else "#3498DB"
+    label <- if (mode == "external") "External Validation Calibration" else "Validation Calibration"
+    cv <- rv$nomogram_cal_validation
+    plot(cv$Predicted, cv$Observed, type = "n", xlim = c(0, 1), ylim = c(0, 1), xlab = "Predicted", ylab = "Observed", main = label)
+    abline(0, 1, lty = 2, col = "grey60")
+    arrows(cv$Predicted, cv$Observed - 1.96 * cv$SE, cv$Predicted, cv$Observed + 1.96 * cv$SE, angle = 90, code = 3, length = 0.05, col = col)
+    points(cv$Predicted, cv$Observed, pch = 19, cex = 1.2, col = col)
+    lines(cv$Predicted, cv$Observed, col = col, lwd = 2)
+  }
+  plot_nomogram_dca_train <- function() {
+    req(rv$nomogram_dca_train)
+    render_dca(rv$nomogram_dca_train, "#E74C3C")
+  }
+  plot_nomogram_dca_val <- function() {
+    req(rv$nomogram_dca_val)
+    mode <- rv$validation_mode; if (is.null(mode)) mode <- "internal"
+    col <- if (mode == "external") "#27AE60" else "#3498DB"
+    render_dca(rv$nomogram_dca_val, col)
+  }
+  plot_nomogram_impact_train <- function() {
+    req(rv$nomogram_ci_train)
+    ci <- rv$nomogram_ci_train
+    plot(ci$threshold, ci$high_risk, type = "l", lwd = 2, col = "#E74C3C", xlab = "Threshold", ylab = "Per 1000", main = "Training Clinical Impact", ylim = c(0, max(ci$high_risk) * 1.1))
+    lines(ci$threshold, ci$high_risk_with_outcome, lwd = 2, col = "#E74C3C", lty = 2)
+    legend("topright", legend = c("Classified High Risk", "High Risk with Outcome"), col = "#E74C3C", lty = c(1, 2), lwd = 2, bty = "n")
+  }
+  plot_nomogram_impact_val <- function() {
+    req(rv$nomogram_ci_val)
+    mode <- rv$validation_mode; if (is.null(mode)) mode <- "internal"
+    col <- if (mode == "external") "#27AE60" else "#3498DB"
+    label <- if (mode == "external") "External Validation Clinical Impact" else "Validation Clinical Impact"
+    ci <- rv$nomogram_ci_val
+    plot(ci$threshold, ci$high_risk, type = "l", lwd = 2, col = col, xlab = "Threshold", ylab = "Per 1000", main = label, ylim = c(0, max(ci$high_risk) * 1.1))
+    lines(ci$threshold, ci$high_risk_with_outcome, lwd = 2, col = col, lty = 2)
+    legend("topright", legend = c("Classified High Risk", "High Risk with Outcome"), col = col, lty = c(1, 2), lwd = 2, bty = "n")
+  }
+
+  add_nomogram_panel_downloads <- function(stem, plotfun, width, height, prefix) {
+    output[[paste0("download_nomogram_", stem, "_png")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".png"),
+      content = function(file) nomogram_panel_to_file(file, plotfun, width, height)
+    )
+    output[[paste0("download_nomogram_", stem, "_jpg")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".jpg"),
+      content = function(file) nomogram_panel_to_file(file, plotfun, width, height)
+    )
+    output[[paste0("download_nomogram_", stem, "_pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".pdf"),
+      content = function(file) nomogram_panel_to_file(file, plotfun, width, height)
+    )
+  }
+
+  add_nomogram_panel_downloads("roc_train", plot_nomogram_roc_train, 7, 5, "Nomogram_ROC_Training")
+  add_nomogram_panel_downloads("roc_val", plot_nomogram_roc_val, 7, 5, "Nomogram_ROC_Validation")
+  add_nomogram_panel_downloads("cal_train", plot_nomogram_cal_train, 7, 4.5, "Nomogram_Calibration_Training")
+  add_nomogram_panel_downloads("cal_val", plot_nomogram_cal_val, 7, 4.5, "Nomogram_Calibration_Validation")
+  add_nomogram_panel_downloads("dca_train", plot_nomogram_dca_train, 7, 4.5, "Nomogram_DCA_Training")
+  add_nomogram_panel_downloads("dca_val", plot_nomogram_dca_val, 7, 4.5, "Nomogram_DCA_Validation")
+  add_nomogram_panel_downloads("impact_train", plot_nomogram_impact_train, 7, 4.5, "Nomogram_Impact_Training")
+  add_nomogram_panel_downloads("impact_val", plot_nomogram_impact_val, 7, 4.5, "Nomogram_Impact_Validation")
 }

@@ -677,11 +677,13 @@ server_ml <- function(input, output, session, rv) {
                        plotOutput("ml_plot_rf_error", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_rf_error_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_rf_error_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_rf_error_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs")))),
           column(6, box(title = "RF: Top 10 importance (MeanDecreaseAccuracy)", width = NULL, status = "success", solidHeader = TRUE,
                        plotOutput("ml_plot_rf_importance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_rf_imp_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_rf_imp_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_rf_imp_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-xs"))))
         )
       ))
@@ -694,11 +696,13 @@ server_ml <- function(input, output, session, rv) {
                        plotOutput("ml_plot_lasso_path", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_lasso_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_lasso_path_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_lasso_path_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs")))),
           column(6, box(title = "LASSO: Binomial deviance vs lambda", width = NULL, status = "danger", solidHeader = TRUE,
                        plotOutput("ml_plot_lasso_deviance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_lasso_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_lasso_dev_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-danger btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_lasso_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs"))))
         )
       ))
@@ -711,11 +715,13 @@ server_ml <- function(input, output, session, rv) {
                        plotOutput("ml_plot_elastic_path", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_elastic_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_elastic_path_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_elastic_path_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs")))),
           column(6, box(title = "Elastic Net: Binomial deviance vs lambda", width = NULL, status = "info", solidHeader = TRUE,
                        plotOutput("ml_plot_elastic_deviance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_elastic_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_elastic_dev_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-info btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_elastic_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-xs"))))
         )
       ))
@@ -728,11 +734,13 @@ server_ml <- function(input, output, session, rv) {
                        plotOutput("ml_plot_ridge_path", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_ridge_path_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_ridge_path_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_ridge_path_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs")))),
           column(6, box(title = "Ridge: Binomial deviance vs lambda", width = NULL, status = "primary", solidHeader = TRUE,
                        plotOutput("ml_plot_ridge_deviance", height = "380px"),
                        tags$div(style = "margin-top:6px;",
                                 downloadButton("dl_ml_ridge_dev_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
+                                downloadButton("dl_ml_ridge_dev_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-xs", style = "margin-right:6px;"),
                                 downloadButton("dl_ml_ridge_dev_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-xs"))))
         )
       ))
@@ -840,10 +848,12 @@ server_ml <- function(input, output, session, rv) {
   output$ml_plot_ridge_deviance <- renderPlot({ plot_ridge_dev() }, height = 380)
 
   # ---------- Downloads (PNG 300 DPI and PDF) ----------
-  download_plot <- function(file, type = c("png", "pdf"), plotfun) {
+  download_plot <- function(file, type = c("png", "jpg", "pdf"), plotfun) {
     type <- match.arg(type)
     if (type == "png") {
       png(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI)
+    } else if (type == "jpg") {
+      jpeg(file, width = 8, height = 6, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
     } else {
       pdf(file, width = 8, height = 6)
     }
@@ -851,69 +861,99 @@ server_ml <- function(input, output, session, rv) {
     plotfun()
   }
 
-  output$dl_ml_rf_error_png <- downloadHandler(
-    filename = function() "rf_error_rates.png",
-    content = function(file) download_plot(file, "png", plot_rf_error)
+  add_ml_diag_downloads <- function(stem, plotfun, prefix) {
+    output[[paste0("dl_ml_", stem, "_png")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".png"),
+      content = function(file) download_plot(file, "png", plotfun)
+    )
+    output[[paste0("dl_ml_", stem, "_jpg")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".jpg"),
+      content = function(file) download_plot(file, "jpg", plotfun)
+    )
+    output[[paste0("dl_ml_", stem, "_pdf")]] <- downloadHandler(
+      filename = function() paste0(prefix, ".pdf"),
+      content = function(file) download_plot(file, "pdf", plotfun)
+    )
+  }
+
+  add_ml_diag_downloads("rf_error", plot_rf_error, "rf_error_rates")
+  add_ml_diag_downloads("rf_imp", plot_rf_importance, "rf_top10_importance")
+  add_ml_diag_downloads("lasso_path", plot_lasso_path, "lasso_coefficient_path")
+  add_ml_diag_downloads("lasso_dev", plot_lasso_dev, "lasso_deviance_vs_lambda")
+  add_ml_diag_downloads("elastic_path", plot_elastic_path, "elastic_net_coefficient_path")
+  add_ml_diag_downloads("elastic_dev", plot_elastic_dev, "elastic_net_deviance_vs_lambda")
+  add_ml_diag_downloads("ridge_path", plot_ridge_path, "ridge_coefficient_path")
+  add_ml_diag_downloads("ridge_dev", plot_ridge_dev, "ridge_deviance_vs_lambda")
+
+  plot_ml_biomarker_cor_heatmap <- function() {
+    req(rv$extracted_data_ml, rv$ml_common_genes)
+    expr_mat <- as.matrix(rv$extracted_data_ml)
+    genes <- intersect(rv$ml_common_genes, colnames(expr_mat))
+    if (length(genes) < 2) {
+      plot.new(); text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40"); return()
+    }
+    expr_sub <- expr_mat[, genes, drop = FALSE]
+    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+    pheatmap::pheatmap(cor_mat, display_numbers = TRUE, number_color = "black", clustering_method = "complete",
+                       main = "Biomarker Co-expression (Spearman)", fontsize = 10)
+  }
+  plot_ml_biomarker_coexp_network <- function() {
+    req(rv$extracted_data_ml, rv$ml_common_genes)
+    expr_mat <- as.matrix(rv$extracted_data_ml)
+    genes <- intersect(rv$ml_common_genes, colnames(expr_mat))
+    if (length(genes) < 2) {
+      plot.new(); text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40"); return()
+    }
+    expr_sub <- expr_mat[, genes, drop = FALSE]
+    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+    diag(cor_mat) <- 0
+    thr <- 0.7
+    adj <- cor_mat; adj[abs(adj) < thr] <- 0
+    if (all(adj == 0)) {
+      plot.new(); text(0.5, 0.5, paste0("No edges with |Spearman| >= ", thr, "."), cex = 0.9, col = "gray40"); return()
+    }
+    g <- igraph::graph_from_adjacency_matrix(adj, mode = "undirected", weighted = TRUE, diag = FALSE)
+    layout <- igraph::layout_with_fr(g)
+    edge_cols <- ifelse(igraph::E(g)$weight >= 0, "#2ECC71", "#E74C3C")
+    edge_width <- 1 + 4 * abs(igraph::E(g)$weight)
+    vertex_size <- 8 + 4 * igraph::degree(g)
+    plot(g, layout = layout, vertex.label = igraph::V(g)$name, vertex.label.cex = 0.8,
+         vertex.color = "#3498DB", vertex.size = vertex_size, edge.color = edge_cols, edge.width = edge_width,
+         main = paste0("Co-expression Network (|Spearman| >= ", thr, ")"))
+  }
+
+  ml_biomarker_to_file <- function(file, plotfun, width = 8, height = 6) {
+    ext <- tolower(sub(".*\\.", "", basename(file)))
+    if (ext == "pdf") pdf(file, width = width, height = height, bg = "white")
+    else if (ext %in% c("jpg", "jpeg")) jpeg(file, width = width, height = height, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
+    else png(file, width = width * IMAGE_DPI, height = height * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+    on.exit(dev.off(), add = TRUE)
+    plotfun()
+  }
+
+  output$download_ml_biomarker_cor_heatmap_png <- downloadHandler(
+    filename = function() "ML_Biomarker_Correlation_Heatmap.png",
+    content = function(file) ml_biomarker_to_file(file, plot_ml_biomarker_cor_heatmap)
   )
-  output$dl_ml_rf_error_pdf <- downloadHandler(
-    filename = function() "rf_error_rates.pdf",
-    content = function(file) download_plot(file, "pdf", plot_rf_error)
+  output$download_ml_biomarker_cor_heatmap_jpg <- downloadHandler(
+    filename = function() "ML_Biomarker_Correlation_Heatmap.jpg",
+    content = function(file) ml_biomarker_to_file(file, plot_ml_biomarker_cor_heatmap)
   )
-  output$dl_ml_rf_imp_png <- downloadHandler(
-    filename = function() "rf_top10_importance.png",
-    content = function(file) download_plot(file, "png", plot_rf_importance)
+  output$download_ml_biomarker_cor_heatmap_pdf <- downloadHandler(
+    filename = function() "ML_Biomarker_Correlation_Heatmap.pdf",
+    content = function(file) ml_biomarker_to_file(file, plot_ml_biomarker_cor_heatmap)
   )
-  output$dl_ml_rf_imp_pdf <- downloadHandler(
-    filename = function() "rf_top10_importance.pdf",
-    content = function(file) download_plot(file, "pdf", plot_rf_importance)
+  output$download_ml_biomarker_coexp_network_png <- downloadHandler(
+    filename = function() "ML_Biomarker_Coexpression_Network.png",
+    content = function(file) ml_biomarker_to_file(file, plot_ml_biomarker_coexp_network)
   )
-  output$dl_ml_lasso_path_png <- downloadHandler(
-    filename = function() "lasso_coefficient_path.png",
-    content = function(file) download_plot(file, "png", plot_lasso_path)
+  output$download_ml_biomarker_coexp_network_jpg <- downloadHandler(
+    filename = function() "ML_Biomarker_Coexpression_Network.jpg",
+    content = function(file) ml_biomarker_to_file(file, plot_ml_biomarker_coexp_network)
   )
-  output$dl_ml_lasso_path_pdf <- downloadHandler(
-    filename = function() "lasso_coefficient_path.pdf",
-    content = function(file) download_plot(file, "pdf", plot_lasso_path)
-  )
-  output$dl_ml_lasso_dev_png <- downloadHandler(
-    filename = function() "lasso_deviance_vs_lambda.png",
-    content = function(file) download_plot(file, "png", plot_lasso_dev)
-  )
-  output$dl_ml_lasso_dev_pdf <- downloadHandler(
-    filename = function() "lasso_deviance_vs_lambda.pdf",
-    content = function(file) download_plot(file, "pdf", plot_lasso_dev)
-  )
-  output$dl_ml_elastic_path_png <- downloadHandler(
-    filename = function() "elastic_net_coefficient_path.png",
-    content = function(file) download_plot(file, "png", plot_elastic_path)
-  )
-  output$dl_ml_elastic_path_pdf <- downloadHandler(
-    filename = function() "elastic_net_coefficient_path.pdf",
-    content = function(file) download_plot(file, "pdf", plot_elastic_path)
-  )
-  output$dl_ml_elastic_dev_png <- downloadHandler(
-    filename = function() "elastic_net_deviance_vs_lambda.png",
-    content = function(file) download_plot(file, "png", plot_elastic_dev)
-  )
-  output$dl_ml_elastic_dev_pdf <- downloadHandler(
-    filename = function() "elastic_net_deviance_vs_lambda.pdf",
-    content = function(file) download_plot(file, "pdf", plot_elastic_dev)
-  )
-  output$dl_ml_ridge_path_png <- downloadHandler(
-    filename = function() "ridge_coefficient_path.png",
-    content = function(file) download_plot(file, "png", plot_ridge_path)
-  )
-  output$dl_ml_ridge_path_pdf <- downloadHandler(
-    filename = function() "ridge_coefficient_path.pdf",
-    content = function(file) download_plot(file, "pdf", plot_ridge_path)
-  )
-  output$dl_ml_ridge_dev_png <- downloadHandler(
-    filename = function() "ridge_deviance_vs_lambda.png",
-    content = function(file) download_plot(file, "png", plot_ridge_dev)
-  )
-  output$dl_ml_ridge_dev_pdf <- downloadHandler(
-    filename = function() "ridge_deviance_vs_lambda.pdf",
-    content = function(file) download_plot(file, "pdf", plot_ridge_dev)
+  output$download_ml_biomarker_coexp_network_pdf <- downloadHandler(
+    filename = function() "ML_Biomarker_Coexpression_Network.pdf",
+    content = function(file) ml_biomarker_to_file(file, plot_ml_biomarker_coexp_network)
   )
 
   output$ml_venn_message <- renderUI({
@@ -1055,6 +1095,88 @@ server_ml <- function(input, output, session, rv) {
       cat_names <- names(sets)
       if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
       png(file, width = 8 * IMAGE_DPI, height = 8 * IMAGE_DPI, res = IMAGE_DPI)
+      grid::grid.newpage()
+      vp <- VennDiagram::venn.diagram(
+        x = sets,
+        category.names = cat_names,
+        filename = NULL,
+        output = TRUE,
+        disable.logging = TRUE,
+        imagetype = "png",
+        height = 8 * IMAGE_DPI,
+        width = 8 * IMAGE_DPI,
+        resolution = IMAGE_DPI,
+        compression = "lzw",
+        lwd = 2.5,
+        lty = "blank",
+        fill = fill_colors,
+        alpha = 0.65,
+        cex = 1.4,
+        fontface = "bold",
+        cat.cex = 1.3,
+        cat.fontface = "bold",
+        cat.col = fill_colors,
+        margin = 0.08,
+        main = "Common Genes Across ML Methods",
+        main.cex = 1.4,
+        main.fontface = "bold"
+      )
+      grid::grid.draw(vp)
+      dev.off()
+    }
+  )
+
+  output$download_ml_venn_jpg <- downloadHandler(
+    filename = function() {
+      sets <- rv$ml_venn_sets
+      n <- if (is.null(sets)) 0 else length(sets)
+      if (n > 5) "upset_plot_ML_methods.jpg" else "venn_diagram_ML_methods.jpg"
+    },
+    content = function(file) {
+      req(rv$ml_venn_sets)
+      sets <- rv$ml_venn_sets
+      n_sets <- length(sets)
+      if (n_sets < 2) return()
+      if (n_sets > 5) {
+        all_genes <- unique(unlist(sets, use.names = FALSE))
+        if (length(all_genes) == 0) return()
+        upset_matrix <- matrix(0L, nrow = length(all_genes), ncol = n_sets)
+        rownames(upset_matrix) <- all_genes
+        colnames(upset_matrix) <- names(sets)
+        for (i in seq_len(n_sets)) {
+          g <- sets[[i]]
+          upset_matrix[intersect(all_genes, g), i] <- 1L
+        }
+        upset_df <- as.data.frame(upset_matrix)
+        max_set_size <- max(sapply(sets, length))
+        jpeg(file, width = 10, height = 6.67, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
+        tryCatch({
+          UpSetR::upset(upset_df,
+                        sets = colnames(upset_df),
+                        keep.order = TRUE,
+                        order.by = "freq",
+                        main.bar.color = "#3498db",
+                        sets.bar.color = ml_venn_fill[seq_len(n_sets)],
+                        matrix.color = "#2ecc71",
+                        point.size = 3.5,
+                        line.size = 1,
+                        text.scale = c(1.5, 1.2, 1.2, 1.1, 1.5, 1.2),
+                        mb.ratio = c(0.6, 0.4),
+                        set_size.show = TRUE,
+                        set_size.scale_max = max(1, max_set_size * 1.1),
+                        mainbar.y.label = "Gene set intersections",
+                        sets.x.label = "Genes per method")
+        }, error = function(e) {
+          plot.new()
+          text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1, col = "red")
+        })
+        dev.off()
+        return()
+      }
+      fill_colors <- if (n_sets <= 8) ml_venn_fill[seq_len(n_sets)] else rep(ml_venn_fill, length.out = n_sets)
+      cat_names <- names(sets)
+      if (is.null(cat_names)) cat_names <- ml_venn_cats[seq_len(n_sets)]
+      jpeg(file, width = 8, height = 8, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
       grid::grid.newpage()
       vp <- VennDiagram::venn.diagram(
         x = sets,

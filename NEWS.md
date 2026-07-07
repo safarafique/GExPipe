@@ -2,6 +2,9 @@
 
 ## Version 0.99.17
 
+### Shiny UI
+- Add JPG and PDF download buttons for all Shiny plots (shared `gexp_ui_plot_download_*` helpers); nomogram panels B-E, ML biomarker plots, and Results Summary plots now exportable.
+
 ### SPB build fix
 - Remove `dev/` from the package source tree (developer utilities kept local via
   `.gitignore`) to eliminate R CMD build WARNING: empty `dev/` directory.

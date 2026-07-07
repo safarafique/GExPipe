@@ -87,6 +87,7 @@ box(
           plotOutput("volcano_plot", height = "550px"),
           tags$div(style = "margin-top: 10px;",
             downloadButton("download_volcano_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_volcano_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
             downloadButton("download_volcano_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))),
       box(title = tags$span(icon("list-ol"), " Top DEGs"),
           width = 4, status = "info", solidHeader = TRUE,
@@ -98,6 +99,7 @@ box(
           plotOutput("heatmap_plot", height = "600px"),
           tags$div(style = "margin-top: 10px;",
             downloadButton("download_heatmap_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_heatmap_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
             downloadButton("download_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")))
     ),
     

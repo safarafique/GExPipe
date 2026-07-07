@@ -7,7 +7,7 @@
 .RDataTmp
 .Ruserdata
 
-# Local installed-version snapshot (machine-specific; regenerate with inst/scripts/dump_installed_versions.R)
+# Local installed-version snapshot (machine-specific; not for GitHub)
 inst/pkg_versions_installed.local.txt
 
 # Build and check artifacts

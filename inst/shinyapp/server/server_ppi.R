@@ -858,6 +858,19 @@ server_ppi <- function(input, output, session, rv) {
       dev.off()
     }
   )
+  output$download_ppi_traditional_jpg <- downloadHandler(
+    filename = function() "PPI_Network_FruchtermanReingold.jpg",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("1. Fruchterman–Reingold", sel$mode, sel$n_val)
+      jpeg(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
+      draw_ppi_traditional(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
   output$download_ppi_traditional_pdf <- downloadHandler(
     filename = function() "PPI_Network_FruchtermanReingold.pdf",
     content = function(file) {
@@ -880,6 +893,19 @@ server_ppi <- function(input, output, session, rv) {
       sel <- ppi_applied_mode_n()
       main_title <- ppi_plot_title("2. Circular by Degree", sel$mode, sel$n_val)
       png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
+      draw_ppi_circular(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_circular_jpg <- downloadHandler(
+    filename = function() "PPI_Network_Circular.jpg",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("2. Circular by Degree", sel$mode, sel$n_val)
+      jpeg(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
       draw_ppi_circular(g_sub, cm, main_title)
       dev.off()
     }
@@ -907,6 +933,16 @@ server_ppi <- function(input, output, session, rv) {
       if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 6.5, dpi = IMAGE_DPI, units = "in", bg = "#FAFAFA", device = "png")
     }
   )
+  output$download_ppi_ggraph_jpg <- downloadHandler(
+    filename = function() "PPI_Network_ggraph.jpg",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("3. ggraph", sel$mode, sel$n_val)
+      p <- make_ppi_ggraph_plot(g_sub, main_title)
+      if (!is.null(p)) ggplot2::ggsave(file, plot = p, width = 7, height = 6.5, dpi = IMAGE_DPI, units = "in", bg = "#FAFAFA", device = "jpeg")
+    }
+  )
   output$download_ppi_ggraph_pdf <- downloadHandler(
     filename = function() "PPI_Network_ggraph.pdf",
     content = function(file) {
@@ -926,6 +962,19 @@ server_ppi <- function(input, output, session, rv) {
       sel <- ppi_applied_mode_n()
       main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
       png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
+      draw_ppi_kamada(g_sub, cm, main_title)
+      dev.off()
+    }
+  )
+  output$download_ppi_kamada_jpg <- downloadHandler(
+    filename = function() "PPI_Network_KamadaKawai.jpg",
+    content = function(file) {
+      g_sub <- ppi_subgraph()
+      cm <- ppi_plot_common(g_sub)
+      if (is.null(cm)) return()
+      sel <- ppi_applied_mode_n()
+      main_title <- ppi_plot_title("4. Kamada–Kawai", sel$mode, sel$n_val)
+      jpeg(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
       draw_ppi_kamada(g_sub, cm, main_title)
       dev.off()
     }
@@ -952,6 +1001,19 @@ server_ppi <- function(input, output, session, rv) {
       } else return()
       if (is.null(g) || igraph::vcount(g) == 0) return()
       png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
+      draw_ppi_hub_or_other(g, main, node_col)
+      dev.off()
+    }
+  )
+  output$download_ppi_hub_or_other_jpg <- downloadHandler(
+    filename = function() "PPI_Network_HubOrOther.jpg",
+    content = function(file) {
+      mode <- app_ppi$applied_mode
+      if (mode == "hub") { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
+      } else if (mode == "topn") { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
+      } else return()
+      if (is.null(g) || igraph::vcount(g) == 0) return()
+      jpeg(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
       draw_ppi_hub_or_other(g, main, node_col)
       dev.off()
     }

@@ -623,6 +623,15 @@ server_qc <- function(input, output, session, rv) {
       draw_qc_venn_to_dev()
     }
   )
+  output$dl_qc_venn_jpg <- downloadHandler(
+    filename = function() "QC_Venn_Diagram.jpg",
+    content = function(file) {
+      req(rv$all_genes_list)
+      jpeg(file, width = 8, height = 6, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
+      on.exit(dev.off())
+      draw_qc_venn_to_dev()
+    }
+  )
   output$dl_qc_venn_pdf <- downloadHandler(
     filename = function() "QC_Venn_Diagram.pdf",
     content = function(file) {
@@ -637,6 +646,15 @@ server_qc <- function(input, output, session, rv) {
     content = function(file) {
       req(rv$all_genes_list)
       png(file, width = 10, height = 6, res = IMAGE_DPI, units = "in", bg = "white")
+      on.exit(dev.off())
+      draw_qc_upset_to_dev()
+    }
+  )
+  output$dl_qc_upset_jpg <- downloadHandler(
+    filename = function() "QC_UpSet_Plot.jpg",
+    content = function(file) {
+      req(rv$all_genes_list)
+      jpeg(file, width = 10, height = 6, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
       on.exit(dev.off())
       draw_qc_upset_to_dev()
     }
@@ -668,6 +686,24 @@ server_qc <- function(input, output, session, rv) {
       ggplot2::ggsave(file, p, width = 10, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
     }
   )
+  output$dl_qc_boxplot_jpg <- downloadHandler(
+    filename = function() "QC_Boxplot.jpg",
+    content = function(file) {
+      req(rv$combined_expr_raw)
+      df <- gexp_qc_prepare_boxplot_data(
+        combined_expr_raw = rv$combined_expr_raw,
+        micro_expr_list = rv$micro_expr_list,
+        rna_counts_list = rv$rna_counts_list,
+        max_points = 500000L
+      )
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = .data$Sample, y = .data$Expression, fill = .data$Platform)) +
+        ggplot2::geom_boxplot(outlier.size = 0.5) +
+        ggplot2::theme_bw() +
+        ggplot2::labs(title = "Expression Distribution - Raw Data", y = "Expression") +
+        ggplot2::theme(axis.text.x = ggplot2::element_blank(), axis.ticks.x = ggplot2::element_blank(), plot.title = ggplot2::element_text(face = "bold", size = 16))
+      ggplot2::ggsave(file, p, width = 10, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+    }
+  )
   output$dl_qc_boxplot_pdf <- downloadHandler(
     filename = function() "QC_Boxplot.pdf",
     content = function(file) {
@@ -691,6 +727,19 @@ server_qc <- function(input, output, session, rv) {
     content = function(file) {
       req(rv$combined_expr_raw)
       png(file, width = 8, height = 5, res = IMAGE_DPI, units = "in", bg = "white")
+      on.exit(dev.off())
+      dd <- gexp_qc_prepare_density_data(rv$combined_expr_raw, max_samples = 50L)
+      plot(dd$first, main = "Expression Density - Raw Data", xlab = "Expression", col = "#3498db", lwd = 2, ylim = c(0, max(dd$first$y) * 1.2))
+      if (length(dd$others) > 0) {
+        for (i in seq_along(dd$others)) lines(dd$others[[i]], col = dd$colors[i + 1L], lwd = 1)
+      }
+    }
+  )
+  output$dl_qc_density_jpg <- downloadHandler(
+    filename = function() "QC_Density.jpg",
+    content = function(file) {
+      req(rv$combined_expr_raw)
+      jpeg(file, width = 8, height = 5, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
       on.exit(dev.off())
       dd <- gexp_qc_prepare_density_data(rv$combined_expr_raw, max_samples = 50L)
       plot(dd$first, main = "Expression Density - Raw Data", xlab = "Expression", col = "#3498db", lwd = 2, ylim = c(0, max(dd$first$y) * 1.2))
