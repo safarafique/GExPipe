@@ -585,7 +585,7 @@ server_ml <- function(input, output, session, rv) {
       return()
     }
     expr_sub <- expr_mat[, genes, drop = FALSE]          # samples x final genes
-    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+    cor_mat <- gexpipe_spearman_cor(expr_sub)
 
     tryCatch({
       pheatmap::pheatmap(
@@ -612,7 +612,7 @@ server_ml <- function(input, output, session, rv) {
       return()
     }
     expr_sub <- expr_mat[, genes, drop = FALSE]
-    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+    cor_mat <- gexpipe_spearman_cor(expr_sub)
     diag(cor_mat) <- 0
 
     thr <- 0.7
@@ -895,7 +895,7 @@ server_ml <- function(input, output, session, rv) {
       plot.new(); text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40"); return()
     }
     expr_sub <- expr_mat[, genes, drop = FALSE]
-    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+    cor_mat <- gexpipe_spearman_cor(expr_sub)
     pheatmap::pheatmap(cor_mat, display_numbers = TRUE, number_color = "black", clustering_method = "complete",
                        main = "Biomarker Co-expression (Spearman)", fontsize = 10)
   }
@@ -907,7 +907,7 @@ server_ml <- function(input, output, session, rv) {
       plot.new(); text(0.5, 0.5, "Need at least 2 final biomarker genes with expression data.", cex = 0.9, col = "gray40"); return()
     }
     expr_sub <- expr_mat[, genes, drop = FALSE]
-    cor_mat <- suppressWarnings(cor(expr_sub, method = "spearman", use = "pairwise.complete.obs"))
+    cor_mat <- gexpipe_spearman_cor(expr_sub)
     diag(cor_mat) <- 0
     thr <- 0.7
     adj <- cor_mat; adj[abs(adj) < thr] <- 0
