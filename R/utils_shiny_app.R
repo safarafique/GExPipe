@@ -1086,7 +1086,8 @@ gexp_app_attach_packages <- function() {
           message(idx, " ", label, "... \u26A0 broken DLL (auto-fixing...)")
           pkg_state$broken <- c(pkg_state$broken, p)
         } else {
-          message(sprintf("%s %s... \u2717 load error: %s", idx, label, err_msg))
+          load_err <- sprintf("%s %s... \u2717 load error: %s", idx, label, err_msg)
+          warning(load_err, call. = FALSE)
         }
         pkg_state$failed <- c(pkg_state$failed, p)
       }
