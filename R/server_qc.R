@@ -490,19 +490,28 @@ server_qc <- function(input, output, session, rv) {
   })
 
   # ---- Plot helper: PCA scatter ----
+  .qc_sample_dataset <- function(sample_ids) {
+    if (!is.null(rv$unified_metadata) && "Dataset" %in% names(rv$unified_metadata) &&
+        "SampleID" %in% names(rv$unified_metadata)) {
+      ds <- rv$unified_metadata$Dataset[match(sample_ids, rv$unified_metadata$SampleID)]
+      if (!all(is.na(ds))) {
+        return(ds)
+      }
+    }
+    ds_map <- gexp_qc_build_sample_dataset_map(
+      if (is.null(rv$micro_expr_list)) list() else rv$micro_expr_list,
+      if (is.null(rv$rna_counts_list)) list() else rv$rna_counts_list
+    )
+    unname(ds_map[sample_ids])
+  }
+
   make_qc_pca_plot <- function() {
     scores <- as.data.frame(rv$qc_pca_scores)
     scores$Sample <- rownames(scores)
     scores$Distance <- rv$qc_pca_distances[scores$Sample]
     scores$IsOutlier <- scores$Distance > rv$qc_pca_threshold
-
-    if (!is.null(rv$unified_metadata) && "Dataset" %in% names(rv$unified_metadata) &&
-        "SampleID" %in% names(rv$unified_metadata)) {
-      scores$Dataset <- rv$unified_metadata$Dataset[match(scores$Sample, rv$unified_metadata$SampleID)]
-      if (all(is.na(scores$Dataset))) scores$Dataset <- "Dataset"
-    } else {
-      scores$Dataset <- "Dataset"
-    }
+    scores$Dataset <- .qc_sample_dataset(scores$Sample)
+    scores$Dataset[is.na(scores$Dataset) | !nzchar(scores$Dataset)] <- "Unknown"
 
     var_exp <- rv$qc_pca_var_explained * 100
     n_out <- sum(scores$IsOutlier)
@@ -769,6 +778,7 @@ server_qc <- function(input, output, session, rv) {
 
     df <- data.frame(
       Sample = all_samples,
+      Dataset = .qc_sample_dataset(all_samples),
       Mahal_Distance = round(rv$qc_pca_distances[all_samples], 2),
       PCA_Outlier = ifelse(all_samples %in% rv$qc_pca_outliers, "Yes", ""),
       Connectivity = round(rv$qc_conn_k[all_samples], 2),
