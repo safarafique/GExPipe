@@ -94,7 +94,7 @@ ui_batch <- tabItem(
                        tags$strong(icon("magic"), " Batch Correction Method:"),
                        tags$i(class = "fa fa-question-circle param-help",
                               `data-toggle` = "tooltip", `data-placement` = "right",
-                              title = "Method to remove technical batch effects.<br><b>ComBat-ref:</b> Recommended — largest dataset as reference.<br><b>SVA:</b> Surrogate variables — unknown/hidden confounders.<br><b>limma:</b> Fast linear model.<br><b>ComBat:</b> Empirical Bayes.<br><b>Quantile+limma:</b> Two-step.<br><b>Hybrid:</b> Quantile + ComBat."),
+                              title = "Method to remove technical batch effects.<br><b>ComBat-ref:</b> Recommended - largest dataset as reference.<br><b>SVA:</b> Surrogate variables - unknown/hidden confounders.<br><b>limma:</b> Fast linear model.<br><b>ComBat:</b> Empirical Bayes.<br><b>Quantile+limma:</b> Two-step.<br><b>Hybrid:</b> Quantile + ComBat."),
                        style = "font-size: 16px; color: #2c3e50; margin-bottom: 15px; display: block;"
                      ),
                      tags$div(
@@ -159,17 +159,17 @@ ui_batch <- tabItem(
               ),
               tags$tbody(
                 tags$tr(
-                  tags$td(tags$strong("Microarray"), " — 2+ GEO studies, groups crossed"),
+                  tags$td(tags$strong("Microarray"), " - 2+ GEO studies, groups crossed"),
                   tags$td(tags$span(class = "label label-success", "ComBat-ref")),
                   tags$td("Largest study as reference; protects Condition in the model.")
                 ),
                 tags$tr(
-                  tags$td(tags$strong("RNA-seq"), " — 2+ studies, log/TMM normalized"),
+                  tags$td(tags$strong("RNA-seq"), " - 2+ studies, log/TMM normalized"),
                   tags$td(tags$span(class = "label label-success", "ComBat-ref")),
                   tags$td("Standard multi-study correction on expression scale; pair with DESeq2/edgeR batch in DE if using counts.")
                 ),
                 tags$tr(
-                  tags$td(tags$strong("Merged"), " — microarray + RNA-seq"),
+                  tags$td(tags$strong("Merged"), " - microarray + RNA-seq"),
                   tags$td(tags$span(class = "label label-primary", "limma")),
                   tags$td("Gentler linear adjustment across technologies; use ", tags$strong("limma"), " DE at Step 6.")
                 ),
@@ -186,7 +186,7 @@ ui_batch <- tabItem(
                 tags$tr(
                   tags$td(tags$span(style = "color: #c0392b;", "Dataset confounded with Condition"), " (see table above)"),
                   tags$td(tags$span(class = "label label-warning", "limma"), " or ", tags$span(class = "label label-warning", "SVA")),
-                  tags$td(tags$em("Avoid ComBat"), " — can remove disease signal when one GSE is all Normal and another all Disease.")
+                  tags$td(tags$em("Avoid ComBat"), " - can remove disease signal when one GSE is all Normal and another all Disease.")
                 ),
                 tags$tr(
                   tags$td("Equal-sized batches, well-balanced design"),
@@ -203,7 +203,7 @@ ui_batch <- tabItem(
               style = "margin: 0; padding-left: 20px; color: #495057; font-size: 12px; line-height: 1.7;",
               tags$li(tags$strong("ComBat-ref:"), " ComBat with the largest dataset as reference batch (default for most multi-GSE runs)."),
               tags$li(tags$strong("ComBat:"), " Standard ComBat when batch sizes are similar."),
-              tags$li(tags$strong("limma:"), " Fast ", tags$code("removeBatchEffect"), " — preferred for merged platforms or confounded designs."),
+              tags$li(tags$strong("limma:"), " Fast ", tags$code("removeBatchEffect"), " - preferred for merged platforms or confounded designs."),
               tags$li(tags$strong("SVA:"), " Surrogate variable analysis for unknown batch factors."),
               tags$li(tags$strong("Quantile + limma:"), " Global quantile alignment, then limma batch removal."),
               tags$li(tags$strong("Hybrid:"), " Quantile normalization followed by ComBat.")

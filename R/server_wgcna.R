@@ -4,8 +4,8 @@
 #
 # WGCNA best practices (signed network):
 #   - Use batch-corrected expression; samples = rows, genes = columns in datExpr.
-#   - Soft threshold: aim for scale-free R² > 0.8; typical power 6–12.
-#   - minModuleSize: 30–50 for discovery; 20 if few genes.
+#   - Soft threshold: aim for scale-free R² > 0.8; typical power 6-12.
+#   - minModuleSize: 30-50 for discovery; 20 if few genes.
 #   - mergeCutHeight: 0.25 merges modules with eigengene cor > 0.75.
 #   - Grey module = unassigned genes; exclude from trait correlation.
 #
@@ -168,7 +168,7 @@ server_wgcna <- function(input, output, session, rv) {
         
         # Require minimum dimensions for meaningful WGCNA
         if (nrow(expr_top) < 20L) {
-          stop("Too few genes (", nrow(expr_top), ") after filtering. Use 'All genes' or larger 'Top Variable Genes' (e.g. 3000–5000) or lower 'Min Samples' fraction.")
+          stop("Too few genes (", nrow(expr_top), ") after filtering. Use 'All genes' or larger 'Top Variable Genes' (e.g. 3000-5000) or lower 'Min Samples' fraction.")
         }
         if (ncol(expr_top) < 3L) {
           stop("Too few samples (", ncol(expr_top), "). Need at least 3 samples for WGCNA.")
@@ -212,7 +212,7 @@ server_wgcna <- function(input, output, session, rv) {
         
         showNotification(
           tags$div(
-            tags$strong("✓ WGCNA data prepared!"),
+            tags$strong("OK WGCNA data prepared!"),
             tags$br(),
             tags$span("Samples: ", nrow(datExpr), " | Genes: ", ncol(datExpr)),
             style = "font-size: 13px;"
@@ -252,7 +252,7 @@ server_wgcna <- function(input, output, session, rv) {
         class = "alert alert-success",
         icon("check-circle"),
         "WGCNA datExpr ready: ",
-        nrow(rv$datExpr), " samples × ",
+        nrow(rv$datExpr), " samples x ",
         ncol(rv$datExpr), " genes."
       )
     }
@@ -348,7 +348,7 @@ server_wgcna <- function(input, output, session, rv) {
       showNotification(paste("Suggested ", length(suggested), " potential outlier(s). Exclude suggested or dismiss.", sep = ""), type = "message", duration = 5)
     } else {
       add_wgcna_log("Outlier detection: no samples above height threshold (median + 3*MAD).")
-      showNotification("No outliers detected — you can proceed to Step 2.", type = "message", duration = 4)
+      showNotification("No outliers detected - you can proceed to Step 2.", type = "message", duration = 4)
     }
   })
 
@@ -459,7 +459,7 @@ server_wgcna <- function(input, output, session, rv) {
     } else {
       tags$p(
         tags$small(
-          icon("user-minus"), " Excluded: ", length(excl), " sample(s) — ",
+          icon("user-minus"), " Excluded: ", length(excl), " sample(s) - ",
           paste(excl, collapse = ", "),
           style = "color: #856404; margin-top: 8px;"
         )
@@ -491,7 +491,7 @@ server_wgcna <- function(input, output, session, rv) {
     on.exit(par(op), add = TRUE)
     plot(d, main = "", xlab = "", ylab = "Height", sub = "", leaflab = "perpendicular", axes = FALSE)
     title(main = "Sample clustering (outlier check)", line = 2.8, col.main = "#1a252f", font.main = 2, cex.main = 1.2)
-    mtext(side = 3, text = sprintf("%s samples × %s genes", format(n_samp, big.mark = ","), format(n_genes, big.mark = ",")), line = 1.4, cex = 0.9, col = "#5d6d7e")
+    mtext(side = 3, text = sprintf("%s samples x %s genes", format(n_samp, big.mark = ","), format(n_genes, big.mark = ",")), line = 1.4, cex = 0.9, col = "#5d6d7e")
     h_max <- max(ht$height)
     y_ticks <- pretty(c(0, h_max), n = 5)
     axis(2, at = y_ticks, col = "#5d6d7e", col.axis = "#2c3e50", cex.axis = 0.9, las = 1)
@@ -629,7 +629,7 @@ server_wgcna <- function(input, output, session, rv) {
     best_power <- if (length(sft$powerEstimate)) sft$powerEstimate else NA
     fitIndices <- sft$fitIndices
     if (is.null(fitIndices) || nrow(fitIndices) < 1) {
-      return(tags$div(class = "alert alert-warning", icon("info-circle"), "No fit indices. Choose power 6–12 in Step 3."))
+      return(tags$div(class = "alert alert-warning", icon("info-circle"), "No fit indices. Choose power 6-12 in Step 3."))
     }
     signedR2 <- -sign(fitIndices[, 3]) * fitIndices[, 2]
     max_r2 <- max(signedR2, na.rm = TRUE)
@@ -643,7 +643,7 @@ server_wgcna <- function(input, output, session, rv) {
         class = "alert alert-warning",
         icon("info-circle"),
         "No power reached R² > 0.8. ", best_hint,
-        "Choose power manually (typically 6–12); higher power = fewer connections."
+        "Choose power manually (typically 6-12); higher power = fewer connections."
       )
     } else {
       tags$div(
@@ -792,7 +792,7 @@ server_wgcna <- function(input, output, session, rv) {
         removeNotification("wgcna_network_processing")
         showNotification(
           tags$div(
-            tags$strong("✓ Network construction complete!"),
+            tags$strong("OK Network construction complete!"),
             tags$br(),
             tags$span("Modules detected: ", n_modules),
             style = "font-size: 13px;"
@@ -922,7 +922,7 @@ server_wgcna <- function(input, output, session, rv) {
           # group indicator (and the mirror image of the other), so it is redundant in
           # the module-trait heatmap. We keep it in trait_data for the GS/MM trait
           # selector but record its name so the heatmap can drop it (see
-          # GExPipe::gexpipe_wgcna_heatmap_cor() below) — otherwise the heatmap shows a duplicate column.
+          # GExPipe::gexpipe_wgcna_heatmap_cor() below) - otherwise the heatmap shows a duplicate column.
           if (length(unique_groups) == 2L) {
             ug <- as.character(unique_groups)
             if ("Normal" %in% ug && "Disease" %in% ug) {
@@ -995,7 +995,7 @@ server_wgcna <- function(input, output, session, rv) {
         rv$geneModuleMembership <- geneModuleMembership
         rv$MMPvalue <- MMPvalue
         
-        add_wgcna_log(paste("✓ GS/MM calculated for", nrow(gene_metrics), "genes"))
+        add_wgcna_log(paste("OK GS/MM calculated for", nrow(gene_metrics), "genes"))
         add_wgcna_log("Module-trait correlation complete")
         
         # Re-enable button
@@ -1809,7 +1809,7 @@ server_wgcna <- function(input, output, session, rv) {
         labels = c("FALSE" = "No", "TRUE" = "Yes")
       ) +
       ggplot2::labs(
-        title = paste0("Gene significance vs. module membership — ", module_color, " (trait: ", trait_col, ")"),
+        title = paste0("Gene significance vs. module membership - ", module_color, " (trait: ", trait_col, ")"),
         x = "Module membership (MM)",
         y = "Gene significance (GS)"
       ) +

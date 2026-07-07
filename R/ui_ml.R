@@ -12,12 +12,12 @@ ui_ml <- tabItem(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " Perform supervised machine learning on expression data (samples × genes) to rank genes by predictive importance for biomarker discovery. Supports LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA, and XGBoost+SHAP.", style = "margin-bottom: 8px;"),
+      tags$p(tags$strong("Purpose:"), " Perform supervised machine learning on expression data (samples x genes) to rank genes by predictive importance for biomarker discovery. Supports LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA, and XGBoost+SHAP.", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Methods:"), " LASSO, Elastic Net, Ridge (glmnet), Random Forest, SVM-RFE, Boruta (all-relevant feature selection), sPLS-DA (sparse PLS-DA), XGBoost+SHAP (interpretable importance). Optional PPI centrality weights (from Step 9) can weight features. Labels from WGCNA sample metadata (e.g. Normal vs Disease).", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Requirements:"), " On the PPI tab, click 'Extract Data for ML' to provide expression matrix and sample labels.", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Smooth run (LASSO / Elastic Net / Ridge):"), " After installing or updating GExPipe, restart R once (RStudio: ",
-             tags$kbd("Ctrl+Shift+F10"), "), then ", tags$code("GExPipe::runGExPipe()"), ". If glmnet was rebuilt mid-session, GExPipe runs those three methods in an isolated R process automatically — wait a few extra minutes; do not skip them.", style = "margin-bottom: 8px; font-size: 12px;"),
-      tags$p(tags$strong("Caution:"), " Feature selection and ROC/nomogram in later steps use the same samples unless you run external validation (Step 11). Small class sizes (< 3 per group) or many features relative to samples increase overfitting risk — treat rankings as exploratory.", style = "margin-bottom: 0; color: #856404;")
+             tags$kbd("Ctrl+Shift+F10"), "), then ", tags$code("GExPipe::runGExPipe()"), ". If glmnet was rebuilt mid-session, GExPipe runs those three methods in an isolated R process automatically - wait a few extra minutes; do not skip them.", style = "margin-bottom: 8px; font-size: 12px;"),
+      tags$p(tags$strong("Caution:"), " Feature selection and ROC/nomogram in later steps use the same samples unless you run external validation (Step 11). Small class sizes (< 3 per group) or many features relative to samples increase overfitting risk - treat rankings as exploratory.", style = "margin-bottom: 0; color: #856404;")
     )
   ),
 
@@ -118,11 +118,11 @@ ui_ml <- tabItem(
     box(
       title = tags$span(icon("project-diagram"), " Correlation & Co-expression of Final Biomarkers"),
       width = 12, status = "danger", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p("Spearman gene–gene correlation and co-expression network for the final biomarker panel (common ML genes).",
+      tags$p("Spearman gene-gene correlation and co-expression network for the final biomarker panel (common ML genes).",
              style = "margin-bottom: 10px; font-size: 12px;"),
       fluidRow(
         column(6,
-          tags$p(tags$strong("Gene–gene Spearman correlation heatmap"), style = "margin-bottom: 6px;"),
+          tags$p(tags$strong("Gene-gene Spearman correlation heatmap"), style = "margin-bottom: 6px;"),
           gexp_ui_plot_download_bar("download_ml_biomarker_cor_heatmap_png", "download_ml_biomarker_cor_heatmap_jpg", "download_ml_biomarker_cor_heatmap_pdf", "btn-danger btn-sm"),
           plotOutput("ml_biomarker_cor_heatmap", height = "380px")
         ),

@@ -10,8 +10,8 @@ ui_ppi <- tabItem(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " Build a protein–protein interaction (PPI) network from common genes using STRINGdb and identify hub genes by centrality (degree, betweenness, PageRank). Network views support interpretation and feature selection for ML.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Methods:"), " STRINGdb mapping and interaction retrieval; consensus hubs (genes appearing in top lists of multiple centrality measures); four layout options (Fruchterman–Reingold, circular, ggraph, Kamada–Kawai). Optional: centrality-weighted features for ML.", style = "margin-bottom: 8px;"),
+      tags$p(tags$strong("Purpose:"), " Build a protein-protein interaction (PPI) network from common genes using STRINGdb and identify hub genes by centrality (degree, betweenness, PageRank). Network views support interpretation and feature selection for ML.", style = "margin-bottom: 8px;"),
+      tags$p(tags$strong("Methods:"), " STRINGdb mapping and interaction retrieval; consensus hubs (genes appearing in top lists of multiple centrality measures); four layout options (Fruchterman-Reingold, circular, ggraph, Kamada-Kawai). Optional: centrality-weighted features for ML.", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Requirements:"), " Step 8 (Common Genes) completed; click 'Compute Common Genes' before running PPI.", style = "margin-bottom: 0;")
     )
   ),
@@ -23,7 +23,7 @@ ui_ppi <- tabItem(
       fluidRow(
         column(4,
                numericInput("ppi_score_threshold",
-                 tags$span("STRING score threshold (150–900)",
+                 tags$span("STRING score threshold (150-900)",
                    tags$i(class = "fa fa-question-circle param-help",
                           `data-toggle` = "tooltip", `data-placement` = "right",
                           title = "Minimum confidence score for protein-protein interactions from STRINGdb.<br><b>400</b> = medium confidence (default, recommended), <b>700</b> = high confidence (fewer but more reliable edges), <b>150</b> = low confidence (more edges, more noise).")),
@@ -82,13 +82,13 @@ ui_ppi <- tabItem(
   
   fluidRow(
     box(
-      title = tags$span(icon("sitemap"), " 2. Network graphs (selected interacting genes) – 4 layouts (2 per row)"),
+      title = tags$span(icon("sitemap"), " 2. Network graphs (selected interacting genes) - 4 layouts (2 per row)"),
       width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE,
       uiOutput("ppi_view_summary_ui"),
       tags$hr(),
       fluidRow(
         column(6,
-               tags$h5(icon("circle-nodes"), " 1. Fruchterman–Reingold (force-directed)", style = "margin-top: 8px; margin-bottom: 6px; color: #1976D2; font-size: 13px;"),
+               tags$h5(icon("circle-nodes"), " 1. Fruchterman-Reingold (force-directed)", style = "margin-top: 8px; margin-bottom: 6px; color: #1976D2; font-size: 13px;"),
                plotOutput("ppi_plot_traditional", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
                  downloadButton("download_ppi_traditional_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
@@ -110,7 +110,7 @@ ui_ppi <- tabItem(
                  downloadButton("download_ppi_ggraph_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
                  downloadButton("download_ppi_ggraph_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
         column(6,
-               tags$h5(icon("project-diagram"), " 4. Kamada–Kawai (stress-minimization)", style = "margin-top: 8px; margin-bottom: 6px; color: #E65100; font-size: 13px;"),
+               tags$h5(icon("project-diagram"), " 4. Kamada-Kawai (stress-minimization)", style = "margin-top: 8px; margin-bottom: 6px; color: #E65100; font-size: 13px;"),
                plotOutput("ppi_plot_kamada", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
                  downloadButton("download_ppi_kamada_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
@@ -159,7 +159,7 @@ ui_ppi <- tabItem(
       tags$div(
         class = "alert alert-info",
         "Use the interactive gene list below in your next step (e.g. machine learning). ",
-        "You can download the list as CSV or the expression matrix (samples × genes) if WGCNA data is available."
+        "You can download the list as CSV or the expression matrix (samples x genes) if WGCNA data is available."
       ),
       uiOutput("ppi_interactive_list_summary_ui"),
       tags$hr(),
@@ -179,7 +179,7 @@ ui_ppi <- tabItem(
       width = 12, status = "primary", solidHeader = TRUE,
       tags$div(
         class = "alert alert-info",
-        "Extract expression data (samples × genes) for ML from WGCNA datExpr. ",
+        "Extract expression data (samples x genes) for ML from WGCNA datExpr. ",
         "The gene set used here comes from your selection above (Hub genes only, Top N by degree, or manual) in the network graphs section. This matrix is used on the next tab for LASSO, Random Forest, SVM-RFE, etc."
       ),
       tags$div(style = "margin-bottom: 15px;",

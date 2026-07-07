@@ -2,7 +2,7 @@
 # SERVER_VALIDATION.R - Step 11: Validation Setup (External / Internal)
 # ==============================================================================
 # Lets user choose External (GEO dataset) or Internal (70/30 split) validation.
-# External: download → phenodata → categorize → DE on validation data.
+# External: download -> phenodata -> categorize -> DE on validation data.
 # Stores rv$validation_mode and all external validation data in rv$.
 # ==============================================================================
 
@@ -415,7 +415,7 @@ server_validation <- function(input, output, session, rv) {
   })
 
   # ============================================================================
-  # Run handler: categorize → DE
+  # Run handler: categorize -> DE
   # ============================================================================
   observeEvent(input$ext_val_run_btn, {
     req(rv$ext_val_raw_expr, rv$ext_val_metadata, input$ext_val_group_col)

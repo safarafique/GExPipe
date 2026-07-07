@@ -1,5 +1,5 @@
 # ==============================================================================
-# UI_RESULTS_SUMMARY.R - Step 15: Results Summary (aesthetic flow: summary → steps with arrow, description, figure)
+# UI_RESULTS_SUMMARY.R - Step 15: Results Summary (aesthetic flow: summary -> steps with arrow, description, figure)
 # ==============================================================================
 
 RESULTS_PLOT_HEIGHT <- "280px"
@@ -85,7 +85,7 @@ ui_results_summary <- tabItem(
 
   # ----- 3. Batch before vs after PCA -----
   step_card(
-    "3–5", "chart-area", "Batch effect: Before vs After",
+    "3-5", "chart-area", "Batch effect: Before vs After",
     "PCA of expression before and after batch correction. Samples should mix better after correction.",
     "primary",
     gexp_ui_plot_download_jpg_pdf("dl_rs_batch_before_after_jpg", "dl_rs_batch_before_after_pdf", "btn-primary btn-sm"),
@@ -115,7 +115,7 @@ ui_results_summary <- tabItem(
   # ----- 5. WGCNA -----
   step_card(
     "7", "project-diagram", "WGCNA co-expression",
-    "Soft-threshold choice, sample tree, gene dendrogram with module colors, and module–trait correlation.",
+    "Soft-threshold choice, sample tree, gene dendrogram with module colors, and module-trait correlation.",
     "primary",
     uiOutput("results_summary_wgcna"),
     fluidRow(
@@ -168,7 +168,7 @@ ui_results_summary <- tabItem(
   # ----- 7. PPI -----
   step_card(
     "9", "project-diagram", "PPI network",
-    "Protein–protein interaction network from common genes (STRINGdb). Hub genes by degree.",
+    "Protein-protein interaction network from common genes (STRINGdb). Hub genes by degree.",
     "info",
     uiOutput("results_summary_ppi"),
     gexp_ui_plot_download_jpg_pdf("dl_rs_ppi_plot_jpg", "dl_rs_ppi_plot_pdf", "btn-info btn-sm"),
@@ -177,7 +177,7 @@ ui_results_summary <- tabItem(
 
   # ----- 8. Machine learning & ROC -----
   step_card(
-    "10", "circle", "Machine learning – Venn/UpSet",
+    "10", "circle", "Machine learning - Venn/UpSet",
     "Overlap of gene lists across selected ML methods. Common genes used for ROC and validation.",
     "warning",
     uiOutput("results_summary_ml"),
@@ -215,7 +215,7 @@ ui_results_summary <- tabItem(
 
   # ----- 11. Input & pipeline info -----
   step_card(
-    "—", "dna", "Input & pipeline",
+    "-", "dna", "Input & pipeline",
     "Common genes and expression matrix size after preprocessing.",
     "primary",
     uiOutput("results_summary_input_genes")

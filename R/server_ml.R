@@ -1,7 +1,7 @@
 # ==============================================================================
 # SERVER_ML.R - Machine Learning (LASSO, Random Forest, SVM-RFE)
 # ==============================================================================
-# Uses rv$extracted_data_ml (samples × genes) and rv$wgcna_sample_info for labels.
+# Uses rv$extracted_data_ml (samples x genes) and rv$wgcna_sample_info for labels.
 # ==============================================================================
 
 server_ml <- function(input, output, session, rv) {
@@ -84,7 +84,7 @@ server_ml <- function(input, output, session, rv) {
     if (is.null(rv$wgcna_sample_info)) {
       showNotification(
         tags$div(icon("exclamation-triangle"), tags$strong(" Sample info missing:"),
-                 " Complete WGCNA (Step 7) first — sample metadata with group labels is required for ML."),
+                 " Complete WGCNA (Step 7) first - sample metadata with group labels is required for ML."),
         type = "error", duration = 8)
       return()
     }

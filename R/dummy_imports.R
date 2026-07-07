@@ -64,6 +64,8 @@ dummy_imports <- function() {
   glue::glue
   lifecycle::deprecate_warn
   Matrix::Matrix
+  methods::slot
+  methods::slotNames
   pillar::new_pillar
   Rcpp::evalCpp
   rlang::is_character

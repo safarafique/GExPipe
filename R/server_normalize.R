@@ -241,7 +241,7 @@ server_normalize <- function(input, output, session, rv) {
       # Show notification with gene count
       showNotification(
         tags$div(
-          tags$strong("✓ Normalization complete!"),
+          tags$strong("OK Normalization complete!"),
           tags$br(),
           tags$span("Genes: ", format(total_genes, big.mark = ","),
                     " | Samples: ", format(total_samples, big.mark = ",")),
@@ -260,7 +260,7 @@ server_normalize <- function(input, output, session, rv) {
   # AUTO-NORMALIZE FOR COUNT-BASED METHODS (silent, no UI interaction)
   # ==========================================================================
   # When DESeq2 is selected + download finishes, auto-run normalization so
-  # downstream steps (WGCNA, heatmaps, etc.) have normalized data — the user
+  # downstream steps (WGCNA, heatmaps, etc.) have normalized data - the user
   # stays on the current tab and just sees a brief notification.
   observeEvent(rv$download_complete, {
     if (!isTRUE(rv$download_complete)) return()
@@ -731,7 +731,7 @@ server_normalize <- function(input, output, session, rv) {
       med_sub <- if (isTRUE(ctx$mixed_no_gq)) {
         "Mixed platform, global quantile OFF: OK if each GSE block is internally aligned (offset across GSEs is expected)"
       } else if (isTRUE(ctx$mixed_gq)) {
-        "Global quantile ON: all medians match visually — alignment is forced; not recommended for mixed microarray + RNA-seq"
+        "Global quantile ON: all medians match visually - alignment is forced; not recommended for mixed microarray + RNA-seq"
       } else {
         "Aligned medians and ranges across samples indicate successful normalization"
       }
@@ -830,7 +830,7 @@ server_normalize <- function(input, output, session, rv) {
       dist_sub <- if (isTRUE(ctx$mixed_no_gq)) {
         "Within each GSE facet, curves should overlap; different peak positions between facets are expected without global quantile"
       } else if (isTRUE(ctx$mixed_gq)) {
-        "Global quantile warped all samples to one scale — visual overlap does not mean biologically safe for mixed platforms"
+        "Global quantile warped all samples to one scale - visual overlap does not mean biologically safe for mixed platforms"
       } else {
         "Overlapping distributions indicate successful normalization"
       }
@@ -1100,7 +1100,7 @@ server_normalize <- function(input, output, session, rv) {
     column(
       12,
       box(
-        title = tags$span(icon("dna"), " Mixed platform — different scales are expected"),
+        title = tags$span(icon("dna"), " Mixed platform - different scales are expected"),
         width = 12,
         status = "info",
         solidHeader = TRUE,
@@ -1117,7 +1117,7 @@ server_normalize <- function(input, output, session, rv) {
             tags$strong("within each study"),
             " (TMM/log-CPM vs quantile log-intensity). They ",
             tags$strong("should not"),
-            " share the same median when global quantile is off — that offset is ",
+            " share the same median when global quantile is off - that offset is ",
             tags$em("not"),
             " failed normalization."
           ),
@@ -1133,7 +1133,7 @@ server_normalize <- function(input, output, session, rv) {
           tags$ol(
             style = "margin: 0 0 10px 0; padding-left: 22px;",
             tags$li(tags$strong("Step 4:"), " Assign Normal / Disease groups."),
-            tags$li(tags$strong("Step 5:"), " Use ", tags$strong("limma removeBatchEffect"), " (not ComBat alone). Check Platform PCA — platforms should intermingle after correction."),
+            tags$li(tags$strong("Step 5:"), " Use ", tags$strong("limma removeBatchEffect"), " (not ComBat alone). Check Platform PCA - platforms should intermingle after correction."),
             tags$li(tags$strong("Step 6:"), " Use ", tags$strong("limma"), " DE (auto-selected for merged). Platform is included in the model when estimable.")
           ),
           tags$p(

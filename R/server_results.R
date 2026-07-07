@@ -37,7 +37,7 @@ server_results <- function(input, output, session, rv) {
         style = "margin: 0 15px 10px 15px; padding: 12px 18px; border-left: 5px solid #3498db;",
         icon("flask"),
         tags$strong(" Active DE method: limma"),
-        " — Empirical Bayes moderated t-statistics on batch-corrected, normalized expression.",
+        " - Empirical Bayes moderated t-statistics on batch-corrected, normalized expression.",
         tags$small(" (Change in Step 1 before running DE)", style = "color: #6c757d;")
       )
     } else if (method == "limma_voom") {
@@ -46,7 +46,7 @@ server_results <- function(input, output, session, rv) {
         style = "margin: 0 15px 10px 15px; padding: 12px 18px; border-left: 5px solid #8e44ad;",
         icon("flask"),
         tags$strong(" Active DE method: limma-voom"),
-        " — voom transforms RNA-seq counts to logCPM with precision weights, then uses limma's empirical Bayes linear models (supports batch covariates).",
+        " - voom transforms RNA-seq counts to logCPM with precision weights, then uses limma's empirical Bayes linear models (supports batch covariates).",
         tags$small(" (Change in Step 1 before running DE)", style = "color: #6c757d;")
       )
     } else if (method == "deseq2") {
@@ -55,7 +55,7 @@ server_results <- function(input, output, session, rv) {
         style = "margin: 0 15px 10px 15px; padding: 12px 18px; border-left: 5px solid #27ae60;",
         icon("dna"),
         tags$strong(" Active DE method: DESeq2"),
-        " — Negative binomial GLM on raw counts with batch as covariate. DESeq2's internal normalization (median-of-ratios) is used.",
+        " - Negative binomial GLM on raw counts with batch as covariate. DESeq2's internal normalization (median-of-ratios) is used.",
         tags$small(" (Change in Step 1 before running DE)", style = "color: #6c757d;")
       )
     } else {
@@ -64,7 +64,7 @@ server_results <- function(input, output, session, rv) {
         style = "margin: 0 15px 10px 15px; padding: 12px 18px; border-left: 5px solid #f39c12;",
         icon("chart-bar"),
         tags$strong(" Active DE method: edgeR"),
-        " — Quasi-likelihood F-test on raw counts with TMM normalization and batch as covariate.",
+        " - Quasi-likelihood F-test on raw counts with TMM normalization and batch as covariate.",
         tags$small(" (Change in Step 1 before running DE)", style = "color: #6c757d;")
       )
     }
@@ -111,7 +111,7 @@ server_results <- function(input, output, session, rv) {
       # ------------------------------------------------------------------
       .try_rebuild_raw_counts <- function() {
         if (!is.null(rv$raw_counts_for_deseq2)) return(TRUE)   # already available
-        if (length(rv$rna_counts_list) == 0)   return(FALSE)   # pure microarray — can't rebuild
+        if (length(rv$rna_counts_list) == 0)   return(FALSE)   # pure microarray - can't rebuild
 
         common_g <- rv$common_genes
         if (is.null(common_g) || length(common_g) == 0) {
@@ -135,7 +135,7 @@ server_results <- function(input, output, session, rv) {
       # Pre-checks for count-based methods (DESeq2 / edgeR / limma-voom).
       # For each method, if raw counts are missing we first try to rebuild
       # them from the stored rna_counts_list.  Only if that also fails (pure
-      # microarray data) do we fall back to limma — we never hard-block.
+      # microarray data) do we fall back to limma - we never hard-block.
       if (method == "deseq2") {
         if (!requireNamespace("DESeq2", quietly = TRUE)) {
           showNotification(
@@ -378,7 +378,7 @@ server_results <- function(input, output, session, rv) {
           count_mat <- filt$expr
           .record_de_transparency(meta, "limma_voom", de_design$formula_desc, filt$note, total_meta)
           
-          incProgress(0.3, detail = "Estimating mean–variance with voom...")
+          incProgress(0.3, detail = "Estimating mean-variance with voom...")
           
           # Apply voom to compute logCPM and precision weights
           v <- limma::voom(count_mat, design = design, plot = FALSE)
@@ -426,7 +426,7 @@ server_results <- function(input, output, session, rv) {
           if (is.null(rv$batch_corrected) || is.null(rv$unified_metadata)) {
             showNotification(
               tags$div(icon("exclamation-triangle"), tags$strong(" Missing data."),
-                       " Run Steps 1–5 (Download, Groups, QC, Normalize, Batch) first."),
+                       " Run Steps 1-5 (Download, Groups, QC, Normalize, Batch) first."),
               type = "error", duration = 8)
             rv$de_running <- FALSE
             return()
@@ -578,22 +578,22 @@ server_results <- function(input, output, session, rv) {
       tags$p(
         style = "margin: 0 0 10px 0; font-weight: 700; font-size: 15px; color: #1e293b;",
         icon("check-circle", style = "color: #10b981; margin-right: 8px;"),
-        "Pipeline verification — Volcano shows real DE results"
+        "Pipeline verification - Volcano shows real DE results"
       ),
       tags$p(
         style = "margin: 0 0 6px 0; font-size: 13px; color: #334155; line-height: 1.6;",
         tags$strong("DE method:"), " ", if (method == "deseq2") "DESeq2" else if (method == "edger") "edgeR" else if (method == "limma_voom") "limma-voom" else "limma",
-        if (batch_in_model) " — batch (Dataset) included in the statistical model, so the volcano reflects differential expression after adjusting for batch." else "."
+        if (batch_in_model) " - batch (Dataset) included in the statistical model, so the volcano reflects differential expression after adjusting for batch." else "."
       ),
       tags$p(
         style = "margin: 0 0 6px 0; font-size: 13px; color: #334155; line-height: 1.6;",
         tags$strong("Batch correction (Step 5):"), " ",
-        if (batch_done) paste0(batch_label, " — applied to the expression matrix used for heatmaps, WGCNA, and downstream steps.")
+        if (batch_done) paste0(batch_label, " - applied to the expression matrix used for heatmaps, WGCNA, and downstream steps.")
         else "Not applied (single dataset or Step 5 skipped)."
       ),
       tags$p(
         style = "margin: 0; font-size: 12px; color: #64748b;",
-        "All prior steps (Download → Normalize → Groups → Batch correction) were completed before DE. The volcano plot uses the actual test statistics (log2FC and adjusted p-value) from the selected DE method. ",
+        "All prior steps (Download -> Normalize -> Groups -> Batch correction) were completed before DE. The volcano plot uses the actual test statistics (log2FC and adjusted p-value) from the selected DE method. ",
         "Use the ", tags$strong("How to check your results are valid"), " box below to verify groups and ML prediction performance."
       )
     )
@@ -706,7 +706,7 @@ server_results <- function(input, output, session, rv) {
       
       expr <- rv$batch_corrected[valid_genes, , drop = FALSE]
       
-      # Remove rows with zero variance (constant expression — can't scale)
+      # Remove rows with zero variance (constant expression - can't scale)
       row_vars <- apply(expr, 1, var, na.rm = TRUE)
       expr <- expr[!is.na(row_vars) & row_vars > 0, , drop = FALSE]
       
