@@ -1,9 +1,21 @@
 # GExPipe NEWS
 
-## Version 0.99.17
+## Version 0.99.18
 
 ### Shiny UI
-- Add JPG and PDF download buttons for all Shiny plots (shared `gexp_ui_plot_download_*` helpers); nomogram panels B-E, ML biomarker plots, and Results Summary plots now exportable.
+- Improve ML methods Venn/UpSet: all selected methods shown, explicit zero when no
+  genes are common to all methods, publication-style colors, and per-method counts
+  in the plot footer.
+- Fix `.gexpipe_lib_base` path collision when sourcing `global.R` locally (character
+  path preserved after helper scripts load).
+- Add JPG and PDF download buttons for all Shiny plots (shared `gexp_ui_plot_download_*`
+  helpers); nomogram panels B–E, ML biomarker plots, and Results Summary plots exportable.
+
+### Check / DESCRIPTION
+- Drop `rmda` from Suggests (unavailable on R 4.6; nomogram DCA uses `dcurves` fallback).
+- Fix `R CMD check` Rd and `grDevices` notes for ML Venn and plot-export helpers.
+
+## Version 0.99.17
 
 ### SPB build fix
 - Remove `dev/` from the package source tree (developer utilities kept local via

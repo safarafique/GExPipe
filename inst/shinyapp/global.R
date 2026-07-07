@@ -748,7 +748,9 @@ tryCatch({
       "gexpipe_wgcna_heatmap_cor",
       ".gexpipe_call",
       "gexp_ui_plot_download_jpg_pdf", "gexp_ui_plot_download_bar",
-      "gexp_plot_device_open", "gexp_ggsave_from_file"
+      "gexp_plot_device_open", "gexp_ggsave_from_file",
+      "gexp_ml_venn_sets_for_selected", "gexp_ml_common_gene_count",
+      "gexp_draw_ml_methods_venn"
     )
     for (nm in to_pull) {
       if (exists(nm, envir = ns, inherits = FALSE))
