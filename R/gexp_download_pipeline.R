@@ -721,11 +721,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
 
   micro_data <- tryCatch(
     {
-      suppressMessages(invisible(capture.output(
-        md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
-        file = nullfile()
-      )))
-      md
+      .gexpipe_geo_quiet(GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE))
     },
     error = function(e) structure(list(error = conditionMessage(e)), class = "geo_error")
   )
@@ -835,10 +831,9 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
         # but supplies processed series_matrix or other text files as supplementary
         # files. Try to download supplementary files and parse any candidate table.
         try({
-          suppressMessages(invisible(capture.output(
-            GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE),
-            file = nullfile()
-          )))
+          .gexpipe_geo_quiet(
+            GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE)
+          )
         }, silent = TRUE)
 
         supp_dir <- file.path(micro_dir, gse_id)
@@ -985,10 +980,9 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   cel <- character(0)
   tryCatch(
     {
-      suppressMessages(invisible(capture.output(
-        GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE),
-        file = nullfile()
-      )))
+      .gexpipe_geo_quiet(
+        GEOquery::getGEOSuppFiles(gse_id, baseDir = micro_dir, makeDirectory = TRUE, fetch_files = TRUE)
+      )
       supp_dir <- file.path(micro_dir, gse_id)
       if (!dir.exists(supp_dir)) supp_dir <- micro_dir
       files <- list.files(supp_dir, full.names = TRUE, recursive = TRUE)
@@ -1042,10 +1036,9 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   count_file <- NULL
   tryCatch(
     {
-      suppressMessages(invisible(capture.output(
-        GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE),
-        file = nullfile()
-      )))
+      .gexpipe_geo_quiet(
+        GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE)
+      )
       files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
       if (length(files) == 0) {
         files <- list.files(rna_dir, full.names = TRUE, recursive = TRUE)
@@ -1062,7 +1055,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
         for (cand in bulk_candidates) {
           tryCatch(
             {
-              df <- suppressWarnings(data.table::fread(cand, data.table = FALSE, nrows = 1e6))
+              df <- .gexpipe_fread_counts(cand, nrows = 1e6)
               if (ncol(df) >= 2 && nrow(df) >= 10 && nrow(df) > best_nrow) {
                 best_nrow <- nrow(df)
                 count_file <- cand
@@ -1103,7 +1096,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
             for (cand in matches) {
               tryCatch(
                 {
-                  df <- suppressWarnings(data.table::fread(cand, data.table = FALSE, nrows = 1e6))
+                  df <- .gexpipe_fread_counts(cand, nrows = 1e6)
                   if (ncol(df) >= 2 && nrow(df) >= 10 && nrow(df) > best_nrow) {
                     best_nrow <- nrow(df)
                     count_file <- cand
@@ -1125,8 +1118,8 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   )
 
   ncbi_best <- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
-  nrow_supp <- if (!is.null(count_file)) tryCatch(nrow(suppressWarnings(data.table::fread(count_file, data.table = FALSE, nrows = 500000L))), error = function(e) 0L) else 0L
-  nrow_ncbi <- if (!is.null(ncbi_best)) tryCatch(nrow(suppressWarnings(data.table::fread(ncbi_best, data.table = FALSE, nrows = 500000L))), error = function(e) 0L) else 0L
+  nrow_supp <- if (!is.null(count_file)) tryCatch(nrow(.gexpipe_fread_counts(count_file, nrows = 500000L)), error = function(e) 0L) else 0L
+  nrow_ncbi <- if (!is.null(ncbi_best)) tryCatch(nrow(.gexpipe_fread_counts(ncbi_best, nrows = 500000L)), error = function(e) 0L) else 0L
   if (nrow_ncbi > nrow_supp && !is.null(ncbi_best)) {
     count_file <- ncbi_best
     out$log <- paste0("(NCBI ", nrow_ncbi, " rows) ")
@@ -1148,7 +1141,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
     return(out)
   }
 
-  count_df <- tryCatch(read_count_matrix(count_file), error = function(e) suppressWarnings(data.table::fread(count_file, data.table = FALSE)))
+  count_df <- tryCatch(read_count_matrix(count_file), error = function(e) .gexpipe_fread_counts(count_file))
   if (is.null(count_df) || ncol(count_df) < 2 || nrow(count_df) < 10) {
     out$reason <- "count file format invalid or too small"
     return(out)
@@ -1157,10 +1150,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   # Fetch metadata early so we can orient/rename samples before QC merge
   rna_metadata <- tryCatch(
     {
-      suppressMessages(invisible(capture.output(
-        gse_list <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE),
-        file = nullfile()
-      )))
+      gse_list <- .gexpipe_geo_quiet(GEOquery::getGEO(gse_id, GSEMatrix = TRUE))
       gse <- if (inherits(gse_list, "list") && length(gse_list) >= 1) {
         gse_list[[1]]
       } else {
