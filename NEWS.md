@@ -1,5 +1,24 @@
 # GExPipe NEWS
 
+## Version 0.99.24
+
+### Vignette (Bioconductor review)
+- Removed maintainer-only text from `vignettes/GExPipe.Rmd` (screenshot paths,
+  internal vignette notes).
+- Moved walkthrough screenshots to `vignettes/images/` with direct
+  `knitr::include_graphics()` calls.
+- Added five PNG figures referenced by the vignette; maintainer regeneration
+  documented in `inst/scripts/README-vignette-screenshots.md`.
+
+## Version 0.99.23
+
+### Bioconductor review (code organization and testing)
+- `inst/shinyapp/server.R` and `ui.R` now delegate to `gexp_app_server()` / `gexp_app_ui()`
+  instead of duplicating modular logic or calling `source()` on tab modules.
+- Added `gexpipe_spearman_cor()` and removed `suppressWarnings(cor(...))` from ML plots.
+- Added `tests/testthat/test-coverage-helpers.R` for normalization, ID detection, WGCNA prep,
+  download overlap helpers, and UI/ML utilities.
+
 ## Version 0.99.22
 
 ### Bioconductor review (testing and code organization)
