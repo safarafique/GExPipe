@@ -1,0 +1,60 @@
+# Shiny / shinydashboard symbols for R/ui_*.R tab definitions (evaluated at load time).
+# Server modules resolve Shiny helpers at call time after gexp_app_attach_packages().
+
+tabItem <- shinydashboard::tabItem
+box <- shinydashboard::box
+dashboardPage <- shinydashboard::dashboardPage
+dashboardHeader <- shinydashboard::dashboardHeader
+dashboardSidebar <- shinydashboard::dashboardSidebar
+dashboardBody <- shinydashboard::dashboardBody
+sidebarMenu <- shinydashboard::sidebarMenu
+menuItem <- shinydashboard::menuItem
+tabItems <- shinydashboard::tabItems
+infoBoxOutput <- shinydashboard::infoBoxOutput
+valueBoxOutput <- shinydashboard::valueBoxOutput
+
+DTOutput <- DT::DTOutput
+dataTableOutput <- DT::dataTableOutput
+
+h2 <- shiny::h2
+h3 <- shiny::h3
+h4 <- shiny::h4
+icon <- shiny::icon
+tags <- shiny::tags
+HTML <- shiny::HTML
+div <- shiny::div
+span <- shiny::span
+p <- shiny::p
+fluidPage <- shiny::fluidPage
+fluidRow <- shiny::fluidRow
+column <- shiny::column
+actionButton <- shiny::actionButton
+downloadButton <- shiny::downloadButton
+fileInput <- shiny::fileInput
+radioButtons <- shiny::radioButtons
+checkboxInput <- shiny::checkboxInput
+checkboxGroupInput <- shiny::checkboxGroupInput
+selectInput <- shiny::selectInput
+textInput <- shiny::textInput
+textAreaInput <- shiny::textAreaInput
+numericInput <- shiny::numericInput
+sliderInput <- shiny::sliderInput
+conditionalPanel <- shiny::conditionalPanel
+tabsetPanel <- shiny::tabsetPanel
+tabPanel <- shiny::tabPanel
+wellPanel <- shiny::wellPanel
+helpText <- shiny::helpText
+titlePanel <- shiny::titlePanel
+uiOutput <- shiny::uiOutput
+textOutput <- shiny::textOutput
+plotOutput <- shiny::plotOutput
+tableOutput <- shiny::tableOutput
+verbatimTextOutput <- shiny::verbatimTextOutput
+tagList <- shiny::tagList
+br <- shiny::br
+hr <- shiny::hr
+strong <- shiny::strong
+em <- shiny::em
+code <- shiny::code
+a <- shiny::a
+useShinyjs <- shinyjs::useShinyjs

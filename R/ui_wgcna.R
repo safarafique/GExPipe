@@ -22,7 +22,7 @@ ui_wgcna <- tabItem(
           "Traits are derived from your group mapping (Normal vs Disease).",
           tags$br(),
           tags$strong(icon("sliders-h"), " Disease-specific modules:"),
-          " In Step 4 and Step 6 you can ", tags$strong("select any threshold"), " — GS P-value, MM correlation, and module p-value/correlation — to define which genes and modules are disease-related. Hover over ", icon("question-circle"), " next to each parameter for help.",
+          " In Step 4 and Step 6 you can ", tags$strong("select any threshold"), " - GS P-value, MM correlation, and module p-value/correlation - to define which genes and modules are disease-related. Hover over ", icon("question-circle"), " next to each parameter for help.",
           tags$br(),
           tags$small(icon("lightbulb"), " Tip: After selecting top variable genes, check the sample dendrogram for outliers (Step 1); one bad sample can ruin the network. Use Step 2 to pick a soft-threshold power (R² > 0.8); grey module = unassigned genes.")
         )
@@ -38,7 +38,7 @@ ui_wgcna <- tabItem(
           style = "padding: 15px 0;",
           tags$p(
             style = "color: #495057; margin-bottom: 18px;",
-            "Choose how many genes to use, prepare the expression matrix, check the sample dendrogram for outliers, and optionally exclude bad samples. The gene set and sample list below are what WGCNA will use in Steps 2–3."
+            "Choose how many genes to use, prepare the expression matrix, check the sample dendrogram for outliers, and optionally exclude bad samples. The gene set and sample list below are what WGCNA will use in Steps 2-3."
           ),
           fluidRow(
             column(12,
@@ -111,9 +111,9 @@ ui_wgcna <- tabItem(
             ),
             tags$ul(
               style = "margin: 8px 0 0 18px; padding: 0;",
-              tags$li(tags$strong("Spot outliers:"), " In the dendrogram, look for a ", tags$em("long vertical branch"), " before one sample joins the rest — that sample is far from the others."),
+              tags$li(tags$strong("Spot outliers:"), " In the dendrogram, look for a ", tags$em("long vertical branch"), " before one sample joins the rest - that sample is far from the others."),
               tags$li(tags$strong("To exclude:"), " Enter that sample ID in the box (right), or use ", tags$em("Detect"), " to get suggestions from the dendrogram. Then click ", tags$em("Exclude & update"), "."),
-              tags$li(tags$strong("No outliers?"), " If all samples cluster without a very long single branch, click ", tags$em("No outliers — proceed to Step 2"), " to continue.")
+              tags$li(tags$strong("No outliers?"), " If all samples cluster without a very long single branch, click ", tags$em("No outliers - proceed to Step 2"), " to continue.")
             )
           ),
           fluidRow(
@@ -155,7 +155,7 @@ ui_wgcna <- tabItem(
                 uiOutput("wgcna_exclude_status"),
                 tags$hr(style = "margin: 12px 0 8px 0;"),
                 actionButton("wgcna_skip_outliers",
-                             tagList(icon("forward"), " No outliers — proceed to Step 2"),
+                             tagList(icon("forward"), " No outliers - proceed to Step 2"),
                              class = "btn-success btn-sm",
                              style = "margin-top: 4px; width: 100%;",
                              title = "Continue to Step 2 (soft threshold). Use this when no samples need to be excluded.")
@@ -224,7 +224,7 @@ ui_wgcna <- tabItem(
                           min = 1,
                           max = 30,
                           step = 1),
-              tags$small("Power from Step 2 (typically 6–12). High power (e.g. 26) = fewer connections, may give few modules.",
+              tags$small("Power from Step 2 (typically 6-12). High power (e.g. 26) = fewer connections, may give few modules.",
                         style = "color: #6c757d;")
             ),
             column(3,
@@ -296,7 +296,7 @@ ui_wgcna <- tabItem(
                           min = 0,
                           max = 1,
                           step = 0.01),
-              tags$small("Choose any value — defines disease-related genes (e.g. 0.05)",
+              tags$small("Choose any value - defines disease-related genes (e.g. 0.05)",
                         style = "color: #17a2b8; font-weight: 500;")
             ),
             column(3,
@@ -308,7 +308,7 @@ ui_wgcna <- tabItem(
                           min = 0,
                           max = 1,
                           step = 0.1),
-              tags$small("Choose any value — genes with |MM| above this are in the module (e.g. 0.8)",
+              tags$small("Choose any value - genes with |MM| above this are in the module (e.g. 0.8)",
                         style = "color: #17a2b8; font-weight: 500;")
             ),
             column(6,
@@ -538,7 +538,7 @@ ui_wgcna <- tabItem(
             style = "background: #fafbfc; border: 1px solid #e8ecef; border-radius: 6px; padding: 16px 20px; margin-bottom: 12px;",
             tags$p(
               tags$strong("Gene significance vs. module membership"),
-              " — scatter plot for the selected module and trait. Dashed vertical lines: MM threshold; orange points: GS/MM significant. Export at 300 DPI for publication.",
+              " - scatter plot for the selected module and trait. Dashed vertical lines: MM threshold; orange points: GS/MM significant. Export at 300 DPI for publication.",
               style = "margin: 0; font-size: 13px; color: #495057; line-height: 1.5;"
             )
           ),

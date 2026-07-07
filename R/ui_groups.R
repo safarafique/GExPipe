@@ -6,7 +6,7 @@ ui_groups <- tabItem(
     tabName = "groups",
     h2(icon("users"), " Step 4: Select Group Columns & Categorize"),
 
-    # DE Method Banner — tells user which pipeline is active
+    # DE Method Banner - tells user which pipeline is active
     uiOutput("groups_de_method_banner"),
 
     fluidRow(
@@ -40,7 +40,7 @@ ui_groups <- tabItem(
     # ---- Phenodata Browser (full interactive table) ----
     fluidRow(
       box(
-        title = tags$span(icon("table"), " Phenodata Browser — Browse All Metadata Columns"),
+        title = tags$span(icon("table"), " Phenodata Browser - Browse All Metadata Columns"),
         width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         tags$div(
           style = "padding: 8px 0 4px 0;",

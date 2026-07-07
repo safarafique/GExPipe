@@ -407,7 +407,7 @@
                       error = function(e) package_version("0.0.0"))
     if (new_v < package_version(min_ver)) return(FALSE)
     tryCatch({
-      suppressWarnings(unloadNamespace(pkg))
+      .gexpipe_quiet_unload(pkg)
       loadNamespace(pkg, lib.loc = gexpipe_lib)
       utils::packageVersion(pkg) >= package_version(min_ver)
     }, error = function(e) FALSE)
@@ -531,7 +531,7 @@
     if (!isTRUE(ok)) break
   }
   if (isNamespaceLoaded(pkg)) {
-    tryCatch(suppressWarnings(unloadNamespace(pkg)), error = function(e) NULL)
+    .gexpipe_quiet_unload(pkg)
   }
   invisible(TRUE)
 }
@@ -659,9 +659,17 @@
 }
 
 ## Unload pkg and remove it from every library on .libPaths().
+.gexpipe_quiet_unload <- function(pkg) {
+  tryCatch(
+    unloadNamespace(pkg),
+    warning = function(w) invisible(NULL),
+    error = function(e) NULL
+  )
+}
+
 .gexpipe_remove_pkg_all_libs <- function(pkg) {
   if (isNamespaceLoaded(pkg)) {
-    tryCatch(suppressWarnings(unloadNamespace(pkg)), error = function(e) NULL)
+    .gexpipe_quiet_unload(pkg)
   }
   for (lib in rev(unique(c(.gexpipe_get_lib(), .libPaths())))) {
     pkg_dir <- file.path(lib, pkg)
@@ -721,7 +729,7 @@
       .gexpipe_native_smoke_test(pkg)
     }, error = function(e) FALSE)
     if (!was_loaded && isNamespaceLoaded(pkg)) {
-      tryCatch(suppressWarnings(unloadNamespace(pkg)), error = function(e) NULL)
+      .gexpipe_quiet_unload(pkg)
     }
     isTRUE(ok)
   }
@@ -835,7 +843,7 @@
     message("GExPipe: corrupted install detected - reinstalling package into ", lib, " ...")
   }
   if (isNamespaceLoaded("GExPipe")) {
-    tryCatch(suppressWarnings(unloadNamespace("GExPipe")), error = function(e) NULL)
+    .gexpipe_quiet_unload("GExPipe")
   }
   tryCatch(utils::remove.packages("GExPipe", lib = lib), error = function(e) NULL)
   ok <- tryCatch({
@@ -944,7 +952,7 @@
       .gexpipe_batch_install(pkg)
       fixed <- tryCatch({
         if (isNamespaceLoaded(pkg))
-          suppressWarnings(unloadNamespace(pkg))
+          .gexpipe_quiet_unload(pkg)
         loadNamespace(pkg, lib.loc = gexpipe_lib)
         TRUE
       }, error = function(e) FALSE)

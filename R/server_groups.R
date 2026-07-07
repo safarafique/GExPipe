@@ -12,7 +12,7 @@ server_groups <- function(input, output, session, rv) {
   selected_columns <- reactiveVal(list())  # Store selected columns per GSE
   
   # ==============================================================================
-  # DE METHOD BANNER — shows which pipeline is active on this step
+  # DE METHOD BANNER - shows which pipeline is active on this step
   # ==============================================================================
   output$groups_de_method_banner <- renderUI({
     method <- if (!is.null(input$de_method)) input$de_method else "limma"
@@ -24,7 +24,7 @@ server_groups <- function(input, output, session, rv) {
               style = "padding: 10px; background: linear-gradient(135deg, #d5f5e3 0%, #abebc6 100%); border-radius: 8px;",
               tags$p(icon("check-circle", style = "color: #1e8449; margin-right: 5px;"),
                      tags$strong("DE Method: DESeq2"),
-                     " — Normalization was handled automatically. Select phenotype columns below to define your groups.",
+                     " - Normalization was handled automatically. Select phenotype columns below to define your groups.",
                      style = "font-size: 14px; margin: 0; color: #1e8449;")
             ))
       )
@@ -36,7 +36,7 @@ server_groups <- function(input, output, session, rv) {
               style = "padding: 10px; background: linear-gradient(135deg, #fdebd0 0%, #f9e79f 100%); border-radius: 8px;",
               tags$p(icon("check-circle", style = "color: #b7950b; margin-right: 5px;"),
                      tags$strong("DE Method: edgeR"),
-                     " — Normalization was handled automatically (TMM). Select phenotype columns below to define your groups.",
+                     " - Normalization was handled automatically (TMM). Select phenotype columns below to define your groups.",
                      style = "font-size: 14px; margin: 0; color: #7d6608;")
             ))
       )
@@ -48,7 +48,7 @@ server_groups <- function(input, output, session, rv) {
               style = "padding: 10px; background: linear-gradient(135deg, #d6eaf8 0%, #aed6f1 100%); border-radius: 8px;",
               tags$p(icon("check-circle", style = "color: #2471a3; margin-right: 5px;"),
                      tags$strong("DE Method: limma"),
-                     " — Select phenotype columns below to define your groups.",
+                     " - Select phenotype columns below to define your groups.",
                      style = "font-size: 14px; margin: 0; color: #2471a3;")
             ))
       )
@@ -56,7 +56,7 @@ server_groups <- function(input, output, session, rv) {
   })
   
   # ==============================================================================
-  # PHENODATA BROWSER — Full interactive table per dataset
+  # PHENODATA BROWSER - Full interactive table per dataset
   # ==============================================================================
   output$phenodata_browser_ui <- renderUI({
     req(rv$download_complete)
@@ -617,7 +617,7 @@ server_groups <- function(input, output, session, rv) {
       extracted_groups(all_groups)
       extracted_groups_per_gse(extracted_per_gse)
       
-      showNotification(paste("✓ Extracted groups from", length(all_groups), "datasets. Please categorize them below."), 
+      showNotification(paste("OK Extracted groups from", length(all_groups), "datasets. Please categorize them below."), 
                        type = "message", duration = 5)
     }, error = function(e) {
       showNotification(paste("Error extracting groups:", e$message), 
@@ -925,7 +925,7 @@ server_groups <- function(input, output, session, rv) {
     de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
     showNotification(
       tags$div(
-        tags$strong("✓ Groups applied!"),
+        tags$strong("OK Groups applied!"),
         tags$br(),
         tags$span("Normal: ", ifelse("Normal" %in% names(counts), counts[["Normal"]], 0),
                   " | Disease: ", ifelse("Disease" %in% names(counts), counts[["Disease"]], 0)),
