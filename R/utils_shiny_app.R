@@ -487,7 +487,7 @@
   if (m < 0L) return(NA)
   built_r <- numeric_version(sub("^R ", "", regmatches(built, m)))
   cur_r <- numeric_version(paste(R.Version()$major, R.Version()$minor, sep = "."))
-  identical(built_r[1, 1:2], cur_r[1, 1:2])
+  identical(built_r[1, seq_len(2)], cur_r[1, seq_len(2)])
 }
 
 ## Lightweight glmnet native-code check (glmnet 4.x: glmnet_control; 5.x: glmnet.control).
@@ -709,8 +709,8 @@
 ## Returns TRUE when native code is usable in this session.
 .gexpipe_ensure_native_pkg <- function(pkg, lib = .gexpipe_get_lib(), quiet = FALSE) {
   if (!quiet) {
-    message("GExPipe: verifying native package ", pkg, " for R ",
-            paste(R.Version()$major, R.Version()$minor, sep = "."), " ...")
+    rver <- paste(R.Version()$major, R.Version()$minor, sep = ".")
+    message(sprintf("GExPipe: verifying native package %s for R %s ...", pkg, rver))
   }
 
   .works <- function() {
@@ -865,7 +865,7 @@
     FALSE
   })
   if (!quiet && isTRUE(ok)) {
-    message("GExPipe: package reinstalled. Restart R if errors persist.")
+    message("GExPipe: package reinstalled successfully.")
   }
   invisible(isTRUE(ok))
 }
@@ -920,10 +920,12 @@
 .gexpipe_fix_broken_pkgs <- function(broken_pkgs) {
   if (length(broken_pkgs) == 0L) return(TRUE)
   if (!.gexpipe_runtime_install_enabled()) {
+    broken_txt <- paste(broken_pkgs, collapse = ", ")
     warning(
-      "GExPipe: package(s) with broken native code detected: ",
-      paste(broken_pkgs, collapse = ", "),
-      ". Restart R and reinstall GExPipe dependencies.",
+      sprintf(
+        "GExPipe: package(s) with broken native code detected: %s. Restart R and reinstall GExPipe dependencies.",
+        broken_txt
+      ),
       call. = FALSE
     )
     return(FALSE)
@@ -998,10 +1000,13 @@ gexp_app_attach_packages <- function() {
       )
     }
     if (length(miss) > 0L) {
+      miss_txt <- paste(miss, collapse = ", ")
       stop(
-        "Missing required packages for the Shiny app: ",
-        paste(miss, collapse = ", "),
-        ". Install them with BiocManager (dependencies = TRUE) and retry."
+        sprintf(
+          "Missing required packages for the Shiny app: %s. Install them with BiocManager (dependencies = TRUE) and retry.",
+          miss_txt
+        ),
+        call. = FALSE
       )
     }
     options(gexpipe.attach.shiny_stack_only_done = TRUE)
@@ -1042,10 +1047,11 @@ gexp_app_attach_packages <- function() {
   }
 
   hard_required <- c("shiny", "shinydashboard", "shinyjs", "DT")
-  missing  <- character(0)
-  loaded   <- character(0)
-  failed   <- character(0)
-  broken   <- character(0)
+  pkg_state <- new.env(parent = emptyenv())
+  pkg_state$missing <- character(0)
+  pkg_state$loaded <- character(0)
+  pkg_state$failed <- character(0)
+  pkg_state$broken <- character(0)
 
   message("\n======================================================================")
   message("  GExPipe \u2014 loading ", n_total, " packages...\n")
@@ -1057,8 +1063,8 @@ gexp_app_attach_packages <- function() {
 
     if (!requireNamespace(p, quietly = TRUE)) {
       message(idx, " ", label, "... \u2717 MISSING")
-      if (p %in% hard_required) missing <- c(missing, p)
-      failed <- c(failed, p)
+      if (p %in% hard_required) pkg_state$missing <- c(pkg_state$missing, p)
+      pkg_state$failed <- c(pkg_state$failed, p)
       next
     }
 
@@ -1069,7 +1075,7 @@ gexp_app_attach_packages <- function() {
           base::attachNamespace(asNamespace(p))
         ver <- tryCatch(as.character(utils::packageVersion(p)), error = function(e) "?")
         message(idx, " ", label, "... \u2713 ", ver)
-        loaded <- c(loaded, p)
+        pkg_state$loaded <- c(pkg_state$loaded, p)
       },
       error = function(e) {
         err_msg <- conditionMessage(e)
@@ -1078,14 +1084,19 @@ gexp_app_attach_packages <- function() {
           err_msg, ignore.case = TRUE)
         if (is_dll_err) {
           message(idx, " ", label, "... \u26A0 broken DLL (auto-fixing...)")
-          broken <<- c(broken, p)
+          pkg_state$broken <- c(pkg_state$broken, p)
         } else {
-          message(idx, " ", label, "... \u2717 load error")
+          message(sprintf("%s %s... \u2717 load error: %s", idx, label, err_msg))
         }
-        failed <<- c(failed, p)
+        pkg_state$failed <- c(pkg_state$failed, p)
       }
     )
   }
+
+  loaded <- pkg_state$loaded
+  failed <- pkg_state$failed
+  broken <- pkg_state$broken
+  missing <- pkg_state$missing
 
   # Auto-fix any broken packages detected during attach
   if (length(broken) > 0L) {
@@ -1097,8 +1108,8 @@ gexp_app_attach_packages <- function() {
           pkg_search <- paste0("package:", p)
           if (!pkg_search %in% search())
             base::attachNamespace(asNamespace(p))
-          failed <<- setdiff(failed, p)
-          loaded  <<- c(loaded, p)
+          failed <- setdiff(failed, p)
+          loaded <- c(loaded, p)
           message("  [fix] ", p, " \u2713 reloaded successfully")
         }, error = function(e) NULL)
       }
@@ -1117,10 +1128,13 @@ gexp_app_attach_packages <- function() {
   message("======================================================================\n")
 
   if (length(missing) > 0L) {
+    missing_txt <- paste(missing, collapse = ", ")
     stop(
-      "Missing required packages for the Shiny app: ",
-      paste(missing, collapse = ", "),
-      ". Install them with BiocManager and retry."
+      sprintf(
+        "Missing required packages for the Shiny app: %s. Install them with BiocManager and retry.",
+        missing_txt
+      ),
+      call. = FALSE
     )
   }
 
