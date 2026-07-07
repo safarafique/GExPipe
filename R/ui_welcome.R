@@ -55,7 +55,7 @@ ui_welcome <- fluidPage(
     .bg-mesh { position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 32px 32px; pointer-events: none; }
   ")),
   tags$div(class = "bg-glow"), tags$div(class = "bg-glow-2"), tags$div(class = "bg-mesh"),
-  tags$div(class = "watermark-welcome", "GExPipe · Gene Expression Pipeline"),
+  tags$div(class = "watermark-welcome", "GExPipe - Gene Expression Pipeline"),
   tags$div(
     style = "max-width: 980px; width: 100%; position: relative; z-index: 1;",
     # Hero: Logo + Stats Badges + 3D Pipeline
@@ -75,7 +75,7 @@ ui_welcome <- fluidPage(
       tags$p(
         class = "hero-animate",
         style = "color: rgba(255,255,255,0.85); font-size: 16px; font-weight: 500; letter-spacing: 0.4px; margin-bottom: 28px;",
-        "One workflow: GEO → QC → DE → WGCNA → PPI → ML → reports. No coding required."
+        "One workflow: GEO -> QC -> DE -> WGCNA -> PPI -> ML -> reports. No coding required."
       ),
       # Stats badges
       tags$div(
@@ -147,13 +147,13 @@ ui_welcome <- fluidPage(
       ),
       tags$div(
         style = "text-align: left; margin: 0 0 28px 0; font-size: 14px; line-height: 1.95; color: #475569;",
-        tags$div(class = "pipeline-item", tags$strong("1. Download"), " — GEO data (RNA-seq / Microarray / Merged) with gene symbol mapping"),
-        tags$div(class = "pipeline-item", tags$strong("2. QC & Visualization"), " — Gene overlap, PCA, sample connectivity"),
-        tags$div(class = "pipeline-item", tags$strong("3–5. Normalize, Groups, Batch"), " — Preprocessing and batch correction"),
-        tags$div(class = "pipeline-item", tags$strong("6. Differential Expression"), " — limma / DESeq2 / edgeR"),
-        tags$div(class = "pipeline-item", tags$strong("7–8. WGCNA & Common Genes"), " — Co-expression modules and enrichment"),
-        tags$div(class = "pipeline-item", tags$strong("9–10. PPI & ML"), " — Protein interaction networks and predictive modeling"),
-        tags$div(class = "pipeline-item", tags$strong("11–15. Validation, ROC, Nomogram, GSEA, Summary"), " — Validation and report")
+        tags$div(class = "pipeline-item", tags$strong("1. Download"), " - GEO data (RNA-seq / Microarray / Merged) with gene symbol mapping"),
+        tags$div(class = "pipeline-item", tags$strong("2. QC & Visualization"), " - Gene overlap, PCA, sample connectivity"),
+        tags$div(class = "pipeline-item", tags$strong("3-5. Normalize, Groups, Batch"), " - Preprocessing and batch correction"),
+        tags$div(class = "pipeline-item", tags$strong("6. Differential Expression"), " - limma / DESeq2 / edgeR"),
+        tags$div(class = "pipeline-item", tags$strong("7-8. WGCNA & Common Genes"), " - Co-expression modules and enrichment"),
+        tags$div(class = "pipeline-item", tags$strong("9-10. PPI & ML"), " - Protein interaction networks and predictive modeling"),
+        tags$div(class = "pipeline-item", tags$strong("11-15. Validation, ROC, Nomogram, GSEA, Summary"), " - Validation and report")
       ),
       tags$h3(
         style = "color: #1e293b; font-size: 20px; font-weight: 700; margin: 26px 0 14px 0; text-align: left;
@@ -196,7 +196,7 @@ ui_welcome <- fluidPage(
         ),
         tags$p(
           style = "color: #94a3b8; font-size: 12px; margin-top: 14px; font-weight: 500;",
-          "GExPipe — Gene Expression Pipeline"
+          "GExPipe - Gene Expression Pipeline"
         )
       )
     )

@@ -21,10 +21,10 @@ ui_normalize <- tabItem(
             ),
             tags$ul(
               style = "font-size: 13px; color: #2c3e50; line-height: 2;",
-              tags$li(tags$strong("For DE analysis:"), " DESeq2 uses median-of-ratios normalization; edgeR uses TMM normalization; limma-voom applies voom transformation to raw counts. All three work directly on raw counts — no manual normalization needed."),
+              tags$li(tags$strong("For DE analysis:"), " DESeq2 uses median-of-ratios normalization; edgeR uses TMM normalization; limma-voom applies voom transformation to raw counts. All three work directly on raw counts - no manual normalization needed."),
               tags$li(tags$strong("For downstream steps:"), " Normalization was run automatically in the background (TMM + quantile) so that WGCNA, heatmaps, and other visualizations work correctly."),
               tags$li(tags$strong("RNA-seq only:"), " These methods require integer RNA-seq counts. If your data is microarray-based, limma will be used automatically instead."),
-              tags$li(tags$strong("Next step:"), " Proceed to ", tags$b("Step 4: Select Groups"), " — this step is already done for you.")
+              tags$li(tags$strong("Next step:"), " Proceed to ", tags$b("Step 4: Select Groups"), " - this step is already done for you.")
             ),
             tags$div(
               style = "text-align: center; margin-top: 15px;",
@@ -68,8 +68,8 @@ ui_normalize <- tabItem(
             "normalize_mode",
             label = NULL,
             choices = c(
-              "Auto (recommended) — use default methods" = "auto",
-              "Manual — choose methods below" = "manual"
+              "Auto (recommended) - use default methods" = "auto",
+              "Manual - choose methods below" = "manual"
             ),
             selected = "auto",
             inline = TRUE
@@ -162,7 +162,7 @@ ui_normalize <- tabItem(
             " Check ", tags$strong("within each dataset"), " (samples should align). ",
             "For ", tags$strong("mixed microarray + RNA-seq"), " with global quantile ",
             tags$strong("off"), ", different median blocks across platforms are ",
-            tags$em("expected"), " — alignment happens in Step 5 (batch correction), not here.",
+            tags$em("expected"), " - alignment happens in Step 5 (batch correction), not here.",
             style = "color: #495057; font-size: 13px; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;"
           )
         )

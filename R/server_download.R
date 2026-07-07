@@ -2,7 +2,7 @@
 # SERVER_DOWNLOAD.R - Step 1: Data Download (Multi-Platform Pipeline)
 # ==============================================================================
 # Matches: PHASE 1 - STEP 1 (Download) + STEP 2 (Gene ID Mapping) + common genes
-# Pipeline: Microarray getGEO → store raw; RNA-seq NCBI raw counts / supp → store raw;
+# Pipeline: Microarray getGEO -> store raw; RNA-seq NCBI raw counts / supp -> store raw;
 #           then map to symbols (remove NA, avereps); then common genes & combined matrix
 # ==============================================================================
 
@@ -175,13 +175,13 @@ server_download <- function(input, output, session, rv) {
       }
 
       # --------------------------------------------------------------------------
-      # Guard: if every download failed there is nothing to process — stop here
+      # Guard: if every download failed there is nothing to process - stop here
       # with a clear message rather than crashing inside the gene ID mapping code.
       # --------------------------------------------------------------------------
       if (length(rv$rna_counts_list) == 0 && length(rv$micro_expr_list) == 0) {
         log_text <- paste0(
           log_text,
-          "\nAll downloads failed — no data to process.\n",
+          "\nAll downloads failed - no data to process.\n",
           "Check the per-GSE reasons above, fix the GSE ID(s) or internet connection, and try again.\n"
         )
         rv$download_running <- FALSE
@@ -257,7 +257,7 @@ server_download <- function(input, output, session, rv) {
             extra_log <- ""
             if (length(gene_symbols) != nrow(micro_expr)) {
               extra_log <- paste0("  ", gse_id, ": symbol length mismatch (", length(gene_symbols),
-                                  " vs ", nrow(micro_expr), " rows) — keeping original row IDs\n")
+                                  " vs ", nrow(micro_expr), " rows) - keeping original row IDs\n")
               gene_symbols <- rownames(micro_expr)
             }
             rownames(micro_expr) <- gene_symbols
@@ -270,7 +270,7 @@ server_download <- function(input, output, session, rv) {
             list(ok = TRUE, micro_expr = micro_expr,
                  msg = paste0(extra_log, "  ", gse_id, ": ", nrow(micro_expr), " unique gene symbols\n"))
           }, error = function(e) {
-            list(ok = FALSE, msg = paste0("  ", gse_id, ": gene ID mapping failed (", conditionMessage(e), ") — keeping raw probe IDs\n"))
+            list(ok = FALSE, msg = paste0("  ", gse_id, ": gene ID mapping failed (", conditionMessage(e), ") - keeping raw probe IDs\n"))
           })
           log_text <- paste0(log_text, .gse_map$msg)
           if (isTRUE(.gse_map$ok)) {
@@ -326,7 +326,7 @@ server_download <- function(input, output, session, rv) {
             showNotification(
               tags$div(
                 icon("exclamation-triangle"),
-                tags$strong("0 common genes — ID conversion may have failed"),
+                tags$strong("0 common genes - ID conversion may have failed"),
                 tags$p("Ensure both datasets use gene symbols. RNA-seq Entrez IDs are converted via org.Hs.eg.db and biomaRt.", style = "margin-top: 8px; font-size: 12px;"),
                 tags$ul(
                   style = "margin: 4px 0 0 0; padding-left: 18px; font-size: 12px; color: #333;",
@@ -388,7 +388,7 @@ server_download <- function(input, output, session, rv) {
     }, error = function(e) {
       closeAllConnections()
       msg <- conditionMessage(e)
-      # Sentinel thrown by the "all downloads failed" guard — notification was
+      # Sentinel thrown by the "all downloads failed" guard - notification was
       # already shown; do not overwrite the log or show a second error popup.
       if (identical(msg, "__gexpipe_all_downloads_failed__")) return()
       err_log <- paste0(log_text, "\n\nError: ", msg, "\nConnections were reset. Please check your network and try again.")

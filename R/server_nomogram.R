@@ -353,22 +353,23 @@ server_nomogram <- function(input, output, session, rv) {
     dca_thresholds <- seq(0.01, 0.99, by = 0.02)
     # Prefer rmda when it is installed; otherwise fall back to dcurves (rmda was
     # archived from CRAN, so it may be unavailable on newer R versions).
-    dca_engine <- if (requireNamespace("rmda", quietly = TRUE)) {
-      "rmda"
-    } else if (requireNamespace("dcurves", quietly = TRUE)) {
+    dca_engine <- if (requireNamespace("dcurves", quietly = TRUE)) {
       "dcurves"
+    } else if (requireNamespace("rmda", quietly = TRUE)) {
+      "rmda"
     } else {
       NA_character_
     }
 
     compute_dca <- function(dat) {
       if (identical(dca_engine, "rmda")) {
+        rmda_dc <- get("decision_curve", envir = asNamespace("rmda"), mode = "function")
         tryCatch(
-          rmda::decision_curve(Outcome ~ Predicted_Prob, data = dat, fitted.risk = TRUE,
-                               thresholds = dca_thresholds, bootstraps = 25),
+          rmda_dc(Outcome ~ Predicted_Prob, data = dat, fitted.risk = TRUE,
+                  thresholds = dca_thresholds, bootstraps = 25),
           error = function(e) tryCatch(
-            rmda::decision_curve(Outcome ~ Predicted_Prob, data = dat, fitted.risk = TRUE,
-                                 thresholds = dca_thresholds, bootstraps = 0),
+            rmda_dc(Outcome ~ Predicted_Prob, data = dat, fitted.risk = TRUE,
+                    thresholds = dca_thresholds, bootstraps = 0),
             error = function(e2) NULL))
       } else if (identical(dca_engine, "dcurves")) {
         tryCatch(
@@ -478,8 +479,9 @@ server_nomogram <- function(input, output, session, rv) {
   render_dca <- function(dca_obj, model_col) {
     engine <- rv$nomogram_dca_engine
     if (identical(engine, "rmda")) {
-      rmda::plot_decision_curve(dca_obj, col = c("grey60", model_col, "grey60"),
-                                legend.position = "topright", lwd = 2)
+      rmda_plot <- get("plot_decision_curve", envir = asNamespace("rmda"), mode = "function")
+      rmda_plot(dca_obj, col = c("grey60", model_col, "grey60"),
+                legend.position = "topright", lwd = 2)
     } else {
       p <- plot(dca_obj, smooth = FALSE)
       print(p + ggplot2::scale_color_manual(values = c("grey60", model_col, "grey60")) +
