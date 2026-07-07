@@ -1,5 +1,11 @@
 # GExPipe NEWS
 
+## Version 0.99.20
+
+### BiocCheck / SPB
+- Use `warning()` (not `message(sprintf(...))`) for package load errors in attach
+  loop to clear remaining coding-practice NOTE.
+
 ## Version 0.99.19
 
 ### BiocCheck / SPB
