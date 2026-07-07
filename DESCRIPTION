@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.18
+Version: 0.99.19
 Authors@R: person("Safa", "Rafique",
            email = "safa.sandhu@gmail.com",
            role = c("aut", "cre"))
@@ -17,7 +17,8 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Depends: R (>= 4.6.0)
 biocViews: Software, ShinyApps, GeneExpression, RNASeq, Microarray,
-    DifferentialExpression, Pathways, Network, Visualization
+    DifferentialExpression, Normalization, Pathways, Network,
+    NetworkEnrichment, Visualization
 URL: https://github.com/safarafique/GExPipe
 BugReports: https://github.com/Bioconductor/Contributions/issues/4162
 Imports:
