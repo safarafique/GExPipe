@@ -1383,6 +1383,37 @@ download_ncbi_raw_counts_best <- function(gse_id, dest_dir) {
   best_path
 }
 
+#' Spearman correlation matrix without warnings on zero-variance columns
+#' @keywords internal
+gexpipe_spearman_cor <- function(x) {
+  if (is.null(x) || (!is.matrix(x) && !is.data.frame(x))) {
+    stop("x must be a matrix or data.frame.")
+  }
+  x <- as.matrix(x)
+  n <- ncol(x)
+  cn <- colnames(x)
+  if (is.null(cn)) {
+    cn <- paste0("V", seq_len(n))
+    colnames(x) <- cn
+  }
+  if (n < 2L) {
+    return(matrix(1, nrow = n, ncol = n, dimnames = list(cn, cn)))
+  }
+  v <- apply(x, 2, stats::var, na.rm = TRUE)
+  keep <- !is.na(v) & v > 0
+  out <- matrix(NA_real_, nrow = n, ncol = n, dimnames = list(cn, cn))
+  if (sum(keep) < 2L) {
+    diag(out) <- 1
+    return(out)
+  }
+  sub <- stats::cor(x[, keep, drop = FALSE], method = "spearman", use = "pairwise.complete.obs")
+  idx <- which(keep)
+  out[idx, idx] <- sub
+  diag(out) <- ifelse(is.na(diag(out)), 1, diag(out))
+  out[!keep, !keep] <- diag(1, sum(!keep))
+  out
+}
+
 #' Capture verbose GEOquery console output without suppressMessages()
 #' @keywords internal
 .gexpipe_geo_quiet <- function(expr) {
