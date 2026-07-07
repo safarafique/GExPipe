@@ -50,6 +50,14 @@ test_that("gexp_align_rnaseq_sample_names replaces fread V2/V3 headers", {
   expect_equal(colnames(out), c("GSM1", "GSM2"))
 })
 
+test_that("gexp_suggest_group_column prefers condition then title", {
+  skip_if_not_installed("GExPipe")
+  suggest <- getFromNamespace("gexp_suggest_group_column", "GExPipe")
+  expect_equal(suggest(c("geo_accession", "title", "supplementary_file")), "title")
+  expect_equal(suggest(c("geo_accession", "disease_state", "title")), "disease_state")
+  expect_equal(suggest(c("characteristics_ch1", "title")), "characteristics_ch1")
+})
+
 test_that("gexp_qc_build_sample_dataset_map maps samples to GSE IDs", {
   m1 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
   m2 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S3", "S4")))
