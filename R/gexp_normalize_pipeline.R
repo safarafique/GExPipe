@@ -85,6 +85,7 @@ gexp_normalize_and_intersect <- function(
             NULL
           }
           fdata <- if (!is.null(micro_eset)) Biobase::fData(micro_eset) else data.frame()
+          # suppressMessages: map_microarray_ids may call AnnotationDbi/GEOquery quietly
           gene_symbols <- suppressMessages(map_microarray_ids(probe_mat, fdata, micro_eset, gse_id = gse))
           if (length(gene_symbols) != nrow(probe_mat)) {
             log_text <- paste0(

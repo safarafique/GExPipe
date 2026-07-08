@@ -57,6 +57,57 @@ options(timeout = 3600)   # 1 hour — covers slow connections and large Bioc pa
                                    paste0(.gexpipe_rv, "-pending"))
 dir.create(.gexpipe_lib, recursive = TRUE, showWarnings = FALSE)
 
+# Installed Bioconductor package: skip isolated-library bootstrap and runtime source().
+.gexpipe_installed_in_system_library <- function() {
+  if (!requireNamespace("GExPipe", quietly = TRUE)) return(FALSE)
+  pkg_path <- tryCatch(
+    normalizePath(system.file(package = "GExPipe"), winslash = "/", mustWork = FALSE),
+    error = function(e) ""
+  )
+  if (!nzchar(pkg_path) || !dir.exists(pkg_path)) return(FALSE)
+  isolated_root <- normalizePath(
+    file.path(.gexpipe_lib_base_path, "GExPipe"), winslash = "/", mustWork = FALSE
+  )
+  !startsWith(
+    normalizePath(pkg_path, winslash = "/", mustWork = FALSE),
+    paste0(isolated_root, "/")
+  )
+}
+
+.gexpipe_verify_core_namespace <- function() {
+  .gexpipe_has_core_fn <- function(nm) {
+    exists(nm, envir = asNamespace("GExPipe"), inherits = FALSE, mode = "function")
+  }
+  core_needed <- c(
+    "gexp_parse_gse_inputs", "gexp_prepare_download_dirs", "gexp_download_finalize_common_genes",
+    "gexp_download_normalize_ids_for_overlap", "gexp_download_one_microarray_gse",
+    "gexp_download_one_rnaseq_gse", "gexp_qc_detect_outliers", "gexp_qc_exclude_samples",
+    "gexp_register_pipeline_observers", "gexp_register_navigation_observers",
+    "gexp_register_workspace_observers", "gexp_register_help_observers"
+  )
+  missing_core <- core_needed[!vapply(core_needed, .gexpipe_has_core_fn, logical(1))]
+  if (length(missing_core) > 0L) {
+    stop(
+      "Missing core GExPipe functions: ", paste(missing_core, collapse = ", "),
+      ". Reinstall/update the package or run GExPipe::runGExPipe().",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+if (.gexpipe_installed_in_system_library()) {
+  cat("  Mode         : installed GExPipe package (namespace only)\n")
+  tryCatch(
+    getFromNamespace("gexp_app_attach_packages", "GExPipe")(),
+    error = function(e) warning("GExPipe attach: ", conditionMessage(e), call. = FALSE)
+  )
+  .gexpipe_verify_core_namespace()
+  cat("  Status       : ready (prefer GExPipe::runGExPipe() for future runs)\n")
+  cat("  ===============================================================\n\n")
+  return(invisible(TRUE))
+}
+
 # Warn if library is still inside a cloud-sync folder (edge case on some configs)
 local({
   p <- normalizePath(.gexpipe_lib, winslash = "/", mustWork = FALSE)
@@ -183,8 +234,9 @@ cat("  Bioconductor :", bioc_ver, "(R", as.character(.r_numeric), ")\n\n")
   pillar    = "1.9.0"
 )
 
-# Load shared helpers early (native-package fix must run before package attach).
-for (.helper in list(
+# Load shared helpers early only for first-run GitHub bootstrap (not when installed).
+if (!requireNamespace("GExPipe", quietly = TRUE)) {
+  for (.helper in list(
   c(file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"), file.path(getwd(), "R", "utils_shiny_app.R")),
   c(file.path(getwd(), "..", "..", "R", "gexp_platform_helpers.R"), file.path(getwd(), "R", "gexp_platform_helpers.R")),
   c(file.path(getwd(), "..", "..", "R", "gexpipe_shiny_helpers.R"), file.path(getwd(), "R", "gexpipe_shiny_helpers.R"))
@@ -195,6 +247,7 @@ for (.helper in list(
       break
     }
   }
+}
 }
 # Restore character path if a sourced helper overwrote .gexpipe_lib_base with a function.
 .gexpipe_lib_base <- .gexpipe_lib_base_path
@@ -695,152 +748,44 @@ if (length(failed_required) > 0L) {
 cat("  ===============================================================\n\n")
 
 # ==============================================================================
-# HELPER LOADING (prefer package namespace; fallback to R/ source checkout)
+# HELPER LOADING — use package namespace when installed (no runtime source of R/)
 # ==============================================================================
-if (!requireNamespace("GExPipe", quietly = TRUE)) {
+if (requireNamespace("GExPipe", quietly = TRUE)) {
+  tryCatch(
+    getFromNamespace("gexp_app_attach_packages", "GExPipe")(),
+    error = function(e) warning("GExPipe attach: ", conditionMessage(e), call. = FALSE)
+  )
+  .gexpipe_verify_core_namespace()
+} else {
   helper_candidates <- c(
     file.path(getwd(), "..", "..", "R", "gexpipe_shiny_helpers.R"),
     file.path(getwd(), "R", "gexpipe_shiny_helpers.R")
   )
   helper_file <- helper_candidates[file.exists(helper_candidates)][1]
   if (is.na(helper_file) || !nzchar(helper_file)) {
-    stop("GExPipe helper code not found. Run via GExPipe::runGExPipe() or from package root.")
+    stop(
+      "GExPipe helper code not found. Install GExPipe or run GExPipe::runGExPipe().",
+      call. = FALSE
+    )
   }
   source(helper_file, local = TRUE)
-}
 
-tryCatch({
-  if (requireNamespace("GExPipe", quietly = TRUE)) {
-    ns <- asNamespace("GExPipe")
-    to_pull <- c(
-      "theme_publication", "palette_primary", ".gexpipe_log_file", "app_log", "safe_run",
-      "IMAGE_DPI", "CSV_EXPORT_DIR",
-      "detect_gene_id_format",
-      "probe_ids_to_symbol_hugene_db", "probe_ids_to_symbol_gpl", "probe_ids_to_symbol_biomart",
-      "map_microarray_ids", "entrez_to_symbol_biomart", "any_id_to_symbol",
-      "get_platform_for_gse", "run_gse_annotation_and_download",
-      "convert_ids_to_symbols_simple", "convert_rnaseq_ids",
-      "download_ncbi_raw_counts", "download_ncbi_raw_counts_best",
-      "read_count_matrix", "classify_groups",
-      "normalize_microarray", "GPL_USE_OLIGO", "normalize_microarray_rma", "normalize_rnaseq",
-      "gexp_parse_gse_inputs", "gexp_prepare_download_dirs", "gexp_download_finalize_common_genes",
-      "gexp_fetch_geo_series_matrix_metadata", "gexp_no_common_genes_diagnostic_log",
-      "gexp_rebuild_all_genes_list", "gexp_download_normalize_ids_for_overlap",
-      "gexp_download_one_microarray_gse", "gexp_download_one_rnaseq_gse",
-      "gexp_qc_detect_outliers", "gexp_qc_exclude_samples", "gexp_qc_gene_overlap_summary",
-      "gexp_qc_prepare_venn_sets", "gexp_qc_prepare_upset_data",
-      "gexp_qc_prepare_boxplot_data", "gexp_qc_prepare_density_data",
-      "gexp_register_pipeline_observers",
-      "gexp_register_navigation_observers",
-      "gexp_register_workspace_observers",
-      "gexp_register_help_observers",
-      "gexp_user_guideline_modal_ui",
-      "gexp_normalize_and_intersect",
-      "gexp_batch_correct",
-      "gexpipe_pvca_df",
-      "gexpipe_pca_polar_df",
-      "gexpipe_has_mixed_platforms",
-      "gexpipe_batch_confounding_summary",
-      "gexpipe_batch_covariate_info",
-      "gexpipe_build_batch_mod",
-      "gexpipe_de_sample_info",
-      "gexpipe_independent_filter",
-      "gexpipe_wgcna_heatmap_cor",
-      ".gexpipe_call",
-      "gexp_ui_plot_download_jpg_pdf", "gexp_ui_plot_download_bar",
-      "gexp_plot_device_open", "gexp_ggsave_from_file",
-      "gexp_ml_venn_sets_for_selected", "gexp_ml_common_gene_count",
-      "gexp_draw_ml_methods_venn"
+  .gexpipe_has_core_fn <- function(nm) {
+    exists(nm, mode = "function", inherits = TRUE)
+  }
+  core_needed <- c(
+    "gexp_parse_gse_inputs", "gexp_prepare_download_dirs", "gexp_download_finalize_common_genes",
+    "gexp_download_normalize_ids_for_overlap", "gexp_download_one_microarray_gse",
+    "gexp_download_one_rnaseq_gse", "gexp_qc_detect_outliers", "gexp_qc_exclude_samples",
+    "gexp_register_pipeline_observers", "gexp_register_navigation_observers",
+    "gexp_register_workspace_observers", "gexp_register_help_observers"
+  )
+  missing_core <- core_needed[!vapply(core_needed, .gexpipe_has_core_fn, logical(1))]
+  if (length(missing_core) > 0L) {
+    stop(
+      "Missing core GExPipe functions: ", paste(missing_core, collapse = ", "),
+      ". Install GExPipe: BiocManager::install('GExPipe'), then GExPipe::runGExPipe().",
+      call. = FALSE
     )
-    for (nm in to_pull) {
-      if (exists(nm, envir = ns, inherits = FALSE))
-        assign(nm, get(nm, envir = ns, inherits = FALSE), envir = .GlobalEnv)
-    }
   }
-}, error = function(e) NULL)
-
-# Source any local R/ pipeline files (covers runGitHub checkout path)
-local_r_files <- c(
-  file.path(getwd(), "..", "..", "R", "gexpipe_shiny_helpers.R"),
-  file.path(getwd(), "..", "..", "R", "utils_shiny_app.R"),
-  file.path(getwd(), "..", "..", "R", "gexp_download_pipeline.R"),
-  file.path(getwd(), "..", "..", "R", "gexp_qc_pipeline.R"),
-  file.path(getwd(), "..", "..", "R", "gexp_normalize_pipeline.R"),
-  file.path(getwd(), "..", "..", "R", "gexp_batch_pipeline.R"),
-  file.path(getwd(), "..", "..", "R", "gexp_de_pipeline.R"),
-  file.path(getwd(), "..", "..", "R", "gexp_wgcna_pipeline.R"),
-  file.path(getwd(), "..", "..", "R", "gexp_platform_helpers.R"),
-  file.path(getwd(), "..", "..", "R", "observers_pipeline.R"),
-  file.path(getwd(), "..", "..", "R", "observers_navigation.R"),
-  file.path(getwd(), "..", "..", "R", "observers_workspace.R"),
-  file.path(getwd(), "..", "..", "R", "observers_help.R"),
-  file.path(getwd(), "R", "gexpipe_shiny_helpers.R"),
-  file.path(getwd(), "R", "utils_shiny_app.R"),
-  file.path(getwd(), "R", "gexp_download_pipeline.R"),
-  file.path(getwd(), "R", "gexp_qc_pipeline.R"),
-  file.path(getwd(), "R", "gexp_normalize_pipeline.R"),
-  file.path(getwd(), "R", "gexp_batch_pipeline.R"),
-  file.path(getwd(), "R", "gexp_de_pipeline.R"),
-  file.path(getwd(), "R", "gexp_wgcna_pipeline.R"),
-  file.path(getwd(), "R", "gexp_platform_helpers.R"),
-  file.path(getwd(), "R", "observers_pipeline.R"),
-  file.path(getwd(), "R", "observers_navigation.R"),
-  file.path(getwd(), "R", "observers_workspace.R"),
-  file.path(getwd(), "R", "observers_help.R")
-)
-for (rf in unique(local_r_files[file.exists(local_r_files)]))
-  tryCatch(source(rf, local = TRUE), error = function(e) NULL)
-
-# Prefer functions sourced above over GExPipe:: (avoids corrupt lazy-load DB on reinstall).
-if (!exists("gexpipe_wgcna_heatmap_cor", mode = "function", inherits = TRUE)) {
-  gexpipe_wgcna_heatmap_cor <- function(cor_mat, combined) {
-    if (is.null(cor_mat)) return(cor_mat)
-    if (!is.null(combined) && combined %in% colnames(cor_mat) && ncol(cor_mat) > 1L) {
-      cor_mat <- cor_mat[, setdiff(colnames(cor_mat), combined), drop = FALSE]
-    }
-    cor_mat
-  }
-}
-
-.gexpipe_call <- function(name, ...) {
-  if (requireNamespace("GExPipe", quietly = TRUE)) {
-    ns <- asNamespace("GExPipe")
-    if (exists(name, envir = ns, inherits = FALSE, mode = "function")) {
-      return(get(name, envir = ns, mode = "function")(...))
-    }
-  }
-  if (exists(name, mode = "function", inherits = TRUE)) {
-    return(get(name, mode = "function", inherits = TRUE)(...))
-  }
-  stop(
-    "Function ", name, " is not available. Update GExPipe:\n",
-    "  remotes::install_github('safarafique/GExPipe')\n",
-    "Then restart R and run GExPipe::runGExPipe() again.",
-    call. = FALSE
-  )
-}
-
-# Verify core functions are present
-.gexpipe_has_core_fn <- function(nm) {
-  if (exists(nm, mode = "function", inherits = TRUE)) return(TRUE)
-  if (requireNamespace("GExPipe", quietly = TRUE)) {
-    ns <- asNamespace("GExPipe")
-    if (exists(nm, envir = ns, inherits = FALSE, mode = "function")) return(TRUE)
-  }
-  FALSE
-}
-
-core_needed <- c(
-  "gexp_parse_gse_inputs", "gexp_prepare_download_dirs", "gexp_download_finalize_common_genes",
-  "gexp_download_normalize_ids_for_overlap", "gexp_download_one_microarray_gse",
-  "gexp_download_one_rnaseq_gse", "gexp_qc_detect_outliers", "gexp_qc_exclude_samples",
-  "gexp_register_pipeline_observers", "gexp_register_navigation_observers",
-  "gexp_register_workspace_observers", "gexp_register_help_observers"
-)
-missing_core <- core_needed[!vapply(core_needed, .gexpipe_has_core_fn, logical(1))]
-if (length(missing_core) > 0L) {
-  stop(
-    "Missing core GExPipe functions: ", paste(missing_core, collapse = ", "),
-    ". Reinstall/update the package or run from the package root."
-  )
 }
