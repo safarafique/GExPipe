@@ -107,7 +107,7 @@ server_groups <- function(input, output, session, rv) {
           DT::DTOutput(paste0("phenodata_table_", gse)),
           tags$p(
             icon("info-circle", style = "color: #17a2b8; margin-right: 5px;"),
-            tags$em("Tip: Look for columns like 'characteristics_ch1', 'source_name_ch1', 'tissue', 'disease state' etc. that contain group/condition information."),
+            tags$em("Tip: If no condition column exists (e.g. GSE108413), select ", tags$strong("title"), ". GExPipe extracts text after \"under\" (control vs cytokine treatment). You can still manually set each group to Normal, Disease, or None below."),
             style = "color: #6c757d; font-size: 12px; margin-top: 10px;"
           )
         )
@@ -552,6 +552,7 @@ server_groups <- function(input, output, session, rv) {
               matched_ids <- gsm_ids[valid]
               if (length(matched_ids) > 0) {
                 vals <- safe_trim(pdata[matched_ids, col_input, drop = TRUE])
+                vals <- gexp_normalize_group_labels(vals, col_name = col_input)
                 if (length(vals) == length(matched_ids)) {
                   group_raw[valid] <- vals
                 }
@@ -568,6 +569,7 @@ server_groups <- function(input, output, session, rv) {
           if (n > 0) {
             tryCatch({
               vals <- safe_trim(pdata[seq_len(n), col_input, drop = TRUE])
+              vals <- gexp_normalize_group_labels(vals, col_name = col_input)
               group_raw[seq_len(n)] <- vals
             }, error = function(e) {
               # If indexing fails, continue to next method
@@ -581,13 +583,19 @@ server_groups <- function(input, output, session, rv) {
           for (i in seq_along(expr_cols)) {
             tryCatch({
               if (expr_cols[i] %in% pdata_rownames) {
-                group_raw[i] <- safe_trim(pdata[expr_cols[i], col_input, drop = TRUE])[1]
+                group_raw[i] <- gexp_normalize_group_labels(
+                  safe_trim(pdata[expr_cols[i], col_input, drop = TRUE])[1],
+                  col_name = col_input
+                )
               } else {
                 # Try partial match (remove _Sample suffix)
                 expr_base <- gsub("_Sample[0-9]+$", "", expr_cols[i])
                 matches <- grep(paste0("^", expr_base), pdata_rownames, value = TRUE)
                 if (length(matches) > 0) {
-                  group_raw[i] <- safe_trim(pdata[matches[1], col_input, drop = TRUE])[1]
+                  group_raw[i] <- gexp_normalize_group_labels(
+                    safe_trim(pdata[matches[1], col_input, drop = TRUE])[1],
+                    col_name = col_input
+                  )
                 }
               }
             }, error = function(e) {
@@ -655,19 +663,7 @@ server_groups <- function(input, output, session, rv) {
           }
           
           # Auto-detect categories
-          auto_cats <- sapply(gse_groups, function(g) {
-            if (is.null(g) || is.na(g) || g == "") {
-              return("None")
-            }
-            g_lower <- tolower(as.character(g))
-            if (grepl("normal|control|healthy|wild", g_lower)) {
-              return("Normal")
-            } else if (grepl("disease|tumor|cancer|metastatic|patient", g_lower)) {
-              return("Disease")
-            } else {
-              return("None")
-            }
-          })
+          auto_cats <- vapply(gse_groups, gexp_suggest_group_category, character(1))
           
           # Count samples per group
           per_gse_data <- extracted_groups_per_gse()[[gse]]

@@ -455,70 +455,72 @@ gexp_download_normalize_ids_for_overlap <- function(
     .gse_result <- tryCatch({
       micro_expr <- micro_expr_list[[gse]]
       rn <- rownames(micro_expr)
-      sample_rn <- head(rn[!is.na(rn) & rn != ""], min(200, length(rn)))
-      looks_like_symbol <- length(sample_rn) > 0 &&
-        mean(grepl("^[A-Za-z]", sample_rn), na.rm = TRUE) > 0.6 &&
-        mean(grepl("^ENSG|_at$|_st$|^[0-9]+$", sample_rn), na.rm = TRUE) < 0.5
       gpl <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
-      if (!looks_like_symbol) {
+      micro_eset <- if (!is.null(micro_eset_list)) micro_eset_list[[gse]] else NULL
+      if (gexpipe_ids_need_symbol_conversion(rn)) {
         fmt <- detect_gene_id_format(rn)
         log_text <- paste0(log_text, "  ", gse, ": format ", fmt, " -> converting to symbols...\n")
-        sym <- any_id_to_symbol(rn, gpl_id = gpl)
+        fdata <- if (!is.null(micro_eset)) {
+          tryCatch(Biobase::fData(micro_eset), error = function(e) NULL)
+        } else {
+          NULL
+        }
+        sym <- map_microarray_ids(micro_expr, fdata, micro_eset, gse_id = gse)
+        if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05) {
+          sym <- any_id_to_symbol(rn, gpl_id = gpl)
+        }
         converted <- FALSE
         if (!is.null(sym) && length(sym) == length(rn)) {
-          valid <- !is.na(sym) & trimws(sym) != ""
-          if (sum(valid) > 0) {
-            changed_ratio <- mean(sym[valid] != rn[valid], na.rm = TRUE)
-            fmt_after <- detect_gene_id_format(sym[valid])
-            if (changed_ratio > 0.05 || identical(fmt_after, "Gene symbol (HGNC)")) {
-              rownames(micro_expr) <- sym
-              micro_expr <- micro_expr[valid, , drop = FALSE]
-              if (any(duplicated(rownames(micro_expr)))) micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
-              micro_expr_list[[gse]] <- micro_expr
-              all_genes_list[[gse]] <- rownames(micro_expr)
-              log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(micro_expr), " gene symbols\n")
-              converted <- TRUE
+          valid <- !is.na(sym) & nzchar(trimws(sym))
+          mapped_rate <- if (sum(valid) > 0L) mean(sym[valid] != rn[valid], na.rm = TRUE) else 0
+          sym_ok <- sum(valid) > 0L && gexpipe_ids_are_verified_symbols(sym[valid])
+          if (sum(valid) > length(rn) * 0.05 && (sym_ok || mapped_rate > 0.05)) {
+            rownames(micro_expr) <- sym
+            micro_expr <- micro_expr[valid, , drop = FALSE]
+            if (any(duplicated(rownames(micro_expr)))) {
+              micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
             }
+            micro_expr_list[[gse]] <- micro_expr
+            all_genes_list[[gse]] <- rownames(micro_expr)
+            log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(micro_expr), " gene symbols\n")
+            converted <- TRUE
           }
         }
         # Fallback: use fData from stored ExpressionSet (avoids repeat GPL download)
-        if (!converted && !is.null(micro_eset_list) && !is.null(micro_eset_list[[gse]])) {
-          fd <- tryCatch(Biobase::fData(micro_eset_list[[gse]]), error = function(e) NULL)
-          if (!is.null(fd) && is.data.frame(fd) && ncol(fd) > 0) {
-            fd_cn     <- colnames(fd)
-            fd_cn_low <- tolower(trimws(fd_cn))
-            sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
-                               "symbol", "hgnc_symbol", "hgnc symbol", "hgnc.symbol",
-                               "gene sym", "genesym", "official symbol", "official_symbol")
-            fd_sym_col <- NULL
-            for (i in seq_along(fd_cn)) {
-              if (fd_cn_low[i] %in% sym_cands_low) { fd_sym_col <- fd_cn[i]; break }
-            }
-            if (is.null(fd_sym_col)) {
-              idx <- grep("gene.*(sym|symbol)|hgnc", fd_cn_low)
-              if (length(idx) > 0) fd_sym_col <- fd_cn[idx[1]]
-            }
-            if (!is.null(fd_sym_col)) {
-              fd_sym <- tryCatch(as.character(fd[[fd_sym_col]]), error = function(e) NULL)
-              if (!is.null(fd_sym) && length(fd_sym) == length(rn)) {
-                .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na",
-                                  "null", "NULL", "none", "NONE", ".", "0",
-                                  "no match", "no symbol", "unknown", "UNKNOWN")
-                fd_sym[fd_sym %in% .geo_na_vals | is.na(fd_sym)] <- NA
-                valid_fd <- !is.na(fd_sym) & nzchar(trimws(fd_sym))
-                if (sum(valid_fd) > length(rn) * 0.05) {
-                  micro_expr_fd <- micro_expr
-                  rownames(micro_expr_fd) <- fd_sym
-                  micro_expr_fd <- micro_expr_fd[valid_fd, , drop = FALSE]
-                  if (any(duplicated(rownames(micro_expr_fd)))) {
-                    micro_expr_fd <- limma::avereps(micro_expr_fd, ID = rownames(micro_expr_fd))
-                  }
-                  micro_expr_list[[gse]] <- micro_expr_fd
-                  all_genes_list[[gse]]  <- rownames(micro_expr_fd)
-                  log_text <- paste0(log_text, "  ", gse, ": fData fallback -> ",
-                                     nrow(micro_expr_fd), " gene symbols\n")
-                  converted <- TRUE
+        if (!converted && !is.null(fdata) && is.data.frame(fdata) && ncol(fdata) > 0) {
+          fd_cn     <- colnames(fdata)
+          fd_cn_low <- tolower(trimws(fd_cn))
+          sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
+                             "symbol", "hgnc_symbol", "hgnc symbol", "hgnc.symbol",
+                             "gene sym", "genesym", "official symbol", "official_symbol")
+          fd_sym_col <- NULL
+          for (i in seq_along(fd_cn)) {
+            if (fd_cn_low[i] %in% sym_cands_low) { fd_sym_col <- fd_cn[i]; break }
+          }
+          if (is.null(fd_sym_col)) {
+            idx <- grep("gene.*(sym|symbol)|hgnc", fd_cn_low)
+            if (length(idx) > 0) fd_sym_col <- fd_cn[idx[1]]
+          }
+          if (!is.null(fd_sym_col)) {
+            fd_sym <- tryCatch(as.character(fdata[[fd_sym_col]]), error = function(e) NULL)
+            if (!is.null(fd_sym) && length(fd_sym) == length(rn)) {
+              .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na",
+                                "null", "NULL", "none", "NONE", ".", "0",
+                                "no match", "no symbol", "unknown", "UNKNOWN")
+              fd_sym[fd_sym %in% .geo_na_vals | is.na(fd_sym)] <- NA
+              valid_fd <- !is.na(fd_sym) & nzchar(trimws(fd_sym))
+              if (sum(valid_fd) > length(rn) * 0.05) {
+                micro_expr_fd <- micro_expr
+                rownames(micro_expr_fd) <- fd_sym
+                micro_expr_fd <- micro_expr_fd[valid_fd, , drop = FALSE]
+                if (any(duplicated(rownames(micro_expr_fd)))) {
+                  micro_expr_fd <- limma::avereps(micro_expr_fd, ID = rownames(micro_expr_fd))
                 }
+                micro_expr_list[[gse]] <- micro_expr_fd
+                all_genes_list[[gse]]  <- rownames(micro_expr_fd)
+                log_text <- paste0(log_text, "  ", gse, ": fData fallback -> ",
+                                   nrow(micro_expr_fd), " gene symbols\n")
+                converted <- TRUE
               }
             }
           }
@@ -554,28 +556,29 @@ gexp_download_normalize_ids_for_overlap <- function(
     .gse_result <- tryCatch({
       cnt <- rna_counts_list[[gse]]
       rn <- rownames(cnt)
-      sample_rn <- head(rn[!is.na(rn) & rn != ""], min(200, length(rn)))
-      looks_like_symbol <- length(sample_rn) > 0 &&
-        mean(grepl("^[A-Za-z]", sample_rn), na.rm = TRUE) > 0.6 &&
-        mean(grepl("^ENSG|_at$|_st$|^[0-9]+$", sample_rn), na.rm = TRUE) < 0.5
-      if (!looks_like_symbol) {
-        sym <- any_id_to_symbol(rn, gpl_id = NULL)
+      if (gexpipe_ids_need_symbol_conversion(rn)) {
+        fmt <- detect_gene_id_format(rn)
+        log_text <- paste0(log_text, "  ", gse, ": format ", fmt, " -> converting to symbols...\n")
+        sym <- convert_rnaseq_ids(rn, gse_id = gse)
+        if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05) {
+          sym <- any_id_to_symbol(rn, gpl_id = NULL)
+        }
         if (!is.null(sym) && length(sym) == length(rn)) {
-          valid <- !is.na(sym) & trimws(sym) != ""
-          if (sum(valid) > 0) {
-            changed_ratio <- mean(sym[valid] != rn[valid], na.rm = TRUE)
-            fmt_after <- detect_gene_id_format(sym[valid])
-            if (changed_ratio > 0.05 || identical(fmt_after, "Gene symbol (HGNC)")) {
-              rownames(cnt) <- sym
-              cnt <- cnt[valid, , drop = FALSE]
-              if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
-              rna_counts_list[[gse]] <- cnt
-              all_genes_list[[gse]] <- rownames(cnt)
-              log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(cnt), " gene symbols\n")
-            } else {
-              log_text <- paste0(log_text, "  ", gse, ": conversion did not yield recognizable symbols; kept original IDs\n")
-            }
+          valid <- !is.na(sym) & nzchar(trimws(sym))
+          mapped_rate <- if (sum(valid) > 0L) mean(sym[valid] != rn[valid], na.rm = TRUE) else 0
+          sym_ok <- sum(valid) > 0L && gexpipe_ids_are_verified_symbols(sym[valid])
+          if (sum(valid) > length(rn) * 0.05 && (sym_ok || mapped_rate > 0.05)) {
+            rownames(cnt) <- sym
+            cnt <- cnt[valid, , drop = FALSE]
+            if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+            rna_counts_list[[gse]] <- cnt
+            all_genes_list[[gse]] <- rownames(cnt)
+            log_text <- paste0(log_text, "  ", gse, ": converted to ", nrow(cnt), " gene symbols\n")
+          } else {
+            log_text <- paste0(log_text, "  ", gse, ": conversion did not yield recognizable symbols; kept original IDs\n")
           }
+        } else {
+          log_text <- paste0(log_text, "  ", gse, ": conversion did not yield recognizable symbols; kept original IDs\n")
         }
       } else {
         sym <- normalize_symbol_tokens(rn)
@@ -609,8 +612,10 @@ gexp_download_normalize_ids_for_overlap <- function(
         log_text <- paste0(log_text, "  ", gse, ": row IDs still Entrez-like -> trying biomaRt Entrez->symbol...\n")
         sym <- entrez_to_symbol_biomart(rn)
         if (!is.null(sym) && length(sym) == length(rn)) {
-          valid <- !is.na(sym) & trimws(sym) != ""
-          if (sum(valid) > 0) {
+          valid <- !is.na(sym) & nzchar(trimws(sym))
+          mapped_rate <- if (sum(valid) > 0L) mean(sym[valid] != rn[valid], na.rm = TRUE) else 0
+          sym_ok <- sum(valid) > 0L && gexpipe_ids_are_verified_symbols(sym[valid])
+          if (sum(valid) > length(rn) * 0.05 && (sym_ok || mapped_rate > 0.05)) {
             cnt <- rna_counts_list[[gse]]
             rownames(cnt) <- sym
             cnt <- cnt[valid, , drop = FALSE]
@@ -1014,6 +1019,181 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   out
 }
 
+#' Preview nrow/ncol of a tabular count file
+#' @keywords internal
+.gexpipe_preview_count_file <- function(path) {
+  tryCatch(
+    {
+      df <- .gexpipe_fread_counts(path, nrows = 1e6)
+      if (is.null(df) || ncol(df) < 2L || nrow(df) < 2L) {
+        return(NULL)
+      }
+      list(
+        path = path,
+        nrow = nrow(df),
+        ncol = ncol(df),
+        nsamp = ncol(df) - 1L
+      )
+    },
+    error = function(e) NULL
+  )
+}
+
+#' Score a count-file candidate (higher is better)
+#' @keywords internal
+.gexpipe_score_count_candidate <- function(info, n_meta = NA_integer_) {
+  if (is.null(info)) {
+    return(-Inf)
+  }
+  nsamp <- info$nsamp
+  ngenes <- info$nrow
+  is_matrix_name <- grepl("matrix", basename(info$path), ignore.case = TRUE)
+  samp_match <- if (!is.na(n_meta) && n_meta > 0L) {
+    -abs(nsamp - n_meta) * 1e6 + nsamp * 1e3
+  } else {
+    nsamp * 1e3
+  }
+  matrix_bonus <- if (is_matrix_name) 1e4 else 0L
+  samp_match + matrix_bonus + ngenes
+}
+
+#' Pick the best count file from candidates using sample count then gene rows
+#' @keywords internal
+.gexpipe_pick_best_count_file <- function(paths, n_meta = NA_integer_) {
+  paths <- unique(paths[nzchar(paths)])
+  if (length(paths) == 0L) {
+    return(NULL)
+  }
+  best_path <- NULL
+  best_score <- -Inf
+  for (p in paths) {
+    info <- .gexpipe_preview_count_file(p)
+    score <- .gexpipe_score_count_candidate(info, n_meta)
+    if (score > best_score) {
+      best_score <- score
+      best_path <- p
+    }
+  }
+  best_path
+}
+
+#' Collect supplementary count-file candidates for one GSE directory
+#' @keywords internal
+.gexpipe_collect_supp_count_candidates <- function(files) {
+  files <- files[!grepl("\\.tar$", files, ignore.case = TRUE)]
+  patterns <- c("count", "raw", "matrix", "htseq")
+  candidates <- character(0)
+  for (pattern in patterns) {
+    matches <- files[grepl(pattern, basename(files), ignore.case = TRUE)]
+    matches <- matches[!grepl("series_matrix", basename(matches), ignore.case = TRUE)]
+    candidates <- c(candidates, matches)
+  }
+  unique(candidates)
+}
+
+#' List all files related to one GSE from both cache locations
+#' @keywords internal
+.gexpipe_list_gse_related_files <- function(gse_dir, rna_dir, gse_id) {
+  files_gse <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
+  files_rna <- list.files(rna_dir, full.names = TRUE, recursive = TRUE)
+  files_rna <- files_rna[grepl(gse_id, basename(files_rna), ignore.case = TRUE)]
+  unique(c(files_gse, files_rna))
+}
+
+#' Detect per-sample HTSeq/count files that can be merged
+#' @keywords internal
+.gexpipe_find_per_sample_count_files <- function(files) {
+  candidates <- .gexpipe_collect_supp_count_candidates(files)
+  candidates <- candidates[
+  !grepl("matrix", basename(candidates), ignore.case = TRUE)
+  ]
+  per_sample <- character(0)
+  for (cand in candidates) {
+    info <- .gexpipe_preview_count_file(cand)
+    if (!is.null(info) && info$nsamp == 1L && info$nrow >= 10L) {
+      per_sample <- c(per_sample, cand)
+    }
+  }
+  unique(per_sample)
+}
+
+#' Merge per-sample count files (genes x one sample each) into one matrix
+#' @keywords internal
+.gexpipe_merge_per_sample_count_files <- function(paths) {
+  paths <- unique(paths)
+  if (length(paths) < 2L) {
+    return(NULL)
+  }
+  merged <- NULL
+  for (p in paths) {
+    df <- tryCatch(.gexpipe_fread_counts(p), error = function(e) NULL)
+    if (is.null(df) || ncol(df) < 2L) {
+      next
+    }
+    gene_col <- as.character(df[[1]])
+    counts <- as.numeric(df[[2]])
+    samp_name <- sub("\\.[^.]+(\\.gz)?$", "", basename(p))
+    samp_name <- sub("\\.htseq-count$", "", samp_name, ignore.case = TRUE)
+    piece <- data.frame(gene = gene_col, count = counts, stringsAsFactors = FALSE)
+    colnames(piece)[2] <- samp_name
+    if (is.null(merged)) {
+      merged <- piece
+    } else {
+      merged <- merge(merged, piece, by = "gene", all = TRUE)
+    }
+  }
+  if (is.null(merged) || ncol(merged) < 3L) {
+    return(NULL)
+  }
+  gene_col <- merged$gene
+  merged$gene <- NULL
+  out <- cbind(gene = gene_col, merged, stringsAsFactors = FALSE)
+  as.data.frame(out, stringsAsFactors = FALSE, check.names = FALSE)
+}
+
+#' Fetch GEO metadata early for expected sample count
+#' @keywords internal
+.gexpipe_fetch_rnaseq_metadata_early <- function(gse_id) {
+  tryCatch(
+    {
+      gse_list <- .gexpipe_geo_quiet(GEOquery::getGEO(gse_id, GSEMatrix = TRUE))
+      gse <- if (inherits(gse_list, "list") && length(gse_list) >= 1) {
+        gse_list[[1]]
+      } else {
+        gse_list
+      }
+      pheno <- Biobase::pData(gse)
+      if (is.null(pheno) || nrow(pheno) == 0) {
+        stop("empty pData")
+      }
+      pheno
+    },
+    error = function(e) {
+      gexp_fetch_geo_series_matrix_metadata(gse_id)
+    }
+  )
+}
+
+#' Choose between GEO supplementary and NCBI count matrices
+#' @keywords internal
+.gexpipe_choose_supp_or_ncbi <- function(supp_file, ncbi_file, n_meta = NA_integer_) {
+  if (is.null(supp_file) || !nzchar(supp_file)) {
+    return(list(file = ncbi_file, source = "NCBI", info = .gexpipe_preview_count_file(ncbi_file)))
+  }
+  if (is.null(ncbi_file) || !nzchar(ncbi_file)) {
+    return(list(file = supp_file, source = "GEO supp", info = .gexpipe_preview_count_file(supp_file)))
+  }
+  supp_info <- .gexpipe_preview_count_file(supp_file)
+  ncbi_info <- .gexpipe_preview_count_file(ncbi_file)
+  supp_score <- .gexpipe_score_count_candidate(supp_info, n_meta)
+  ncbi_score <- .gexpipe_score_count_candidate(ncbi_info, n_meta)
+  if (ncbi_score > supp_score) {
+    list(file = ncbi_file, source = "NCBI", info = ncbi_info)
+  } else {
+    list(file = supp_file, source = "GEO supp", info = supp_info)
+  }
+}
+
 #' Download and parse one RNA-seq GSE
 #'
 #' @param gse_id GEO series ID.
@@ -1031,82 +1211,78 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   gse_dir <- file.path(rna_dir, gse_id)
   dir.create(gse_dir, showWarnings = FALSE, recursive = TRUE)
 
+  rna_metadata <- tryCatch(
+    .gexpipe_fetch_rnaseq_metadata_early(gse_id),
+    error = function(e) NULL
+  )
+  n_meta <- if (!is.null(rna_metadata) && nrow(rna_metadata) > 0L) {
+    nrow(rna_metadata)
+  } else {
+    NA_integer_
+  }
+
   supp_state <- new.env(parent = emptyenv())
   supp_state$err <- NULL
   count_file <- NULL
+  count_df_merged <- NULL
   tryCatch(
     {
       .gexpipe_geo_quiet(
         GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE)
       )
-      files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
-      if (length(files) == 0) {
-        files <- list.files(rna_dir, full.names = TRUE, recursive = TRUE)
-        files <- files[grepl(gse_id, basename(files), ignore.case = TRUE)]
-      }
+      files <- .gexpipe_list_gse_related_files(gse_dir, rna_dir, gse_id)
 
-      supp_files <- files[!grepl("\\.tar$", files, ignore.case = TRUE)]
-      bulk_candidates <- supp_files[
-        grepl("bulk", basename(supp_files), ignore.case = TRUE) &
-          grepl("count", basename(supp_files), ignore.case = TRUE)
+      tar_files <- files[grepl("\\.tar$", files, ignore.case = TRUE)]
+      for (tar_file in tar_files) {
+        tryCatch(
+          {
+            utils::untar(tar_file, exdir = gse_dir, tar = "internal")
+          },
+          error = function(e) {
+            msg <- conditionMessage(e)
+            if (grepl("truncated|corrupt|error|invalid", msg, ignore.case = TRUE)) {
+              supp_state$err <- paste0("Truncated or corrupted tar archive (", basename(tar_file), "). Re-download or try another GSE.")
+            } else {
+              supp_state$err <- paste0("Untar failed: ", substr(msg, 1L, 120L))
+            }
+          },
+          warning = function(w) {
+            supp_state$err <- paste0("Tar archive problem (", basename(tar_file), "). File may be truncated or corrupted.")
+          }
+        )
+      }
+      files <- .gexpipe_list_gse_related_files(gse_dir, rna_dir, gse_id)
+
+      matrix_candidates <- files[
+        grepl("matrix\\.htseq-count(\\.txt)?(\\.gz)?$", basename(files), ignore.case = TRUE)
       ]
-      if (length(bulk_candidates) > 0) {
-        best_nrow <- 0L
-        for (cand in bulk_candidates) {
-          tryCatch(
-            {
-              df <- .gexpipe_fread_counts(cand, nrows = 1e6)
-              if (ncol(df) >= 2 && nrow(df) >= 10 && nrow(df) > best_nrow) {
-                best_nrow <- nrow(df)
-                count_file <- cand
-              }
-            },
-            error = function(e) NULL
-          )
+      if (length(matrix_candidates) > 0L) {
+        count_file <- .gexpipe_pick_best_count_file(matrix_candidates, n_meta)
+        if (!is.null(count_file)) {
+          out$log <- paste0(out$log, "(preferred matrix.htseq-count file) ")
         }
       }
 
       if (is.null(count_file)) {
-        tar_files <- files[grepl("\\.tar$", files, ignore.case = TRUE)]
-        for (tar_file in tar_files) {
-          tryCatch(
-            {
-              utils::untar(tar_file, exdir = gse_dir, tar = "internal")
-            },
-            error = function(e) {
-              msg <- conditionMessage(e)
-              if (grepl("truncated|corrupt|error|invalid", msg, ignore.case = TRUE)) {
-                supp_state$err <- paste0("Truncated or corrupted tar archive (", basename(tar_file), "). Re-download or try another GSE.")
-              } else {
-                supp_state$err <- paste0("Untar failed: ", substr(msg, 1L, 120L))
-              }
-            },
-            warning = function(w) {
-              supp_state$err <- paste0("Tar archive problem (", basename(tar_file), "). File may be truncated or corrupted.")
-            }
-          )
-        }
-        files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
-        if (length(files) == 0) files <- list.files(rna_dir, full.names = TRUE)
-        for (pattern in c("count", "raw", "matrix")) {
-          matches <- files[grepl(pattern, basename(files), ignore.case = TRUE)]
-          matches <- matches[!grepl("series_matrix", basename(matches), ignore.case = TRUE)]
-          if (length(matches) > 0) {
-            best_nrow <- 0L
-            for (cand in matches) {
-              tryCatch(
-                {
-                  df <- .gexpipe_fread_counts(cand, nrows = 1e6)
-                  if (ncol(df) >= 2 && nrow(df) >= 10 && nrow(df) > best_nrow) {
-                    best_nrow <- nrow(df)
-                    count_file <- cand
-                  }
-                },
-                error = function(e) NULL
-              )
-            }
-            if (!is.null(count_file)) break
-            break
+        candidates <- .gexpipe_collect_supp_count_candidates(files)
+        count_file <- .gexpipe_pick_best_count_file(candidates, n_meta)
+      }
+
+      best_info <- if (!is.null(count_file)) .gexpipe_preview_count_file(count_file) else NULL
+      need_merge <- !is.null(best_info) && (
+        (!is.na(n_meta) && best_info$nsamp < n_meta) ||
+          best_info$nsamp <= 1L
+      )
+      if (isTRUE(need_merge) || is.null(count_file)) {
+        per_sample <- .gexpipe_find_per_sample_count_files(files)
+        if (length(per_sample) >= 2L) {
+          merged_df <- .gexpipe_merge_per_sample_count_files(per_sample)
+          merged_nsamp <- if (!is.null(merged_df)) ncol(merged_df) else 0L
+          if (!is.null(merged_df) && merged_nsamp >= 2L &&
+            (is.null(best_info) || merged_nsamp > best_info$nsamp)) {
+            count_df_merged <- merged_df
+            count_file <- NULL
+            out$log <- paste0(out$log, "(merged ", merged_nsamp, " per-sample files) ")
           }
         }
       }
@@ -1118,16 +1294,33 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   )
 
   ncbi_best <- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
-  nrow_supp <- if (!is.null(count_file)) tryCatch(nrow(.gexpipe_fread_counts(count_file, nrows = 500000L)), error = function(e) 0L) else 0L
-  nrow_ncbi <- if (!is.null(ncbi_best)) tryCatch(nrow(.gexpipe_fread_counts(ncbi_best, nrows = 500000L)), error = function(e) 0L) else 0L
-  if (nrow_ncbi > nrow_supp && !is.null(ncbi_best)) {
-    count_file <- ncbi_best
-    out$log <- paste0("(NCBI ", nrow_ncbi, " rows) ")
-  } else if (!is.null(count_file)) {
-    out$log <- paste0("(GEO supp ", nrow_supp, " rows) ")
+  chosen <- .gexpipe_choose_supp_or_ncbi(count_file, ncbi_best, n_meta)
+  if (!is.null(count_df_merged)) {
+    merged_nsamp <- ncol(count_df_merged)
+    merged_ngenes <- nrow(count_df_merged)
+    merged_score <- .gexpipe_score_count_candidate(
+      list(path = "merged", nrow = merged_ngenes, ncol = merged_nsamp + 1L, nsamp = merged_nsamp),
+      n_meta
+    )
+    chosen_score <- .gexpipe_score_count_candidate(chosen$info, n_meta)
+    if (merged_score >= chosen_score) {
+      chosen <- list(file = NULL, source = "GEO supp merged", info = list(nsamp = merged_nsamp, nrow = merged_ngenes))
+    } else {
+      count_df_merged <- NULL
+    }
   }
-  if (is.null(count_file) && !is.null(ncbi_best)) count_file <- ncbi_best
-  if (is.null(count_file)) {
+  if (!is.null(chosen$file)) {
+    count_file <- chosen$file
+    info <- chosen$info
+    if (!is.null(info) && !is.null(info$nrow)) {
+      out$log <- paste0(out$log, "(", chosen$source, " ", info$nrow, " rows, ", info$nsamp, " samples) ")
+    }
+  } else if (!is.null(count_df_merged)) {
+    count_file <- NULL
+  } else if (!is.null(ncbi_best)) {
+    count_file <- ncbi_best
+  }
+  if (is.null(count_file) && is.null(count_df_merged)) {
     out$reason <- "no count file (check internet or GSE may not have GEO supp or NCBI counts)"
     if (!is.null(supp_state$err) && nzchar(supp_state$err)) {
       out$reason <- if (grepl("connection|timeout|hostname|resolve|HTTP|ssl", supp_state$err, ignore.case = TRUE)) {
@@ -1141,29 +1334,51 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
     return(out)
   }
 
-  count_df <- tryCatch(read_count_matrix(count_file), error = function(e) .gexpipe_fread_counts(count_file))
+  count_df <- if (!is.null(count_df_merged)) {
+    count_df_merged
+  } else {
+    tryCatch(read_count_matrix(count_file), error = function(e) .gexpipe_fread_counts(count_file))
+  }
+  # Hard safeguard: if selected table has too few sample columns versus metadata,
+  # force-switch to matrix.htseq-count or NCBI candidate with more samples.
+  if (!is.null(count_df) && !is.na(n_meta) && n_meta > 1L) {
+    current_nsamp <- ncol(count_df) - 1L
+    if (is.finite(current_nsamp) && current_nsamp < n_meta) {
+      fallback_files <- .gexpipe_list_gse_related_files(gse_dir, rna_dir, gse_id)
+      matrix_candidates <- fallback_files[
+        grepl("matrix\\.htseq-count(\\.txt)?(\\.gz)?$", basename(fallback_files), ignore.case = TRUE)
+      ]
+      fallback_pick <- .gexpipe_pick_best_count_file(matrix_candidates, n_meta)
+      fallback_source <- "matrix.htseq-count fallback"
+      if (is.null(fallback_pick)) {
+        fallback_pick <- ncbi_best
+        fallback_source <- "NCBI fallback"
+      }
+      if (!is.null(fallback_pick) && nzchar(fallback_pick)) {
+        fallback_df <- tryCatch(read_count_matrix(fallback_pick), error = function(e) .gexpipe_fread_counts(fallback_pick))
+        fallback_nsamp <- if (!is.null(fallback_df)) ncol(fallback_df) - 1L else -1L
+        if (!is.null(fallback_df) && fallback_nsamp > current_nsamp) {
+          count_df <- fallback_df
+          count_file <- fallback_pick
+          out$log <- paste0(out$log, "(auto-switched: ", fallback_source, ", ", fallback_nsamp, " samples) ")
+        }
+      }
+    }
+  }
   if (is.null(count_df) || ncol(count_df) < 2 || nrow(count_df) < 10) {
     out$reason <- "count file format invalid or too small"
     return(out)
   }
 
-  # Fetch metadata early so we can orient/rename samples before QC merge
-  rna_metadata <- tryCatch(
-    {
-      gse_list <- .gexpipe_geo_quiet(GEOquery::getGEO(gse_id, GSEMatrix = TRUE))
-      gse <- if (inherits(gse_list, "list") && length(gse_list) >= 1) {
-        gse_list[[1]]
-      } else {
-        gse_list
-      }
-      pheno <- Biobase::pData(gse)
-      if (is.null(pheno) || nrow(pheno) == 0) stop("empty pData")
-      pheno
-    },
-    error = function(e) {
-      gexp_fetch_geo_series_matrix_metadata(gse_id)
-    }
-  )
+  # Reuse metadata fetched early; refresh only if missing
+  if (is.null(rna_metadata) || nrow(rna_metadata) == 0L) {
+    rna_metadata <- tryCatch(
+      {
+        .gexpipe_fetch_rnaseq_metadata_early(gse_id)
+      },
+      error = function(e) NULL
+    )
+  }
 
   oriented <- gexp_orient_count_dataframe(count_df, metadata = rna_metadata)
   count_matrix <- oriented$matrix
