@@ -72,6 +72,30 @@ test_that("read_count_matrix reads a plain CSV count file", {
   expect_equal(nrow(df), 3L)
 })
 
+test_that("Arraystar probe IDs never classified as HGNC", {
+  skip_if_not_installed("GExPipe")
+  verified <- getFromNamespace("gexpipe_ids_are_verified_symbols", "GExPipe")
+  detect <- getFromNamespace("detect_gene_id_format", "GExPipe")
+  need <- getFromNamespace("gexpipe_ids_need_symbol_conversion", "GExPipe")
+  e1a <- c("(+)E1A_r60_1", "(+)E1A_r60_3", "(+)E1A_r60_a104")
+  ashg <- c("ASHG19AP1B100000016V5", "ASHG19AP1B100000050V5")
+  expect_false(verified(e1a))
+  expect_false(verified(ashg))
+  expect_true(need(e1a))
+  expect_true(need(ashg))
+  expect_equal(detect(e1a), "Microarray probe-like ID")
+  expect_equal(detect(ashg), "Microarray probe-like ID")
+  expect_false(identical(detect(e1a), "Gene symbol (HGNC)"))
+})
+
+test_that(".gexpipe_accept_mapped_symbols accepts plausible gene names", {
+  skip_if_not_installed("GExPipe")
+  accept <- getFromNamespace(".gexpipe_accept_mapped_symbols", "GExPipe")
+  sym <- c("TP53", "BRCA1", "MALAT1", "GAPDH", "ACTB")
+  expect_true(accept(sym, length(sym)))
+  expect_false(accept(c("(+)E1A_r60_1", "ASHG19AP1B100000016V5"), 2L))
+})
+
 test_that("gexpipe_ids_are_verified_symbols rejects probe-like rownames", {
   skip_if_not_installed("GExPipe")
   verified <- getFromNamespace("gexpipe_ids_are_verified_symbols", "GExPipe")

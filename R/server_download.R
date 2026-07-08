@@ -74,7 +74,9 @@ server_download <- function(input, output, session, rv) {
           }
         }
 
-      log_text <- paste0("Starting download...\n")
+      log_text <- "Starting download...\n"
+      pkg_ver <- tryCatch(as.character(utils::packageVersion("GExPipe")), error = function(e) "dev")
+      log_text <- paste0("GExPipe ", pkg_ver, " | ", format(Sys.time()), "\n", log_text)
       disease <- trimws(if (is.null(input$disease_name)) "" else input$disease_name)
       if (nzchar(disease)) {
         log_text <- paste0(log_text, "Disease/Condition: ", disease, "\n")
@@ -274,7 +276,16 @@ server_download <- function(input, output, session, rv) {
                                   " vs ", nrow(micro_expr), " rows) - keeping original row IDs\n")
               gene_symbols <- rownames(micro_expr)
             }
-            rownames(micro_expr) <- gene_symbols
+            if (.gexpipe_accept_mapped_symbols(gene_symbols, nrow(micro_expr))) {
+              rownames(micro_expr) <- gene_symbols
+            } else if (gexpipe_ids_need_symbol_conversion(rownames(micro_expr))) {
+              extra_log <- paste0(
+                extra_log, "  ", gse_id,
+                ": probe/custom IDs detected — STEP 2b will map via GPL/fData\n"
+              )
+            } else {
+              rownames(micro_expr) <- gene_symbols
+            }
             valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
             micro_expr <- micro_expr[valid, , drop = FALSE]
             if (nrow(micro_expr) == 0) return(list(ok = "skip", msg = ""))
