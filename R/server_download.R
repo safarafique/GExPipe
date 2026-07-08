@@ -246,6 +246,7 @@ server_download <- function(input, output, session, rv) {
             micro_eset <- rv$micro_eset_list[[gse_id]]
             if (is.null(micro_eset)) {
               micro_data <- tryCatch({
+                # suppressMessages: GEOquery prints download/cache notices; log goes to nullfile()
                 suppressMessages(invisible(capture.output(
                   md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE),
                   file = nullfile()
@@ -262,6 +263,7 @@ server_download <- function(input, output, session, rv) {
               return(list(ok = "skip", msg = paste0("  ", gse_id, ": skipped mapping (GEO object unavailable during remap)\n")))
             }
             fdata <- tryCatch(Biobase::fData(micro_eset), error = function(e) data.frame())
+            # suppressMessages: map_microarray_ids may call AnnotationDbi/GEOquery quietly
             gene_symbols <- suppressMessages(
               tryCatch(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id),
                        error = function(e) rownames(micro_expr)))
