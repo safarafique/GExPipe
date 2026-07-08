@@ -57,6 +57,22 @@
 #'   shiny::runApp(app, port = 3838L)  # Step 2: start the server
 #' }
 runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
+  # When running from the package source tree, load latest R/ code (not stale install).
+  if (interactive() && !isTRUE(getOption("gexpipe.no_auto_dev_load"))) {
+    desc <- file.path(getwd(), "DESCRIPTION")
+    if (file.exists(desc)) {
+      hdr <- tryCatch(readLines(desc, n = 12L, warn = FALSE), error = function(e) character(0))
+      if (any(grepl("^Package:\\s*GExPipe\\s*$", hdr))) {
+        if (requireNamespace("pkgload", quietly = TRUE)) {
+          message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
+          pkgload::load_all(getwd(), quiet = TRUE, export_all = FALSE)
+        } else if (requireNamespace("devtools", quietly = TRUE)) {
+          message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
+          devtools::load_all(getwd(), quiet = TRUE)
+        }
+      }
+    }
+  }
   # Bioconductor Shiny guidance: do not launch the app inside the package.
   # This function must return a Shiny app object.
   port <- as.integer(port)
