@@ -7,6 +7,10 @@ test_that("detect_gene_id_format recognizes common ID types", {
   expect_equal(detect(c("ENSG00000141510", "ENSG00000012048")), "Ensembl ID")
   expect_equal(detect(c("AB000409", "AB000463", "AB000781")), "GenBank/EMBL accession")
   expect_equal(detect(c("ASHG19AP1B100000016V5", "ASHG19AP1B100000050V5")), "Microarray probe-like ID")
+  expect_false(identical(
+    detect(c("(+)E1A_r60_1", "(+)E1A_r60_3", "(+)E1A_r60_a104")),
+    "Gene symbol (HGNC)"
+  ))
 })
 
 test_that("gexpipe_ids_need_symbol_conversion flags non-symbol IDs", {
