@@ -526,7 +526,11 @@ gexp_download_normalize_ids_for_overlap <- function(
           }
         }
         if (!converted) {
-          log_text <- paste0(log_text, "  ", gse, ": conversion did not yield recognizable symbols; kept original IDs\n")
+          log_text <- paste0(
+            log_text, "  ", gse,
+            ": conversion did not yield recognizable symbols; kept original IDs",
+            " (probe/custom IDs will not overlap across platforms — need GPL gene symbols)\n"
+          )
         }
       } else {
         sym <- normalize_symbol_tokens(rn)
@@ -735,8 +739,10 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
     err_msg <- micro_data$error
     out$reason <- if (grepl("connection|timeout|hostname|resolve|HTTP|ssl|could not resolve|Unable to", err_msg, ignore.case = TRUE)) {
       "network/HTTP - check internet connection"
+    } else if (grepl("destfile", err_msg, ignore.case = TRUE)) {
+      "GEOquery download failed (destfile not found) - retry later or download this GSE manually from GEO"
     } else {
-      substr(gsub("\n", " ", err_msg), 1L, 80L)
+      substr(gsub("\n", " ", err_msg), 1L, 120L)
     }
     return(out)
   }
