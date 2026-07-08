@@ -534,6 +534,141 @@ GPL_to_biomart_probe_attr <- c(
   "GPL6104" = "illumina_humanht_12_v3"
 )
 
+  "GPL6104" = "illumina_humanht_12_v3"
+)
+
+#' Return TRUE when a single ID looks like a microarray probe (not HGNC)
+#' @keywords internal
+.gexpipe_id_looks_like_probe <- function(id) {
+  if (length(id) == 0L) {
+    return(logical(0))
+  }
+  id <- as.character(id)
+  vapply(id, function(x) {
+    if (is.na(x) || !nzchar(trimws(x))) {
+      return(FALSE)
+    }
+    grepl("_at$|_x_at$|_st$|probe[0-9]*$|^ILMN_|^A_[0-9]+_P[0-9]+", x, ignore.case = TRUE) ||
+      grepl("^(ASHG|BEAD)", x, ignore.case = TRUE) ||
+      grepl("\\(\\+\\)|^E1A_|_r[0-9]+_", x, ignore.case = TRUE) ||
+      (grepl("^ENSG", x, ignore.case = TRUE) && grepl("_at$", x, ignore.case = TRUE)) ||
+      nchar(x) > 18L
+  }, logical(1))
+}
+
+#' Accept a mapped symbol vector for overlap (relaxed vs strict org.Hs.eg.db check)
+#' @keywords internal
+.gexpipe_accept_mapped_symbols <- function(sym, n_total = length(sym), min_rate = 0.05) {
+  sym <- as.character(sym)
+  if (length(sym) != n_total || n_total == 0L) {
+    return(FALSE)
+  }
+  .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na", "null",
+                    "NULL", "none", "NONE", ".", "0", "no match", "no symbol",
+                    "unknown", "UNKNOWN")
+  sym[sym %in% .geo_na_vals | is.na(sym)] <- NA_character_
+  valid <- !is.na(sym) & nzchar(trimws(sym))
+  if (sum(valid) < max(3L, ceiling(n_total * min_rate))) {
+    return(FALSE)
+  }
+  if (mean(.gexpipe_id_looks_like_probe(sym[valid]), na.rm = TRUE) > 0.1) {
+    return(FALSE)
+  }
+  TRUE
+}
+
+#' Directories to search for cached GEO GPL files (GSE download folders first)
+#' @keywords internal
+.gexpipe_gpl_destdirs <- function(gse_id = NULL) {
+  dirs <- character(0)
+  wd <- getwd()
+  dirs <- c(dirs, file.path(wd, "micro_data"))
+  if (!is.null(gse_id) && nzchar(gse_id)) {
+    dirs <- c(dirs, file.path(wd, "micro_data", gse_id))
+  }
+  opt_micro <- getOption("gexpipe.micro_dir", NULL)
+  if (!is.null(opt_micro) && nzchar(opt_micro)) {
+    dirs <- c(dirs, opt_micro)
+  }
+  dirs <- c(dirs, tempdir(), wd)
+  unique(dirs[nzchar(dirs) & dir.exists(dirs)])
+}
+
+#' Extract gene symbols from ExpressionSet fData (GeneName, Symbol, Entrez, GB_ACC, ...)
+#' @keywords internal
+.gexpipe_extract_fdata_symbols <- function(fdata) {
+  if (is.null(fdata) || !is.data.frame(fdata) || ncol(fdata) == 0L) {
+    return(NULL)
+  }
+  n <- nrow(fdata)
+  cn <- colnames(fdata)
+  cn_low <- tolower(trimws(cn))
+  .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na", "null",
+                    "NULL", "none", "NONE", ".", "0", "no match", "no symbol",
+                    "unknown", "UNKNOWN")
+
+  .clean_col <- function(vals) {
+    vals <- as.character(vals)
+    vals[vals %in% .geo_na_vals | is.na(vals)] <- NA_character_
+    vals <- trimws(vals)
+    vals[!nzchar(vals)] <- NA_character_
+    vals
+  }
+
+  sym_cands_low <- c(
+    "gene symbol", "gene.symbol", "gene_symbol", "genesymbol", "genename",
+    "gene name", "gene_name", "symbol", "hgnc_symbol", "hgnc symbol",
+    "hgnc.symbol", "official symbol", "official_symbol", "gene sym", "genesym"
+  )
+  for (i in seq_along(cn)) {
+    if (cn_low[i] %in% sym_cands_low) {
+      sym <- .clean_col(fdata[[cn[i]]])
+      if (.gexpipe_accept_mapped_symbols(sym, n)) {
+        return(sym)
+      }
+    }
+  }
+  idx <- grep("gene.*(sym|symbol|name)|hgnc|^genename$", cn_low)
+  for (j in idx) {
+    sym <- .clean_col(fdata[[cn[j]]])
+    if (.gexpipe_accept_mapped_symbols(sym, n)) {
+      return(sym)
+    }
+  }
+  acc_idx <- grep("gb_?acc|refseq|entrez|gene.?id", cn_low)
+  acc_idx <- acc_idx[!grepl("probe|spot|symbol|name", cn_low[acc_idx])]
+  hs_db <- .gexpipe_hs_db()
+  if (length(acc_idx) > 0L && !is.null(hs_db)) {
+    for (j in acc_idx) {
+      keys <- .clean_col(fdata[[cn[j]]])
+      if (sum(!is.na(keys)) < max(3L, ceiling(n * 0.05))) {
+        next
+      }
+      mapped <- tryCatch(
+        if (mean(grepl("^[0-9]+$", keys[!is.na(keys)]), na.rm = TRUE) > 0.5) {
+          suppressMessages(AnnotationDbi::mapIds(
+            hs_db, keys = keys, column = "SYMBOL",
+            keytype = "ENTREZID", multiVals = "first"
+          ))
+        } else {
+          suppressMessages(AnnotationDbi::mapIds(
+            hs_db, keys = keys, column = "SYMBOL",
+            keytype = "ACCNUM", multiVals = "first"
+          ))
+        },
+        error = function(e) NULL
+      )
+      if (!is.null(mapped)) {
+        mapped <- as.character(mapped)
+        if (.gexpipe_accept_mapped_symbols(mapped, n)) {
+          return(mapped)
+        }
+      }
+    }
+  }
+  NULL
+}
+
 #' Return TRUE when row IDs are confirmed HGNC gene symbols
 #' @keywords internal
 gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
@@ -584,6 +719,13 @@ gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
 #' Return TRUE when IDs should be converted before common-gene overlap
 #' @keywords internal
 gexpipe_ids_need_symbol_conversion <- function(ids) {
+  if (isTRUE(.gexpipe_is_probe_like_ids(ids))) {
+    return(TRUE)
+  }
+  head_ids <- head(as.character(ids), min(50L, length(ids)))
+  if (length(head_ids) > 0L && any(.gexpipe_id_looks_like_probe(head_ids))) {
+    return(TRUE)
+  }
   !gexpipe_ids_are_verified_symbols(ids)
 }
 
@@ -619,6 +761,13 @@ detect_gene_id_format <- function(ids) {
   ids <- as.character(ids[!is.na(ids) & nzchar(trimws(ids))])
   if (length(ids) == 0) {
     return("Unknown")
+  }
+  head_ids <- head(ids, min(50L, length(ids)))
+  if (length(head_ids) > 0L && any(.gexpipe_id_looks_like_probe(head_ids))) {
+    if (mean(grepl("^ENSG", head_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
+      return("Ensembl ID")
+    }
+    return("Microarray probe-like ID")
   }
   sample_ids <- head(ids, min(300, length(ids)))
   if (mean(grepl("^[0-9]+_st$", sample_ids), na.rm = TRUE) > 0.5) {
@@ -735,15 +884,13 @@ probe_ids_to_symbol_hugene_db <- function(probe_ids, gpl_id = NULL) {
 }
 
 # Map probe IDs to gene symbols using GEO platform (GPL) annotation table.
-probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
+probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
   tryCatch({
     if (is.null(gpl_id) || !nzchar(gpl_id)) {
       return(NULL)
     }
     probe_ids <- as.character(probe_ids)
 
-    # Try multiple destdir values: default (tempdir), then current working dir.
-    # This reuses any GPL file already cached during the GSE download step.
     .fetch_gpl <- function(destdir_val) {
       tryCatch(
         # suppressMessages: GEOquery prints cache/download status for GPL fetch
@@ -751,17 +898,15 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
         error = function(e) NULL
       )
     }
-    gpl_raw <- .fetch_gpl(tempdir())
-    if (is.null(gpl_raw)) gpl_raw <- .fetch_gpl(getwd())
-    if (is.null(gpl_raw)) {
-      micro_dir <- file.path(getwd(), "micro_data")
-      if (dir.exists(micro_dir)) {
-        gpl_raw <- .fetch_gpl(micro_dir)
+    gpl_raw <- NULL
+    for (dd in .gexpipe_gpl_destdirs(gse_id)) {
+      gpl_raw <- .fetch_gpl(dd)
+      if (!is.null(gpl_raw)) {
+        break
       }
     }
-
     if (is.null(gpl_raw)) {
-      return(NULL)
+      gpl_raw <- .fetch_gpl(tempdir())
     }
     # getGEO may return a bare GPL object or a list wrapping one (GEOquery version-dependent)
     .unwrap_gpl <- function(x) {
@@ -1084,6 +1229,15 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     if (length(sym) == n_probes) sym else NULL
   }
 
+  # fData from GEO (GeneName / Symbol / Entrez) — primary path for Arraystar, Agilent, etc.
+  if (!is.null(fdata) && is.data.frame(fdata) && nrow(fdata) == n_probes) {
+    fd_sym <- .gexpipe_extract_fdata_symbols(fdata)
+    checked <- .safe_sym(fd_sym)
+    if (!is.null(checked)) {
+      return(checked)
+    }
+  }
+
   # Common GEO missing-value placeholders to treat as NA
   .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na", "null",
                     "NULL", "none", "NONE", ".", "0", "no match", "no symbol",
@@ -1121,7 +1275,7 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
       checked <- .safe_sym(gene_symbols)
       valid_sym <- checked[!is.na(checked) & nzchar(trimws(checked))]
       if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.05 &&
-        length(valid_sym) > 0L && gexpipe_ids_are_verified_symbols(valid_sym)) {
+        .gexpipe_accept_mapped_symbols(checked, n_probes)) {
         return(checked)
       }
     }
@@ -1204,9 +1358,9 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     }
   }
 
-  # GEO GPL annotation table (custom/CodeLink/Agilent probe IDs)
+  # GEO GPL annotation table (custom/CodeLink/Agilent/Arraystar probe IDs)
   if (.gexpipe_is_probe_like_ids(probe_ids) || (!is.null(platform_id) && nzchar(platform_id))) {
-    gene_symbols <- probe_ids_to_symbol_gpl(probe_ids, platform_id)
+    gene_symbols <- probe_ids_to_symbol_gpl(probe_ids, platform_id, gse_id = gse_id)
     checked <- .safe_sym(gene_symbols)
     if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.05) {
       return(checked)
@@ -1315,7 +1469,7 @@ entrez_to_symbol_biomart <- function(ids) {
 }
 
 # Convert any gene ID (probe, Entrez, Ensembl, or symbol) to gene symbol for overlap
-any_id_to_symbol <- function(ids, gpl_id = NULL) {
+any_id_to_symbol <- function(ids, gpl_id = NULL, gse_id = NULL) {
   if (is.null(ids) || length(ids) == 0) {
     return(ids)
   }
@@ -1337,7 +1491,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
 
   # GPL/platform annotation first when probe-like or platform is known
   if (.gexpipe_is_probe_like_ids(ids) || (!is.null(gpl_id) && nzchar(gpl_id))) {
-    gpl_sym <- probe_ids_to_symbol_gpl(ids, gpl_id)
+    gpl_sym <- probe_ids_to_symbol_gpl(ids, gpl_id, gse_id = gse_id)
     if (!is.null(gpl_sym) && length(gpl_sym) == length(ids) && sum(!is.na(gpl_sym)) > length(ids) * 0.05) {
       return(as.character(gpl_sym))
     }
@@ -1601,7 +1755,7 @@ convert_rnaseq_ids <- function(gene_ids, gse_id = NULL) {
   if (gexpipe_ids_are_verified_symbols(gene_ids)) {
     return(gene_ids)
   }
-  sym <- any_id_to_symbol(gene_ids, gpl_id = NULL)
+  sym <- any_id_to_symbol(gene_ids, gpl_id = NULL, gse_id = gse_id)
   if (!is.null(sym) && length(sym) == length(gene_ids) && sum(!is.na(sym)) > length(gene_ids) * 0.05) {
     return(as.character(sym))
   }
