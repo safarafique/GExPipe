@@ -175,6 +175,7 @@ server_validation <- function(input, output, session, rv) {
           count_file <- tryCatch(download_ncbi_raw_counts(gse_id, gse_dir), error = function(e) NULL)
           if (is.null(count_file)) {
             tryCatch({
+              # suppressMessages: GEOquery getGEOSuppFiles prints download progress to console
               suppressMessages(invisible(capture.output(GEOquery::getGEOSuppFiles(gse_id, baseDir = dirname(gse_dir), makeDirectory = FALSE, fetch_files = TRUE), file = nullfile())))
               files <- list.files(gse_dir, full.names = TRUE, recursive = TRUE)
               tar_files <- files[grepl("\\.tar$", files, ignore.case = TRUE)]
@@ -185,6 +186,7 @@ server_validation <- function(input, output, session, rv) {
                 matches <- matches[!grepl("series_matrix", basename(matches), ignore.case = TRUE)]
                 for (cand in matches) {
                   tryCatch({
+                    # suppressWarnings: fread may warn on mixed-type GEO supplement columns
                     df_test <- suppressWarnings(data.table::fread(cand, data.table = FALSE, nrows = 1e6))
                     if (ncol(df_test) >= 2 && nrow(df_test) >= 10) { count_file <- cand; break }
                   }, error = function(e) NULL)
@@ -194,11 +196,13 @@ server_validation <- function(input, output, session, rv) {
             }, error = function(e) NULL)
           }
           if (is.null(count_file)) { ext_log <- paste0(ext_log, "FAILED\n"); next }
+          # suppressWarnings: fread fallback when read_count_matrix fails on non-standard files
           count_df <- tryCatch(read_count_matrix(count_file), error = function(e) suppressWarnings(data.table::fread(count_file, data.table = FALSE)))
           if (is.null(count_df) || ncol(count_df) < 2) { ext_log <- paste0(ext_log, "FAILED\n"); next }
           gene_ids <- as.character(count_df[[1]])
           count_matrix <- as.matrix(count_df[, -1, drop = FALSE]); mode(count_matrix) <- "numeric"
           rownames(count_matrix) <- gene_ids
+          # suppressMessages: convert_rnaseq_ids uses AnnotationDbi mapIds (verbose by default)
           gene_symbols <- suppressMessages(convert_rnaseq_ids(gene_ids, gse_id))
           rownames(count_matrix) <- gene_symbols
           vld <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
@@ -206,6 +210,7 @@ server_validation <- function(input, output, session, rv) {
           if (any(duplicated(rownames(count_matrix)))) count_matrix <- limma::avereps(count_matrix, ID = rownames(count_matrix))
           all_expr_list[[gse_id]] <- count_matrix
           rna_meta <- tryCatch({
+            # suppressMessages: GEOquery getGEO prints cache/download notices
             suppressMessages(invisible(capture.output(gl <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE), file = nullfile())))
             Biobase::pData(if (is.list(gl)) gl[[1]] else gl)
           }, error = function(e) { sm <- fetch_geo_series_matrix_metadata(gse_id); if (!is.null(sm)) sm else data.frame(title = colnames(count_matrix), row.names = colnames(count_matrix)) })
@@ -219,6 +224,7 @@ server_validation <- function(input, output, session, rv) {
           incProgress(0.2 / max(1, length(gse_ids)), detail = paste0(gse_id, " (Microarray)"))
           ext_log <- paste0(ext_log, gse_id, " (Microarray)... ")
           micro_data <- tryCatch({
+            # suppressMessages: GEOquery getGEO prints cache/download notices
             suppressMessages(invisible(capture.output(md <- GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE), file = nullfile()))); md
           }, error = function(e) NULL)
           if (is.null(micro_data)) { ext_log <- paste0(ext_log, "FAILED\n"); next }
@@ -235,6 +241,7 @@ server_validation <- function(input, output, session, rv) {
           }
           if (is.null(micro_eset)) { ext_log <- paste0(ext_log, "FAILED\n"); next }
           micro_expr <- Biobase::exprs(micro_eset); fdata <- Biobase::fData(micro_eset)
+          # suppressMessages: map_microarray_ids may call AnnotationDbi/GEOquery quietly
           gene_symbols <- suppressMessages(map_microarray_ids(micro_expr, fdata, micro_eset, gse_id))
           rownames(micro_expr) <- gene_symbols
           vld <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
