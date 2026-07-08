@@ -38,6 +38,10 @@ server_download <- function(input, output, session, rv) {
     rv$download_start <- Sys.time()
     rv$download_running <- TRUE
     log_text <- "Starting download...\n"
+    refresh_log <- function() {
+      output$download_log <- renderText({ log_text })
+    }
+    refresh_log()
 
     showNotification(
       tags$div(
@@ -78,6 +82,7 @@ server_download <- function(input, output, session, rv) {
       }
       log_text <- paste0(log_text, "Mode: ", if (identical(rv$dataset_mode, "single")) "Single dataset" else "Multiple datasets", "\n")
       log_text <- paste0(log_text, "RNA-seq: ", length(rnaseq_ids), " | Microarray: ", length(micro_ids), "\n\n")
+      refresh_log()
 
       if (length(rnaseq_ids) == 0 && length(micro_ids) == 0) {
         log_text <- paste0(log_text, "Please specify at least one GSE ID in RNA-seq or Microarray.\n")
@@ -131,10 +136,12 @@ server_download <- function(input, output, session, rv) {
         dir.create(micro_dir, showWarnings = FALSE, recursive = TRUE)
         if (is.null(rv$micro_cel_paths)) rv$micro_cel_paths <- list()
         log_text <- paste0(log_text, "Downloading Microarray Datasets...\n")
+        refresh_log()
         for (i in seq_along(micro_ids)) {
           incProgress(1 / (length(rnaseq_ids) + length(micro_ids)))
           gse_id <- micro_ids[i]
           log_text <- paste0(log_text, "[", i, "/", length(micro_ids), "] ", gse_id, "... ")
+          refresh_log()
           res <- gexp_download_one_microarray_gse(gse_id, micro_dir)
           if (!isTRUE(res$ok)) {
             log_text <- paste0(log_text, "FAILED (", res$reason, "). Skipped.\n")
@@ -148,6 +155,7 @@ server_download <- function(input, output, session, rv) {
           rv$platform_per_gse[[gse_id]] <- res$platform_id
           if (length(res$cel_paths) > 0) rv$micro_cel_paths[[gse_id]] <- res$cel_paths
           log_text <- paste0(log_text, res$log, "\n")
+          refresh_log()
         }
       }
 
@@ -157,10 +165,12 @@ server_download <- function(input, output, session, rv) {
         log_text <- paste0(log_text, "\nDownloading RNA-seq Datasets...\n")
         rna_dir <- file.path(getwd(), "rna_data")
         if (!dir.exists(rna_dir)) dir.create(rna_dir, showWarnings = FALSE, recursive = TRUE)
+        refresh_log()
         for (i in seq_along(rnaseq_ids)) {
           incProgress(1 / (length(rnaseq_ids) + length(micro_ids)))
           gse_id <- rnaseq_ids[i]
           log_text <- paste0(log_text, "[", i, "/", length(rnaseq_ids), "] ", gse_id, "... ")
+          refresh_log()
           res <- gexp_download_one_rnaseq_gse(gse_id, rna_dir)
           if (!isTRUE(res$ok)) {
             log_text <- paste0(log_text, " FAILED (", res$reason, "). Skipped.\n")
@@ -171,6 +181,7 @@ server_download <- function(input, output, session, rv) {
           rv$rna_metadata_list[[gse_id]] <- res$metadata
           rv$all_genes_list[[gse_id]] <- rownames(res$count_matrix)
           log_text <- paste0(log_text, res$log, " OK (", nrow(res$count_matrix), " genes)\n")
+          refresh_log()
         }
       }
 
@@ -226,6 +237,7 @@ server_download <- function(input, output, session, rv) {
       # --------------------------------------------------------------------------
 
       log_text <- paste0(log_text, "\nSTEP 2: Gene ID mapping...\n")
+      refresh_log()
 
       if (length(rv$micro_expr_list) > 0) {
         for (gse_id in names(rv$micro_expr_list)) {
@@ -268,7 +280,8 @@ server_download <- function(input, output, session, rv) {
               micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
             }
             list(ok = TRUE, micro_expr = micro_expr,
-                 msg = paste0(extra_log, "  ", gse_id, ": ", nrow(micro_expr), " unique gene symbols\n"))
+                 msg = paste0(extra_log, "  ", gse_id, ": ", nrow(micro_expr), " rows after ID mapping",
+                              if (gexpipe_ids_are_verified_symbols(rownames(micro_expr))) " (gene symbols)" else "", "\n"))
           }, error = function(e) {
             list(ok = FALSE, msg = paste0("  ", gse_id, ": gene ID mapping failed (", conditionMessage(e), ") - keeping raw probe IDs\n"))
           })

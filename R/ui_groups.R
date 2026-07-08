@@ -28,7 +28,7 @@ ui_groups <- tabItem(
           tags$ol(
             style = "font-size: 15px; line-height: 2;",
             tags$li(tags$strong("Browse Phenodata:"), " Review all metadata columns for each dataset"),
-            tags$li(tags$strong("Select Column:"), " Choose the phenotype column that contains group info (e.g. tissue, disease state)"),
+            tags$li(tags$strong("Select Column:"), " Choose the phenotype column that contains group info (e.g. tissue, disease state, or ", tags$strong("title"), " when condition is embedded in sample titles)"),
             tags$li(tags$strong("Extract Groups:"), " Click to extract unique groups from the selected column"),
             tags$li(tags$strong("Categorize:"), " Assign each group as Normal, Disease, or None"),
             tags$li(tags$strong("Apply:"), " Finalize your selections")

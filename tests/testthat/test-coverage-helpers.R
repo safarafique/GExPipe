@@ -5,6 +5,34 @@ test_that("detect_gene_id_format recognizes common ID types", {
   expect_equal(detect(c("1007_s_at", "1053_at")), "Affymetrix HG-U133 probe (_at)")
   expect_equal(detect(c("12345", "67890", "11111")), "Entrez ID")
   expect_equal(detect(c("ENSG00000141510", "ENSG00000012048")), "Ensembl ID")
+  expect_equal(detect(c("AB000409", "AB000463", "AB000781")), "GenBank/EMBL accession")
+  expect_equal(detect(c("ASHG19AP1B100000016V5", "ASHG19AP1B100000050V5")), "Microarray probe-like ID")
+})
+
+test_that("gexpipe_ids_need_symbol_conversion flags non-symbol IDs", {
+  skip_if_not_installed("GExPipe")
+  need_conv <- getFromNamespace("gexpipe_ids_need_symbol_conversion", "GExPipe")
+  expect_false(need_conv(c("TP53", "BRCA1", "EGFR", "MYC", "GAPDH")))
+  expect_true(need_conv(c("AB000409", "AB000463", "AB000781")))
+  expect_true(need_conv(c("1007_s_at", "1053_at", "117_at")))
+  expect_true(need_conv(c("ENSG00000141510", "ENSG00000012048")))
+  expect_true(need_conv(c("ASHG19AP1B100000016V5", "ASHG19AP1B100000050V5")))
+  expect_true(need_conv(c("(+)E1A_r60_1", "(+)E1A_r60_3", "(+)E1A_r60_a104")))
+})
+
+test_that(".gexpipe_clean_ensembl_keys strips Affymetrix _at suffix", {
+  skip_if_not_installed("GExPipe")
+  clean <- getFromNamespace(".gexpipe_clean_ensembl_keys", "GExPipe")
+  expect_equal(clean("ENSG00000000003_at"), "ENSG00000000003")
+  expect_equal(clean("ENSG00000000005.14_at"), "ENSG00000000005")
+})
+
+test_that("detect_gene_id_format flags custom probe IDs from user GSEs", {
+  skip_if_not_installed("GExPipe")
+  detect <- getFromNamespace("detect_gene_id_format", "GExPipe")
+  expect_equal(detect(c("(+)E1A_r60_1", "(+)E1A_r60_3")), "Microarray probe-like ID")
+  expect_equal(detect(c("ASHG19AP1B100000016V5", "ASHG19AP1B100000050V5")), "Microarray probe-like ID")
+  expect_equal(detect(c("ENSG00000000003_at", "ENSG00000000005_at")), "Affymetrix HG-U133 probe (_at)")
 })
 
 test_that("normalize_microarray and normalize_rnaseq run on small matrices", {
