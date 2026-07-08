@@ -467,14 +467,15 @@ gexp_download_normalize_ids_for_overlap <- function(
         }
         sym <- map_microarray_ids(micro_expr, fdata, micro_eset, gse_id = gse)
         if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05) {
-          sym <- any_id_to_symbol(rn, gpl_id = gpl)
+          sym <- any_id_to_symbol(rn, gpl_id = gpl, gse_id = gse)
         }
         converted <- FALSE
         if (!is.null(sym) && length(sym) == length(rn)) {
           valid <- !is.na(sym) & nzchar(trimws(sym))
           mapped_rate <- if (sum(valid) > 0L) mean(sym[valid] != rn[valid], na.rm = TRUE) else 0
-          sym_ok <- sum(valid) > 0L && gexpipe_ids_are_verified_symbols(sym[valid])
-          if (sum(valid) > length(rn) * 0.05 && (sym_ok || mapped_rate > 0.05)) {
+          accept <- sum(valid) > length(rn) * 0.05 &&
+            (.gexpipe_accept_mapped_symbols(sym, length(rn)) || mapped_rate > 0.05)
+          if (accept) {
             rownames(micro_expr) <- sym
             micro_expr <- micro_expr[valid, , drop = FALSE]
             if (any(duplicated(rownames(micro_expr)))) {
@@ -487,41 +488,23 @@ gexp_download_normalize_ids_for_overlap <- function(
           }
         }
         # Fallback: use fData from stored ExpressionSet (avoids repeat GPL download)
-        if (!converted && !is.null(fdata) && is.data.frame(fdata) && ncol(fdata) > 0) {
-          fd_cn     <- colnames(fdata)
-          fd_cn_low <- tolower(trimws(fd_cn))
-          sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
-                             "symbol", "hgnc_symbol", "hgnc symbol", "hgnc.symbol",
-                             "gene sym", "genesym", "official symbol", "official_symbol")
-          fd_sym_col <- NULL
-          for (i in seq_along(fd_cn)) {
-            if (fd_cn_low[i] %in% sym_cands_low) { fd_sym_col <- fd_cn[i]; break }
-          }
-          if (is.null(fd_sym_col)) {
-            idx <- grep("gene.*(sym|symbol)|hgnc", fd_cn_low)
-            if (length(idx) > 0) fd_sym_col <- fd_cn[idx[1]]
-          }
-          if (!is.null(fd_sym_col)) {
-            fd_sym <- tryCatch(as.character(fdata[[fd_sym_col]]), error = function(e) NULL)
-            if (!is.null(fd_sym) && length(fd_sym) == length(rn)) {
-              .geo_na_vals <- c("", "---", "--", "-", "N/A", "n/a", "NA", "na",
-                                "null", "NULL", "none", "NONE", ".", "0",
-                                "no match", "no symbol", "unknown", "UNKNOWN")
-              fd_sym[fd_sym %in% .geo_na_vals | is.na(fd_sym)] <- NA
-              valid_fd <- !is.na(fd_sym) & nzchar(trimws(fd_sym))
-              if (sum(valid_fd) > length(rn) * 0.05) {
-                micro_expr_fd <- micro_expr
-                rownames(micro_expr_fd) <- fd_sym
-                micro_expr_fd <- micro_expr_fd[valid_fd, , drop = FALSE]
-                if (any(duplicated(rownames(micro_expr_fd)))) {
-                  micro_expr_fd <- limma::avereps(micro_expr_fd, ID = rownames(micro_expr_fd))
-                }
-                micro_expr_list[[gse]] <- micro_expr_fd
-                all_genes_list[[gse]]  <- rownames(micro_expr_fd)
-                log_text <- paste0(log_text, "  ", gse, ": fData fallback -> ",
-                                   nrow(micro_expr_fd), " gene symbols\n")
-                converted <- TRUE
+        if (!converted && !is.null(fdata) && is.data.frame(fdata) && nrow(fdata) == length(rn)) {
+          fd_sym <- .gexpipe_extract_fdata_symbols(fdata)
+          if (!is.null(fd_sym) && length(fd_sym) == length(rn)) {
+            valid_fd <- !is.na(fd_sym) & nzchar(trimws(fd_sym))
+            if (sum(valid_fd) > length(rn) * 0.05 &&
+                .gexpipe_accept_mapped_symbols(fd_sym, length(rn))) {
+              micro_expr_fd <- micro_expr
+              rownames(micro_expr_fd) <- fd_sym
+              micro_expr_fd <- micro_expr_fd[valid_fd, , drop = FALSE]
+              if (any(duplicated(rownames(micro_expr_fd)))) {
+                micro_expr_fd <- limma::avereps(micro_expr_fd, ID = rownames(micro_expr_fd))
               }
+              micro_expr_list[[gse]] <- micro_expr_fd
+              all_genes_list[[gse]]  <- rownames(micro_expr_fd)
+              log_text <- paste0(log_text, "  ", gse, ": fData fallback -> ",
+                                 nrow(micro_expr_fd), " gene symbols\n")
+              converted <- TRUE
             }
           }
         }
@@ -565,13 +548,14 @@ gexp_download_normalize_ids_for_overlap <- function(
         log_text <- paste0(log_text, "  ", gse, ": format ", fmt, " -> converting to symbols...\n")
         sym <- convert_rnaseq_ids(rn, gse_id = gse)
         if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05) {
-          sym <- any_id_to_symbol(rn, gpl_id = NULL)
+          sym <- any_id_to_symbol(rn, gpl_id = NULL, gse_id = gse)
         }
         if (!is.null(sym) && length(sym) == length(rn)) {
           valid <- !is.na(sym) & nzchar(trimws(sym))
           mapped_rate <- if (sum(valid) > 0L) mean(sym[valid] != rn[valid], na.rm = TRUE) else 0
-          sym_ok <- sum(valid) > 0L && gexpipe_ids_are_verified_symbols(sym[valid])
-          if (sum(valid) > length(rn) * 0.05 && (sym_ok || mapped_rate > 0.05)) {
+          accept <- sum(valid) > length(rn) * 0.05 &&
+            (.gexpipe_accept_mapped_symbols(sym, length(rn)) || mapped_rate > 0.05)
+          if (accept) {
             rownames(cnt) <- sym
             cnt <- cnt[valid, , drop = FALSE]
             if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
