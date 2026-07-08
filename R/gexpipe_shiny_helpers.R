@@ -480,6 +480,10 @@ platform_to_annot <- list(
   "GPL23126" = "clariomdhuman.db",
   "GPL23159" = "clariomdhuman.db",
   "GPL23270" = "clarionshuman.db",
+  # Clariom S / ENSG transcript IDs (symbols via org.Hs.eg.db ENSEMBL, not probe .db)
+  "GPL30033" = NA_character_,
+  "GPL21827" = NA_character_,  # Arraystar LncRNA V4 — use GPL table / biomaRt
+  "GPL26963" = NA_character_,  # Arraystar LncRNA V5 — use GPL table / biomaRt
   "GPL23432" = "hgu133plus2.db",
   "GPL24299" = "clarionshuman.db",
   "GPL24532" = "hugene21sttranscriptcluster.db",
@@ -537,17 +541,21 @@ gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
   if (length(ids) == 0L) {
     return(FALSE)
   }
+  # Never treat probe-like / Arraystar / Clariom IDs as HGNC symbols
+  if (isTRUE(.gexpipe_is_probe_like_ids(ids))) {
+    return(FALSE)
+  }
   sample_ids <- head(unique(ids), min(80L, length(unique(ids))))
   non_symbol_rate <- mean(
     grepl("_at$|_x_at$|_st$|^ENSG|^ENST|^ENTREZ|^NM_|^NR_", sample_ids, ignore.case = TRUE) |
       grepl("^[0-9]+$", sample_ids) |
       grepl("^[A-Z]{1,2}[0-9]{5,}", sample_ids) |
       grepl("^(ASHG|ILMN_|A_[0-9]+_P[0-9]+|BEAD)", sample_ids, ignore.case = TRUE) |
-      grepl("\\(\\+\\)|_r[0-9]+_", sample_ids) |
+      grepl("\\(\\+\\)|^E1A_|_r[0-9]+_", sample_ids) |
       nchar(sample_ids) > 14L,
     na.rm = TRUE
   )
-  if (non_symbol_rate > 0.2) {
+  if (non_symbol_rate > 0.1) {
     return(FALSE)
   }
 
@@ -595,14 +603,15 @@ gexpipe_ids_need_symbol_conversion <- function(ids) {
   if (length(ids) == 0L) {
     return(FALSE)
   }
-  sample_ids <- head(ids, min(200L, length(ids)))
+  sample_ids <- head(ids, min(300L, length(ids)))
   mean(
     grepl("_at$|_x_at$|_st$|probe[0-9]*$|^ILMN_|^A_[0-9]+_P[0-9]+", sample_ids, ignore.case = TRUE) |
       grepl("^(ASHG|BEAD)", sample_ids, ignore.case = TRUE) |
       grepl("\\(\\+\\)|^E1A_|_r[0-9]+_", sample_ids, ignore.case = TRUE) |
-      (grepl("^ENSG", sample_ids, ignore.case = TRUE) & grepl("_at$", sample_ids, ignore.case = TRUE)),
+      grepl("^ENSG", sample_ids, ignore.case = TRUE) |
+      nchar(sample_ids) > 18L,
     na.rm = TRUE
-  ) > 0.2
+  ) > 0.15
 }
 
 # Detect gene ID format for logging and UI (returns human-readable label)
@@ -621,10 +630,16 @@ detect_gene_id_format <- function(ids) {
   if (mean(grepl("probe[0-9]*$", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
     return("Microarray probe-like ID")
   }
-  if (mean(grepl("^(ASHG|ILMN_|A_[0-9]+_P[0-9]+|BEAD)", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
+  if (mean(grepl("^(ASHG|ILMN_|A_[0-9]+_P[0-9]+|BEAD)", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.15) {
     return("Microarray probe-like ID")
   }
-  if (mean(grepl("\\(\\+\\)|^E1A_|_r[0-9]+_", sample_ids), na.rm = TRUE) > 0.3) {
+  if (mean(grepl("\\(\\+\\)|^E1A_|_r[0-9]+_", sample_ids), na.rm = TRUE) > 0.15) {
+    return("Microarray probe-like ID")
+  }
+  if (.gexpipe_is_probe_like_ids(ids)) {
+    if (mean(grepl("^ENSG", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
+      return("Ensembl ID")
+    }
     return("Microarray probe-like ID")
   }
   if (mean(grepl("^ENSG", sample_ids, ignore.case = TRUE) & grepl("_at$", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
@@ -783,22 +798,39 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
     }
     if (is.null(probe_col) || !probe_col %in% cn) return(NULL)
 
-    # --- Gene symbol column (case-insensitive) ---
+    # --- Gene symbol column (case-insensitive; includes Arraystar GeneName) ---
     symbol_col <- NULL
-    sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
-                       "symbol", "hgnc_symbol", "hgnc symbol", "hgnc.symbol",
-                       "gene sym", "genesym", "official symbol", "official_symbol")
+    sym_cands_low <- c(
+      "gene symbol", "gene.symbol", "gene_symbol", "genesymbol", "genename",
+      "gene name", "gene_name", "symbol", "hgnc_symbol", "hgnc symbol",
+      "hgnc.symbol", "gene sym", "genesym", "official symbol", "official_symbol",
+      "gene", "orf", "associated_gene", "associated gene"
+    )
     for (i in seq_along(cn)) {
       if (cn_low[i] %in% sym_cands_low) { symbol_col <- cn[i]; break }
     }
     if (is.null(symbol_col)) {
-      idx <- grep("gene.*(sym|symbol)|hgnc", cn_low)
+      idx <- grep("gene.*(sym|symbol|name)|hgnc|^genename$", cn_low)
       if (length(idx) > 0) symbol_col <- cn[idx[1]]
     }
     if (is.null(symbol_col)) {
-      idx <- grep("symbol", cn_low)
+      idx <- grep("symbol|genename", cn_low)
       idx <- idx[!grepl("probe|spot|id$|accession|sequence|title|desc", cn_low[idx])]
       if (length(idx) > 0) symbol_col <- cn[idx[1]]
+    }
+    # Arraystar / Agilent often store Entrez or RefSeq instead of symbols
+    acc_col <- NULL
+    acc_cands_low <- c(
+      "gb_acc", "gbacc", "genbank", "refseq", "refseqaccession", "refseq_id",
+      "entrez_gene_id", "entrezgene", "entrez gene", "gene_id", "geneid"
+    )
+    for (i in seq_along(cn)) {
+      if (cn_low[i] %in% acc_cands_low) { acc_col <- cn[i]; break }
+    }
+    if (is.null(acc_col)) {
+      idx <- grep("gb_?acc|refseq|entrez|gene.?id", cn_low)
+      idx <- idx[!grepl("probe|spot|symbol|name", cn_low[idx])]
+      if (length(idx) > 0) acc_col <- cn[idx[1]]
     }
 
     # --- Assignment / description fallback ---
@@ -814,9 +846,10 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
       }
     }
     # Heuristic fallback: any column with keywords but not the probe column
-    if (is.null(symbol_col) && (is.null(assignment_col) || !assignment_col %in% cn)) {
+    if (is.null(symbol_col) && is.null(acc_col) &&
+        (is.null(assignment_col) || !assignment_col %in% cn)) {
       candidate_idx <- which(
-        grepl("symbol|gene|assign|description|title|annotation", cn_low) &
+        grepl("symbol|gene|assign|description|title|annotation|refseq|entrez", cn_low) &
           !(cn %in% c(probe_col))
       )
       if (length(candidate_idx) > 0) {
@@ -827,8 +860,14 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
     }
 
     tab[[probe_col]] <- as.character(tab[[probe_col]])
+    convert_via_acc <- FALSE
     if (!is.null(symbol_col)) {
       tab[[symbol_col]] <- as.character(tab[[symbol_col]])
+      symbol_source_col <- symbol_col
+    } else if (!is.null(acc_col) && acc_col %in% cn) {
+      tab[[acc_col]] <- as.character(tab[[acc_col]])
+      symbol_source_col <- acc_col
+      convert_via_acc <- TRUE
     } else {
       tab[[assignment_col]] <- as.character(tab[[assignment_col]])
       tab[[assignment_col]] <- vapply(tab[[assignment_col]], function(x) {
@@ -844,8 +883,8 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
         toks <- toks[grepl("^[A-Za-z][A-Za-z0-9._-]*$", toks)]
         if (length(toks) > 0) toks[1] else NA_character_
       }, character(1))
+      symbol_source_col <- assignment_col
     }
-    symbol_source_col <- if (!is.null(symbol_col)) symbol_col else assignment_col
     if (!symbol_source_col %in% cn) return(NULL)
 
     # Filter out rows with missing/placeholder symbols
@@ -903,8 +942,43 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
       if (length(toks) == 0) return(NA_character_)
       toks[1]
     }, character(1))
+    # Accession / Entrez columns need one more hop to HGNC symbols
+    if (isTRUE(convert_via_acc) && sum(!is.na(out)) > 0L) {
+      hs_db <- .gexpipe_hs_db()
+      if (!is.null(hs_db)) {
+        keys <- as.character(out)
+        mapped <- rep(NA_character_, length(keys))
+        entrez_idx <- grepl("^[0-9]+$", keys)
+        if (any(entrez_idx)) {
+          ent <- tryCatch(
+            suppressMessages(AnnotationDbi::mapIds(
+              hs_db, keys = keys[entrez_idx], column = "SYMBOL",
+              keytype = "ENTREZID", multiVals = "first"
+            )),
+            error = function(e) NULL
+          )
+          if (!is.null(ent)) mapped[entrez_idx] <- as.character(ent)
+        }
+        acc_idx <- is.na(mapped) & !is.na(keys) & grepl("^[A-Z]{1,2}[0-9]", keys)
+        if (any(acc_idx)) {
+          acc <- tryCatch(
+            suppressMessages(AnnotationDbi::mapIds(
+              hs_db, keys = keys[acc_idx], column = "SYMBOL",
+              keytype = "ACCNUM", multiVals = "first"
+            )),
+            error = function(e) NULL
+          )
+          if (!is.null(acc)) mapped[acc_idx] <- as.character(acc)
+        }
+        # Keep already-looking symbols
+        keep_sym <- is.na(mapped) & !is.na(keys) &
+          grepl("^[A-Za-z][A-Za-z0-9-]*$", keys) & nchar(keys) <= 20L
+        mapped[keep_sym] <- keys[keep_sym]
+        out <- mapped
+      }
+    }
     names(out) <- probe_ids
-    if (sum(!is.na(out)) > length(probe_ids) * 0.1) {
+    if (sum(!is.na(out)) > length(probe_ids) * 0.05) {
       return(out)
     }
     NULL
@@ -1021,15 +1095,16 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     cn_low <- tolower(trimws(cn))
     # 1) Exact case-insensitive match against known symbol column names
     sym_cands_low <- c("gene symbol", "gene.symbol", "gene_symbol", "genesymbol",
+                       "genename", "gene name", "gene_name",
                        "symbol", "gene sym", "hgnc_symbol", "hgnc symbol",
                        "hgnc.symbol", "official symbol", "official_symbol",
                        "gene.sym", "genesym")
     for (i in seq_along(cn)) {
       if (cn_low[i] %in% sym_cands_low) { gene_symbol_col <- cn[i]; break }
     }
-    # 2) Regex fallback: column name contains "gene" AND ("sym" or "symbol")
+    # 2) Regex fallback: column name contains "gene" AND ("sym" or "symbol" or "name")
     if (is.null(gene_symbol_col)) {
-      idx <- grep("gene.*(sym|symbol)|hgnc", cn_low)
+      idx <- grep("gene.*(sym|symbol|name)|hgnc|^genename$", cn_low)
       if (length(idx) > 0) gene_symbol_col <- cn[idx[1]]
     }
     # 3) Broader regex: any column whose name contains "symbol" (not probe/id)
