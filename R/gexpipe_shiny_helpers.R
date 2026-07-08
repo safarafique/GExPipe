@@ -558,6 +558,7 @@ gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
   }
 
   mapped <- tryCatch(
+    # suppressMessages: AnnotationDbi::mapIds reports unmapped keys to the console
     suppressMessages(AnnotationDbi::mapIds(
       hs_db, keys = sample_ids, column = "SYMBOL",
       keytype = "SYMBOL", multiVals = "first"
@@ -730,6 +731,7 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
     # This reuses any GPL file already cached during the GSE download step.
     .fetch_gpl <- function(destdir_val) {
       tryCatch(
+        # suppressMessages: GEOquery prints cache/download status for GPL fetch
         suppressMessages(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
         error = function(e) NULL
       )
@@ -1281,6 +1283,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
     sym <- tryCatch(
       {
         hs_db <- .gexpipe_hs_db()
+        # suppressMessages: AnnotationDbi::mapIds (ACCNUM -> SYMBOL)
         suppressMessages(AnnotationDbi::mapIds(hs_db,
           keys = ids, column = "SYMBOL",
           keytype = "ACCNUM", multiVals = "first"
@@ -1299,6 +1302,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
     sym <- tryCatch(
       {
         hs_db <- .gexpipe_hs_db()
+        # suppressMessages: AnnotationDbi::mapIds (ENSEMBL -> SYMBOL)
         suppressMessages(AnnotationDbi::mapIds(hs_db,
           keys = clean, column = "SYMBOL",
           keytype = "ENSEMBL", multiVals = "first"
@@ -1317,6 +1321,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
     sym <- tryCatch(
       {
         hs_db <- .gexpipe_hs_db()
+        # suppressMessages: AnnotationDbi::mapIds (ENTREZID -> SYMBOL)
         suppressMessages(AnnotationDbi::mapIds(hs_db,
           keys = keys_entrez, column = "SYMBOL",
           keytype = "ENTREZID", multiVals = "first"
@@ -1338,6 +1343,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
   sym <- tryCatch(
     {
       hs_db <- .gexpipe_hs_db()
+      # suppressMessages: AnnotationDbi::mapIds (ALIAS -> SYMBOL)
       suppressMessages(AnnotationDbi::mapIds(hs_db,
         keys = ids, column = "SYMBOL",
         keytype = "ALIAS", multiVals = "first"
@@ -1486,6 +1492,7 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
   if (any(grepl("^ENSG", sample_ids, ignore.case = TRUE))) {
     clean <- .gexpipe_clean_ensembl_keys(gene_ids)
     sym <- tryCatch(
+      # suppressMessages: AnnotationDbi::mapIds (ENSEMBL -> SYMBOL)
       suppressMessages(AnnotationDbi::mapIds(db,
         keys = clean, column = "SYMBOL",
         keytype = "ENSEMBL", multiVals = "first"
@@ -1500,6 +1507,7 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
   if (mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) > 0.5) {
     keys_entrez <- gsub("\\.0+$", "", as.character(gene_ids))
     sym <- tryCatch(
+      # suppressMessages: AnnotationDbi::mapIds (ENTREZID -> SYMBOL)
       suppressMessages(AnnotationDbi::mapIds(db,
         keys = keys_entrez, column = "SYMBOL",
         keytype = "ENTREZID", multiVals = "first"

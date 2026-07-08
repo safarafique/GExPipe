@@ -92,6 +92,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     valid_ids <- as.character(na.omit(mapped[[id_col]]))
 
     interactions <- tryCatch(
+      # suppressWarnings: STRINGdb warns when some gene IDs cannot be mapped
       suppressWarnings(string_db$get_interactions(valid_ids)),
       error = function(e) {
         msg <- conditionMessage(e)
@@ -307,6 +308,7 @@ server_ppi <- function(input, output, session, rv) {
           SYMBOL = if (is.null(igraph::V(g)$SYMBOL)) igraph::V(g)$name else igraph::V(g)$SYMBOL,
           Degree = igraph::degree(g),
           Betweenness = igraph::betweenness(g, normalized = TRUE),
+          # suppressWarnings: igraph closeness warns on disconnected graph components
           Closeness = suppressWarnings(igraph::closeness(g, normalized = TRUE)),
           Eigenvector = tryCatch(igraph::eigen_centrality(g)$vector, error = function(e) rep(0, igraph::vcount(g))),
           PageRank = igraph::page_rank(g)$vector,
