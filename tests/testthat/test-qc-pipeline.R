@@ -58,6 +58,26 @@ test_that("gexp_suggest_group_column prefers condition then title", {
   expect_equal(suggest(c("characteristics_ch1", "title")), "characteristics_ch1")
 })
 
+test_that("gexp_normalize_group_labels parses GEO title conditions", {
+  skip_if_not_installed("GExPipe")
+  norm <- getFromNamespace("gexp_normalize_group_labels", "GExPipe")
+  titles <- c(
+    "islet preparation 1 under control condition",
+    "islet preparation 2 under control condition",
+    "islet preparation 1 under cytokine treatment",
+    "islet preparation 2 under cytokine treatment"
+  )
+  out <- norm(titles, col_name = "title")
+  expect_equal(unique(out), c("control condition", "cytokine treatment"))
+})
+
+test_that("gexp_suggest_group_category detects control and cytokine labels", {
+  skip_if_not_installed("GExPipe")
+  suggest_cat <- getFromNamespace("gexp_suggest_group_category", "GExPipe")
+  expect_equal(suggest_cat("control condition"), "Normal")
+  expect_equal(suggest_cat("cytokine treatment"), "Disease")
+})
+
 test_that("gexp_qc_build_sample_dataset_map maps samples to GSE IDs", {
   m1 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
   m2 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S3", "S4")))

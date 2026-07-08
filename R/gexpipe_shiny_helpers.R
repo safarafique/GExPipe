@@ -166,6 +166,53 @@ gexp_suggest_group_column <- function(col_names) {
   col_names[[1L]]
 }
 
+#' Normalize phenotype labels for group extraction (e.g. parse GEO title text)
+#'
+#' For GEO series like GSE108413, treatment is only in \code{title}, e.g.
+#' "islet preparation 1 under control condition". This extracts the condition
+#' substring so replicate-specific titles collapse to shared groups.
+#'
+#' @param vals Character vector of phenotype values.
+#' @param col_name Metadata column name (optional).
+#' @return Normalized character vector, same length as \code{vals}.
+#' @keywords internal
+gexp_normalize_group_labels <- function(vals, col_name = NULL) {
+  vals <- as.character(vals)
+  if (length(vals) == 0L) {
+    return(vals)
+  }
+  out <- trimws(vals)
+  use_title_rules <- is.null(col_name) || grepl("title", col_name, ignore.case = TRUE)
+  if (isTRUE(use_title_rules)) {
+    under_cond <- grepl("\\sunder\\s", out, ignore.case = TRUE)
+    if (any(under_cond)) {
+      out[under_cond] <- trimws(sub("^.*\\sunder\\s+", "", out[under_cond], ignore.case = TRUE))
+    }
+    colon_cond <- grepl(":", out) & !grepl("^GSM", out, ignore.case = TRUE)
+    if (any(colon_cond)) {
+      parts <- strsplit(out[colon_cond], ":", fixed = TRUE)
+      out[colon_cond] <- vapply(parts, function(x) trimws(x[[length(x)]]), character(1))
+    }
+  }
+  out
+}
+
+#' Suggest Normal / Disease / None for an extracted group label
+#' @keywords internal
+gexp_suggest_group_category <- function(label) {
+  if (is.null(label) || is.na(label) || !nzchar(trimws(as.character(label)))) {
+    return("None")
+  }
+  g_lower <- tolower(trimws(as.character(label)))
+  if (grepl("normal|control|healthy|wild.?type|untreated|vehicle|mock|sham|baseline", g_lower)) {
+    return("Normal")
+  }
+  if (grepl("disease|tumor|cancer|metastatic|patient|treat|stimul|cytokine|case|infected|infection|diabetic|lesion", g_lower)) {
+    return("Disease")
+  }
+  "None"
+}
+
 # Display names for ML method keys (checkbox values in Step 10).
 #' @noRd
 gexp_ml_method_display_names <- function() {
@@ -483,6 +530,80 @@ GPL_to_biomart_probe_attr <- c(
   "GPL6104" = "illumina_humanht_12_v3"
 )
 
+#' Return TRUE when row IDs are confirmed HGNC gene symbols
+#' @keywords internal
+gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
+  ids <- as.character(ids[!is.na(ids) & nzchar(trimws(ids))])
+  if (length(ids) == 0L) {
+    return(FALSE)
+  }
+  sample_ids <- head(unique(ids), min(80L, length(unique(ids))))
+  non_symbol_rate <- mean(
+    grepl("_at$|_x_at$|_st$|^ENSG|^ENST|^ENTREZ|^NM_|^NR_", sample_ids, ignore.case = TRUE) |
+      grepl("^[0-9]+$", sample_ids) |
+      grepl("^[A-Z]{1,2}[0-9]{5,}", sample_ids) |
+      grepl("^(ASHG|ILMN_|A_[0-9]+_P[0-9]+|BEAD)", sample_ids, ignore.case = TRUE) |
+      grepl("\\(\\+\\)|_r[0-9]+_", sample_ids) |
+      nchar(sample_ids) > 14L,
+    na.rm = TRUE
+  )
+  if (non_symbol_rate > 0.2) {
+    return(FALSE)
+  }
+
+  hs_db <- .gexpipe_hs_db()
+  if (is.null(hs_db)) {
+    return(all(nchar(sample_ids) <= 10L) &&
+      mean(grepl("^[A-Za-z][A-Za-z0-9-]*$", sample_ids), na.rm = TRUE) > 0.9)
+  }
+
+  mapped <- tryCatch(
+    suppressMessages(AnnotationDbi::mapIds(
+      hs_db, keys = sample_ids, column = "SYMBOL",
+      keytype = "SYMBOL", multiVals = "first"
+    )),
+    error = function(e) NULL
+  )
+  if (is.null(mapped)) {
+    return(FALSE)
+  }
+  mapped <- as.character(mapped)
+  hit <- mean(!is.na(mapped) & toupper(mapped) == toupper(sample_ids), na.rm = TRUE)
+  isTRUE(hit >= min_hit_rate)
+}
+
+#' Return TRUE when IDs should be converted before common-gene overlap
+#' @keywords internal
+gexpipe_ids_need_symbol_conversion <- function(ids) {
+  !gexpipe_ids_are_verified_symbols(ids)
+}
+
+#' Strip Affymetrix suffixes and version from Ensembl-like keys
+#' @keywords internal
+.gexpipe_clean_ensembl_keys <- function(ids) {
+  ids <- as.character(ids)
+  ids <- sub("_x_at$", "", ids, ignore.case = TRUE)
+  ids <- sub("_at$", "", ids, ignore.case = TRUE)
+  gsub("\\..*", "", ids)
+}
+
+#' Return TRUE when IDs look like microarray probe IDs (not gene symbols)
+#' @keywords internal
+.gexpipe_is_probe_like_ids <- function(ids) {
+  ids <- as.character(ids[!is.na(ids) & nzchar(trimws(ids))])
+  if (length(ids) == 0L) {
+    return(FALSE)
+  }
+  sample_ids <- head(ids, min(200L, length(ids)))
+  mean(
+    grepl("_at$|_x_at$|_st$|probe[0-9]*$|^ILMN_|^A_[0-9]+_P[0-9]+", sample_ids, ignore.case = TRUE) |
+      grepl("^(ASHG|BEAD)", sample_ids, ignore.case = TRUE) |
+      grepl("\\(\\+\\)|^E1A_|_r[0-9]+_", sample_ids, ignore.case = TRUE) |
+      (grepl("^ENSG", sample_ids, ignore.case = TRUE) & grepl("_at$", sample_ids, ignore.case = TRUE)),
+    na.rm = TRUE
+  ) > 0.2
+}
+
 # Detect gene ID format for logging and UI (returns human-readable label)
 detect_gene_id_format <- function(ids) {
   ids <- as.character(ids[!is.na(ids) & nzchar(trimws(ids))])
@@ -499,14 +620,25 @@ detect_gene_id_format <- function(ids) {
   if (mean(grepl("probe[0-9]*$", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
     return("Microarray probe-like ID")
   }
+  if (mean(grepl("^(ASHG|ILMN_|A_[0-9]+_P[0-9]+|BEAD)", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
+    return("Microarray probe-like ID")
+  }
+  if (mean(grepl("\\(\\+\\)|^E1A_|_r[0-9]+_", sample_ids), na.rm = TRUE) > 0.3) {
+    return("Microarray probe-like ID")
+  }
+  if (mean(grepl("^ENSG", sample_ids, ignore.case = TRUE) & grepl("_at$", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
+    return("Affymetrix HG-U133 probe (_at)")
+  }
   if (mean(grepl("^ENSG", sample_ids), na.rm = TRUE) > 0.5) {
     return("Ensembl ID")
   }
   if (mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) > 0.7) {
     return("Entrez ID")
   }
-  if (mean(grepl("^[A-Za-z]", sample_ids), na.rm = TRUE) > 0.6 &&
-    mean(grepl("^ENSG|_at$|_st$|^[0-9]+$", sample_ids), na.rm = TRUE) < 0.3) {
+  if (mean(grepl("^[A-Z]{1,2}[0-9]{5,}([.][0-9]+)?$", sample_ids), na.rm = TRUE) > 0.5) {
+    return("GenBank/EMBL accession")
+  }
+  if (gexpipe_ids_are_verified_symbols(ids)) {
     return("Gene symbol (HGNC)")
   }
   "Unknown / mixed"
@@ -604,6 +736,12 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id) {
     }
     gpl_raw <- .fetch_gpl(tempdir())
     if (is.null(gpl_raw)) gpl_raw <- .fetch_gpl(getwd())
+    if (is.null(gpl_raw)) {
+      micro_dir <- file.path(getwd(), "micro_data")
+      if (dir.exists(micro_dir)) {
+        gpl_raw <- .fetch_gpl(micro_dir)
+      }
+    }
 
     if (is.null(gpl_raw)) {
       return(NULL)
@@ -903,9 +1041,12 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     gene_symbols <- tryCatch(as.character(fdata[[gene_symbol_col]]), error = function(e) NULL)
     if (!is.null(gene_symbols)) {
       gene_symbols[gene_symbols %in% .geo_na_vals | is.na(gene_symbols)] <- NA
-      # .safe_sym enforces that length must match n_probes
       checked <- .safe_sym(gene_symbols)
-      if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.05) return(checked)
+      valid_sym <- checked[!is.na(checked) & nzchar(trimws(checked))]
+      if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.05 &&
+        length(valid_sym) > 0L && gexpipe_ids_are_verified_symbols(valid_sym)) {
+        return(checked)
+      }
     }
   }
 
@@ -946,29 +1087,14 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     return(probe_ids)
   }
 
-  # If these already look like symbols, keep as-is (verify against org.Hs.eg.db when available)
-  is_likely_symbol <- mean(grepl("^[A-Za-z]", sample_ids), na.rm = TRUE) > 0.7 &&
-    mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) < 0.3
-  if (is_likely_symbol && !any(grepl("^[0-9]{5,}", sample_ids))) {
-    verified <- tryCatch(
-      {
-        hs_db <- .gexpipe_hs_db()
-        mapped <- AnnotationDbi::mapIds(hs_db,
-          keys = head(sample_ids, 10), column = "SYMBOL",
-          keytype = "SYMBOL", multiVals = "first"
-        )
-        sum(!is.na(mapped)) / min(10, length(sample_ids)) > 0.5
-      },
-      error = function(e) FALSE
-    )
-    if (verified) {
-      return(probe_ids)
-    }
+  # If these already look like verified HGNC symbols, keep as-is
+  if (gexpipe_ids_are_verified_symbols(probe_ids)) {
+    return(probe_ids)
   }
 
-  # Ensembl IDs
-  if (any(grepl("^ENSG", sample_ids))) {
-    clean_keys <- gsub("\\..*", "", probe_ids)
+  # Ensembl IDs (including Affymetrix probes like ENSG00000000003_at)
+  if (any(grepl("^ENSG", sample_ids, ignore.case = TRUE))) {
+    clean_keys <- .gexpipe_clean_ensembl_keys(probe_ids)
     gene_symbols <- tryCatch(
       {
         hs_db <- .gexpipe_hs_db()
@@ -981,6 +1107,31 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     )
     checked <- .safe_sym(gene_symbols)
     if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+      return(checked)
+    }
+  }
+
+  # Affymetrix _at probes via platform .db (PROBEID -> SYMBOL)
+  if (mean(grepl("_at$|_x_at$", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.2 &&
+    !is.null(annot_pkg) && nzchar(annot_pkg) && requireNamespace(annot_pkg, quietly = TRUE)) {
+    db <- tryCatch(get(annot_pkg, envir = asNamespace(annot_pkg)), error = function(e) NULL)
+    if (!is.null(db)) {
+      gene_symbols <- tryCatch(
+        AnnotationDbi::mapIds(db, keys = probe_ids, column = "SYMBOL", keytype = "PROBEID", multiVals = "first"),
+        error = function(e) NULL
+      )
+      checked <- .safe_sym(gene_symbols)
+      if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
+        return(checked)
+      }
+    }
+  }
+
+  # GEO GPL annotation table (custom/CodeLink/Agilent probe IDs)
+  if (.gexpipe_is_probe_like_ids(probe_ids) || (!is.null(platform_id) && nzchar(platform_id))) {
+    gene_symbols <- probe_ids_to_symbol_gpl(probe_ids, platform_id)
+    checked <- .safe_sym(gene_symbols)
+    if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.05) {
       return(checked)
     }
   }
@@ -1026,13 +1177,6 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
       return(checked)
     }
-  }
-
-  # GEO GPL annotation table
-  gene_symbols <- probe_ids_to_symbol_gpl(probe_ids, platform_id)
-  checked <- .safe_sym(gene_symbols)
-  if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
-    return(checked)
   }
 
   # biomaRt
@@ -1104,19 +1248,54 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
   if (length(sample_ids) == 0) {
     return(ids)
   }
-  probe_like <- grepl("_at$|_st$|_x_at$|probe[0-9]*$|^ILMN_|^A_[0-9]+_P[0-9]+", sample_ids, ignore.case = TRUE)
+  probe_like <- grepl(
+    "_at$|_st$|_x_at$|probe[0-9]*$|^ILMN_|^A_[0-9]+_P[0-9]+|^ASHG|\\(\\+\\)|^E1A_",
+    sample_ids,
+    ignore.case = TRUE
+  )
 
-  is_likely_symbol <- mean(grepl("^[A-Za-z]", sample_ids), na.rm = TRUE) > 0.6 &&
-    mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) < 0.4 &&
-    mean(grepl("^ENSG", sample_ids), na.rm = TRUE) < 0.5 &&
-    mean(probe_like, na.rm = TRUE) < 0.2
-  if (is_likely_symbol) {
+  if (gexpipe_ids_are_verified_symbols(ids)) {
     return(ids)
   }
 
-  # Ensembl
-  if (any(grepl("^ENSG", sample_ids))) {
-    clean <- gsub("\\..*", "", ids)
+  # GPL/platform annotation first when probe-like or platform is known
+  if (.gexpipe_is_probe_like_ids(ids) || (!is.null(gpl_id) && nzchar(gpl_id))) {
+    gpl_sym <- probe_ids_to_symbol_gpl(ids, gpl_id)
+    if (!is.null(gpl_sym) && length(gpl_sym) == length(ids) && sum(!is.na(gpl_sym)) > length(ids) * 0.05) {
+      return(as.character(gpl_sym))
+    }
+    if (mean(probe_like, na.rm = TRUE) > 0.2) {
+      db_sym <- probe_ids_to_symbol_hugene_db(ids, gpl_id)
+      if (!is.null(db_sym) && length(db_sym) == length(ids) && sum(!is.na(db_sym)) > length(ids) * 0.05) {
+        return(as.character(db_sym))
+      }
+    }
+    bm_probe <- probe_ids_to_symbol_biomart(ids, gpl_id)
+    if (!is.null(bm_probe) && length(bm_probe) == length(ids) && sum(!is.na(bm_probe)) > length(ids) * 0.05) {
+      return(as.character(bm_probe))
+    }
+  }
+
+  # GenBank / EMBL accessions (e.g. AB000409)
+  if (mean(grepl("^[A-Z]{1,2}[0-9]{5,}([.][0-9]+)?$", sample_ids), na.rm = TRUE) > 0.3) {
+    sym <- tryCatch(
+      {
+        hs_db <- .gexpipe_hs_db()
+        suppressMessages(AnnotationDbi::mapIds(hs_db,
+          keys = ids, column = "SYMBOL",
+          keytype = "ACCNUM", multiVals = "first"
+        ))
+      },
+      error = function(e) NULL
+    )
+    if (!is.null(sym) && length(sym) == length(ids) && sum(!is.na(sym)) > length(ids) * 0.05) {
+      return(as.character(sym))
+    }
+  }
+
+  # Ensembl (strip Affymetrix _at suffix when present)
+  if (any(grepl("^ENSG", sample_ids, ignore.case = TRUE))) {
+    clean <- .gexpipe_clean_ensembl_keys(ids)
     sym <- tryCatch(
       {
         hs_db <- .gexpipe_hs_db()
@@ -1127,7 +1306,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
       },
       error = function(e) NULL
     )
-    if (!is.null(sym) && length(sym) == length(ids) && sum(!is.na(sym)) > length(ids) * 0.1) {
+    if (!is.null(sym) && length(sym) == length(ids) && sum(!is.na(sym)) > length(ids) * 0.05) {
       return(as.character(sym))
     }
   }
@@ -1173,7 +1352,9 @@ any_id_to_symbol <- function(ids, gpl_id = NULL) {
   # Probe IDs - try Bioconductor .db, then GPL annotation table, then biomaRt.
   # GPL annotation is tried for ALL probe-like formats (not just _at/_st),
   # so CodeLink, Illumina BEADCHIP, and other non-Affymetrix arrays are handled.
-  if (mean(probe_like, na.rm = TRUE) > 0.2 || (!is.null(gpl_id) && nzchar(gpl_id))) {
+  if (mean(probe_like, na.rm = TRUE) > 0.2 ||
+      mean(grepl("^(ASHG|ILMN_|A_[0-9]+_P[0-9]+|BEAD)", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.2 ||
+      (!is.null(gpl_id) && nzchar(gpl_id))) {
     if (mean(probe_like, na.rm = TRUE) > 0.2) {
       db_sym <- probe_ids_to_symbol_hugene_db(ids, gpl_id)
       if (!is.null(db_sym) && length(db_sym) == length(ids) && sum(!is.na(db_sym)) > length(ids) * 0.1) {
@@ -1298,14 +1479,12 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
   if (length(sample_ids) == 0) {
     return(gene_ids)
   }
-  # Already gene symbols?
-  if (mean(grepl("^[A-Za-z]", sample_ids), na.rm = TRUE) > 0.7 &&
-    mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) < 0.3) {
+  if (gexpipe_ids_are_verified_symbols(gene_ids)) {
     return(gene_ids)
   }
   # Ensembl IDs
-  if (any(grepl("^ENSG", sample_ids))) {
-    clean <- gsub("\\..*", "", gene_ids)
+  if (any(grepl("^ENSG", sample_ids, ignore.case = TRUE))) {
+    clean <- .gexpipe_clean_ensembl_keys(gene_ids)
     sym <- tryCatch(
       suppressMessages(AnnotationDbi::mapIds(db,
         keys = clean, column = "SYMBOL",
@@ -1313,7 +1492,7 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
       )),
       error = function(e) NULL
     )
-    if (!is.null(sym) && sum(!is.na(sym)) > length(gene_ids) * 0.1) {
+    if (!is.null(sym) && sum(!is.na(sym)) > length(gene_ids) * 0.05) {
       return(as.character(sym))
     }
   }
@@ -1336,6 +1515,13 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
 
 # Convert RNA-seq IDs to symbols - wrapper so app == manual script
 convert_rnaseq_ids <- function(gene_ids, gse_id = NULL) {
+  if (gexpipe_ids_are_verified_symbols(gene_ids)) {
+    return(gene_ids)
+  }
+  sym <- any_id_to_symbol(gene_ids, gpl_id = NULL)
+  if (!is.null(sym) && length(sym) == length(gene_ids) && sum(!is.na(sym)) > length(gene_ids) * 0.05) {
+    return(as.character(sym))
+  }
   convert_ids_to_symbols_simple(gene_ids)
 }
 
