@@ -68,6 +68,23 @@ test_that("read_count_matrix reads a plain CSV count file", {
   expect_equal(nrow(df), 3L)
 })
 
+test_that("gexpipe_ids_are_verified_symbols rejects probe-like rownames", {
+  skip_if_not_installed("GExPipe")
+  verified <- getFromNamespace("gexpipe_ids_are_verified_symbols", "GExPipe")
+  expect_false(verified(c("1007_s_at", "1053_at", "117_at")))
+  expect_false(verified(c("(+)E1A_r60_1", "(+)E1A_r60_3", "(+)E1A_r60_a104")))
+  expect_false(verified(c("ENSG00000141510", "ENSG00000012048")))
+  expect_true(verified(c("TP53", "BRCA1", "EGFR", "MYC", "GAPDH")))
+})
+
+test_that(".gexpipe_is_probe_like_ids detects custom and Affymetrix probes", {
+  skip_if_not_installed("GExPipe")
+  probe_like <- getFromNamespace(".gexpipe_is_probe_like_ids", "GExPipe")
+  expect_true(probe_like(c("1007_s_at", "1053_at")))
+  expect_true(probe_like(c("(+)E1A_r60_1", "ASHG19AP1B100000016V5")))
+  expect_false(probe_like(c("TP53", "BRCA1", "EGFR")))
+})
+
 test_that("gexp_download_normalize_ids_for_overlap keeps HGNC symbol matrices", {
   skip_if_not_installed("GExPipe")
   genes <- paste0("SYM", seq_len(15))
