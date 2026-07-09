@@ -29,6 +29,7 @@ app/
 
 # Data and exports (do not commit to repo)
 inst/shinyapp/rna_data/
+rna_data/
 inst/shinyapp/ext_val_rna/
 inst/shinyapp/csv_exports/
 
