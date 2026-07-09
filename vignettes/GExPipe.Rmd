@@ -39,11 +39,11 @@ co-expression networks, refine candidates with PPI and machine learning,
 and export a clinical summary report — without manually wiring separate
 Bioconductor tools together.
 
-This vignette walks through the **GExPipe Shiny application**: download
-GEO data, run QC and normalization, correct batch effects, discover
-differentially expressed genes, build co-expression networks, refine
-candidates with PPI and machine learning, and export a clinical summary
-report.
+This vignette walks through the **GExPipe Shiny application** end to end.
+For mixed microarray studies (Arraystar, Affymetrix, Agilent, custom probe
+IDs), the download step automatically runs **STEP 2b** to map probes to HGNC
+gene symbols before merging — see
+[Gene ID mapping](#gene-id-mapping-mixed-studies) below.
 
 ## Vignette outline
 
@@ -53,6 +53,7 @@ report.
 | [Installation](#installation) | Bioconductor and GitHub install |
 | [Launch the Shiny application](#launch-the-shiny-application) | Start the app (`runGExPipe()` + `shiny::runApp()`) |
 | [Step-by-step Shiny walkthrough](#step-by-step-shiny-walkthrough) | Screenshots and actions for all 15 steps |
+| [Gene ID mapping](#gene-id-mapping-mixed-studies) | Probe / accession → symbol conversion (STEP 2b) |
 | [Programmatic example](#programmatic-example-bundled-data) | Optional scripting with bundled CSV data |
 | [Troubleshooting](#troubleshooting) | Common install and runtime issues |
 
@@ -165,10 +166,29 @@ if (!requireNamespace("remotes", quietly = TRUE))
     install.packages("remotes")
 remotes::install_github(
   "safarafique/GExPipe",
+  ref = "main",
   dependencies = TRUE,
   INSTALL_opts = "--no-staged-install"
 )
 ```
+
+**Run without installing** (always uses the latest `main` from GitHub):
+
+```{r run-github, eval=FALSE}
+if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
+if (!requireNamespace("pkgload", quietly = TRUE)) install.packages("pkgload")
+shiny::runGitHub(
+  "safarafique/GExPipe",
+  ref = "main",
+  subdir = "inst/shinyapp",
+  destdir = tempfile()
+)
+```
+
+The console should show `Mode: GitHub checkout (loaded from clone, not old
+install)`. If you only see `installed GExPipe package`, restart R, install
+`pkgload`, and run the command again — otherwise an older Bioconductor
+install is used and probe-ID fixes are skipped.
 
 After any install or update, **restart R** once (RStudio:
 `Ctrl+Shift+F10`) before launching the app. This avoids Windows DLL lock
@@ -220,11 +240,16 @@ expression matrix.
 **What to do:**
 
 - Choose platform type: **Microarray**, **RNA-seq**, or **Merged**.
-- Enter GSE accessions (comma-separated), e.g. `GSE89076, GSE50760`.
+- Enter GSE accessions (comma-separated). For a first test, use one series
+  with HGNC row names (e.g. `GSE62646`). For **multiple microarray**
+  platforms, include all GSE IDs and check the download log for **STEP 2b**
+  (probe → symbol conversion).
 - Click **Download & merge**.
 
-**Success check:** A preview table and sample count appear; the sidebar
-unlocks Step 2.
+**Success check:** The log lists each GSE with detected ID format and
+`Common genes` > 0. If you see probe IDs such as `(+)E1A_r60_1`,
+`ASHG19AP…`, or `AB000409` in the sample row list, wait for STEP 2b to
+finish or see [Troubleshooting](#troubleshooting).
 
 ```{r step1-screenshot, echo=FALSE, fig.cap="Step 1 - Download Data panel.", out.width="100%"}
 knitr::include_graphics("images/step1_download.png")
@@ -382,6 +407,67 @@ ML features, validation, ROC, and pathways.
 knitr::include_graphics("images/step15_summary.png")
 ```
 
+# Gene ID mapping (mixed studies) {#gene-id-mapping-mixed-studies}
+
+When you merge **multiple GEO microarray** series, row names are often
+probe IDs, Ensembl IDs, or GenBank accessions — not HGNC symbols. GExPipe
+detects the format per GSE and converts to symbols in **STEP 2b** before
+computing the gene intersection.
+
+```{r id-formats}
+library(GExPipe)
+
+detect_fmt <- getFromNamespace("detect_gene_id_format", "GExPipe")
+need_conv <- getFromNamespace("gexpipe_ids_need_symbol_conversion", "GExPipe")
+
+examples <- list(
+  "HGNC symbols"              = c("TP53", "BRCA1", "EGFR"),
+  "Arraystar / custom probes" = c("(+)E1A_r60_1", "ASHGV40000001"),
+  "Affymetrix Ensembl probes" = c("ENSG00000000003_at", "ENSG00000000005_at"),
+  "GenBank accessions"        = c("AB000409", "AB000463", "AB000781")
+)
+
+id_table <- data.frame(
+  Example = names(examples),
+  Detected_format = vapply(examples, detect_fmt, character(1)),
+  Needs_symbol_conversion = vapply(examples, need_conv, logical(1)),
+  row.names = NULL,
+  check.names = FALSE
+)
+knitr::kable(id_table, caption = "How GExPipe classifies common GEO row ID types.")
+```
+
+**Arraystar GPL21827** (e.g. `GSE188653`) has no gene-symbol column on GEO;
+GExPipe crosswalks V4 probe IDs to **GPL26963** annotation (ORF / accession
+→ symbol). Control probes such as `(+)E1A_r60_*` are dropped. Ensure
+`org.Hs.eg.db` and `biomaRt` are installed for full conversion.
+
+Demonstration with two small matrices (symbols only — no network):
+
+```{r id-overlap-demo}
+genes <- c("TP53", "BRCA1", "EGFR", "MYC", "GAPDH", "ACTB")
+set.seed(11)
+m1 <- matrix(abs(rnorm(length(genes) * 4)), nrow = length(genes),
+             dimnames = list(genes, paste0("GSE1_S", 1:4)))
+m2 <- matrix(abs(rnorm(length(genes) * 4)), nrow = length(genes),
+             dimnames = list(genes, paste0("GSE2_S", 1:4)))
+
+overlap_out <- gexp_download_normalize_ids_for_overlap(
+  micro_expr_list = list(GSE1 = m1, GSE2 = m2),
+  rna_counts_list = list()
+)
+cat(overlap_out$log_text)
+fin <- gexp_download_finalize_common_genes(
+  micro_expr_list = overlap_out$micro_expr_list,
+  rna_counts_list = overlap_out$rna_counts_list,
+  all_genes_list  = gexp_rebuild_all_genes_list(
+    overlap_out$micro_expr_list,
+    overlap_out$rna_counts_list
+  )
+)
+cat("\nCommon genes after merge:", length(fin$common_genes), "\n")
+```
+
 # Programmatic example (bundled data) {#programmatic-example-bundled-data}
 
 The Shiny app is the recommended interface. The functions below let you
@@ -493,6 +579,8 @@ if (length(top_var) > 1L) {
 
 | Problem | Solution |
 |------------------------------------|------------------------------------|
+| **0 common genes after download** | Check STEP 2b in the log. Probe/custom IDs must convert to symbols. Install `org.Hs.eg.db` and `biomaRt`. For Arraystar (`GSE188653`), allow GPL26963 to download once (cached under `micro_data/`). |
+| **IDs still probe-like in log** | Restart R; use `pkgload` + `runGitHub(..., ref = "main")` or `pkgload::load_all()` on a fresh clone — an old Bioconductor install overrides GitHub fixes. |
 | **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
 | **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
