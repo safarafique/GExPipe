@@ -2,11 +2,11 @@
 # GLOBAL.R  —  GExPipe auto-setup: installs all packages, loads libraries
 # ==============================================================================
 # Users never need to manually install anything.
-# Just run (latest fixes — use this ref until merged to main):
+# Just run:
 #   shiny::runGitHub("safarafique/GExPipe",
-#                    ref = "cursor/bioc-review-vignette-0.99.24",
-#                    subdir = "inst/shinyapp",
+#                    ref = "main", subdir = "inst/shinyapp",
 #                    destdir = tempfile())
+# Install pkgload first if needed so the clone loads (not an old Bioconductor install).
 # ==============================================================================
 
 cat("\n")
