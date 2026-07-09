@@ -24,6 +24,15 @@ test_that("gexpipe_ids_need_symbol_conversion flags non-symbol IDs", {
   expect_true(need_conv(c("(+)E1A_r60_1", "(+)E1A_r60_3", "(+)E1A_r60_a104")))
 })
 
+test_that("gexpipe_ids_need_symbol_conversion forces mapping for custom GPLs", {
+  skip_if_not_installed("GExPipe")
+  need_conv <- getFromNamespace("gexpipe_ids_need_symbol_conversion", "GExPipe")
+  expect_true(need_conv(c("TP53", "BRCA1"), gpl_id = "GPL21827"))
+  expect_true(need_conv(c("TP53", "BRCA1"), gpl_id = "GPL26963"))
+  expect_true(need_conv(c("TP53", "BRCA1"), gpl_id = "GPL30033"))
+  expect_true(need_conv(c("AB000409", "AB000463"), gpl_id = "GPL16025"))
+})
+
 test_that(".gexpipe_clean_ensembl_keys strips Affymetrix _at suffix", {
   skip_if_not_installed("GExPipe")
   clean <- getFromNamespace(".gexpipe_clean_ensembl_keys", "GExPipe")
@@ -101,6 +110,20 @@ test_that("probe_ids_to_symbol_gpl returns symbols for Arraystar GPL21827", {
   sym <- map_gpl(probes, "GPL21827", gse_id = "GSE188653")
   expect_length(sym, 3L)
   expect_true(sum(!is.na(sym) & nzchar(sym)) >= 2L)
+})
+
+test_that("Arraystar GPL26963 maps ASHG19AP V5 probe IDs", {
+  skip_if_not_installed("GExPipe")
+  gpl_path <- file.path(getwd(), "Gexpipe", "micro_data", "GPL26963.soft.gz")
+  if (!file.exists(gpl_path)) {
+    gpl_path <- file.path(getwd(), "micro_data", "GPL26963.soft.gz")
+  }
+  skip_if_not(file.exists(gpl_path), "GPL26963 cache not available locally")
+  map_gpl <- getFromNamespace("probe_ids_to_symbol_gpl", "GExPipe")
+  probes <- c("ASHG19AP1B100000016V5", "ASHG19AP1B100000050V5", "ASHGV40000001V5")
+  sym <- map_gpl(probes, "GPL26963", gse_id = "GSE207304")
+  expect_length(sym, 3L)
+  expect_true(sum(!is.na(sym) & nzchar(sym)) >= 1L)
 })
 
 test_that("Arraystar probe IDs never classified as HGNC", {
