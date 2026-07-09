@@ -78,11 +78,20 @@ gexp_prepare_download_dirs <- function(base_dir = getwd(), has_micro = FALSE, ha
   logs <- character(0)
   if (isTRUE(has_micro)) {
     micro_dir <- file.path(base_dir, "micro_data")
+    gpl_backup <- character(0)
     if (dir.exists(micro_dir)) {
+      gpl_backup <- list.files(
+        micro_dir, pattern = "^GPL[0-9]+\\.soft(\\.gz)?$",
+        full.names = TRUE
+      )
       tryCatch(unlink(micro_dir, recursive = TRUE, force = TRUE), error = function(e) NULL)
       logs <- c(logs, "Cleared previous microarray cache (micro_data).")
     }
     dir.create(micro_dir, showWarnings = FALSE, recursive = TRUE)
+    if (length(gpl_backup) > 0L) {
+      tryCatch(file.copy(gpl_backup, micro_dir, overwrite = TRUE), error = function(e) NULL)
+    }
+    .gexpipe_seed_gpl_cache(micro_dir)
   }
   if (isTRUE(has_rna)) {
     rna_dir <- file.path(base_dir, "rna_data")
@@ -457,7 +466,7 @@ gexp_download_normalize_ids_for_overlap <- function(
       rn <- rownames(micro_expr)
       gpl <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
       micro_eset <- if (!is.null(micro_eset_list)) micro_eset_list[[gse]] else NULL
-      if (gexpipe_ids_need_symbol_conversion(rn)) {
+      if (gexpipe_ids_need_symbol_conversion(rn, gpl_id = gpl)) {
         fmt <- detect_gene_id_format(rn)
         log_text <- paste0(log_text, "  ", gse, ": format ", fmt, " -> converting to symbols...\n")
         fdata <- if (!is.null(micro_eset)) {
@@ -472,9 +481,7 @@ gexp_download_normalize_ids_for_overlap <- function(
         converted <- FALSE
         if (!is.null(sym) && length(sym) == length(rn)) {
           valid <- !is.na(sym) & nzchar(trimws(sym))
-          mapped_rate <- if (sum(valid) > 0L) mean(sym[valid] != rn[valid], na.rm = TRUE) else 0
-          accept <- sum(valid) > length(rn) * 0.05 &&
-            (.gexpipe_accept_mapped_symbols(sym, length(rn)) || mapped_rate > 0.05)
+          accept <- .gexpipe_accept_overlap_mapping(sym, rn)
           if (accept) {
             rownames(micro_expr) <- sym
             micro_expr <- micro_expr[valid, , drop = FALSE]
@@ -543,7 +550,7 @@ gexp_download_normalize_ids_for_overlap <- function(
     .gse_result <- tryCatch({
       cnt <- rna_counts_list[[gse]]
       rn <- rownames(cnt)
-      if (gexpipe_ids_need_symbol_conversion(rn)) {
+      if (gexpipe_ids_need_symbol_conversion(rn, gpl_id = NULL)) {
         fmt <- detect_gene_id_format(rn)
         log_text <- paste0(log_text, "  ", gse, ": format ", fmt, " -> converting to symbols...\n")
         sym <- convert_rnaseq_ids(rn, gse_id = gse)
@@ -552,9 +559,7 @@ gexp_download_normalize_ids_for_overlap <- function(
         }
         if (!is.null(sym) && length(sym) == length(rn)) {
           valid <- !is.na(sym) & nzchar(trimws(sym))
-          mapped_rate <- if (sum(valid) > 0L) mean(sym[valid] != rn[valid], na.rm = TRUE) else 0
-          accept <- sum(valid) > length(rn) * 0.05 &&
-            (.gexpipe_accept_mapped_symbols(sym, length(rn)) || mapped_rate > 0.05)
+          accept <- .gexpipe_accept_overlap_mapping(sym, rn)
           if (accept) {
             rownames(cnt) <- sym
             cnt <- cnt[valid, , drop = FALSE]
@@ -673,6 +678,73 @@ gexp_download_normalize_ids_for_overlap <- function(
       all_genes_list  <- .gse_result$all_genes_list
     } else {
       log_text <- paste0(log_text, "  ", gse, ": _st conversion error (", .gse_result$msg, ") - kept original IDs\n")
+    }
+  }
+
+  for (gse in names(all_genes_list)) {
+    .gse_result <- tryCatch({
+      rn <- all_genes_list[[gse]]
+      sample_rn <- .gexpipe_stratified_id_sample(rn, 500L)
+      if (length(sample_rn) > 0 &&
+          mean(grepl("^ENSG.*_at$", sample_rn, ignore.case = TRUE), na.rm = TRUE) > 0.3 &&
+          gexpipe_ids_need_symbol_conversion(rn, gpl_id = if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL)) {
+        log_text <- paste0(log_text, "  ", gse, ": detected Ensembl Affymetrix probe (_at) format -> converting...\n")
+        gpl <- if (!is.null(platform_per_gse)) platform_per_gse[[gse]] else NULL
+        sym <- .gexpipe_ensembl_ids_to_symbols(rn)
+        if (is.null(sym) || length(sym) != length(rn) || sum(!is.na(sym)) <= length(rn) * 0.05) {
+          sym <- any_id_to_symbol(rn, gpl_id = gpl, gse_id = gse)
+        }
+        if (!is.null(sym) && length(sym) == length(rn) && .gexpipe_accept_overlap_mapping(sym, rn)) {
+          valid <- !is.na(sym) & nzchar(trimws(sym))
+          if (gse %in% names(micro_expr_list)) {
+            micro_expr <- micro_expr_list[[gse]]
+            if (nrow(micro_expr) == length(sym)) {
+              rownames(micro_expr) <- sym
+              micro_expr <- micro_expr[valid, , drop = FALSE]
+              if (any(duplicated(rownames(micro_expr)))) {
+                micro_expr <- limma::avereps(micro_expr, ID = rownames(micro_expr))
+              }
+              micro_expr_list[[gse]] <- micro_expr
+            }
+          } else if (gse %in% names(rna_counts_list)) {
+            cnt <- rna_counts_list[[gse]]
+            if (nrow(cnt) == length(sym)) {
+              rownames(cnt) <- sym
+              cnt <- cnt[valid, , drop = FALSE]
+              if (any(duplicated(rownames(cnt)))) {
+                cnt <- limma::avereps(cnt, ID = rownames(cnt))
+              }
+              rna_counts_list[[gse]] <- cnt
+            }
+          }
+          all_genes_list[[gse]] <- if (gse %in% names(micro_expr_list)) {
+            rownames(micro_expr_list[[gse]])
+          } else {
+            rownames(rna_counts_list[[gse]])
+          }
+          n_after <- if (gse %in% names(micro_expr_list)) {
+            nrow(micro_expr_list[[gse]])
+          } else {
+            nrow(rna_counts_list[[gse]])
+          }
+          log_text <- paste0(
+            log_text, "  ", gse,
+            ": Ensembl _at probe IDs converted to ", n_after, " gene symbols\n"
+          )
+        }
+      }
+      list(ok = TRUE, log_text = log_text, micro_expr_list = micro_expr_list,
+           rna_counts_list = rna_counts_list, all_genes_list = all_genes_list)
+    }, error = function(e) {
+      list(ok = FALSE, msg = conditionMessage(e))
+    })
+    if (isTRUE(.gse_result$ok)) {
+      log_text        <- .gse_result$log_text
+      micro_expr_list <- .gse_result$micro_expr_list
+      rna_counts_list <- .gse_result$rna_counts_list
+      all_genes_list  <- .gse_result$all_genes_list
+    } else {
+      log_text <- paste0(log_text, "  ", gse, ": _at conversion error (", .gse_result$msg, ") - kept original IDs\n")
     }
   }
 
