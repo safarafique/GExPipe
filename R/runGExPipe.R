@@ -66,9 +66,11 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
         if (requireNamespace("pkgload", quietly = TRUE)) {
           message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
           pkgload::load_all(getwd(), quiet = TRUE, export_all = FALSE)
+          options(gexpipe.run_source = "source-tree")
         } else if (requireNamespace("devtools", quietly = TRUE)) {
           message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
           devtools::load_all(getwd(), quiet = TRUE)
+          options(gexpipe.run_source = "source-tree")
         }
       }
     }
