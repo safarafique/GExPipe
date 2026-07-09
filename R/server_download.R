@@ -278,7 +278,10 @@ server_download <- function(input, output, session, rv) {
             }
             if (.gexpipe_accept_mapped_symbols(gene_symbols, nrow(micro_expr))) {
               rownames(micro_expr) <- gene_symbols
-            } else if (gexpipe_ids_need_symbol_conversion(rownames(micro_expr))) {
+            } else if (gexpipe_ids_need_symbol_conversion(
+              rownames(micro_expr),
+              gpl_id = if (!is.null(rv$platform_per_gse)) rv$platform_per_gse[[gse_id]] else NULL
+            )) {
               extra_log <- paste0(
                 extra_log, "  ", gse_id,
                 ": probe/custom IDs detected — STEP 2b will map via GPL/fData\n"
