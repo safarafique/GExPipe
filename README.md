@@ -45,16 +45,16 @@ Dependencies are from **CRAN** and **Bioconductor** only.
 
 ## Installation & Run
 
-### Option 1 — Run directly from GitHub (latest fixes on branch `cursor/bioc-review-vignette-0.99.24`)
+### Option 1 — Run directly from GitHub (`main`, includes 0.99.24 probe-ID fixes)
 
-Paste into R or RStudio. **Use the `ref` below** — default `main` does not yet include the probe-ID mapping fixes.
+Paste into R or RStudio. Install `pkgload` once so the app loads the cloned source (not an older Bioconductor install).
 
 ```r
 if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
 if (!requireNamespace("pkgload", quietly = TRUE)) install.packages("pkgload")
 shiny::runGitHub(
   "safarafique/GExPipe",
-  ref = "cursor/bioc-review-vignette-0.99.24",
+  ref = "main",
   subdir = "inst/shinyapp",
   destdir = tempfile()
 )
