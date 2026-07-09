@@ -42,17 +42,45 @@
 app_dir <- .gexpipe_detect_app_dir()
 src_root <- .gexpipe_find_src_root(app_dir)
 
-# Prefer local source tree so edits (ID mapping, GEO fixes) apply after restart
-# without waiting for a reinstall. Fall back to installed package otherwise.
-if (!is.null(src_root) &&
-    (requireNamespace("pkgload", quietly = TRUE) || requireNamespace("devtools", quietly = TRUE))) {
-  message("GExPipe — loading local source from: ", src_root)
+# Prefer local source tree so GitHub clone wins over an older Bioconductor install.
+if (!is.null(src_root)) {
+  loaded <- FALSE
   if (requireNamespace("pkgload", quietly = TRUE)) {
-    pkgload::load_all(src_root, quiet = TRUE, export_all = FALSE)
-  } else {
-    devtools::load_all(src_root, quiet = TRUE)
+    loaded <- tryCatch({
+      pkgload::load_all(src_root, quiet = TRUE, export_all = FALSE)
+      TRUE
+    }, error = function(e) FALSE)
+  } else if (requireNamespace("devtools", quietly = TRUE)) {
+    loaded <- tryCatch({
+      devtools::load_all(src_root, quiet = TRUE)
+      TRUE
+    }, error = function(e) FALSE)
   }
-  GExPipe::runGExPipe(launch.browser = FALSE)
+  if (!loaded) {
+    lib <- file.path(
+      Sys.getenv("LOCALAPPDATA", unset = tempdir()),
+      "GExPipe", paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
+    )
+    dir.create(lib, recursive = TRUE, showWarnings = FALSE)
+    loaded <- tryCatch({
+      utils::install.packages(
+        src_root, repos = NULL, type = "source", lib = lib,
+        quiet = TRUE, INSTALL_opts = c("--no-staged-install", "--no-lock")
+      )
+      requireNamespace("GExPipe", lib.loc = lib, quietly = TRUE)
+    }, error = function(e) FALSE)
+  }
+  if (loaded && requireNamespace("GExPipe", quietly = TRUE)) {
+    message("GExPipe — loaded from GitHub clone: ", src_root)
+    GExPipe::runGExPipe(launch.browser = FALSE)
+  } else {
+    stop(
+      "Could not load GExPipe from the GitHub clone. Install pkgload:\n",
+      "  install.packages('pkgload')\n",
+      "Then re-run runGitHub().",
+      call. = FALSE
+    )
+  }
 } else if (requireNamespace("GExPipe", quietly = TRUE)) {
   message(
     "GExPipe — launching via installed package.\n",

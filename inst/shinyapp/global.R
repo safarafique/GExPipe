@@ -2,9 +2,11 @@
 # GLOBAL.R  —  GExPipe auto-setup: installs all packages, loads libraries
 # ==============================================================================
 # Users never need to manually install anything.
-# Just run: shiny::runGitHub("GExPipe", "safarafique",
-#                             ref = "main", subdir = "inst/shinyapp",
-#                             destdir = tempfile())
+# Just run (latest fixes — use this ref until merged to main):
+#   shiny::runGitHub("safarafique/GExPipe",
+#                    ref = "cursor/bioc-review-vignette-0.99.24",
+#                    subdir = "inst/shinyapp",
+#                    destdir = tempfile())
 # ==============================================================================
 
 cat("\n")
@@ -94,6 +96,59 @@ dir.create(.gexpipe_lib, recursive = TRUE, showWarnings = FALSE)
     )
   }
   invisible(TRUE)
+}
+
+# When launched via runGitHub, prefer the cloned source tree over an older
+# Bioconductor/system install (otherwise probe-ID fixes never apply).
+.gexpipe_clone_src <- local({
+  wd <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+  for (d in unique(c(
+    normalizePath(file.path(wd, "..", ".."), winslash = "/", mustWork = FALSE),
+    wd
+  ))) {
+    desc <- file.path(d, "DESCRIPTION")
+    if (!file.exists(desc)) next
+    hdr <- tryCatch(readLines(desc, n = 12L, warn = FALSE), error = function(e) character(0))
+    if (any(grepl("^Package:\\s*GExPipe\\s*$", hdr))) return(d)
+  }
+  NULL
+})
+
+.gexpipe_loaded_from_clone <- FALSE
+if (!is.null(.gexpipe_clone_src)) {
+  if (requireNamespace("pkgload", quietly = TRUE)) {
+    .gexpipe_loaded_from_clone <- tryCatch({
+      pkgload::load_all(.gexpipe_clone_src, quiet = TRUE, export_all = FALSE)
+      TRUE
+    }, error = function(e) FALSE)
+  } else if (requireNamespace("devtools", quietly = TRUE)) {
+    .gexpipe_loaded_from_clone <- tryCatch({
+      devtools::load_all(.gexpipe_clone_src, quiet = TRUE)
+      TRUE
+    }, error = function(e) FALSE)
+  }
+  if (!isTRUE(.gexpipe_loaded_from_clone)) {
+    .gexpipe_loaded_from_clone <- tryCatch({
+      utils::install.packages(
+        .gexpipe_clone_src, repos = NULL, type = "source", lib = .gexpipe_lib,
+        quiet = TRUE, INSTALL_opts = c("--no-staged-install", "--no-lock")
+      )
+      requireNamespace("GExPipe", lib.loc = .gexpipe_lib, quietly = TRUE)
+    }, error = function(e) FALSE)
+  }
+}
+
+if (isTRUE(.gexpipe_loaded_from_clone) && requireNamespace("GExPipe", quietly = TRUE)) {
+  cat("  Mode         : GitHub checkout (loaded from clone, not old install)\n")
+  cat("  Source       :", .gexpipe_clone_src, "\n")
+  tryCatch(
+    getFromNamespace("gexp_app_attach_packages", "GExPipe")(),
+    error = function(e) warning("GExPipe attach: ", conditionMessage(e), call. = FALSE)
+  )
+  .gexpipe_verify_core_namespace()
+  cat("  Status       : ready\n")
+  cat("  ===============================================================\n\n")
+  return(invisible(TRUE))
 }
 
 if (.gexpipe_installed_in_system_library()) {
