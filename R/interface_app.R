@@ -66,21 +66,23 @@ gexp_app_analysis_dashboard_ui <- function() {
         shinydashboard::menuItem("15. Results Summary", tabName = "results_summary", icon = shiny::icon("file-alt", class = "fa-lg"), badgeLabel = "PDF", badgeColor = "red")
       ),
       shiny::tags$div(
-        style = "padding: 15px; text-align: center; border-top: 1px solid #ddd; background: #f8f9fa;",
-        shiny::tags$label("File name (optional)", style = "font-size: 11px; color: #555; display: block; text-align: left; margin-bottom: 4px;"),
+        class = "gexp-sidebar-workspace",
+        style = "padding: 15px; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.18);",
+        shiny::tags$label("File name (optional)", class = "gexp-sidebar-label"),
         shiny::textInput("workspace_save_filename", NULL, placeholder = "e.g. my_analysis", value = "my_analysis", width = "100%"),
         shiny::tags$div(
           shiny::actionButton("save_workspace_to_folder", shiny::tagList(shiny::icon("save"), " Save to folder"), class = "btn-success btn-block", style = "font-size: 13px; margin-top: 8px; margin-bottom: 6px;"),
           shiny::downloadButton("download_workspace", shiny::tagList(shiny::icon("download"), " Save workspace (download)"), class = "btn-info btn-block", style = "font-size: 12px; margin-bottom: 10px;")
         ),
-        shiny::tags$p(shiny::tags$strong("Save to folder:"), " Saves to 'saved_workspaces' in the app directory. Use this if the download button does nothing.", style = "font-size: 11px; color: #555; margin: 4px 0 2px 0;"),
-        shiny::tags$p(shiny::tags$strong("Save (download):"), " Same save + browser may download a copy.", style = "font-size: 11px; color: #555; margin: 0 0 4px 0;"),
-        shiny::tags$p(shiny::tags$strong("Load:"), " Step 1 (Download) -> choose file from 'saved_workspaces' or Downloads -> Load.", style = "font-size: 11px; color: #555; margin: 0;")
+        shiny::tags$p(shiny::tags$strong("Save to folder:"), " Saves to 'saved_workspaces' in the app directory. Use this if the download button does nothing.", class = "gexp-sidebar-help"),
+        shiny::tags$p(shiny::tags$strong("Save (download):"), " Same save + browser may download a copy.", class = "gexp-sidebar-help"),
+        shiny::tags$p(shiny::tags$strong("Load:"), " Step 1 (Download) -> choose file from 'saved_workspaces' or Downloads -> Load.", class = "gexp-sidebar-help")
       ),
       shiny::tags$div(
-        style = "padding: 20px; text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: auto;",
-        shiny::tags$h4(shiny::icon("info-circle"), " GExPipe", style = "color: white; font-weight: bold;"),
-        shiny::tags$p("Gene Expression Pipeline", style = "font-size: 12px; margin-top: 10px; opacity: 0.9;")
+        class = "gexp-sidebar-brand",
+        style = "padding: 20px; text-align: center; background: linear-gradient(135deg, rgba(102,126,234,0.35) 0%, rgba(118,75,162,0.35) 100%); color: white; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.08);",
+        shiny::tags$h4(shiny::icon("info-circle"), " GExPipe", style = "color: #fff; font-weight: 600; margin: 0 0 6px 0;"),
+        shiny::tags$p("Gene Expression Pipeline", style = "font-size: 12px; margin: 0; opacity: 0.85; color: rgba(255,255,255,0.9);")
       )
     ),
     shinydashboard::dashboardBody(
@@ -439,27 +441,147 @@ gexp_app_head <- function() {
           font-weight: bold;
         }
         
-        /* ===== SIDEBAR STYLING ===== */
+        /* ===== SIDEBAR STYLING (modern dark) ===== */
         .main-sidebar {
-          background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%) !important;
+          background: linear-gradient(180deg, #151b28 0%, #1e2636 55%, #232d40 100%) !important;
+          box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
         }
-        
+
+        .skin-purple .main-sidebar .sidebar-menu > li > a,
         .sidebar-menu > li > a {
-          border-left: 4px solid transparent;
-          transition: all 0.3s ease;
+          color: rgba(255, 255, 255, 0.92) !important;
+          font-size: 13px;
+          font-weight: 500;
+          letter-spacing: 0.01em;
+          line-height: 1.35;
+          padding: 11px 10px 11px 14px;
+          border-left: 3px solid transparent;
+          border-radius: 0 10px 10px 0;
+          margin: 3px 10px 3px 0;
+          transition: background 0.22s ease, color 0.22s ease, border-color 0.22s ease;
         }
-        
-        .sidebar-menu > li > a:hover {
-          background: linear-gradient(90deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%) !important;
-          border-left-color: #667eea;
-          color: #fff !important;
+
+        .skin-purple .main-sidebar .sidebar-menu > li > a span,
+        .sidebar-menu > li > a span {
+          color: rgba(255, 255, 255, 0.94) !important;
         }
-        
-        .sidebar-menu > li.active > a {
-          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%) !important;
-          border-left-color: #f1c40f;
-          color: #fff !important;
-          font-weight: bold;
+
+        .sidebar-menu > li > a .fa,
+        .sidebar-menu > li > a i {
+          color: rgba(255, 255, 255, 0.78) !important;
+          width: 22px;
+          text-align: center;
+          margin-right: 6px;
+        }
+
+        .sidebar-menu > li > a:hover,
+        .skin-purple .main-sidebar .sidebar-menu > li > a:hover {
+          background: rgba(102, 126, 234, 0.22) !important;
+          border-left-color: rgba(102, 126, 234, 0.85);
+          color: #ffffff !important;
+        }
+
+        .sidebar-menu > li > a:hover span {
+          color: #ffffff !important;
+        }
+
+        .sidebar-menu > li.active > a,
+        .skin-purple .main-sidebar .sidebar-menu > li.active > a {
+          background: linear-gradient(90deg, rgba(102, 126, 234, 0.92) 0%, rgba(118, 75, 162, 0.82) 100%) !important;
+          border-left-color: #f5d76e;
+          color: #ffffff !important;
+          font-weight: 600;
+          box-shadow: 0 4px 14px rgba(102, 126, 234, 0.28);
+        }
+
+        .sidebar-menu > li.active > a span,
+        .sidebar-menu > li.active > a .fa,
+        .sidebar-menu > li.active > a i {
+          color: #ffffff !important;
+        }
+
+        /* Step badges (View, Process, …) — white text, refined pills */
+        .sidebar-menu .label,
+        .sidebar-menu > li > a .label,
+        .sidebar-menu > li > a .pull-right-container .label,
+        .sidebar-menu > li > a > small.label {
+          color: #ffffff !important;
+          font-size: 9.5px;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          border-radius: 999px;
+          padding: 4px 9px;
+          margin-top: 2px;
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          background: rgba(255, 255, 255, 0.14) !important;
+          box-shadow: none;
+        }
+
+        .sidebar-menu .bg-blue,
+        .sidebar-menu .bg-green,
+        .sidebar-menu .bg-purple,
+        .sidebar-menu .bg-orange,
+        .sidebar-menu .bg-red,
+        .sidebar-menu .bg-yellow,
+        .sidebar-menu .bg-teal,
+        .sidebar-menu .bg-maroon,
+        .sidebar-menu .bg-olive {
+          color: #ffffff !important;
+          background: rgba(255, 255, 255, 0.16) !important;
+        }
+
+        .sidebar-menu > li.active > a .label,
+        .sidebar-menu > li.active > a .bg-blue,
+        .sidebar-menu > li.active > a .bg-green,
+        .sidebar-menu > li.active > a .bg-purple,
+        .sidebar-menu > li.active > a .bg-orange,
+        .sidebar-menu > li.active > a .bg-red,
+        .sidebar-menu > li.active > a .bg-yellow,
+        .sidebar-menu > li.active > a .bg-teal,
+        .sidebar-menu > li.active > a .bg-maroon,
+        .sidebar-menu > li.active > a .bg-olive {
+          color: #ffffff !important;
+          background: rgba(255, 255, 255, 0.28) !important;
+          border-color: rgba(255, 255, 255, 0.35);
+        }
+
+        .gexp-sidebar-label {
+          font-size: 11px;
+          color: rgba(255, 255, 255, 0.72) !important;
+          display: block;
+          text-align: left;
+          margin-bottom: 4px;
+          font-weight: 500;
+        }
+
+        .gexp-sidebar-help {
+          font-size: 11px;
+          color: rgba(255, 255, 255, 0.62) !important;
+          margin: 4px 0 2px 0;
+          text-align: left;
+          line-height: 1.45;
+        }
+
+        .gexp-sidebar-workspace .form-control {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.14);
+          color: #ffffff;
+        }
+
+        .gexp-sidebar-workspace .form-control::placeholder {
+          color: rgba(255, 255, 255, 0.45);
+        }
+
+        .gexp-sidebar-workspace .btn-success,
+        .gexp-sidebar-workspace .btn-info {
+          border-radius: 8px;
+          font-weight: 600;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .main-sidebar .sidebar::-webkit-scrollbar-thumb {
+          background: rgba(102, 126, 234, 0.45);
         }
         
         /* ===== BOX STYLING ===== */
@@ -592,7 +714,10 @@ gexp_app_head <- function() {
           background: #fafafa;
           max-width: 100%;
         }
-        .content-wrapper { padding: 20px; }
+        .content-wrapper {
+          padding: 20px;
+          background: linear-gradient(180deg, #f4f6fb 0%, #eef1f8 100%);
+        }
         
         /* ===== NEXT BUTTON STYLING ===== */
         .next-btn {
