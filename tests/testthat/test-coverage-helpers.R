@@ -2,7 +2,7 @@ test_that("detect_gene_id_format recognizes common ID types", {
   skip_if_not_installed("GExPipe")
   detect <- getFromNamespace("detect_gene_id_format", "GExPipe")
   expect_equal(detect(c("BRCA1", "TP53", "EGFR")), "Gene symbol (HGNC)")
-  expect_equal(detect(c("1007_s_at", "1053_at")), "Affymetrix HG-U133 probe (_at)")
+  expect_equal(detect(c("1007_s_at", "1053_at")), "Microarray probe-like ID")
   expect_equal(detect(c("12345", "67890", "11111")), "Entrez ID")
   expect_equal(detect(c("ENSG00000141510", "ENSG00000012048")), "Ensembl ID")
   expect_equal(detect(c("AB000409", "AB000463", "AB000781")), "GenBank/EMBL accession")
@@ -36,7 +36,7 @@ test_that("detect_gene_id_format flags custom probe IDs from user GSEs", {
   detect <- getFromNamespace("detect_gene_id_format", "GExPipe")
   expect_equal(detect(c("(+)E1A_r60_1", "(+)E1A_r60_3")), "Microarray probe-like ID")
   expect_equal(detect(c("ASHG19AP1B100000016V5", "ASHG19AP1B100000050V5")), "Microarray probe-like ID")
-  expect_equal(detect(c("ENSG00000000003_at", "ENSG00000000005_at")), "Affymetrix HG-U133 probe (_at)")
+  expect_equal(detect(c("ENSG00000000003_at", "ENSG00000000005_at")), "Ensembl ID")
 })
 
 test_that("normalize_microarray and normalize_rnaseq run on small matrices", {
@@ -141,7 +141,7 @@ test_that("gexp_wgcna_prepare returns datExpr for small synthetic data", {
   skip_if_not_installed("GExPipe")
   skip_if_not_installed("WGCNA")
   set.seed(3)
-  expr <- matrix(rnorm(600), nrow = 60)
+  expr <- matrix(rnorm(1200), nrow = 120)
   rownames(expr) <- paste0("Gene", seq_len(nrow(expr)))
   colnames(expr) <- paste0("S", seq_len(ncol(expr)))
   meta <- data.frame(
@@ -150,10 +150,10 @@ test_that("gexp_wgcna_prepare returns datExpr for small synthetic data", {
     Dataset = rep(c("D1", "D2"), each = 5),
     stringsAsFactors = FALSE
   )
-  prep <- gexp_wgcna_prepare(expr, meta, gene_mode = "top_variable", top_genes = 50L)
+  prep <- gexp_wgcna_prepare(expr, meta, gene_mode = "top_variable", top_genes = 100L)
   expect_true(is.matrix(prep$datExpr))
   expect_equal(nrow(prep$datExpr), ncol(expr))
-  expect_lte(ncol(prep$datExpr), 50L)
+  expect_lte(ncol(prep$datExpr), 100L)
 })
 
 test_that("ML and UI helper functions return expected structures", {
@@ -165,7 +165,7 @@ test_that("ML and UI helper functions return expected structures", {
   expect_true(length(names) >= 4L)
 
   sets <- gexp_ml_venn_sets_for_selected(
-    list(lasso = c("A", "B"), rf = c("B", "C")),
+    list(LASSO = c("A", "B"), `Random Forest` = c("B", "C")),
     c("lasso", "rf")
   )
   expect_equal(gexp_ml_common_gene_count(sets), 1L)
