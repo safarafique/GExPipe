@@ -138,7 +138,8 @@ if (!is.null(.gexpipe_clone_src)) {
   }
 }
 
-if (isTRUE(.gexpipe_loaded_from_clone) && requireNamespace("GExPipe", quietly = TRUE)) {
+  if (isTRUE(.gexpipe_loaded_from_clone) && requireNamespace("GExPipe", quietly = TRUE)) {
+  options(gexpipe.run_source = "github-clone")
   cat("  Mode         : GitHub checkout (loaded from clone, not old install)\n")
   cat("  Source       :", .gexpipe_clone_src, "\n")
   tryCatch(
@@ -152,6 +153,7 @@ if (isTRUE(.gexpipe_loaded_from_clone) && requireNamespace("GExPipe", quietly = 
 }
 
 if (.gexpipe_installed_in_system_library()) {
+  options(gexpipe.run_source = "installed")
   cat("  Mode         : installed GExPipe package (namespace only)\n")
   tryCatch(
     getFromNamespace("gexp_app_attach_packages", "GExPipe")(),
