@@ -534,9 +534,6 @@ GPL_to_biomart_probe_attr <- c(
   "GPL6104" = "illumina_humanht_12_v3"
 )
 
-  "GPL6104" = "illumina_humanht_12_v3"
-)
-
 #' Return TRUE when a single ID looks like a microarray probe (not HGNC)
 #' @keywords internal
 .gexpipe_id_looks_like_probe <- function(id) {
