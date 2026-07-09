@@ -580,8 +580,10 @@ GPL_to_biomart_probe_attr <- c(
   dirs <- character(0)
   wd <- getwd()
   dirs <- c(dirs, file.path(wd, "micro_data"))
+  dirs <- c(dirs, file.path(wd, "Gexpipe", "micro_data"))
   if (!is.null(gse_id) && nzchar(gse_id)) {
     dirs <- c(dirs, file.path(wd, "micro_data", gse_id))
+    dirs <- c(dirs, file.path(wd, "Gexpipe", "micro_data", gse_id))
   }
   opt_micro <- getOption("gexpipe.micro_dir", NULL)
   if (!is.null(opt_micro) && nzchar(opt_micro)) {
@@ -589,6 +591,270 @@ GPL_to_biomart_probe_attr <- c(
   }
   dirs <- c(dirs, tempdir(), wd)
   unique(dirs[nzchar(dirs) & dir.exists(dirs)])
+}
+
+# Arraystar GPL21827 (V4) has no gene-symbol column on GEO; GPL26963 (V5) adds ORF/ACC.
+.gexpipe_arraystar_gpls <- c("GPL21827", "GPL26963")
+.gexpipe_arraystar_map_cache <- new.env(parent = emptyenv())
+
+#' Fetch GEO GPL annotation table as a data.frame (cached under micro_data when available)
+#' @keywords internal
+.gexpipe_read_gpl_soft_table <- function(gpl_id, gse_id = NULL) {
+  fname <- paste0(gpl_id, ".soft.gz")
+  .open_maybe_gz <- function(fp) {
+    magic <- tryCatch(readBin(fp, what = raw(2), n = 2), error = function(e) raw(0))
+    if (length(magic) == 2L && identical(magic, as.raw(c(0x1f, 0x8b)))) {
+      gzfile(fp, open = "rt")
+    } else {
+      file(fp, open = "rt")
+    }
+  }
+  for (dd in .gexpipe_gpl_destdirs(gse_id)) {
+    fp <- file.path(dd, fname)
+    if (!file.exists(fp)) {
+      next
+    }
+    con <- tryCatch(.open_maybe_gz(fp), error = function(e) NULL)
+    if (is.null(con)) {
+      next
+    }
+    on.exit(try(close(con), silent = TRUE), add = TRUE)
+    lines <- tryCatch(readLines(con, warn = FALSE), error = function(e) character(0))
+    if (length(lines) == 0L) {
+      next
+    }
+    begin <- grep("^!platform_table_begin", lines, ignore.case = TRUE)[1L]
+    end <- grep("^!platform_table_end", lines, ignore.case = TRUE)[1L]
+    if (is.na(begin) || is.na(end) || end <= begin + 1L) {
+      next
+    }
+    hdr <- strsplit(lines[begin + 1L], "\t", fixed = TRUE)[[1L]]
+    data_lines <- lines[(begin + 2L):(end - 1L)]
+    if (length(data_lines) == 0L) {
+      next
+    }
+    tmpf <- tempfile(fileext = ".txt")
+    on.exit(unlink(tmpf), add = TRUE)
+    writeLines(c(paste(hdr, collapse = "\t"), data_lines), tmpf, useBytes = TRUE)
+    df <- tryCatch(
+      read.delim(
+        tmpf, sep = "\t", header = TRUE, quote = "", comment.char = "",
+        stringsAsFactors = FALSE, check.names = FALSE
+      ),
+      error = function(e) NULL
+    )
+    if (!is.null(df) && nrow(df) > 0L) {
+      return(df)
+    }
+  }
+  NULL
+}
+
+#' Fetch GEO GPL annotation table as a data.frame (cached under micro_data when available)
+#' @keywords internal
+.gexpipe_fetch_gpl_table_df <- function(gpl_id, gse_id = NULL) {
+  if (is.null(gpl_id) || !nzchar(gpl_id)) {
+    return(NULL)
+  }
+  tab <- .gexpipe_read_gpl_soft_table(gpl_id, gse_id = gse_id)
+  if (!is.null(tab)) {
+    return(tab)
+  }
+  .fetch_gpl <- function(destdir_val) {
+    tryCatch(
+      suppressMessages(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
+      error = function(e) NULL
+    )
+  }
+  gpl_raw <- NULL
+  for (dd in .gexpipe_gpl_destdirs(gse_id)) {
+    gpl_raw <- .fetch_gpl(dd)
+    if (!is.null(gpl_raw)) {
+      break
+    }
+  }
+  if (is.null(gpl_raw)) {
+    gpl_raw <- .fetch_gpl(tempdir())
+  }
+  gpl <- if (inherits(gpl_raw, "GPL")) {
+    gpl_raw
+  } else if (is.list(gpl_raw)) {
+    els <- Filter(function(e) inherits(e, "GPL"), gpl_raw)
+    if (length(els) > 0) els[[1L]] else NULL
+  } else {
+    NULL
+  }
+  if (is.null(gpl)) {
+    return(NULL)
+  }
+  tab <- tryCatch(GEOquery::Table(gpl), error = function(e) NULL)
+  if (is.null(tab) || nrow(tab) == 0 || ncol(tab) == 0) {
+    return(NULL)
+  }
+  as.data.frame(tab, stringsAsFactors = FALSE)
+}
+
+#' Best-effort HGNC symbol from Arraystar ORF / ACC fields (GPL26963-style annotation)
+#' @keywords internal
+.gexpipe_symbol_from_arraystar_fields <- function(orf, acc = NA_character_) {
+  orf <- trimws(as.character(orf))
+  acc <- trimws(as.character(acc))
+  if (nzchar(orf) &&
+      grepl("^[A-Za-z][A-Za-z0-9-]*$", orf) &&
+      !grepl("^LOC[0-9]+$", orf, ignore.case = TRUE) &&
+      !grepl("^[A-Z]{1,2}[0-9]{5,}$", orf) &&
+      nchar(orf) <= 20L) {
+    return(orf)
+  }
+  key <- if (nzchar(acc)) acc else orf
+  if (!nzchar(key)) {
+    return(NA_character_)
+  }
+  hs_db <- .gexpipe_hs_db()
+  if (is.null(hs_db)) {
+    return(NA_character_)
+  }
+  mapped <- tryCatch({
+    if (grepl("^ENST", key, ignore.case = TRUE)) {
+      suppressMessages(AnnotationDbi::mapIds(
+        hs_db, keys = key, column = "SYMBOL",
+        keytype = "ENSEMBL", multiVals = "first"
+      ))
+    } else if (grepl("^(NM_|NR_|XM_|XR_)", key, ignore.case = TRUE)) {
+      suppressMessages(AnnotationDbi::mapIds(
+        hs_db, keys = key, column = "SYMBOL",
+        keytype = "REFSEQ", multiVals = "first"
+      ))
+    } else if (grepl("^[0-9]+$", key)) {
+      suppressMessages(AnnotationDbi::mapIds(
+        hs_db, keys = key, column = "SYMBOL",
+        keytype = "ENTREZID", multiVals = "first"
+      ))
+    } else if (grepl("^[A-Z]{1,2}[0-9]", key)) {
+      suppressMessages(AnnotationDbi::mapIds(
+        hs_db, keys = key, column = "SYMBOL",
+        keytype = "ACCNUM", multiVals = "first"
+      ))
+    } else {
+      NA_character_
+    }
+  }, error = function(e) NA_character_)
+  as.character(mapped)
+}
+
+#' Build probe-ID -> symbol map for Arraystar GPL21827/GPL26963
+#' @keywords internal
+.gexpipe_build_arraystar_symbol_map <- function(gpl_id, gse_id = NULL) {
+  gpl_id <- as.character(gpl_id)
+  if (!gpl_id %in% .gexpipe_arraystar_gpls) {
+    return(NULL)
+  }
+  cache_key <- paste0(gpl_id, "::", if (is.null(gse_id)) "" else gse_id)
+  if (exists(cache_key, envir = .gexpipe_arraystar_map_cache, inherits = FALSE)) {
+    return(get(cache_key, envir = .gexpipe_arraystar_map_cache))
+  }
+  annot_gpl <- if (identical(gpl_id, "GPL21827")) "GPL26963" else gpl_id
+  tab <- .gexpipe_fetch_gpl_table_df(annot_gpl, gse_id = gse_id)
+  if (is.null(tab) || nrow(tab) == 0L || !"ID" %in% names(tab)) {
+    return(NULL)
+  }
+  ids <- as.character(tab[["ID"]])
+  orf <- if ("ORF" %in% names(tab)) as.character(tab[["ORF"]]) else rep(NA_character_, length(ids))
+  acc <- if ("ACC" %in% names(tab)) as.character(tab[["ACC"]]) else rep(NA_character_, length(ids))
+  syms <- rep(NA_character_, length(ids))
+  good_orf <- nzchar(orf) &
+    grepl("^[A-Za-z][A-Za-z0-9-]*$", orf) &
+    !grepl("^LOC[0-9]+$", orf, ignore.case = TRUE) &
+    !grepl("^[A-Z]{1,2}[0-9]{5,}$", orf) &
+    nchar(orf) <= 20L
+  syms[good_orf] <- orf[good_orf]
+  miss <- is.na(syms) | !nzchar(syms)
+  if (any(miss)) {
+    keys <- ifelse(nzchar(acc[miss]), acc[miss], orf[miss])
+    keys <- trimws(keys)
+    hs_db <- .gexpipe_hs_db()
+    if (!is.null(hs_db)) {
+      mapped <- rep(NA_character_, length(keys))
+      enst <- grepl("^ENST", keys, ignore.case = TRUE)
+      refseq <- grepl("^(NM_|NR_|XM_|XR_)", keys, ignore.case = TRUE)
+      entrez <- grepl("^[0-9]+$", keys)
+      accnum <- !enst & !refseq & !entrez & grepl("^[A-Z]{1,2}[0-9]", keys)
+      if (any(enst)) {
+        mapped[enst] <- tryCatch(
+          suppressMessages(AnnotationDbi::mapIds(
+            hs_db, keys = keys[enst], column = "SYMBOL",
+            keytype = "ENSEMBL", multiVals = "first"
+          )),
+          error = function(e) rep(NA_character_, sum(enst))
+        )
+      }
+      if (any(refseq)) {
+        mapped[refseq] <- tryCatch(
+          suppressMessages(AnnotationDbi::mapIds(
+            hs_db, keys = keys[refseq], column = "SYMBOL",
+            keytype = "REFSEQ", multiVals = "first"
+          )),
+          error = function(e) rep(NA_character_, sum(refseq))
+        )
+      }
+      if (any(entrez)) {
+        mapped[entrez] <- tryCatch(
+          suppressMessages(AnnotationDbi::mapIds(
+            hs_db, keys = keys[entrez], column = "SYMBOL",
+            keytype = "ENTREZID", multiVals = "first"
+          )),
+          error = function(e) rep(NA_character_, sum(entrez))
+        )
+      }
+      if (any(accnum)) {
+        mapped[accnum] <- tryCatch(
+          suppressMessages(AnnotationDbi::mapIds(
+            hs_db, keys = keys[accnum], column = "SYMBOL",
+            keytype = "ACCNUM", multiVals = "first"
+          )),
+          error = function(e) rep(NA_character_, sum(accnum))
+        )
+      }
+      syms[miss] <- as.character(mapped)
+    }
+  }
+  names(syms) <- ids
+  if (identical(gpl_id, "GPL21827")) {
+    v4_names <- sub("V5$", "", names(syms))
+  } else {
+    v4_names <- names(syms)
+  }
+  keep <- !is.na(syms) & nzchar(trimws(syms))
+  if (!any(keep)) {
+    return(NULL)
+  }
+  sym_map <- syms[keep]
+  names(sym_map) <- v4_names[keep]
+  assign(cache_key, sym_map, envir = .gexpipe_arraystar_map_cache)
+  sym_map
+}
+
+#' Map Arraystar probe IDs to HGNC symbols (GPL21827 crosswalk via GPL26963)
+#' @keywords internal
+.gexpipe_arraystar_probe_to_symbols <- function(probe_ids, gpl_id, gse_id = NULL) {
+  probe_ids <- as.character(probe_ids)
+  sym_map <- .gexpipe_build_arraystar_symbol_map(gpl_id, gse_id = gse_id)
+  if (is.null(sym_map) || length(sym_map) == 0L) {
+    return(NULL)
+  }
+  out <- sym_map[probe_ids]
+  miss <- is.na(out) & !is.na(probe_ids) & nzchar(probe_ids)
+  if (any(miss) && identical(gpl_id, "GPL21827")) {
+    out[miss] <- sym_map[paste0(probe_ids[miss], "V5")]
+  }
+  ctrl <- grepl("^\\(\\+\\)|^E1A_", probe_ids) |
+    tolower(trimws(probe_ids)) %in% c("control", "blank", "empty")
+  out[ctrl] <- NA_character_
+  names(out) <- probe_ids
+  if (sum(!is.na(out) & nzchar(out)) <= length(probe_ids) * 0.05) {
+    return(NULL)
+  }
+  out
 }
 
 #' Extract gene symbols from ExpressionSet fData (GeneName, Symbol, Entrez, GB_ACC, ...)
@@ -615,7 +881,8 @@ GPL_to_biomart_probe_attr <- c(
   sym_cands_low <- c(
     "gene symbol", "gene.symbol", "gene_symbol", "genesymbol", "genename",
     "gene name", "gene_name", "symbol", "hgnc_symbol", "hgnc symbol",
-    "hgnc.symbol", "official symbol", "official_symbol", "gene sym", "genesym"
+    "hgnc.symbol", "official symbol", "official_symbol", "gene sym", "genesym",
+    "orf"
   )
   for (i in seq_along(cn)) {
     if (cn_low[i] %in% sym_cands_low) {
@@ -632,7 +899,7 @@ GPL_to_biomart_probe_attr <- c(
       return(sym)
     }
   }
-  acc_idx <- grep("gb_?acc|refseq|entrez|gene.?id", cn_low)
+  acc_idx <- grep("gb_?acc|refseq|entrez|gene.?id|^acc$", cn_low)
   acc_idx <- acc_idx[!grepl("probe|spot|symbol|name", cn_low[acc_idx])]
   hs_db <- .gexpipe_hs_db()
   if (length(acc_idx) > 0L && !is.null(hs_db)) {
@@ -640,6 +907,13 @@ GPL_to_biomart_probe_attr <- c(
       keys <- .clean_col(fdata[[cn[j]]])
       if (sum(!is.na(keys)) < max(3L, ceiling(n * 0.05))) {
         next
+      }
+      orf_col <- if ("ORF" %in% cn) .clean_col(fdata[["ORF"]]) else rep(NA_character_, n)
+      mapped <- vapply(seq_len(n), function(i) {
+        .gexpipe_symbol_from_arraystar_fields(orf_col[i], keys[i])
+      }, character(1))
+      if (.gexpipe_accept_mapped_symbols(mapped, n)) {
+        return(mapped)
       }
       mapped <- tryCatch(
         if (mean(grepl("^[0-9]+$", keys[!is.na(keys)]), na.rm = TRUE) > 0.5) {
@@ -887,6 +1161,13 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
       return(NULL)
     }
     probe_ids <- as.character(probe_ids)
+
+    if (gpl_id %in% .gexpipe_arraystar_gpls) {
+      arraystar_sym <- .gexpipe_arraystar_probe_to_symbols(probe_ids, gpl_id, gse_id = gse_id)
+      if (!is.null(arraystar_sym) && length(arraystar_sym) == length(probe_ids)) {
+        return(arraystar_sym)
+      }
+    }
 
     .fetch_gpl <- function(destdir_val) {
       tryCatch(
