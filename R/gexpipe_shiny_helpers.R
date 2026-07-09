@@ -482,6 +482,7 @@ platform_to_annot <- list(
   "GPL23270" = "clarionshuman.db",
   # Clariom S / ENSG transcript IDs (symbols via org.Hs.eg.db ENSEMBL, not probe .db)
   "GPL30033" = NA_character_,
+  "GPL16025" = NA_character_,
   "GPL21827" = NA_character_,  # Arraystar LncRNA V4 — use GPL table / biomaRt
   "GPL26963" = NA_character_,  # Arraystar LncRNA V5 — use GPL table / biomaRt
   "GPL23432" = "hgu133plus2.db",
@@ -553,6 +554,26 @@ GPL_to_biomart_probe_attr <- c(
   }, logical(1))
 }
 
+#' Accept mapped symbols for multi-dataset overlap (STEP 2b)
+#' @keywords internal
+.gexpipe_accept_overlap_mapping <- function(sym, rn, min_rate = 0.03) {
+  sym <- as.character(sym)
+  rn <- as.character(rn)
+  if (length(sym) != length(rn) || length(rn) == 0L) {
+    return(FALSE)
+  }
+  valid <- !is.na(sym) & nzchar(trimws(sym))
+  if (sum(valid) < max(3L, ceiling(length(rn) * min_rate))) {
+    return(FALSE)
+  }
+  mapped_rate <- mean(sym[valid] != rn[valid], na.rm = TRUE)
+  isTRUE(
+    .gexpipe_accept_mapped_symbols(sym, length(rn), min_rate = min_rate) ||
+      mapped_rate > min_rate ||
+      gexpipe_ids_are_verified_symbols(sym[valid])
+  )
+}
+
 #' Accept a mapped symbol vector for overlap (relaxed vs strict org.Hs.eg.db check)
 #' @keywords internal
 .gexpipe_accept_mapped_symbols <- function(sym, n_total = length(sym), min_rate = 0.05) {
@@ -593,9 +614,99 @@ GPL_to_biomart_probe_attr <- c(
   unique(dirs[nzchar(dirs) & dir.exists(dirs)])
 }
 
+#' Copy bundled GEO GPL SOFT files into a writable micro_data cache
+#' @keywords internal
+.gexpipe_seed_gpl_cache <- function(micro_dir) {
+  if (is.null(micro_dir) || !nzchar(micro_dir)) {
+    return(invisible(NULL))
+  }
+  if (!dir.exists(micro_dir)) {
+    dir.create(micro_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  src_dirs <- unique(c(
+    file.path(getwd(), "Gexpipe", "micro_data"),
+    system.file("micro_data", package = "GExPipe")
+  ))
+  for (src in src_dirs) {
+    if (!nzchar(src) || !dir.exists(src)) {
+      next
+    }
+    for (f in list.files(src, pattern = "^GPL[0-9]+\\.soft(\\.gz)?$", full.names = TRUE)) {
+      dest <- file.path(micro_dir, basename(f))
+      if (!file.exists(dest)) {
+        tryCatch(file.copy(f, dest, overwrite = FALSE), error = function(e) NULL)
+      }
+    }
+  }
+  invisible(NULL)
+}
+
 # Arraystar GPL21827 (V4) has no gene-symbol column on GEO; GPL26963 (V5) adds ORF/ACC.
 .gexpipe_arraystar_gpls <- c("GPL21827", "GPL26963")
 .gexpipe_arraystar_map_cache <- new.env(parent = emptyenv())
+
+#' Stratified sample of row IDs (head / mid / tail) for format detection
+#' @keywords internal
+.gexpipe_stratified_id_sample <- function(ids, n = 500L) {
+  ids <- unique(as.character(ids[!is.na(ids) & nzchar(trimws(ids))]))
+  if (length(ids) <= n) {
+    return(ids)
+  }
+  third <- max(1L, floor(n / 3L))
+  mid_start <- max(1L, floor((length(ids) - third) / 2L))
+  c(
+    head(ids, third),
+    ids[seq(mid_start, min(length(ids), mid_start + third - 1L))],
+    tail(ids, third)
+  )
+}
+
+#' Return TRUE when IDs are mostly GenBank/EMBL accessions (e.g. AB000409)
+#' @keywords internal
+.gexpipe_is_genbank_accession_ids <- function(ids) {
+  ids <- as.character(ids[!is.na(ids) & nzchar(trimws(ids))])
+  if (length(ids) == 0L) {
+    return(FALSE)
+  }
+  sample_ids <- .gexpipe_stratified_id_sample(ids, 500L)
+  mean(grepl("^[A-Z]{1,2}[0-9]{5,}([.][0-9]+)?$", sample_ids), na.rm = TRUE) > 0.3
+}
+
+#' GPLs that require probe/accession -> symbol mapping before overlap
+#' @keywords internal
+.gexpipe_gpl_needs_id_conversion <- function(gpl_id) {
+  if (is.null(gpl_id) || !nzchar(gpl_id)) {
+    return(FALSE)
+  }
+  gpl_id %in% .gexpipe_arraystar_gpls ||
+    gpl_id %in% c("GPL30033", "GPL16025") ||
+    (gpl_id %in% names(platform_to_annot) && is.na(platform_to_annot[[gpl_id]]))
+}
+
+#' Map Ensembl gene IDs (optionally Affymetrix _at probes) to HGNC symbols
+#' @keywords internal
+.gexpipe_ensembl_ids_to_symbols <- function(ids) {
+  ids <- as.character(ids)
+  if (length(ids) == 0L) {
+    return(NULL)
+  }
+  clean <- .gexpipe_clean_ensembl_keys(ids)
+  hs_db <- .gexpipe_hs_db()
+  if (is.null(hs_db)) {
+    return(NULL)
+  }
+  sym <- tryCatch(
+    suppressMessages(AnnotationDbi::mapIds(
+      hs_db, keys = clean, column = "SYMBOL",
+      keytype = "ENSEMBL", multiVals = "first"
+    )),
+    error = function(e) NULL
+  )
+  if (is.null(sym)) {
+    return(NULL)
+  }
+  as.character(sym)
+}
 
 #' Fetch GEO GPL annotation table as a data.frame (cached under micro_data when available)
 #' @keywords internal
@@ -703,6 +814,7 @@ GPL_to_biomart_probe_attr <- c(
       grepl("^[A-Za-z][A-Za-z0-9-]*$", orf) &&
       !grepl("^LOC[0-9]+$", orf, ignore.case = TRUE) &&
       !grepl("^[A-Z]{1,2}[0-9]{5,}$", orf) &&
+      !grepl("^(ENCT|CATG|MICT|FANTOM)", orf, ignore.case = TRUE) &&
       nchar(orf) <= 20L) {
     return(orf)
   }
@@ -766,6 +878,7 @@ GPL_to_biomart_probe_attr <- c(
     grepl("^[A-Za-z][A-Za-z0-9-]*$", orf) &
     !grepl("^LOC[0-9]+$", orf, ignore.case = TRUE) &
     !grepl("^[A-Z]{1,2}[0-9]{5,}$", orf) &
+    !grepl("^(ENCT|CATG|MICT|FANTOM)", orf, ignore.case = TRUE) &
     nchar(orf) <= 20L
   syms[good_orf] <- orf[good_orf]
   miss <- is.na(syms) | !nzchar(syms)
@@ -967,8 +1080,12 @@ gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
 
   hs_db <- .gexpipe_hs_db()
   if (is.null(hs_db)) {
-    return(all(nchar(sample_ids) <= 10L) &&
-      mean(grepl("^[A-Za-z][A-Za-z0-9-]*$", sample_ids), na.rm = TRUE) > 0.9)
+    return(
+      all(nchar(sample_ids) <= 10L) &&
+        mean(grepl("^[A-Za-z][A-Za-z0-9-]*$", sample_ids), na.rm = TRUE) > 0.9 &&
+        !isTRUE(.gexpipe_is_genbank_accession_ids(sample_ids)) &&
+        !isTRUE(.gexpipe_is_probe_like_ids(sample_ids))
+    )
   }
 
   mapped <- tryCatch(
@@ -988,12 +1105,19 @@ gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
 }
 
 #' Return TRUE when IDs should be converted before common-gene overlap
+#' @param gpl_id Optional GEO platform ID (forces conversion for custom/array GPLs).
 #' @keywords internal
-gexpipe_ids_need_symbol_conversion <- function(ids) {
+gexpipe_ids_need_symbol_conversion <- function(ids, gpl_id = NULL) {
+  if (!is.null(gpl_id) && .gexpipe_gpl_needs_id_conversion(gpl_id)) {
+    return(TRUE)
+  }
   if (isTRUE(.gexpipe_is_probe_like_ids(ids))) {
     return(TRUE)
   }
-  head_ids <- head(as.character(ids), min(50L, length(ids)))
+  if (isTRUE(.gexpipe_is_genbank_accession_ids(ids))) {
+    return(TRUE)
+  }
+  head_ids <- .gexpipe_stratified_id_sample(ids, 80L)
   if (length(head_ids) > 0L && any(.gexpipe_id_looks_like_probe(head_ids))) {
     return(TRUE)
   }
@@ -1016,7 +1140,7 @@ gexpipe_ids_need_symbol_conversion <- function(ids) {
   if (length(ids) == 0L) {
     return(FALSE)
   }
-  sample_ids <- head(ids, min(300L, length(ids)))
+  sample_ids <- .gexpipe_stratified_id_sample(ids, 500L)
   mean(
     grepl("_at$|_x_at$|_st$|probe[0-9]*$|^ILMN_|^A_[0-9]+_P[0-9]+", sample_ids, ignore.case = TRUE) |
       grepl("^(ASHG|BEAD)", sample_ids, ignore.case = TRUE) |
@@ -1033,14 +1157,14 @@ detect_gene_id_format <- function(ids) {
   if (length(ids) == 0) {
     return("Unknown")
   }
-  head_ids <- head(ids, min(50L, length(ids)))
+  head_ids <- .gexpipe_stratified_id_sample(ids, 80L)
   if (length(head_ids) > 0L && any(.gexpipe_id_looks_like_probe(head_ids))) {
     if (mean(grepl("^ENSG", head_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
       return("Ensembl ID")
     }
     return("Microarray probe-like ID")
   }
-  sample_ids <- head(ids, min(300, length(ids)))
+  sample_ids <- .gexpipe_stratified_id_sample(ids, 500L)
   if (mean(grepl("^[0-9]+_st$", sample_ids), na.rm = TRUE) > 0.5) {
     return("Affymetrix HuGene probe (_st)")
   }
@@ -1603,17 +1727,7 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
 
   # Ensembl IDs (including Affymetrix probes like ENSG00000000003_at)
   if (any(grepl("^ENSG", sample_ids, ignore.case = TRUE))) {
-    clean_keys <- .gexpipe_clean_ensembl_keys(probe_ids)
-    gene_symbols <- tryCatch(
-      {
-        hs_db <- .gexpipe_hs_db()
-        AnnotationDbi::mapIds(hs_db,
-          keys = clean_keys, column = "SYMBOL",
-          keytype = "ENSEMBL", multiVals = "first"
-        )
-      },
-      error = function(e) NULL
-    )
+    gene_symbols <- .gexpipe_ensembl_ids_to_symbols(probe_ids)
     checked <- .safe_sym(gene_symbols)
     if (!is.null(checked) && sum(!is.na(checked)) > n_probes * 0.1) {
       return(checked)
@@ -1763,7 +1877,10 @@ any_id_to_symbol <- function(ids, gpl_id = NULL, gse_id = NULL) {
     ignore.case = TRUE
   )
 
-  if (gexpipe_ids_are_verified_symbols(ids)) {
+  if (!.gexpipe_is_probe_like_ids(ids) &&
+      !.gexpipe_is_genbank_accession_ids(ids) &&
+      !.gexpipe_gpl_needs_id_conversion(gpl_id) &&
+      gexpipe_ids_are_verified_symbols(ids)) {
     return(ids)
   }
 
@@ -1805,18 +1922,7 @@ any_id_to_symbol <- function(ids, gpl_id = NULL, gse_id = NULL) {
 
   # Ensembl (strip Affymetrix _at suffix when present)
   if (any(grepl("^ENSG", sample_ids, ignore.case = TRUE))) {
-    clean <- .gexpipe_clean_ensembl_keys(ids)
-    sym <- tryCatch(
-      {
-        hs_db <- .gexpipe_hs_db()
-        # suppressMessages: AnnotationDbi::mapIds (ENSEMBL -> SYMBOL)
-        suppressMessages(AnnotationDbi::mapIds(hs_db,
-          keys = clean, column = "SYMBOL",
-          keytype = "ENSEMBL", multiVals = "first"
-        ))
-      },
-      error = function(e) NULL
-    )
+    sym <- .gexpipe_ensembl_ids_to_symbols(ids)
     if (!is.null(sym) && length(sym) == length(ids) && sum(!is.na(sym)) > length(ids) * 0.05) {
       return(as.character(sym))
     }
