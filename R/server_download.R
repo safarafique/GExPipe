@@ -76,7 +76,18 @@ server_download <- function(input, output, session, rv) {
 
       log_text <- "Starting download...\n"
       pkg_ver <- tryCatch(as.character(utils::packageVersion("GExPipe")), error = function(e) "dev")
-      log_text <- paste0("GExPipe ", pkg_ver, " | ", format(Sys.time()), "\n", log_text)
+      run_src <- getOption("gexpipe.run_source", "installed")
+      run_src_label <- switch(
+        run_src,
+        "github-clone" = "GitHub checkout (latest main)",
+        "source-tree"  = "local source tree (pkgload)",
+        "installed"
+      )
+      log_text <- paste0(
+        "GExPipe ", pkg_ver, " | ", format(Sys.time()), "\n",
+        "Code source: ", run_src_label, "\n",
+        log_text
+      )
       disease <- trimws(if (is.null(input$disease_name)) "" else input$disease_name)
       if (nzchar(disease)) {
         log_text <- paste0(log_text, "Disease/Condition: ", disease, "\n")

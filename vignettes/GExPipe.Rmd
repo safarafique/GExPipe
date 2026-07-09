@@ -48,6 +48,7 @@ probes to HGNC gene symbols before merging — see
 |------------------------------------|------------------------------------|
 | [How the Shiny app is organised](#how-the-shiny-app-is-organised) | Pipeline overview figure |
 | [Installation](#installation) | Bioconductor and GitHub install |
+| [Run latest code for analysis](#run-latest-code) | Avoid stale installs; use `main` / `pkgload` |
 | [Launch the Shiny application](#launch-the-shiny-application) | Start the app (`runGExPipe()` + `shiny::runApp()`) |
 | [Step-by-step Shiny walkthrough](#step-by-step-shiny-walkthrough) | Screenshots and actions for all 15 steps |
 | [Gene ID mapping](#gene-id-mapping-mixed-studies) | Probe / accession → symbol conversion (STEP 2b) |
@@ -169,9 +170,28 @@ remotes::install_github(
 )
 ```
 
-**Run without installing** (always uses the latest `main` from GitHub):
+**Quick start without installing:** see
+[Run latest code for analysis](#run-latest-code) (recommended for mixed
+microarray merges).
 
-```{r run-github, eval=FALSE}
+For **mixed microarray merges** (probe IDs across platforms), also install
+annotation helpers once:
+
+```{r install-annot, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install(c("org.Hs.eg.db", "biomaRt"), ask = FALSE, update = FALSE)
+```
+
+# Run latest code for analysis {#run-latest-code}
+
+Gene-ID fixes (STEP 2b probe → symbol conversion) ship on GitHub `main`
+continuously. An older Bioconductor or GitHub **install** can override the
+latest code unless you launch as below.
+
+**Pick one launch path** (restart R first: `Ctrl+Shift+F10`):
+
+```{r run-latest-github, eval=FALSE}
+# Recommended — always runs latest main from GitHub
 if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
 if (!requireNamespace("pkgload", quietly = TRUE)) install.packages("pkgload")
 shiny::runGitHub(
@@ -182,18 +202,48 @@ shiny::runGitHub(
 )
 ```
 
-The console should show `Mode: GitHub checkout (loaded from clone, not old
-install)`. If you only see `installed GExPipe package`, **restart R** once
-(RStudio: `Ctrl+Shift+F10`), install `pkgload`, and run the command again —
-otherwise an older Bioconductor install is used and probe-ID fixes are
-skipped. The same restart after any install or update avoids Windows DLL
-lock issues and ensures machine-learning helpers load correctly.
+```{r run-latest-local, eval=FALSE}
+# Local clone — developers / contributors
+setwd("path/to/GExPipe")   # folder that contains DESCRIPTION
+if (!requireNamespace("pkgload", quietly = TRUE)) install.packages("pkgload")
+pkgload::load_all(".")
+app <- GExPipe::runGExPipe(launch.browser = FALSE)
+shiny::runApp(app, port = 3838L)
+```
+
+```{r run-latest-reinstall, eval=FALSE}
+# Reinstall from GitHub, then launch (when you prefer a library install)
+remotes::install_github(
+  "safarafique/GExPipe",
+  ref = "main",
+  force = TRUE,
+  dependencies = TRUE,
+  INSTALL_opts = "--no-staged-install"
+)
+app <- GExPipe::runGExPipe(launch.browser = FALSE)
+shiny::runApp(app, port = 3838L)
+```
+
+**Confirm you are on the latest build** before Step 1 — Download:
+
+| Where to look | Latest code | Stale install (fix launch) |
+|---------------|-------------|---------------------------|
+| Console at app start | `Mode: GitHub checkout` or `loading latest source` | `installed GExPipe package` only |
+| Download log (Step 1) | `Code source: GitHub checkout (latest main)` or `local source tree` | `Code source: installed` with probe IDs unchanged |
+| STEP 2b in download log | Each GSE: `format … -> converting to symbols` | Skipped for most GSEs; `0 common genes` |
+
+```{r verify-version, eval=FALSE}
+packageVersion("GExPipe")
+getOption("gexpipe.run_source", "installed")  # after launch: github-clone / source-tree / installed
+```
 
 # Launch the Shiny application {#launch-the-shiny-application}
 
 Bioconductor Shiny apps return an app object from the package; users
 start the server with `shiny::runApp()` ([Bioconductor Shiny
-guide](https://contributions.bioconductor.org/shiny.html#documentation)):
+guide](https://contributions.bioconductor.org/shiny.html#documentation)).
+If you need probe-ID conversion on mixed platforms, prefer
+[Run latest code for analysis](#run-latest-code) over a months-old install.
 
 ```{r launch, eval=FALSE}
 app <- GExPipe::runGExPipe()
@@ -238,13 +288,21 @@ expression matrix.
 - Enter GSE accessions (comma-separated). For a first test, use one series
   with HGNC row names (e.g. `GSE62646`). For **multiple microarray**
   platforms, include all GSE IDs and check the download log for **STEP 2b**
-  (probe → symbol conversion).
+  (probe → symbol conversion). Example mixed Arraystar / Affymetrix /
+  GenBank merge:
+
+  `GSE188653, GSE207304, GSE211729, GSE92252`
+
+  Install `org.Hs.eg.db` and `biomaRt` first (see [Installation](#installation)).
 - Click **Download & merge**.
 
-**Success check:** The log lists each GSE with detected ID format and
-`Common genes` > 0. If you see probe IDs such as `(+)E1A_r60_1`,
-`ASHGV40000001`, or `AB000409` in the sample row list, wait for STEP 2b to
-finish or see [Troubleshooting](#troubleshooting).
+**Success check:** The log shows `Code source: GitHub checkout` or
+`local source tree`, then **STEP 2b** converts each GSE. Final row samples
+should be HGNC symbols (`TP53`, `BRCA1`, …), not probes. `Common genes` must
+be **> 0**. If you still see probe IDs such as `(+)E1A_r60_1`,
+`ASHGV40000001`, or `AB000409`, see
+[Troubleshooting](#troubleshooting) or
+[Run latest code](#run-latest-code).
 
 ```{r step1-screenshot, echo=FALSE, fig.cap="Step 1 - Download Data panel.", out.width="100%"}
 knitr::include_graphics("images/step1_download.png")
@@ -436,6 +494,15 @@ GExPipe crosswalks V4 probe IDs to **GPL26963** annotation (ORF / accession
 → symbol). Control probes such as `(+)E1A_r60_*` are dropped. Ensure
 `org.Hs.eg.db` and `biomaRt` are installed for full conversion.
 
+Example platforms in a four-study microarray merge:
+
+| GSE | GPL | Row ID style |
+|-----|-----|----------------|
+| GSE188653 | GPL21827 | Arraystar V4 probes `(+)E1A_r60_*`, `ASHGV…` |
+| GSE207304 | GPL26963 | Arraystar V5 probes `ASHG19AP…V5` |
+| GSE211729 | GPL30033 | Affymetrix Ensembl `ENSG*_at` |
+| GSE92252 | GPL16025 | GenBank accessions `AB000409` |
+
 Demonstration with two small matrices (symbols only — no network):
 
 ```{r id-overlap-demo}
@@ -571,8 +638,9 @@ if (length(top_var) > 1L) {
 
 | Problem | Solution |
 |------------------------------------|------------------------------------|
-| **0 common genes after download** | Check STEP 2b in the log. Probe/custom IDs must convert to symbols. Install `org.Hs.eg.db` and `biomaRt`. For Arraystar (`GSE188653`), allow GPL26963 to download once (cached under `micro_data/`). |
-| **IDs still probe-like in log** | Restart R; use the [Run without installing](#installation) block above — an old Bioconductor install overrides GitHub fixes. |
+| **0 common genes after download** | Use [latest code](#run-latest-code). Check STEP 2b in the log. Install `org.Hs.eg.db` and `biomaRt`. For Arraystar (`GSE188653`), allow GPL26963 to download once (cached under `micro_data/`). |
+| **IDs still probe-like in log** | Restart R; use [Run latest code](#run-latest-code) — an old install skips STEP 2b fixes. |
+| **Download log says `Code source: installed`** | You are not on the GitHub clone; use `runGitHub(..., ref = "main")` or `pkgload::load_all()`. |
 | **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
 | **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
