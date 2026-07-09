@@ -67,7 +67,7 @@ gexp_app_analysis_dashboard_ui <- function() {
       ),
       shiny::tags$div(
         class = "gexp-sidebar-workspace",
-        style = "padding: 15px; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.18);",
+        style = "padding: 15px; text-align: center; border-top: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.08);",
         shiny::tags$label("File name (optional)", class = "gexp-sidebar-label"),
         shiny::textInput("workspace_save_filename", NULL, placeholder = "e.g. my_analysis", value = "my_analysis", width = "100%"),
         shiny::tags$div(
@@ -80,7 +80,7 @@ gexp_app_analysis_dashboard_ui <- function() {
       ),
       shiny::tags$div(
         class = "gexp-sidebar-brand",
-        style = "padding: 20px; text-align: center; background: linear-gradient(135deg, rgba(102,126,234,0.35) 0%, rgba(118,75,162,0.35) 100%); color: white; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.08);",
+        style = "padding: 20px; text-align: center; background: linear-gradient(135deg, rgba(102,126,234,0.55) 0%, rgba(118,75,162,0.45) 100%); color: white; margin-top: auto; border-top: 1px solid rgba(255,255,255,0.15);",
         shiny::tags$h4(shiny::icon("info-circle"), " GExPipe", style = "color: #fff; font-weight: 600; margin: 0 0 6px 0;"),
         shiny::tags$p("Gene Expression Pipeline", style = "font-size: 12px; margin: 0; opacity: 0.85; color: rgba(255,255,255,0.9);")
       )
@@ -441,10 +441,15 @@ gexp_app_head <- function() {
           font-weight: bold;
         }
         
-        /* ===== SIDEBAR STYLING (modern dark) ===== */
+        /* ===== SIDEBAR STYLING (light blue, white labels) ===== */
         .main-sidebar {
-          background: linear-gradient(180deg, #151b28 0%, #1e2636 55%, #232d40 100%) !important;
-          box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+          background: linear-gradient(180deg, #3d6f9b 0%, #4a7fad 45%, #5b8fbd 100%) !important;
+          box-shadow: 2px 0 14px rgba(61, 111, 155, 0.22);
+        }
+
+        .skin-purple .main-sidebar,
+        .skin-purple .left-side {
+          background: linear-gradient(180deg, #3d6f9b 0%, #4a7fad 45%, #5b8fbd 100%) !important;
         }
 
         .skin-purple .main-sidebar .sidebar-menu > li > a,
@@ -476,8 +481,8 @@ gexp_app_head <- function() {
 
         .sidebar-menu > li > a:hover,
         .skin-purple .main-sidebar .sidebar-menu > li > a:hover {
-          background: rgba(102, 126, 234, 0.22) !important;
-          border-left-color: rgba(102, 126, 234, 0.85);
+          background: rgba(255, 255, 255, 0.14) !important;
+          border-left-color: rgba(255, 255, 255, 0.85);
           color: #ffffff !important;
         }
 
@@ -564,13 +569,13 @@ gexp_app_head <- function() {
         }
 
         .gexp-sidebar-workspace .form-control {
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.14);
-          color: #ffffff;
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          color: #2c3e50;
         }
 
         .gexp-sidebar-workspace .form-control::placeholder {
-          color: rgba(255, 255, 255, 0.45);
+          color: rgba(44, 62, 80, 0.45);
         }
 
         .gexp-sidebar-workspace .btn-success,
