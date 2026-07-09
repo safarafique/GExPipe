@@ -72,6 +72,37 @@ test_that("read_count_matrix reads a plain CSV count file", {
   expect_equal(nrow(df), 3L)
 })
 
+test_that("Arraystar GPL21827 maps probes via GPL26963 ORF crosswalk", {
+  skip_if_not_installed("GExPipe")
+  gpl_path <- file.path(getwd(), "Gexpipe", "micro_data", "GPL26963.soft.gz")
+  if (!file.exists(gpl_path)) {
+    gpl_path <- file.path(getwd(), "micro_data", "GPL26963.soft.gz")
+  }
+  skip_if_not(file.exists(gpl_path), "GPL26963 cache not available locally")
+  map_fn <- getFromNamespace(".gexpipe_arraystar_probe_to_symbols", "GExPipe")
+  probes <- c("(+)E1A_r60_1", "ASHGV40000001", "ASHGV40057175")
+  out <- map_fn(probes, "GPL21827", gse_id = "GSE188653")
+  expect_length(out, 3L)
+  expect_true(is.na(out[1]) || !nzchar(out[1]))
+  expect_false(is.na(out[2]))
+  expect_false(is.na(out[3]))
+  expect_true(sum(!is.na(out) & nzchar(out)) >= 2L)
+})
+
+test_that("probe_ids_to_symbol_gpl returns symbols for Arraystar GPL21827", {
+  skip_if_not_installed("GExPipe")
+  gpl_path <- file.path(getwd(), "Gexpipe", "micro_data", "GPL26963.soft.gz")
+  if (!file.exists(gpl_path)) {
+    gpl_path <- file.path(getwd(), "micro_data", "GPL26963.soft.gz")
+  }
+  skip_if_not(file.exists(gpl_path), "GPL26963 cache not available locally")
+  map_gpl <- getFromNamespace("probe_ids_to_symbol_gpl", "GExPipe")
+  probes <- c("ASHGV40000001", "ASHGV40057175", "ASHGV40000125")
+  sym <- map_gpl(probes, "GPL21827", gse_id = "GSE188653")
+  expect_length(sym, 3L)
+  expect_true(sum(!is.na(sym) & nzchar(sym)) >= 2L)
+})
+
 test_that("Arraystar probe IDs never classified as HGNC", {
   skip_if_not_installed("GExPipe")
   verified <- getFromNamespace("gexpipe_ids_are_verified_symbols", "GExPipe")
