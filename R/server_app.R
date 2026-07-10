@@ -298,7 +298,7 @@ gexp_app_server <- function(input, output, session) {
   # Heavy work deferred to first flush: sourcing ~15 server modules was blocking the initial
   # server tick and shinytest2 session stability. UI already ran phase-1 attach in test mode.
   session$onFlushed(function() {
-    if (!isTRUE(getOption("gexpipe.attach.done", FALSE))) {
+    if (isTRUE(.gexpipe_should_full_attach())) {
       options(gexpipe.attach.allow_full_now = TRUE)
       gexp_app_attach_packages()
       options(gexpipe.attach.allow_full_now = NULL)
