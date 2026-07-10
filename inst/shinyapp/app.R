@@ -110,15 +110,23 @@ if (!is.null(src_root)) {
   if (inherits(err_global, "error")) {
     stop("Failed to load global.R: ", conditionMessage(err_global), call. = FALSE)
   }
-  err_ui <- tryCatch(source("ui.R"), error = function(e) e)
-  if (inherits(err_ui, "error")) {
-    stop("Failed to load ui.R: ", conditionMessage(err_ui), call. = FALSE)
-  }
-  err_server <- tryCatch(source("server.R"), error = function(e) e)
-  if (inherits(err_server, "error")) {
-    stop("Failed to load server.R: ", conditionMessage(err_server), call. = FALSE)
-  }
 
-  cat("  Ready. Starting Shiny app...\n\n")
-  shiny::shinyApp(ui = ui, server = server)
+  blocked <- exists(".gexpipe_bootstrap_result", inherits = FALSE) &&
+    identical(get(".gexpipe_bootstrap_result", inherits = FALSE)$status, "blocked")
+
+  if (blocked) {
+    cat("  Missing required packages — showing install instructions.\n\n")
+    shiny::shinyApp(ui = ui, server = server)
+  } else {
+    err_ui <- tryCatch(source("ui.R"), error = function(e) e)
+    if (inherits(err_ui, "error")) {
+      stop("Failed to load ui.R: ", conditionMessage(err_ui), call. = FALSE)
+    }
+    err_server <- tryCatch(source("server.R"), error = function(e) e)
+    if (inherits(err_server, "error")) {
+      stop("Failed to load server.R: ", conditionMessage(err_server), call. = FALSE)
+    }
+    cat("  Ready. Starting Shiny app...\n\n")
+    shiny::shinyApp(ui = ui, server = server)
+  }
 }
