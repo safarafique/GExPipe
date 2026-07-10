@@ -933,8 +933,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
             }, error = function(e) NULL)
             if (is.null(df) || nrow(df) == 0) next
             # find numeric columns (likely expression data)
-            # suppressWarnings: fread may warn on mixed-type columns in GEO supplement tables
-            num_cols <- vapply(df, function(col) is.numeric(col) || suppressWarnings(!all(is.na(as.numeric(as.character(col))))), logical(1))
+            num_cols <- vapply(df, .gexpipe_col_looks_numeric, logical(1))
             if (sum(num_cols) < 1) next
             # assume first column is probe/gene id, numeric columns are samples
             probe_col <- which(!num_cols)[1]
@@ -1524,8 +1523,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   }
 
   gene_ids <- rownames(count_matrix)
-  # suppressMessages: convert_rnaseq_ids uses AnnotationDbi mapIds (verbose by default)
-  gene_symbols <- suppressMessages(convert_rnaseq_ids(gene_ids, gse_id))
+  gene_symbols <- convert_rnaseq_ids(gene_ids, gse_id)
   rownames(count_matrix) <- gene_symbols
   valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
   count_matrix <- count_matrix[valid, , drop = FALSE]
