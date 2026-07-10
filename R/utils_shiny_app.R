@@ -977,6 +977,19 @@
   TRUE
 }
 
+## Skip full Bioconductor attach during shiny.testmode (shinytest2 / fast check).
+.gexpipe_should_full_attach <- function() {
+  if (isTRUE(getOption("gexpipe.attach.done", FALSE))) {
+    return(FALSE)
+  }
+  if (isTRUE(getOption("shiny.testmode")) &&
+      isTRUE(getOption("gexpipe.minimal_attach_in_testmode", TRUE)) &&
+      isTRUE(getOption("gexpipe.attach.shiny_stack_only_done", FALSE))) {
+    return(FALSE)
+  }
+  TRUE
+}
+
 gexp_app_attach_packages <- function() {
   # Called from gexp_app_ui(), gexp_app_server(), and tab/server loaders. Attach once
   # per app; runGExPipe() clears the flags so each new app object gets a fresh attach.

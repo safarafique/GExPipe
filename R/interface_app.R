@@ -2,9 +2,10 @@
 ## and shinytest2 do not source every tab file on first HTTP response.
 gexp_app_analysis_dashboard_ui <- function() {
   # Ensure full namespace attach before any tab UI sources (race: user clicks Go before onFlushed).
-  if (!isTRUE(getOption("gexpipe.attach.done", FALSE))) {
+  if (isTRUE(.gexpipe_should_full_attach())) {
     options(gexpipe.attach.allow_full_now = TRUE)
     gexp_app_attach_packages()
+    options(gexpipe.attach.allow_full_now = NULL)
   }
   shinydashboard::dashboardPage(
     skin = "purple",

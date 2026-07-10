@@ -192,3 +192,16 @@ test_that("DESCRIPTION BugReports points to GitHub issues", {
   bug <- desc[1, "BugReports"]
   expect_match(bug, "github\\.com/safarafique/GExPipe/issues")
 })
+
+test_that("shinytest2 integration test scaffolding is present", {
+  helper <- file.path(testthat::test_path(), "helper-shinytest2.R")
+  tests <- file.path(testthat::test_path(), "test-shiny-integration.R")
+  readme <- normalizePath(
+    file.path(testthat::test_path(), "..", "..", "inst", "scripts", "README-shinytest2.md"),
+    mustWork = TRUE
+  )
+  expect_true(file.exists(helper))
+  expect_true(file.exists(tests))
+  expect_true(file.exists(readme))
+  expect_true(any(grepl("shinytest2", readLines(helper, warn = FALSE), fixed = TRUE)))
+})
