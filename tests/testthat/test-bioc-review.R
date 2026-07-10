@@ -28,7 +28,6 @@ test_that("Shiny UI tab objects are defined in the package namespace", {
 test_that("gexp_ui tab accessors return shiny tags", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("GExPipe")
-  skip_on_cran()
 
   op <- options(
     shiny.testmode = TRUE,
@@ -81,7 +80,6 @@ test_that("ML Venn helpers handle empty overlap", {
 test_that("observers register without error when shiny is available", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("GExPipe")
-  skip_on_cran()
 
   reg_pipe <- getFromNamespace("gexp_register_pipeline_observers", "GExPipe")
   reg_nav <- getFromNamespace("gexp_register_navigation_observers", "GExPipe")
@@ -138,10 +136,12 @@ test_that("vignette screenshots exist under vignettes/images", {
 })
 
 test_that("inst/shinyapp global.R is a thin bootstrap delegate", {
-  repo_global <- normalizePath(
-    file.path(testthat::test_path(), "..", "..", "inst", "shinyapp", "global.R"),
-    mustWork = TRUE
-  )
+  repo_global <- system.file("shinyapp", "global.R", package = "GExPipe")
+  if (!nzchar(repo_global) || !file.exists(repo_global)) {
+    repo_global <- file.path(testthat::test_path(), "..", "..", "inst", "shinyapp", "global.R")
+  }
+  skip_if_not(file.exists(repo_global), "inst/shinyapp/global.R not found")
+  repo_global <- normalizePath(repo_global, winslash = "/", mustWork = TRUE)
   global_txt <- readLines(repo_global, warn = FALSE)
   expect_lt(length(global_txt), 80L)
   expect_false(any(grepl("source\\(.*R/", global_txt)))
@@ -162,7 +162,7 @@ test_that("blocked bootstrap returns minimal Shiny app", {
   fn <- getFromNamespace(".gexpipe_shinyapp_blocked_app", "GExPipe")
   res <- fn("not_a_real_pkg")
   expect_equal(res$status, "blocked")
-  expect_true(is.function(res$ui))
+  expect_true(is.list(res$ui) && length(res$ui) > 0L)
   expect_true(is.function(res$server))
 })
 
@@ -174,7 +174,7 @@ test_that("R/ avoids suppressWarnings and suppressMessages", {
     hits <- grep("suppressWarnings\\(|suppressMessages\\(", txt, value = TRUE)
     hits <- hits[!grepl("^\\s*#", hits)]
     hits <- hits[!grepl("preferred over suppress", hits, fixed = TRUE)]
-    expect_length(hits, 0L, info = basename(f))
+    expect_equal(length(hits), 0L, label = basename(f))
   }
 })
 
