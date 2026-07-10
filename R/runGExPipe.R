@@ -25,7 +25,8 @@
 #' after the user clicks **Go to Analysis**, so the initial browser response is
 #' fast even on slow networks.  Prefer `GExPipe::runGExPipe()` from an
 #' **installed** package rather than opening `inst/shinyapp/` in RStudio
-#' directly (that path runs `global.R`, which duplicates the install logic).
+#' directly (that path runs thin `global.R`, which delegates to
+#' `gexpipe_shinyapp_bootstrap()` in the package).
 #'
 #' Optional tuning before `runGExPipe()`:
 #' * `options(gexpipe.wgcna_threads = 1L)` - fewer WGCNA threads (less parallel setup noise).

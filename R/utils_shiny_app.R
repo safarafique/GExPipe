@@ -21,7 +21,7 @@
   if (include_optional) c(required, core, optional) else c(required, core)
 }
 
-## Resolve and call an exported GExPipe helper (works from Shiny server modules and global.R).
+## Resolve and call an exported GExPipe helper (works from Shiny server modules and bootstrap).
 .gexpipe_call <- function(name, ...) {
   if (requireNamespace("GExPipe", quietly = TRUE)) {
     ns <- asNamespace("GExPipe")
@@ -72,14 +72,14 @@
   pillar    = "1.9.0"
 )
 
-## Universal library helpers - same OS-aware, cloud-safe, two-lib logic as global.R.
+## Universal library helpers - same OS-aware, cloud-safe, two-lib logic as shiny bootstrap.
 
 ## Return the R version string used as the library subdirectory name.
 .gexpipe_rv_str <- function()
   paste0(R.Version()$major, ".", sub("\\..*", "", R.Version()$minor))
 
 ## OS-aware base directory (never inside a cloud-sync folder).
-## Named _dir() to avoid clobbering the character path set in inst/shinyapp/global.R.
+## Named _dir() to avoid clobbering the character path option used by Shiny bootstrap.
 .gexpipe_lib_base_dir <- function() {
   sysname <- Sys.info()[["sysname"]]
   if (.Platform$OS.type == "windows") {

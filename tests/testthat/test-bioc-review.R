@@ -107,6 +107,9 @@ test_that("legacy inst/shinyapp entry files delegate to package namespace", {
   expect_true(any(grepl("runGExPipe", app_txt, fixed = TRUE)))
   expect_false(any(grepl("to_pull", global_txt)))
   expect_false(any(grepl("local_r_files", global_txt)))
+  expect_false(any(grepl("source\\(.*R/", global_txt)))
+  expect_lt(length(global_txt), 80L)
+  expect_true(any(grepl("gexpipe_shinyapp_bootstrap", global_txt, fixed = TRUE)))
   expect_true(any(grepl("gexp_app_server", srv_txt, fixed = TRUE)))
   expect_true(any(grepl("gexp_app_ui", ui_txt, fixed = TRUE)))
   srv_env <- new.env(parent = globalenv())
@@ -132,6 +135,35 @@ test_that("vignette screenshots exist under vignettes/images", {
   for (img in imgs) {
     expect_true(file.exists(file.path(vig_dir, "images", img)), info = img)
   }
+})
+
+test_that("inst/shinyapp global.R is a thin bootstrap delegate", {
+  repo_global <- normalizePath(
+    file.path(testthat::test_path(), "..", "..", "inst", "shinyapp", "global.R"),
+    mustWork = TRUE
+  )
+  global_txt <- readLines(repo_global, warn = FALSE)
+  expect_lt(length(global_txt), 80L)
+  expect_false(any(grepl("source\\(.*R/", global_txt)))
+  expect_false(any(grepl("to_pull|local_r_files", global_txt)))
+  expect_true(any(grepl("gexpipe_shinyapp_bootstrap", global_txt, fixed = TRUE)))
+})
+
+test_that("gexpipe_shinyapp_bootstrap lives in R/ not inst/shinyapp", {
+  skip_if_not_installed("GExPipe")
+  ns <- asNamespace("GExPipe")
+  expect_true(exists("gexpipe_shinyapp_bootstrap", envir = ns, inherits = FALSE, mode = "function"))
+  expect_true(exists("gexpipe_shinyapp_ensure_package", envir = ns, inherits = FALSE, mode = "function"))
+})
+
+test_that("blocked bootstrap returns minimal Shiny app", {
+  skip_if_not_installed("GExPipe")
+  skip_if_not_installed("shiny")
+  fn <- getFromNamespace(".gexpipe_shinyapp_blocked_app", "GExPipe")
+  res <- fn("not_a_real_pkg")
+  expect_equal(res$status, "blocked")
+  expect_true(is.function(res$ui))
+  expect_true(is.function(res$server))
 })
 
 test_that("DESCRIPTION BugReports points to GitHub issues", {
