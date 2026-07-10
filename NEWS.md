@@ -1,5 +1,10 @@
 # GExPipe NEWS
 
+## Version 0.99.28
+
+### Shinytest2 readiness signal
+- Inject `shinytest2::use_shinytest2()` in test mode so `window.shinytest2.ready` is set for AppDriver.
+
 ## Version 0.99.27
 
 ### Shinytest2 GEO download scenario
