@@ -74,6 +74,19 @@ test_that("all gexp_ui tab accessors build shiny UI in test mode", {
   }
 })
 
+test_that(".gexpipe_should_full_attach respects shiny test mode", {
+  skip_if_not_installed("GExPipe")
+  should <- getFromNamespace(".gexpipe_should_full_attach", "GExPipe")
+  op <- options(
+    gexpipe.attach.done = FALSE,
+    shiny.testmode = TRUE,
+    gexpipe.minimal_attach_in_testmode = TRUE,
+    gexpipe.attach.shiny_stack_only_done = TRUE
+  )
+  on.exit(options(op), add = TRUE)
+  expect_false(should())
+})
+
 test_that("gexp_stringdb_new_safe handles missing STRINGdb gracefully", {
   skip_if_not_installed("GExPipe")
   fn <- getFromNamespace("gexp_stringdb_new_safe", "GExPipe")
