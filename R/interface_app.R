@@ -206,6 +206,16 @@ gexp_app_analysis_dashboard_ui <- function() {
 
 gexp_app_head <- function() {
       shiny::tags$head(
+      if (isTRUE(getOption("shiny.testmode")) && requireNamespace("shinytest2", quietly = TRUE)) {
+        shinytest2::use_shinytest2()
+      } else if (isTRUE(getOption("shiny.testmode"))) {
+        shiny::tags$script(shiny::HTML(
+          "document.addEventListener('shiny:connected', function() {
+             window.shinytest2 = window.shinytest2 || {};
+             window.shinytest2.ready = true;
+           });"
+        ))
+      },
       # Bootstrap tooltip initializer (activates all data-toggle="tooltip" elements)
       shiny::tags$script(shiny::HTML("
         $(document).ready(function() {
