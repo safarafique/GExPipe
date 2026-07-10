@@ -330,5 +330,12 @@ gexp_app_server <- function(input, output, session) {
         tryCatch(guide$init()$start(), error = function(e) NULL)
       }
     })
+
+    if (isTRUE(getOption("shiny.testmode"))) {
+      tryCatch(
+        shinyjs::runjs("window.shinytest2 = window.shinytest2 || {}; window.shinytest2.ready = true;"),
+        error = function(e) NULL
+      )
+    }
   }, once = TRUE)
 }
