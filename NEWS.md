@@ -1,5 +1,13 @@
 # GExPipe NEWS
 
+## Version 0.99.26
+
+### Shiny testing (Bioconductor review)
+- Added `shinytest2` workflow tests (`tests/testthat/test-shiny-integration.R`) and
+  `helper-shinytest2.R` for welcome → dashboard → QC navigation.
+- Skip full Bioconductor attach in `shiny.testmode` so `shinytest2` sessions start quickly.
+- Documented usage in `inst/scripts/README-shinytest2.md`.
+
 ## Version 0.99.25
 
 ### Bioconductor review (second round)
