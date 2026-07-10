@@ -84,3 +84,49 @@
   app$wait_for_value(input = "analysis_type", timeout = 120000L)
   invisible(app)
 }
+
+.gexpipe_shinytest2_geo_ms <- function() {
+  ms <- suppressWarnings(as.integer(Sys.getenv("GEXPIPE_SHINYTEST2_GEO_MS", "180000")))
+  if (length(ms) != 1L || is.na(ms) || ms < 30000L) {
+    180000L
+  } else {
+    ms
+  }
+}
+
+.gexpipe_shinytest2_skip_geo <- function() {
+  if (identical(Sys.getenv("GEXPIPE_SKIP_SHINYTEST2_GEO", ""), "1")) {
+    testthat::skip("GEXPIPE_SKIP_SHINYTEST2_GEO=1")
+  }
+  invisible(TRUE)
+}
+
+## Poll a text/html output until it matches a regex (renderText outputs).
+.gexpipe_shinytest2_poll_output <- function(app, output, pattern, timeout_ms = 30000L) {
+  deadline <- proc.time()[["elapsed"]] + timeout_ms / 1000
+  last <- ""
+  while (proc.time()[["elapsed"]] < deadline) {
+    last <- tryCatch(
+      as.character(app$get_value(output = output)),
+      error = function(e) ""
+    )
+    if (length(last) == 1L && grepl(pattern, last, perl = TRUE)) {
+      return(last)
+    }
+    Sys.sleep(0.5)
+  }
+  testthat::fail(sprintf(
+    "Output '%s' did not match /%s/ within %d ms.\nLast value:\n%s",
+    output, pattern, timeout_ms, substr(last, 1L, 500L)
+  ))
+}
+
+.gexpipe_shinytest2_start_geo_download <- function(app, gse_id = "GSE62646", disease = "") {
+  app$set_inputs(analysis_type = "rnaseq")
+  app$set_inputs(rnaseq_gses = gse_id)
+  if (nzchar(disease)) {
+    app$set_inputs(disease_name = disease)
+  }
+  app$click("start_processing")
+  invisible(app)
+}

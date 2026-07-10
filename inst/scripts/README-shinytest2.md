@@ -34,15 +34,38 @@ R CMD check .
 
 ## Record new interactions (optional)
 
+Interactive recording (opens browser; you click through the app):
+
 ```r
 pkgload::load_all(".")
+source("inst/scripts/record-shinytest2-geo.R")
+```
+
+Or manually:
+
+```r
 shinytest2::record_test(
   app = GExPipe::runGExPipe(launch.browser = FALSE),
-  name = "my-new-scenario"
+  name = "geo-download"
 )
 ```
 
-Save generated files under `tests/testthat/_shinytest/` if you add recorded scenarios.
+## GEO download test (automated)
+
+`test-shiny-integration.R` includes:
+
+| Test | Network | Description |
+|------|---------|-------------|
+| `start processing warns when no GSE IDs` | No | Clicks Start with empty GSE box |
+| `start processing with GSE ID updates download log` | Yes | Enters `GSE62646` (or `GEXPIPE_SHINYTEST2_GSE`) and clicks Start |
+
+Environment variables:
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `GEXPIPE_SKIP_SHINYTEST2_GEO=1` | off | Skip GEO network test |
+| `GEXPIPE_SHINYTEST2_GSE` | `GSE62646` | GSE accession to download |
+| `GEXPIPE_SHINYTEST2_GEO_MS` | `180000` | Max wait for download log (ms) |
 
 Tests live in `tests/testthat/test-shiny-integration.R`; helpers in
 `tests/testthat/helper-shinytest2.R`.
