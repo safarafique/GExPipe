@@ -696,10 +696,10 @@ GPL_to_biomart_probe_attr <- c(
     return(NULL)
   }
   sym <- tryCatch(
-    suppressMessages(AnnotationDbi::mapIds(
+    .gexpipe_map_ids(
       hs_db, keys = clean, column = "SYMBOL",
       keytype = "ENSEMBL", multiVals = "first"
-    )),
+    ),
     error = function(e) NULL
   )
   if (is.null(sym)) {
@@ -773,7 +773,7 @@ GPL_to_biomart_probe_attr <- c(
   }
   .fetch_gpl <- function(destdir_val) {
     tryCatch(
-      suppressMessages(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
+      .gexpipe_geo_quiet(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
       error = function(e) NULL
     )
   }
@@ -828,25 +828,25 @@ GPL_to_biomart_probe_attr <- c(
   }
   mapped <- tryCatch({
     if (grepl("^ENST", key, ignore.case = TRUE)) {
-      suppressMessages(AnnotationDbi::mapIds(
+      .gexpipe_map_ids(
         hs_db, keys = key, column = "SYMBOL",
         keytype = "ENSEMBL", multiVals = "first"
-      ))
+      )
     } else if (grepl("^(NM_|NR_|XM_|XR_)", key, ignore.case = TRUE)) {
-      suppressMessages(AnnotationDbi::mapIds(
+      .gexpipe_map_ids(
         hs_db, keys = key, column = "SYMBOL",
         keytype = "REFSEQ", multiVals = "first"
-      ))
+      )
     } else if (grepl("^[0-9]+$", key)) {
-      suppressMessages(AnnotationDbi::mapIds(
+      .gexpipe_map_ids(
         hs_db, keys = key, column = "SYMBOL",
         keytype = "ENTREZID", multiVals = "first"
-      ))
+      )
     } else if (grepl("^[A-Z]{1,2}[0-9]", key)) {
-      suppressMessages(AnnotationDbi::mapIds(
+      .gexpipe_map_ids(
         hs_db, keys = key, column = "SYMBOL",
         keytype = "ACCNUM", multiVals = "first"
-      ))
+      )
     } else {
       NA_character_
     }
@@ -894,37 +894,37 @@ GPL_to_biomart_probe_attr <- c(
       accnum <- !enst & !refseq & !entrez & grepl("^[A-Z]{1,2}[0-9]", keys)
       if (any(enst)) {
         mapped[enst] <- tryCatch(
-          suppressMessages(AnnotationDbi::mapIds(
+          .gexpipe_map_ids(
             hs_db, keys = keys[enst], column = "SYMBOL",
             keytype = "ENSEMBL", multiVals = "first"
-          )),
+          ),
           error = function(e) rep(NA_character_, sum(enst))
         )
       }
       if (any(refseq)) {
         mapped[refseq] <- tryCatch(
-          suppressMessages(AnnotationDbi::mapIds(
+          .gexpipe_map_ids(
             hs_db, keys = keys[refseq], column = "SYMBOL",
             keytype = "REFSEQ", multiVals = "first"
-          )),
+          ),
           error = function(e) rep(NA_character_, sum(refseq))
         )
       }
       if (any(entrez)) {
         mapped[entrez] <- tryCatch(
-          suppressMessages(AnnotationDbi::mapIds(
+          .gexpipe_map_ids(
             hs_db, keys = keys[entrez], column = "SYMBOL",
             keytype = "ENTREZID", multiVals = "first"
-          )),
+          ),
           error = function(e) rep(NA_character_, sum(entrez))
         )
       }
       if (any(accnum)) {
         mapped[accnum] <- tryCatch(
-          suppressMessages(AnnotationDbi::mapIds(
+          .gexpipe_map_ids(
             hs_db, keys = keys[accnum], column = "SYMBOL",
             keytype = "ACCNUM", multiVals = "first"
-          )),
+          ),
           error = function(e) rep(NA_character_, sum(accnum))
         )
       }
@@ -1030,15 +1030,15 @@ GPL_to_biomart_probe_attr <- c(
       }
       mapped <- tryCatch(
         if (mean(grepl("^[0-9]+$", keys[!is.na(keys)]), na.rm = TRUE) > 0.5) {
-          suppressMessages(AnnotationDbi::mapIds(
+          .gexpipe_map_ids(
             hs_db, keys = keys, column = "SYMBOL",
             keytype = "ENTREZID", multiVals = "first"
-          ))
+          )
         } else {
-          suppressMessages(AnnotationDbi::mapIds(
+          .gexpipe_map_ids(
             hs_db, keys = keys, column = "SYMBOL",
             keytype = "ACCNUM", multiVals = "first"
-          ))
+          )
         },
         error = function(e) NULL
       )
@@ -1089,11 +1089,10 @@ gexpipe_ids_are_verified_symbols <- function(ids, min_hit_rate = 0.5) {
   }
 
   mapped <- tryCatch(
-    # suppressMessages: AnnotationDbi::mapIds reports unmapped keys to the console
-    suppressMessages(AnnotationDbi::mapIds(
+        .gexpipe_map_ids(
       hs_db, keys = sample_ids, column = "SYMBOL",
       keytype = "SYMBOL", multiVals = "first"
-    )),
+    ),
     error = function(e) NULL
   )
   if (is.null(mapped)) {
@@ -1295,8 +1294,7 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
 
     .fetch_gpl <- function(destdir_val) {
       tryCatch(
-        # suppressMessages: GEOquery prints cache/download status for GPL fetch
-        suppressMessages(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
+                .gexpipe_geo_quiet(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
         error = function(e) NULL
       )
     }
@@ -1498,10 +1496,10 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
         entrez_idx <- grepl("^[0-9]+$", keys)
         if (any(entrez_idx)) {
           ent <- tryCatch(
-            suppressMessages(AnnotationDbi::mapIds(
+            .gexpipe_map_ids(
               hs_db, keys = keys[entrez_idx], column = "SYMBOL",
               keytype = "ENTREZID", multiVals = "first"
-            )),
+            ),
             error = function(e) NULL
           )
           if (!is.null(ent)) mapped[entrez_idx] <- as.character(ent)
@@ -1509,10 +1507,10 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
         acc_idx <- is.na(mapped) & !is.na(keys) & grepl("^[A-Z]{1,2}[0-9]", keys)
         if (any(acc_idx)) {
           acc <- tryCatch(
-            suppressMessages(AnnotationDbi::mapIds(
+            .gexpipe_map_ids(
               hs_db, keys = keys[acc_idx], column = "SYMBOL",
               keytype = "ACCNUM", multiVals = "first"
-            )),
+            ),
             error = function(e) NULL
           )
           if (!is.null(acc)) mapped[acc_idx] <- as.character(acc)
@@ -1907,11 +1905,10 @@ any_id_to_symbol <- function(ids, gpl_id = NULL, gse_id = NULL) {
     sym <- tryCatch(
       {
         hs_db <- .gexpipe_hs_db()
-        # suppressMessages: AnnotationDbi::mapIds (ACCNUM -> SYMBOL)
-        suppressMessages(AnnotationDbi::mapIds(hs_db,
+        .gexpipe_map_ids(hs_db,
           keys = ids, column = "SYMBOL",
           keytype = "ACCNUM", multiVals = "first"
-        ))
+        )
       },
       error = function(e) NULL
     )
@@ -1934,11 +1931,10 @@ any_id_to_symbol <- function(ids, gpl_id = NULL, gse_id = NULL) {
     sym <- tryCatch(
       {
         hs_db <- .gexpipe_hs_db()
-        # suppressMessages: AnnotationDbi::mapIds (ENTREZID -> SYMBOL)
-        suppressMessages(AnnotationDbi::mapIds(hs_db,
+        .gexpipe_map_ids(hs_db,
           keys = keys_entrez, column = "SYMBOL",
           keytype = "ENTREZID", multiVals = "first"
-        ))
+        )
       },
       error = function(e) NULL
     )
@@ -1956,11 +1952,10 @@ any_id_to_symbol <- function(ids, gpl_id = NULL, gse_id = NULL) {
   sym <- tryCatch(
     {
       hs_db <- .gexpipe_hs_db()
-      # suppressMessages: AnnotationDbi::mapIds (ALIAS -> SYMBOL)
-      suppressMessages(AnnotationDbi::mapIds(hs_db,
+      .gexpipe_map_ids(hs_db,
         keys = ids, column = "SYMBOL",
         keytype = "ALIAS", multiVals = "first"
-      ))
+      )
     },
     error = function(e) NULL
   )
@@ -2105,11 +2100,10 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
   if (any(grepl("^ENSG", sample_ids, ignore.case = TRUE))) {
     clean <- .gexpipe_clean_ensembl_keys(gene_ids)
     sym <- tryCatch(
-      # suppressMessages: AnnotationDbi::mapIds (ENSEMBL -> SYMBOL)
-      suppressMessages(AnnotationDbi::mapIds(db,
+      .gexpipe_map_ids(db,
         keys = clean, column = "SYMBOL",
         keytype = "ENSEMBL", multiVals = "first"
-      )),
+      ),
       error = function(e) NULL
     )
     if (!is.null(sym) && sum(!is.na(sym)) > length(gene_ids) * 0.05) {
@@ -2120,11 +2114,10 @@ convert_ids_to_symbols_simple <- function(gene_ids) {
   if (mean(grepl("^[0-9]+$", sample_ids), na.rm = TRUE) > 0.5) {
     keys_entrez <- gsub("\\.0+$", "", as.character(gene_ids))
     sym <- tryCatch(
-      # suppressMessages: AnnotationDbi::mapIds (ENTREZID -> SYMBOL)
-      suppressMessages(AnnotationDbi::mapIds(db,
+      .gexpipe_map_ids(db,
         keys = keys_entrez, column = "SYMBOL",
         keytype = "ENTREZID", multiVals = "first"
-      )),
+      ),
       error = function(e) NULL
     )
     if (!is.null(sym) && sum(!is.na(sym)) > length(gene_ids) * 0.1) {
@@ -2256,14 +2249,15 @@ gexpipe_spearman_cor <- function(x) {
   out
 }
 
-#' Capture verbose GEOquery console output without suppressMessages()
+#' Capture stdout/messages to nullfile (preferred over suppressMessages/suppressWarnings).
 #' @keywords internal
-.gexpipe_geo_quiet <- function(expr) {
+.gexpipe_capture_console <- function(expr) {
   res <- NULL
   err <- NULL
   tryCatch(
     {
       invisible(utils::capture.output(
+        type = c("output", "message"),
         res <- force(expr),
         file = nullfile()
       ))
@@ -2276,6 +2270,59 @@ gexpipe_spearman_cor <- function(x) {
     stop(err)
   }
   res
+}
+
+#' AnnotationDbi::mapIds without console spam from unmapped keys.
+#' @keywords internal
+.gexpipe_map_ids <- function(db, ...) {
+  .gexpipe_capture_console(AnnotationDbi::mapIds(db, ...))
+}
+
+#' GEOquery calls without download/cache console output.
+#' @keywords internal
+.gexpipe_geo_quiet <- function(expr) {
+  .gexpipe_capture_console(expr)
+}
+
+#' Heuristic: column is numeric or parseable as numeric (GEO supplement tables).
+#' @keywords internal
+.gexpipe_col_looks_numeric <- function(col) {
+  if (is.numeric(col)) {
+    return(TRUE)
+  }
+  withCallingHandlers(
+    {
+      num <- as.numeric(as.character(col))
+      !all(is.na(num))
+    },
+    warning = function(w) invokeRestart("muffleWarning")
+  )
+}
+
+#' STRINGdb map/get_interactions with expected mapping warnings muffled.
+#' @keywords internal
+.gexpipe_stringdb_quiet <- function(expr) {
+  withCallingHandlers(
+    expr,
+    warning = function(w) {
+      if (grepl("couldn't map|not be mapped|unmapped|mapped to STRING", conditionMessage(w), ignore.case = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
+}
+
+#' igraph::closeness on disconnected PPI graphs.
+#' @keywords internal
+.gexpipe_igraph_closeness <- function(graph, normalized = TRUE) {
+  withCallingHandlers(
+    igraph::closeness(graph, normalized = normalized),
+    warning = function(w) {
+      if (grepl("disconnected|NaN|infinite|closeness", conditionMessage(w), ignore.case = TRUE)) {
+        invokeRestart("muffleWarning")
+      }
+    }
+  )
 }
 
 #' Read tabular count files (GEO supplementary files are often messy)

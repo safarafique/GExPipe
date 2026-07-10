@@ -166,6 +166,27 @@ test_that("blocked bootstrap returns minimal Shiny app", {
   expect_true(is.function(res$server))
 })
 
+test_that("R/ avoids suppressWarnings and suppressMessages", {
+  r_dir <- normalizePath(file.path(testthat::test_path(), "..", "..", "R"), mustWork = TRUE)
+  r_files <- list.files(r_dir, pattern = "\\.R$", full.names = TRUE)
+  for (f in r_files) {
+    txt <- readLines(f, warn = FALSE)
+    hits <- grep("suppressWarnings\\(|suppressMessages\\(", txt, value = TRUE)
+    hits <- hits[!grepl("^\\s*#", hits)]
+    hits <- hits[!grepl("preferred over suppress", hits, fixed = TRUE)]
+    expect_length(hits, 0L, info = basename(f))
+  }
+})
+
+test_that("quiet I/O helpers are defined in package namespace", {
+  skip_if_not_installed("GExPipe")
+  ns <- asNamespace("GExPipe")
+  for (nm in c(".gexpipe_capture_console", ".gexpipe_map_ids", ".gexpipe_geo_quiet",
+               ".gexpipe_fread_counts", ".gexpipe_stringdb_quiet", ".gexpipe_igraph_closeness")) {
+    expect_true(exists(nm, envir = ns, inherits = FALSE, mode = "function"), info = nm)
+  }
+})
+
 test_that("DESCRIPTION BugReports points to GitHub issues", {
   desc <- read.dcf(system.file("DESCRIPTION", package = "GExPipe"))
   bug <- desc[1, "BugReports"]

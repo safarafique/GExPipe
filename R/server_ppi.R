@@ -60,10 +60,8 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     }
     if (is.null(string_db)) next
 
-    # suppressWarnings: STRINGdb prints "couldn't map X% of identifiers" to console
-    # for every call - we show this info cleanly in the app UI instead
     mapped <- tryCatch(
-      suppressWarnings(
+      .gexpipe_stringdb_quiet(
         string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE)
       ),
       error = function(e) {
@@ -92,8 +90,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     valid_ids <- as.character(na.omit(mapped[[id_col]]))
 
     interactions <- tryCatch(
-      # suppressWarnings: STRINGdb warns when some gene IDs cannot be mapped
-      suppressWarnings(string_db$get_interactions(valid_ids)),
+      .gexpipe_stringdb_quiet(string_db$get_interactions(valid_ids)),
       error = function(e) {
         msg <- conditionMessage(e)
         errs <<- c(errs, paste0("STRING interactions v", sv, ": ", msg))
@@ -308,8 +305,7 @@ server_ppi <- function(input, output, session, rv) {
           SYMBOL = if (is.null(igraph::V(g)$SYMBOL)) igraph::V(g)$name else igraph::V(g)$SYMBOL,
           Degree = igraph::degree(g),
           Betweenness = igraph::betweenness(g, normalized = TRUE),
-          # suppressWarnings: igraph closeness warns on disconnected graph components
-          Closeness = suppressWarnings(igraph::closeness(g, normalized = TRUE)),
+          Closeness = .gexpipe_igraph_closeness(g, normalized = TRUE),
           Eigenvector = tryCatch(igraph::eigen_centrality(g)$vector, error = function(e) rep(0, igraph::vcount(g))),
           PageRank = igraph::page_rank(g)$vector,
           stringsAsFactors = FALSE
