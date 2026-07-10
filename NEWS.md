@@ -1,5 +1,13 @@
 # GExPipe NEWS
 
+## Version 0.99.25
+
+### Bioconductor review (second round)
+- Moved Shiny bootstrap from `inst/shinyapp/global.R` into `R/gexpipe_shinyapp_bootstrap.R`.
+- Replaced all `suppressWarnings()` / `suppressMessages()` in `R/` with targeted quiet I/O helpers.
+- Added `tests/testthat/test-shiny-coverage.R` and expanded bioc-review / app-builder tests for UI tabs, `utils_shiny_app`, and `dummy_imports`.
+- Fixed `.gexpipe_best_version()` for R 4.6+ (`package_version` comparison).
+
 ## Version 0.99.24
 
 ### Vignette (Bioconductor review)
