@@ -1,6 +1,5 @@
 test_that("internal app UI and server builders construct without error", {
   skip_if_not_installed("shiny")
-  skip_on_cran()
 
   op <- options(
     shiny.testmode = TRUE,
@@ -20,7 +19,6 @@ test_that("internal app UI and server builders construct without error", {
 
 test_that("gexp_ui_plot_download_bar resolves when loading tab UI", {
   skip_if_not_installed("shiny")
-  skip_on_cran()
 
   op <- options(
     shiny.testmode = TRUE,

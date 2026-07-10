@@ -162,7 +162,8 @@
   }, character(1L))
   vers <- vers[vers != "0.0.0"]
   if (length(vers) == 0L) return(package_version("0.0.0"))
-  max(lapply(vers, package_version))
+  pv <- do.call(c, lapply(vers, package_version))
+  max(pv)
 }
 
 ## Batch-install a vector of packages via BiocManager (handles both Bioc + CRAN).
