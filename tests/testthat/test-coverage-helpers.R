@@ -243,7 +243,6 @@ test_that("gexpipe_spearman_cor handles constant columns without warnings", {
 test_that("gexp_app_ui builds welcome page in test mode", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("GExPipe")
-  skip_on_cran()
   op <- options(
     shiny.testmode = TRUE,
     gexpipe.minimal_attach_in_testmode = TRUE,
