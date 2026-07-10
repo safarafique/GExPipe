@@ -1,5 +1,12 @@
 # GExPipe NEWS
 
+## Version 0.99.27
+
+### Shinytest2 GEO download scenario
+- Added tests: empty GSE validation and GSE ID + Start Processing (`GSE62646` by default).
+- Helpers: `.gexpipe_shinytest2_poll_output()`, `.gexpipe_shinytest2_start_geo_download()`.
+- Added `inst/scripts/record-shinytest2-geo.R` for interactive recording.
+
 ## Version 0.99.26
 
 ### Shiny testing (Bioconductor review)
