@@ -333,8 +333,8 @@ gexp_qc_prepare_boxplot_data <- function(
 #' @return Named character vector: sample ID -> GSE accession.
 #'
 #' @examples
-#' m <- matrix(1:6, nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
-#' r <- matrix(1:6, nrow = 2, dimnames = list(c("A", "B"), c("S3", "S4")))
+#' m <- matrix(1:4, nrow = 2, ncol = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
+#' r <- matrix(1:4, nrow = 2, ncol = 2, dimnames = list(c("A", "B"), c("S3", "S4")))
 #' gexp_qc_build_sample_dataset_map(list(GSE1 = m), list(GSE2 = r))
 #' @export
 gexp_qc_build_sample_dataset_map <- function(micro_expr_list, rna_counts_list) {
