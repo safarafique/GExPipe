@@ -44,7 +44,8 @@ test_that("gexp_qc_exclude_samples excludes samples consistently", {
 })
 
 test_that("gexp_align_rnaseq_sample_names replaces fread V2/V3 headers", {
-  mat <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("V2", "V3")))
+  mat <- matrix(1:4, nrow = 2, ncol = 2,
+                dimnames = list(c("GENE1", "GENE2"), c("V2", "V3")))
   meta <- data.frame(title = c("s1", "s2"), row.names = c("GSM1", "GSM2"))
   out <- gexp_align_rnaseq_sample_names(mat, meta, "GSE137136")
   expect_equal(colnames(out), c("GSM1", "GSM2"))
