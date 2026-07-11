@@ -99,6 +99,17 @@ server_results <- function(input, output, session, rv) {
 
     method <- rv$de_method
     if (is.null(method)) method <- "limma"
+    ref_lab <- if (!is.null(rv$condition_ref_label) && nzchar(rv$condition_ref_label)) {
+      rv$condition_ref_label
+    } else {
+      "Normal"
+    }
+    alt_lab <- if (!is.null(rv$condition_alt_label) && nzchar(rv$condition_alt_label)) {
+      rv$condition_alt_label
+    } else {
+      "Disease"
+    }
+    de_contrast_label <- paste0(alt_lab, " vs ", ref_lab)
     
     rv$de_start <- Sys.time()
     rv$de_running <- TRUE
@@ -197,7 +208,7 @@ server_results <- function(input, output, session, rv) {
           total_meta <- rv$unified_metadata
           
           # Ensure Condition is a factor
-          meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
+          meta$Condition <- factor(meta$Condition, levels = c(ref_lab, alt_lab))
           
           ds_design <- gexpipe_deseq2_design(meta)
           design_mm <- stats::model.matrix(ds_design$formula, data = meta)
@@ -221,8 +232,11 @@ server_results <- function(input, output, session, rv) {
           incProgress(0.3, detail = "Extracting results...")
           
           # Extract results (Disease vs Normal)
-          res <- DESeq2::results(dds, contrast = c("Condition", "Disease", "Normal"),
-                                 alpha = input$padj_cutoff)
+          res <- DESeq2::results(
+            dds,
+            contrast = gexp_condition_contrast(ref_lab, alt_lab),
+            alpha = input$padj_cutoff
+          )
           res_df <- as.data.frame(res)
           res_df$Gene <- rownames(res_df)
           
@@ -285,7 +299,7 @@ server_results <- function(input, output, session, rv) {
           meta <- meta[common_samples, , drop = FALSE]
           total_meta <- rv$unified_metadata
           
-          meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
+          meta$Condition <- factor(meta$Condition, levels = c(ref_lab, alt_lab))
           
           de_design <- gexpipe_build_de_design(meta)
           design <- de_design$design
@@ -370,7 +384,7 @@ server_results <- function(input, output, session, rv) {
           total_meta <- rv$unified_metadata
           
           # Ensure Condition is a factor
-          meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
+          meta$Condition <- factor(meta$Condition, levels = c(ref_lab, alt_lab))
           
           de_design <- gexpipe_build_de_design(meta)
           design <- de_design$design
@@ -433,7 +447,7 @@ server_results <- function(input, output, session, rv) {
           }
           
           meta <- rv$unified_metadata
-          meta$Condition <- factor(meta$Condition, levels = c("Normal", "Disease"))
+          meta$Condition <- factor(meta$Condition, levels = c(ref_lab, alt_lab))
           rv$unified_metadata <- meta
           
           # Align samples: batch_corrected and metadata must match
@@ -459,13 +473,14 @@ server_results <- function(input, output, session, rv) {
             colnames(design) <- levels(meta$Condition)
             filt <- .gexpipe_call("gexpipe_independent_filter", expr_de, design = design)
             expr_de <- filt$expr
-            contrast <- limma::makeContrasts(Disease - Normal, levels = design)
+            contrast_expr <- paste0(alt_lab, " - ", ref_lab)
+            contrast <- limma::makeContrasts(contrasts = contrast_expr, levels = design)
             fit <- limma::lmFit(expr_de, design)
             fit2 <- limma::contrasts.fit(fit, contrast)
             fit2 <- limma::eBayes(fit2)
             de_results <- limma::topTable(fit2, number = Inf, adjust.method = "BH")
             .record_de_transparency(
-              meta, "limma", "~ Condition (contrast: Disease vs Normal)", filt$note, total_meta
+              meta, "limma", paste0("~ Condition (contrast: ", de_contrast_label, ")"), filt$note, total_meta
             )
           } else {
             de_design <- gexpipe_build_de_design(meta)
@@ -636,6 +651,10 @@ server_results <- function(input, output, session, rv) {
       sub_line1 <- paste0(method_label, batch_note, " \u2014 DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")")
       sub_line2 <- paste0("LogFC \u00b1", input$logfc_cutoff, ", Adj.P \u2264 ", input$padj_cutoff)
 
+      ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+      alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
+      volcano_title <- paste0("Volcano Plot: ", alt_lab, " vs ", ref_lab)
+
       p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
         ggplot2::geom_point(alpha = 0.6, size = 2) +
         ggplot2::scale_color_manual(
@@ -644,7 +663,7 @@ server_results <- function(input, output, session, rv) {
         ) +
         ggplot2::theme_bw(base_size = 14) +
         ggplot2::labs(
-          title = "Volcano Plot: Disease vs Normal",
+          title = volcano_title,
           subtitle = paste0(sub_line1, "\n", sub_line2),
           x = "Log2 Fold Change",
           y = "-Log10 Adjusted P-value"
@@ -777,7 +796,9 @@ server_results <- function(input, output, session, rv) {
         ggplot2::geom_point(alpha = 0.6, size = 2) +
         ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
         ggplot2::theme_bw(base_size = 14) +
-        ggplot2::labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+        alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
+        ggplot2::labs(title = paste0("Volcano Plot: ", alt_lab, " vs ", ref_lab), subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
         ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggrepel::geom_text_repel(ggplot2::aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
@@ -816,7 +837,9 @@ server_results <- function(input, output, session, rv) {
         ggplot2::geom_point(alpha = 0.6, size = 2) +
         ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
         ggplot2::theme_bw(base_size = 14) +
-        ggplot2::labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+        alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
+        ggplot2::labs(title = paste0("Volcano Plot: ", alt_lab, " vs ", ref_lab), subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
         ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggrepel::geom_text_repel(ggplot2::aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +
@@ -856,7 +879,9 @@ server_results <- function(input, output, session, rv) {
         ggplot2::geom_point(alpha = 0.6, size = 2) +
         ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
         ggplot2::theme_bw(base_size = 14) +
-        ggplot2::labs(title = "Volcano Plot: Disease vs Normal", subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+        ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+        alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
+        ggplot2::labs(title = paste0("Volcano Plot: ", alt_lab, " vs ", ref_lab), subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
         ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggrepel::geom_text_repel(ggplot2::aes(label = Label), size = 3, max.overlaps = 20, box.padding = 0.5, segment.color = "gray50") +

@@ -16,7 +16,7 @@ ui_groups <- tabItem(
         tags$p(tags$strong("Purpose:"), " Define phenotype groups (e.g. control vs disease) for differential expression and WGCNA. Samples are assigned to groups using metadata columns from your datasets.", style = "margin-bottom: 8px;"),
         tags$p(tags$strong("Disease-specific analysis:"), " Assign your condition groups to ", tags$strong("Disease"), " and controls to ", tags$strong("Normal"), ". Step 6 (DE) and Step 7 (WGCNA) will use these to find disease-associated genes and modules.", style = "margin-bottom: 8px; color: #2c3e50;"),
         tags$p(tags$strong("Need both groups for DE:"), " Differential expression (Step 6) compares Normal vs Disease. You must have at least one sample in ", tags$strong("Normal"), " and one in ", tags$strong("Disease"), ". If you enter GSEs from the same sample source (e.g. same study with only one condition), you will not get DEGs until you add a dataset that contains the other condition.", style = "margin-bottom: 8px; color: #555;"),
-        tags$p(tags$strong("Workflow:"), " Browse the phenodata table below to understand your metadata, select the phenotype column per dataset, extract unique group labels, categorize each as Normal, Disease, or None, then apply.", style = "margin-bottom: 0;")
+        tags$p(tags$strong("Workflow:"), " Browse phenodata, select a column per dataset, extract groups, categorize as reference vs comparison, apply, then optionally rename group labels in the summary below.", style = "margin-bottom: 0;")
       )
     ),
     fluidRow(
@@ -30,8 +30,9 @@ ui_groups <- tabItem(
             tags$li(tags$strong("Browse Phenodata:"), " Review all metadata columns for each dataset"),
             tags$li(tags$strong("Select Column:"), " Choose the phenotype column that contains group info (e.g. tissue, disease state, or ", tags$strong("title"), " when condition is embedded in sample titles)"),
             tags$li(tags$strong("Extract Groups:"), " Click to extract unique groups from the selected column"),
-            tags$li(tags$strong("Categorize:"), " Assign each group as Normal, Disease, or None"),
-            tags$li(tags$strong("Apply:"), " Finalize your selections")
+            tags$li(tags$strong("Categorize:"), " Assign each group as reference (Normal) or comparison (Disease), or None"),
+            tags$li(tags$strong("Apply:"), " Finalize your selections"),
+            tags$li(tags$strong("Rename (optional):"), " After apply, customize group display names in the Group Summary section")
           )
         )
       )
@@ -92,7 +93,7 @@ ui_groups <- tabItem(
         tags$div(
           style = "text-align: center; padding: 15px;",
           actionButton("apply_groups_btn", 
-                       tagList(icon("check"), " Apply Categorization"), 
+                       tagList(icon("check"), " Apply Groups"), 
                        class = "btn-danger btn-lg",
                        style = "font-size: 16px; padding: 12px 30px;")
         )
