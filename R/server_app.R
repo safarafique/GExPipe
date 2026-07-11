@@ -120,6 +120,8 @@ gexp_app_server <- function(input, output, session) {
     download_complete = FALSE,
     normalization_complete = FALSE,
     groups_applied = FALSE,
+    condition_ref_label = "Normal",
+    condition_alt_label = "Disease",
     batch_complete = FALSE,
     wgcna_prepared = FALSE,
     wgcna_complete = FALSE,
