@@ -1,5 +1,13 @@
 # GExPipe NEWS
 
+## Version 0.99.31
+
+### SPB / R CMD check fixes
+- Fix `gexp_align_rnaseq_sample_names()` example matrix dimensions.
+- Skip source-tree-only bioc-review tests when `R/` is not in installed layout.
+- Harden server namespace test; avoid false match on `inst/shinyapp/server.R`.
+- Remove `install.packages()` from GitHub bootstrap (BiocCheck compliance).
+
 ## Version 0.99.30
 
 ### Tests
