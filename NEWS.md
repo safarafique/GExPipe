@@ -1,5 +1,10 @@
 # GExPipe NEWS
 
+## Version 0.99.34
+
+### SPB / R CMD check
+- Fix `gexp_qc_build_sample_dataset_map` man page example matrix dimensions.
+
 ## Version 0.99.33
 
 ### Documentation
