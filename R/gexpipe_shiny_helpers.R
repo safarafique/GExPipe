@@ -197,6 +197,132 @@ gexp_normalize_group_labels <- function(vals, col_name = NULL) {
   out
 }
 
+#' Rename reference / comparison condition labels in sample metadata
+#'
+#' Keeps factor order: reference (first level) then comparison (second level).
+#'
+#' @param meta data.frame with \code{Condition} column.
+#' @param ref_old,ref_new Reference group name (was Normal role).
+#' @param alt_old,alt_new Comparison group name (was Disease role).
+#' @return Updated metadata with renamed \code{Condition} factor.
+#' @keywords internal
+gexp_rename_condition_labels <- function(
+    meta,
+    ref_old,
+    alt_old,
+    ref_new,
+    alt_new
+) {
+  if (is.null(meta) || !"Condition" %in% colnames(meta)) {
+    return(meta)
+  }
+  ref_new <- trimws(as.character(ref_new))
+  alt_new <- trimws(as.character(alt_new))
+  if (!nzchar(ref_new) || !nzchar(alt_new) || identical(ref_new, alt_new)) {
+    stop("Group names must be non-empty and distinct.")
+  }
+  cond <- as.character(meta$Condition)
+  cond[cond == ref_old] <- ref_new
+  cond[cond == alt_old] <- alt_new
+  meta$Condition <- factor(cond, levels = c(ref_new, alt_new))
+  meta
+}
+
+#' Build a DESeq2-style contrast vector from reference and comparison labels
+#' @keywords internal
+gexp_condition_contrast <- function(ref_label, alt_label) {
+  c("Condition", as.character(alt_label), as.character(ref_label))
+}
+
+#' Test whether sample conditions belong to the comparison (non-reference) group
+#' @keywords internal
+gexp_is_comparison_condition <- function(x, alt_label = "Disease") {
+  as.character(x) %in% c(as.character(alt_label), "Disease", "disease", "2")
+}
+
+#' Safe Shiny input id from a sample or group label
+#' @param x Character scalar.
+#' @return Character scalar suitable for \code{inputId}.
+#' @keywords internal
+gexp_safe_shiny_input_id <- function(x) {
+  id <- gsub("[^A-Za-z0-9]", "_", as.character(x))
+  id <- gsub("_+", "_", id)
+  id <- gsub("^_|_$", "", id)
+  if (!nzchar(id)) {
+    "sample"
+  } else {
+    id
+  }
+}
+
+#' Collect per-sample Normal / Disease labels from manual assignment inputs
+#'
+#' @param sample_ids Character vector of sample IDs (expression column names).
+#' @param choices Named character vector: input id suffix or sample id -> Normal|Disease|None.
+#' @param id_prefix Prefix used for Shiny inputs (default \code{"manual_grp_"}).
+#' @return Named character vector aligned to \code{sample_ids}; \code{NA} for None/unset.
+#' @keywords internal
+gexp_manual_sample_group_labels <- function(
+    sample_ids,
+    choices,
+    id_prefix = "manual_grp_"
+) {
+  sample_ids <- as.character(sample_ids)
+  if (length(sample_ids) == 0L) {
+    return(setNames(character(0), character(0)))
+  }
+  out <- rep(NA_character_, length(sample_ids))
+  names(out) <- sample_ids
+  for (i in seq_along(sample_ids)) {
+    sid <- sample_ids[[i]]
+    val <- choices[[sid]]
+    if (is.null(val) || is.na(val) || !nzchar(val)) {
+      val <- choices[[paste0(id_prefix, gexp_safe_shiny_input_id(sid))]]
+    }
+    if (is.null(val) || is.na(val) || !nzchar(val) || identical(val, "None")) {
+      next
+    }
+    if (val %in% c("Normal", "Disease")) {
+      out[[i]] <- val
+    }
+  }
+  out
+}
+
+#' Lookup a short phenodata hint (e.g. GEO title) for manual group assignment
+#' @keywords internal
+gexp_sample_metadata_hint <- function(sample_id, gse, micro_metadata_list, rna_metadata_list) {
+  pdata <- if (!is.null(gse) && gse %in% names(rna_metadata_list)) {
+    rna_metadata_list[[gse]]
+  } else if (!is.null(gse) && gse %in% names(micro_metadata_list)) {
+    micro_metadata_list[[gse]]
+  } else {
+    NULL
+  }
+  if (is.null(pdata) || nrow(pdata) == 0L) {
+    return("")
+  }
+  row_id <- if (sample_id %in% rownames(pdata)) {
+    sample_id
+  } else {
+    idx <- match(sample_id, rownames(pdata))
+    if (is.na(idx)) {
+      return("")
+    } else {
+      rownames(pdata)[[idx]]
+    }
+  }
+  for (col in c("title", "description", "characteristics_ch1", "source_name_ch1")) {
+    if (col %in% colnames(pdata)) {
+      val <- trimws(as.character(pdata[row_id, col, drop = TRUE]))
+      if (length(val) > 0L && !is.na(val) && nzchar(val)) {
+        return(val[[1L]])
+      }
+    }
+  }
+  ""
+}
+
 #' Suggest Normal / Disease / None for an extracted group label
 #' @keywords internal
 gexp_suggest_group_category <- function(label) {

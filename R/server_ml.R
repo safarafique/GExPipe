@@ -123,7 +123,8 @@ server_ml <- function(input, output, session, rv) {
       return()
     }
     grp <- sample_info[[cond_col]]
-    y <- as.factor(ifelse(grp %in% c("Disease", "disease", "2"), 1, 0))
+    alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
+    y <- as.factor(ifelse(gexp_is_comparison_condition(grp, alt_lab), 1, 0))
     if (length(unique(y)) < 2) {
       showNotification("Need at least two classes (e.g. Disease vs Normal).", type = "error", duration = 6)
       return()
