@@ -796,44 +796,128 @@ server_groups <- function(input, output, session, rv) {
   # ==============================================================================
   # APPLY GROUPS (Enhanced with Better Alignment)
   # ==============================================================================
-  
+
+  .groups_apply_sample_labels <- function(samples_kept, labels_kept, batch_kept) {
+    if (length(samples_kept) == 0 || sum(!is.na(labels_kept)) == 0) {
+      showNotification(
+        "Assign at least one sample to Normal or Disease before applying.",
+        type = "error", duration = 6
+      )
+      return(invisible(FALSE))
+    }
+
+    keep <- !is.na(labels_kept)
+    samples_kept <- samples_kept[keep]
+    labels_kept <- labels_kept[keep]
+    batch_kept <- batch_kept[keep]
+
+    if (is.null(rv$combined_expr)) {
+      showNotification("No expression matrix found. Please normalize data first.",
+                       type = "error", duration = 6)
+      return(invisible(FALSE))
+    }
+
+    matched <- intersect(samples_kept, colnames(rv$combined_expr))
+    if (length(matched) == 0) {
+      showNotification("No matching samples between group selection and expression matrix.",
+                       type = "error", duration = 6)
+      return(invisible(FALSE))
+    }
+
+    matched <- intersect(matched, rownames(rv$unified_metadata))
+    if (length(matched) == 0) {
+      showNotification("No matching samples between group selection and metadata.",
+                       type = "error", duration = 6)
+      return(invisible(FALSE))
+    }
+
+    idx <- match(matched, samples_kept)
+    labels_final <- labels_kept[idx]
+    batch_final <- batch_kept[idx]
+
+    rv$combined_expr <- rv$combined_expr[, matched, drop = FALSE]
+    rv$unified_metadata <- rv$unified_metadata[matched, , drop = FALSE]
+    rv$unified_metadata$Condition <- labels_final
+    rv$unified_metadata$Batch <- factor(batch_final)
+    rv$unified_metadata$Condition <- factor(rv$unified_metadata$Condition,
+                                            levels = c("Normal", "Disease"))
+
+    if (!is.null(rv$raw_counts_for_deseq2)) {
+      common_samp <- intersect(matched, colnames(rv$raw_counts_for_deseq2))
+      if (length(common_samp) > 0) {
+        rv$raw_counts_for_deseq2 <- rv$raw_counts_for_deseq2[, common_samp, drop = FALSE]
+        rv$raw_counts_metadata <- rv$unified_metadata[common_samp, , drop = FALSE]
+      }
+    }
+
+    rv$groups_applied <- TRUE
+    rv$condition_ref_label <- "Normal"
+    rv$condition_alt_label <- "Disease"
+
+    counts <- table(rv$unified_metadata$Condition)
+    de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
+    showNotification(
+      tags$div(
+        tags$strong("OK Groups applied!"),
+        tags$br(),
+        tags$span(
+          "Normal: ", ifelse("Normal" %in% names(counts), counts[["Normal"]], 0),
+          " | Disease: ", ifelse("Disease" %in% names(counts), counts[["Disease"]], 0)
+        ),
+        tags$br(),
+        tags$span(
+          "Genes: ", format(nrow(rv$combined_expr), big.mark = ","),
+          " | Samples: ", sum(counts)
+        ),
+        tags$p(
+          "Optional: rename groups in the Group Summary section below, or continue to batch correction.",
+          style = "margin: 8px 0 0 0; font-size: 12px;"
+        ),
+        if (de_method == "deseq2" && !is.null(rv$raw_counts_for_deseq2)) {
+          tags$span(
+            tags$br(), icon("dna"), " DESeq2 raw counts aligned: ",
+            ncol(rv$raw_counts_for_deseq2), " samples",
+            style = "color: #1e8449;"
+          )
+        },
+        style = "font-size: 13px;"
+      ),
+      type = "message", duration = 8
+    )
+    invisible(TRUE)
+  }
+
   observeEvent(input$apply_groups_btn, {
     groups <- extracted_groups()
     per_gse_data <- extracted_groups_per_gse()
-    
+
     if (length(groups) == 0) {
       showNotification("Please extract groups first.", type = "warning", duration = 5)
       return()
     }
-    
-    # Collect categorizations
+
     all_cats <- list()
-    
     for (gse in names(groups)) {
       gse_groups <- groups[[gse]]
-      gse_cats <- sapply(seq_along(gse_groups), function(i) {
+      gse_cats <- vapply(seq_along(gse_groups), function(i) {
         input[[paste0("cat_", gse, "_", i)]]
-      })
+      }, character(1))
       names(gse_cats) <- gse_groups
       all_cats[[gse]] <- gse_cats
     }
-    
-    # Build per-sample labels using aligned data
+
     all_samples <- character(0)
     all_labels <- character(0)
     all_batches <- character(0)
-    
+
     for (gse in names(per_gse_data)) {
       per <- per_gse_data[[gse]]
       expr_cols <- per$expr_cols
       gr <- per$group_raw
-      
       if (length(expr_cols) == 0 || length(gr) == 0) next
-      
-      # Map groups to categories
+
       labels <- rep(NA_character_, length(expr_cols))
       cats <- all_cats[[gse]]
-      
       for (i in seq_along(expr_cols)) {
         gval <- gr[[expr_cols[i]]]
         if (!is.null(gval) && !is.na(gval) && gval != "" && gval %in% names(cats)) {
@@ -843,109 +927,81 @@ server_groups <- function(input, output, session, rv) {
           }
         }
       }
-      
+
       all_samples <- c(all_samples, expr_cols)
       all_labels <- c(all_labels, labels)
       all_batches <- c(all_batches, rep(gse, length(expr_cols)))
     }
-    
-    # Keep only samples labeled Normal/Disease
+
     keep <- !is.na(all_labels)
     if (sum(keep) == 0) {
-      showNotification("All samples are excluded (None/empty). Please assign at least one group to Normal or Disease.", 
-                       type = "error", duration = 6)
+      showNotification(
+        "All samples are excluded (None/empty). Please assign at least one group to Normal or Disease.",
+        type = "error", duration = 6
+      )
       return()
     }
-    
-    samples_kept <- all_samples[keep]
-    labels_kept <- all_labels[keep]
-    batch_kept <- all_batches[keep]
-    
-    # Align to expression matrix
-    if (is.null(rv$combined_expr)) {
-      showNotification("No expression matrix found. Please normalize data first.", 
-                       type = "error", duration = 6)
-      return()
-    }
-    
-    # Find samples that exist in both group selection and expression matrix
-    matched <- intersect(samples_kept, colnames(rv$combined_expr))
-    if (length(matched) == 0) {
-      showNotification("No matching samples between group selection and expression matrix.", 
-                       type = "error", duration = 6)
-      return()
-    }
-    
-    # Also ensure matched samples exist in metadata
-    matched <- intersect(matched, rownames(rv$unified_metadata))
-    if (length(matched) == 0) {
-      showNotification("No matching samples between group selection and metadata.", 
-                       type = "error", duration = 6)
-      return()
-    }
-    
-    # Filter to matched samples, preserving order
-    idx <- match(matched, samples_kept)
-    labels_final <- labels_kept[idx]
-    batch_final <- batch_kept[idx]
-    
-    # Store gene count before filtering
-    genes_before <- nrow(rv$combined_expr)
-    
-    # Filter expression matrix to matched samples first
-    rv$combined_expr <- rv$combined_expr[, matched, drop = FALSE]
-    
-    # Filter metadata to matched samples
-    rv$unified_metadata <- rv$unified_metadata[matched, , drop = FALSE]
-    
-    # Now update Condition and Batch columns (they should match exactly now)
-    rv$unified_metadata$Condition <- labels_final
-    rv$unified_metadata$Batch <- factor(batch_final)
-    
-    # Ensure Condition is a factor with correct levels
-    rv$unified_metadata$Condition <- factor(rv$unified_metadata$Condition, 
-                                            levels = c("Normal", "Disease"))
-    
-    # Store gene count after filtering (should be same, but track it)
-    genes_after <- nrow(rv$combined_expr)
-    
-    # ----- DESeq2: align raw counts and metadata to matched samples -----
-    if (!is.null(rv$raw_counts_for_deseq2)) {
-      common_samp <- intersect(matched, colnames(rv$raw_counts_for_deseq2))
-      if (length(common_samp) > 0) {
-        rv$raw_counts_for_deseq2 <- rv$raw_counts_for_deseq2[, common_samp, drop = FALSE]
-        # Build matching metadata for DESeq2 with Condition + Batch
-        rv$raw_counts_metadata <- rv$unified_metadata[common_samp, , drop = FALSE]
-      }
-    }
-    
-    rv$groups_applied <- TRUE
-    
-    counts <- table(rv$unified_metadata$Condition)
-    de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
-    showNotification(
-      tags$div(
-        tags$strong("OK Groups applied!"),
-        tags$br(),
-        tags$span("Normal: ", ifelse("Normal" %in% names(counts), counts[["Normal"]], 0),
-                  " | Disease: ", ifelse("Disease" %in% names(counts), counts[["Disease"]], 0)),
-        tags$br(),
-        tags$span("Genes: ", format(genes_after, big.mark = ","), 
-                  " | Samples: ", sum(counts)),
-        if (de_method == "deseq2" && !is.null(rv$raw_counts_for_deseq2)) {
-          tags$span(tags$br(), icon("dna"), " DESeq2 raw counts aligned: ",
-                    ncol(rv$raw_counts_for_deseq2), " samples",
-                    style = "color: #1e8449;")
-        },
-        style = "font-size: 13px;"
-      ),
-      type = "message", duration = 8
-    )
+
+    .groups_apply_sample_labels(all_samples[keep], all_labels[keep], all_batches[keep])
   })
-  
+
   # ==============================================================================
   # GROUP SUMMARY
   # ==============================================================================
+
+  observeEvent(input$update_group_names_btn, {
+    req(rv$groups_applied, rv$unified_metadata)
+    new_ref <- trimws(as.character(input$group_rename_ref))
+    new_alt <- trimws(as.character(input$group_rename_alt))
+    if (!nzchar(new_ref) || !nzchar(new_alt)) {
+      showNotification("Enter a name for both groups.", type = "warning", duration = 5)
+      return()
+    }
+    if (identical(new_ref, new_alt)) {
+      showNotification("Group names must be different.", type = "warning", duration = 5)
+      return()
+    }
+    old_ref <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+    old_alt <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
+    if (identical(new_ref, old_ref) && identical(new_alt, old_alt)) {
+      showNotification("Group names unchanged.", type = "message", duration = 3)
+      return()
+    }
+    tryCatch({
+      rv$unified_metadata <- gexp_rename_condition_labels(
+        rv$unified_metadata, old_ref, old_alt, new_ref, new_alt
+      )
+      if (!is.null(rv$raw_counts_metadata)) {
+        rv$raw_counts_metadata <- gexp_rename_condition_labels(
+          rv$raw_counts_metadata, old_ref, old_alt, new_ref, new_alt
+        )
+      }
+      if (!is.null(rv$wgcna_sample_info) && "Condition" %in% colnames(rv$wgcna_sample_info)) {
+        wsi <- rv$wgcna_sample_info
+        if (is.null(rownames(wsi)) && "SampleID" %in% colnames(wsi)) {
+          rownames(wsi) <- wsi$SampleID
+        }
+        common <- intersect(rownames(wsi), rownames(rv$unified_metadata))
+        if (length(common) > 0L) {
+          wsi[common, "Condition"] <- rv$unified_metadata[common, "Condition"]
+          rv$wgcna_sample_info <- wsi
+        }
+      }
+      rv$condition_ref_label <- new_ref
+      rv$condition_alt_label <- new_alt
+      showNotification(
+        tags$div(
+          tags$strong("Group names updated."),
+          tags$br(),
+          tags$span(new_ref, " (reference) vs ", new_alt, " (comparison)")
+        ),
+        type = "message",
+        duration = 6
+      )
+    }, error = function(e) {
+      showNotification(paste("Could not rename groups:", e$message), type = "error", duration = 6)
+    })
+  })
 
   output$groups_process_summary_ui <- renderUI({
     if (is.null(rv$groups_applied) || !rv$groups_applied) {
@@ -968,11 +1024,26 @@ server_groups <- function(input, output, session, rv) {
         tags$strong("Apply groups to see summary", style = "font-size: 16px;")
       ))
     }
-    
+
+    ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+    alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
     counts <- table(rv$unified_metadata$Condition)
     total_samples <- sum(counts)
     total_genes <- if (!is.null(rv$combined_expr)) nrow(rv$combined_expr) else 0
-    
+
+    card_specs <- list(
+      list(
+        label = ref_lab,
+        count = if (ref_lab %in% names(counts)) as.integer(counts[[ref_lab]]) else 0L,
+        role = "ref"
+      ),
+      list(
+        label = alt_lab,
+        count = if (alt_lab %in% names(counts)) as.integer(counts[[alt_lab]]) else 0L,
+        role = "alt"
+      )
+    )
+
     tags$div(
       style = "padding: 20px;",
       tags$div(
@@ -1001,38 +1072,69 @@ server_groups <- function(input, output, session, rv) {
         )
       ),
       tags$div(
-        style = "display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;",
-        lapply(names(counts), function(g) {
-          bg_color <- if (g == "Normal") {
+        style = "display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 24px;",
+        lapply(card_specs, function(spec) {
+          bg_color <- if (identical(spec$role, "ref")) {
             "linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)"
-          } else if (g == "Disease") {
-            "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)"
           } else {
-            "linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%)"
+            "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)"
           }
-          
-          icon_name <- if (g == "Normal") "check-circle" else if (g == "Disease") "exclamation-triangle" else "minus-circle"
-          
+          icon_name <- if (identical(spec$role, "ref")) "check-circle" else "exclamation-triangle"
           tags$div(
-            style = paste0("min-width: 200px; padding: 25px; background: ", bg_color, "; border-radius: 15px; color: white; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.2);"),
-            tags$div(
-              icon(icon_name, class = "fa-3x"),
-              style = "margin-bottom: 15px;"
+            style = paste0(
+              "min-width: 200px; padding: 25px; background: ", bg_color,
+              "; border-radius: 15px; color: white; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.2);"
             ),
-            tags$h3(
-              tags$strong(g),
-              style = "margin: 0 0 10px 0; font-size: 24px; font-weight: bold;"
-            ),
-            tags$div(
-              style = "font-size: 36px; font-weight: bold;",
-              counts[[g]]
-            ),
-            tags$div(
-              style = "margin-top: 10px; font-size: 14px; opacity: 0.9;",
-              "samples"
-            )
+            tags$div(icon(icon_name, class = "fa-3x"), style = "margin-bottom: 15px;"),
+            tags$h3(tags$strong(spec$label), style = "margin: 0 0 10px 0; font-size: 24px; font-weight: bold;"),
+            tags$div(style = "font-size: 36px; font-weight: bold;", spec$count),
+            tags$div(style = "margin-top: 10px; font-size: 14px; opacity: 0.9;", "samples")
           )
         })
+      ),
+      tags$div(
+        style = "max-width: 720px; margin: 0 auto; padding: 18px 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px;",
+        tags$h4(
+          icon("edit", style = "margin-right: 8px; color: #495057;"),
+          "Customize group names (optional)",
+          style = "margin-top: 0; color: #2c3e50; font-size: 17px;"
+        ),
+        tags$p(
+          "Rename the reference and comparison groups for your study (e.g. Control / Treated). ",
+          "Leave unchanged to keep Normal and Disease.",
+          style = "font-size: 13px; color: #6c757d; margin-bottom: 14px;"
+        ),
+        fluidRow(
+          column(
+            5,
+            textInput(
+              "group_rename_ref",
+              "Reference group name",
+              value = ref_lab,
+              width = "100%"
+            )
+          ),
+          column(
+            5,
+            textInput(
+              "group_rename_alt",
+              "Comparison group name",
+              value = alt_lab,
+              width = "100%"
+            )
+          ),
+          column(
+            2,
+            tags$div(
+              style = "margin-top: 25px;",
+              actionButton(
+                "update_group_names_btn",
+                tagList(icon("save"), " Update"),
+                class = "btn-primary btn-block"
+              )
+            )
+          )
+        )
       )
     )
   })

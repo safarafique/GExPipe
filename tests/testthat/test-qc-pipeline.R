@@ -78,6 +78,26 @@ test_that("gexp_suggest_group_category detects control and cytokine labels", {
   expect_equal(suggest_cat("cytokine treatment"), "Disease")
 })
 
+test_that("gexp_rename_condition_labels updates Condition factor levels", {
+  skip_if_not_installed("GExPipe")
+  fn <- getFromNamespace("gexp_rename_condition_labels", "GExPipe")
+  meta <- data.frame(
+    SampleID = c("S1", "S2"),
+    Condition = factor(c("Normal", "Disease"), levels = c("Normal", "Disease")),
+    row.names = c("S1", "S2"),
+    stringsAsFactors = FALSE
+  )
+  out <- fn(meta, "Normal", "Disease", "Control", "Treated")
+  expect_equal(as.character(out$Condition), c("Control", "Treated"))
+  expect_equal(levels(out$Condition), c("Control", "Treated"))
+})
+
+test_that("gexp_condition_contrast builds DESeq2 contrast vector", {
+  skip_if_not_installed("GExPipe")
+  fn <- getFromNamespace("gexp_condition_contrast", "GExPipe")
+  expect_equal(fn("Control", "Treated"), c("Condition", "Treated", "Control"))
+})
+
 test_that("gexp_qc_build_sample_dataset_map maps samples to GSE IDs", {
   m1 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S1", "S2")))
   m2 <- matrix(1:4, nrow = 2, dimnames = list(c("A", "B"), c("S3", "S4")))

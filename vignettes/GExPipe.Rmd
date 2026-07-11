@@ -374,14 +374,15 @@ knitr::include_graphics("images/step03b_normalize.png")
 
 1. Browse **Phenodata Browser** for each GSE.
 2. Under **Select Phenotype Columns** (panel a), pick the condition column
-   per dataset (e.g. `characteristics_ch1` for `GSE50760`,
-   `characteristics_ch1.1` for `GSE104836`).
+   per dataset (e.g. `characteristics_ch1`, or **`title`** when treatment is
+   only in sample titles).
 3. Click **Extract Groups from Selected Columns**.
-4. **Categorize Groups** — map labels to Normal / Disease / None.
-5. Click **Apply Categorization**.
-6. Confirm **Group Summary** (panel b) — at least one Normal and one
-   Disease sample required for Step 6 DE.
-7. Click **Next: Batch Correction**.
+4. **Categorize Groups** — map labels to reference (Normal) or comparison
+   (Disease), or None.
+5. Click **Apply Groups**.
+6. In **Group Summary** (panel b), optionally rename groups (e.g. Control /
+   Treated); click **Update**, or leave as Normal / Disease and continue.
+7. Confirm sample counts, then click **Next: Batch Correction**.
 
 **Success check:** Group Summary counts match your study design.
 

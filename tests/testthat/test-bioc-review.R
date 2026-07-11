@@ -119,16 +119,32 @@ test_that("legacy inst/shinyapp entry files delegate to package namespace", {
 })
 
 test_that("vignette screenshots exist under vignettes/images", {
-  skip_if_not_installed("GExPipe")
+  src_vig <- normalizePath(
+    file.path(testthat::test_path(), "..", "..", "vignettes"),
+    mustWork = FALSE
+  )
   pkg_root <- system.file(package = "GExPipe")
-  skip_if_not(nzchar(pkg_root))
-  vig_dir <- normalizePath(file.path(dirname(pkg_root), "vignettes"), mustWork = FALSE)
-  if (!dir.exists(vig_dir)) {
-    vig_dir <- normalizePath(file.path(testthat::test_path(), "..", "..", "vignettes"), mustWork = TRUE)
+  pkg_vig <- if (nzchar(pkg_root)) {
+    normalizePath(file.path(dirname(pkg_root), "vignettes"), mustWork = FALSE)
+  } else {
+    ""
   }
+  vig_dir <- if (dir.exists(src_vig)) src_vig else pkg_vig
+  skip_if_not(dir.exists(vig_dir), "vignettes/ not found")
   imgs <- c(
-    "step1_download.png", "step2_qc.png", "step6_de.png",
-    "step9_ppi.png", "step15_summary.png"
+    "step01_download.png",
+    "step02a_qc.png", "step02b_qc.png", "step02c_qc.png",
+    "step03a_normalize.png", "step03b_normalize.png",
+    "step04a_groups.png", "step04b_groups.png",
+    "step05a_batch.png", "step05b_batch.png",
+    "step06a_de.png", "step06b_de.png",
+    "step07a_wgcna.png", "step07b_wgcna.png", "step07c_wgcna.png", "step07d_wgcna.png",
+    "step08a_common_genes.png", "step08b_go.png", "step08c_kegg.png",
+    "step09a_ppi.png", "step09b_ppi.png",
+    "step10a_ml.png", "step10b_ml.png",
+    "step11a_validation.png", "step11b_validation_external.png",
+    "step12a_roc.png", "step12b_roc.png",
+    "step13_nomogram.png", "step14_gsea.png", "step15_summary.png"
   )
   for (img in imgs) {
     expect_true(file.exists(file.path(vig_dir, "images", img)), info = img)
