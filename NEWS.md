@@ -1,5 +1,10 @@
 # GExPipe NEWS
 
+## Version 0.99.33
+
+### Documentation
+- Clarify `gexp_align_rnaseq_sample_names()` runs after GEO download (GSE ID workflow), not manual data entry; fix example matrix dimensions in man page.
+
 ## Version 0.99.32
 
 ### SPB / R CMD check
