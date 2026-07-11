@@ -95,15 +95,7 @@ gexpipe_shinyapp_ensure_package <- function() {
       return(invisible(TRUE))
     }
   }
-  lib <- .gexpipe_get_lib()
-  ok <- tryCatch({
-    utils::install.packages(
-      src, repos = NULL, type = "source", lib = lib,
-      quiet = TRUE, INSTALL_opts = c("--no-staged-install", "--no-lock")
-    )
-    requireNamespace("GExPipe", lib.loc = lib, quietly = TRUE)
-  }, error = function(e) FALSE)
-  invisible(isTRUE(ok))
+  invisible(FALSE)
 }
 
 .gexpipe_promote_pending_lib <- function() {
