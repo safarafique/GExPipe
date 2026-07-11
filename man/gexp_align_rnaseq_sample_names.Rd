@@ -22,7 +22,8 @@ breaks QC outlier plots and downstream sample matching. This renames columns
 using GEO pData row names (GSM IDs) in sample order.
 }
 \examples{
-mat <- matrix(1:20, nrow = 2, dimnames = list(c("A", "B"), c("V2", "V3")))
+mat <- matrix(1:4, nrow = 2, ncol = 2,
+              dimnames = list(c("A", "B"), c("V2", "V3")))
 meta <- data.frame(title = c("s1", "s2"), row.names = c("GSM1", "GSM2"))
 out <- gexp_align_rnaseq_sample_names(mat, meta, "GSE1")
 colnames(out)
