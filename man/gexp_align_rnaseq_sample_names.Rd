@@ -17,14 +17,18 @@ gexp_align_rnaseq_sample_names(count_matrix, metadata = NULL, gse_id = NULL)
 Matrix with improved column names.
 }
 \description{
-When count files lack headers, data.table::fread assigns V1, V2, ... which
-breaks QC outlier plots and downstream sample matching. This renames columns
-using GEO pData row names (GSM IDs) in sample order.
+GExPipe users enter \strong{GSE accessions} in the app; this helper runs
+automatically during GEO download when a count file has no sample headers
+(e.g. \code{data.table::fread} assigns \code{V2}, \code{V3}, ...). Columns are renamed
+to GSM IDs from GEO pData so QC, normalization, and group selection see
+individual samples (fixes issues such as a single \strong{V2} bar in outlier QC).
 }
 \examples{
+# GSE137136-style: headerless columns after download, GSM IDs in metadata.
 mat <- matrix(1:4, nrow = 2, ncol = 2,
-              dimnames = list(c("A", "B"), c("V2", "V3")))
-meta <- data.frame(title = c("s1", "s2"), row.names = c("GSM1", "GSM2"))
-out <- gexp_align_rnaseq_sample_names(mat, meta, "GSE1")
+              dimnames = list(c("GENE1", "GENE2"), c("V2", "V3")))
+meta <- data.frame(title = c("sample 1", "sample 2"),
+                   row.names = c("GSM111", "GSM222"))
+out <- gexp_align_rnaseq_sample_names(mat, meta, "GSE137136")
 colnames(out)
 }
