@@ -1,5 +1,10 @@
 # GExPipe NEWS
 
+## Version 0.99.30
+
+### Tests
+- Fix `test-bioc-review.R` shinytest2 readme path for `covr` / installed-package test runs.
+
 ## Version 0.99.29
 
 ### Bioconductor second-review response
