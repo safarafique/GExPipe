@@ -183,7 +183,8 @@ test_that("blocked bootstrap returns minimal Shiny app", {
 })
 
 test_that("R/ avoids suppressWarnings and suppressMessages", {
-  r_dir <- normalizePath(file.path(testthat::test_path(), "..", "..", "R"), mustWork = TRUE)
+  r_dir <- normalizePath(file.path(testthat::test_path(), "..", "..", "R"), mustWork = FALSE)
+  skip_if_not(dir.exists(r_dir), "R/ source tree not available in installed package")
   r_files <- list.files(r_dir, pattern = "\\.R$", full.names = TRUE)
   for (f in r_files) {
     txt <- readLines(f, warn = FALSE)

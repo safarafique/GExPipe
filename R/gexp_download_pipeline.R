@@ -161,7 +161,8 @@ gexp_orient_count_dataframe <- function(count_df, metadata = NULL) {
 #' @param gse_id GEO series accession (used for fallback naming).
 #' @return Matrix with improved column names.
 #' @examples
-#' mat <- matrix(1:20, nrow = 2, dimnames = list(c("A", "B"), c("V2", "V3")))
+#' mat <- matrix(1:4, nrow = 2, ncol = 2,
+#'               dimnames = list(c("A", "B"), c("V2", "V3")))
 #' meta <- data.frame(title = c("s1", "s2"), row.names = c("GSM1", "GSM2"))
 #' out <- gexp_align_rnaseq_sample_names(mat, meta, "GSE1")
 #' colnames(out)
