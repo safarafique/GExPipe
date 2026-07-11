@@ -1,5 +1,10 @@
 # GExPipe NEWS
 
+## Version 0.99.32
+
+### SPB / R CMD check
+- Regenerate `man/gexp_align_rnaseq_sample_names.Rd` example (fixes examples ERROR).
+
 ## Version 0.99.31
 
 ### SPB / R CMD check fixes
