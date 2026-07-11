@@ -78,9 +78,13 @@ test_that("gexp_prepare_download_dirs creates expected folders", {
 
 test_that("primary Shiny server wires modules from namespace not inst source", {
   skip_if_not_installed("GExPipe")
-  srv <- getFromNamespace("gexp_app_server", "GExPipe")
-  srv_file <- utils::getSrcFilename(srv)
+  ns <- asNamespace("GExPipe")
+  expect_true(exists("gexp_app_server", envir = ns, inherits = FALSE, mode = "function"))
+  expect_true(exists("server_download", envir = ns, inherits = FALSE, mode = "function"))
+  srv_file <- utils::getSrcFilename(getFromNamespace("gexp_app_server", "GExPipe"))
+  skip_if_not(nzchar(srv_file), "getSrcFilename unavailable for installed bytecode")
   expect_false(grepl("inst/shinyapp/server/", srv_file, fixed = TRUE))
+  expect_true(grepl("server_app", basename(srv_file), fixed = TRUE))
 })
 
 test_that("count-file scoring prefers multi-sample matrix over single-sample HTSeq", {
