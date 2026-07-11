@@ -1,5 +1,12 @@
 # GExPipe NEWS
 
+## Version 0.99.29
+
+### Bioconductor second-review response
+- Vignette: 30 end-user screenshots in `vignettes/images/`; maintainer-only notes removed.
+- Step 4: `title` column fallback for poorly annotated GEO series; optional group rename at Group Summary.
+- DE/ML contrasts respect custom reference/comparison labels.
+
 ## Version 0.99.28
 
 ### Shinytest2 readiness signal
