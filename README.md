@@ -183,4 +183,6 @@ Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then 
 
 ## Contributors
 
-- **Safa Rafique** — author and maintainer
+- **Safa Rafique** (`safa.sandhu@gmail.com`) — author and maintainer
+- **Naeem Mahmood** (`naeem.sbb@pu.edu.pk`) — author
+- **Muhammad Farooq Sabar** (`farooq.sbb@pu.edu.pk`) — author
