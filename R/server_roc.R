@@ -399,7 +399,7 @@ server_roc <- function(input, output, session, rv) {
       return(invisible(NULL))
     }
     curves <- roc$curves
-    curves <- curves[!sapply(curves, is.null)]
+    curves <- curves[!vapply(curves, is.null, logical(1))]
     if (length(curves) == 0) {
       par(mar = c(2, 2, 2, 2), bg = "#FAFAFA")
       plot.new()
@@ -409,7 +409,7 @@ server_roc <- function(input, output, session, rv) {
     n_plot <- min(10, length(curves))
     top_genes <- as.character(roc$df$Gene[seq_len(n_plot)])
     curves_plot <- curves[intersect(top_genes, names(curves))]
-    curves_plot <- curves_plot[!sapply(curves_plot, is.null)]
+    curves_plot <- curves_plot[!vapply(curves_plot, is.null, logical(1))]
     if (length(curves_plot) == 0) {
       par(mar = c(2, 2, 2, 2), bg = "#FAFAFA")
       plot.new()
@@ -438,11 +438,11 @@ server_roc <- function(input, output, session, rv) {
   roc_curves_plot_data <- reactive({
     roc <- roc_results()
     if (is.null(roc)) return(NULL)
-    curves <- roc$curves[!sapply(roc$curves, is.null)]
+    curves <- roc$curves[!vapply(roc$curves, is.null, logical(1))]
     n_plot <- min(10, length(curves))
     top_genes <- roc$df$Gene[seq_len(n_plot)]
     curves_plot <- curves[top_genes]
-    curves_plot <- curves_plot[!sapply(curves_plot, is.null)]
+    curves_plot <- curves_plot[!vapply(curves_plot, is.null, logical(1))]
     if (length(curves_plot) == 0) return(NULL)
     list(curves_plot = curves_plot)
   })
@@ -531,7 +531,7 @@ server_roc <- function(input, output, session, rv) {
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(legend.position = "top", axis.title.x = ggplot2::element_blank()) +
       ggplot2::labs(y = "Expression", title = "Gene Expression: Normal vs Disease")
-    print(p)
+    p
   }, width = 700, height = 400, res = 96)
 
   output$download_roc_boxplots_jpg <- downloadHandler(
@@ -716,12 +716,12 @@ server_roc <- function(input, output, session, rv) {
       text(0.5, 0.5, "No overlapping genes in external dataset.", cex = 1, col = "gray40")
       return()
     }
-    curves <- ext$curves[!sapply(ext$curves, is.null)]
+    curves <- ext$curves[!vapply(ext$curves, is.null, logical(1))]
     if (length(curves) == 0) return()
     n_plot <- min(10, length(curves))
     top_genes <- ext$df$Gene[seq_len(n_plot)]
     curves_plot <- curves[intersect(top_genes, names(curves))]
-    curves_plot <- curves_plot[!sapply(curves_plot, is.null)]
+    curves_plot <- curves_plot[!vapply(curves_plot, is.null, logical(1))]
     if (length(curves_plot) == 0) return()
 
     gene_cols <- roc_gene_colors()
@@ -795,7 +795,7 @@ server_roc <- function(input, output, session, rv) {
       text(0.5, 0.5, "No AUC comparison data available.", cex = 1, col = "gray40")
       return()
     }
-    print(p)
+    p
   }, height = 380, res = 96)
 
   output$download_roc_comparison_plot_jpg <- downloadHandler(
@@ -864,7 +864,7 @@ server_roc <- function(input, output, session, rv) {
       text(0.5, 0.5, "No validation data for boxplots.", cex = 1, col = "gray40")
       return()
     }
-    print(p)
+    p
   }, height = 450, res = 96)
 
   output$download_roc_val_boxplots_jpg <- downloadHandler(
@@ -911,12 +911,12 @@ server_roc <- function(input, output, session, rv) {
     content = function(file) {
       ext <- roc_external_results()
       if (is.null(ext) || length(ext$curves) == 0) return()
-      curves <- ext$curves[!sapply(ext$curves, is.null)]
+      curves <- ext$curves[!vapply(ext$curves, is.null, logical(1))]
       if (length(curves) == 0) return()
       n_plot <- min(10, length(curves))
       top_genes <- ext$df$Gene[seq_len(n_plot)]
       curves_plot <- curves[intersect(top_genes, names(curves))]
-      curves_plot <- curves_plot[!sapply(curves_plot, is.null)]
+      curves_plot <- curves_plot[!vapply(curves_plot, is.null, logical(1))]
       if (length(curves_plot) == 0) return()
       cols <- c("#27AE60", "#1ABC9C", "#2ECC71", "#16A085", "#009688",
                 "#00BCD4", "#26A69A", "#66BB6A", "#81C784", "#A5D6A7")
@@ -942,12 +942,12 @@ server_roc <- function(input, output, session, rv) {
     content = function(file) {
       ext <- roc_external_results()
       if (is.null(ext) || length(ext$curves) == 0) return()
-      curves <- ext$curves[!sapply(ext$curves, is.null)]
+      curves <- ext$curves[!vapply(ext$curves, is.null, logical(1))]
       if (length(curves) == 0) return()
       n_plot <- min(10, length(curves))
       top_genes <- ext$df$Gene[seq_len(n_plot)]
       curves_plot <- curves[intersect(top_genes, names(curves))]
-      curves_plot <- curves_plot[!sapply(curves_plot, is.null)]
+      curves_plot <- curves_plot[!vapply(curves_plot, is.null, logical(1))]
       if (length(curves_plot) == 0) return()
       cols <- c("#27AE60", "#1ABC9C", "#2ECC71", "#16A085", "#009688",
                 "#00BCD4", "#26A69A", "#66BB6A", "#81C784", "#A5D6A7")
@@ -1001,7 +1001,9 @@ server_roc <- function(input, output, session, rv) {
 
     # Sort by validation AUC (or training AUC if no validation)
     gene_info <- gene_info[order(
-      -sapply(gene_info, function(x) ifelse(is.na(x$auc_val), x$auc_train, x$auc_val)),
+      -vapply(gene_info, function(x) {
+        ifelse(is.na(x$auc_val), x$auc_train, x$auc_val)
+      }, numeric(1)),
       na.last = TRUE
     )]
 
@@ -1009,27 +1011,29 @@ server_roc <- function(input, output, session, rv) {
 
     # Build checkbox labels with AUC info
     checkbox_choices <- setNames(
-      sapply(gene_info, function(x) x$gene),
-      sapply(gene_info, function(x) {
+      vapply(gene_info, function(x) x$gene, character(1)),
+      vapply(gene_info, function(x) {
         lbl <- x$gene
         parts <- c()
         if (!is.na(x$auc_train)) parts <- c(parts, paste0("Training AUC: ", round(x$auc_train, 3)))
         if (!is.na(x$auc_val)) parts <- c(parts, paste0("Validation AUC: ", round(x$auc_val, 3)))
         if (length(parts) > 0) lbl <- paste0(lbl, "  [", paste(parts, collapse = " | "), "]")
         lbl
-      })
+      }, character(1))
     )
 
     # Pre-select genes with both AUCs >= 0.7 (or all if no validation data)
-    preselected <- sapply(gene_info, function(x) {
+    preselected <- vapply(gene_info, function(x) {
       if (has_validation) {
         !is.na(x$auc_val) && x$auc_val >= 0.7 && !is.na(x$auc_train) && x$auc_train >= 0.7
       } else {
         !is.na(x$auc_train) && x$auc_train >= 0.8
       }
-    })
-    preselected_genes <- sapply(gene_info[preselected], function(x) x$gene)
-    if (length(preselected_genes) == 0) preselected_genes <- sapply(gene_info, function(x) x$gene)
+    }, logical(1))
+    preselected_genes <- vapply(gene_info[preselected], function(x) x$gene, character(1))
+    if (length(preselected_genes) == 0) {
+      preselected_genes <- vapply(gene_info, function(x) x$gene, character(1))
+    }
 
     tagList(
       fluidRow(
@@ -1090,7 +1094,7 @@ server_roc <- function(input, output, session, rv) {
     if (is.null(common_genes) || length(common_genes) == 0) return()
     roc_train <- roc_results()
     ext <- tryCatch(roc_external_results(), error = function(e) NULL)
-    sel <- sapply(common_genes, function(g) {
+    sel <- vapply(common_genes, function(g) {
       auc_t <- NA_real_; auc_v <- NA_real_
       if (!is.null(roc_train) && nrow(roc_train$df) > 0) {
         idx <- which(roc_train$df$Gene == g)
@@ -1101,7 +1105,7 @@ server_roc <- function(input, output, session, rv) {
         if (length(idx) > 0) auc_v <- ext$df$AUC_External[idx[1]]
       }
       !is.na(auc_t) && auc_t >= 0.7 && !is.na(auc_v) && auc_v >= 0.7
-    })
+    }, logical(1))
     high_genes <- common_genes[sel]
     if (length(high_genes) == 0) {
       showNotification("No genes meet AUC >= 0.7 in both datasets.", type = "warning", duration = 4)
