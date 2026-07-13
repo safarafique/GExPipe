@@ -12,6 +12,8 @@
 ^GExPipe_.*\.tar\.gz$
 ^app$
 ^GExPipe/
+^GExPipe\(original_paper\)/
+^.*\.docx$
 ^inst/shinyapp/micro_data
 ^inst/shinyapp/rna_data
 ^inst/shinyapp/ext_val_rna

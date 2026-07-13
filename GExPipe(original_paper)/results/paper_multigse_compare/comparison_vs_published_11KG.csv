@@ -1,4 +1,0 @@
-"Method","k","Overlap_published_11KG","Genes_shared_with_paper","Frac_of_panel","Frac_of_paperKG","Jaccard_vs_paperKG"
-"Paper_style_intersect_top20",20,8,"ADH1C;CA4;CLCA4;GUCA2A;GUCA2B;MMP7;MS4A12;ZG16",0.4,0.727272727272727,0.347826086956522
-"Joint_limma_top20",20,3,"CEMIP;CLDN1;GUCA2B",0.15,0.272727272727273,0.107142857142857
-"BIOS_Rank_top20",20,3,"CEMIP;CLDN1;GUCA2B",0.15,0.272727272727273,0.107142857142857
