@@ -51,7 +51,7 @@ server_common_genes <- function(input, output, session, rv) {
     if (length(common) == 0) {
       showNotification("Computation done: no overlap between DEGs and WGCNA significant module genes. Try relaxing DE or module-trait cutoffs.", type = "warning", duration = 8)
     } else {
-      showNotification(paste("Found", length(common), "common genes (DEG ∩ WGCNA)."), type = "message", duration = 5)
+      showNotification(paste("Found", length(common), "common genes (DEG n WGCNA)."), type = "message", duration = 5)
     }
   })
   

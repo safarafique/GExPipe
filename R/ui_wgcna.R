@@ -24,7 +24,7 @@ ui_wgcna <- tabItem(
           tags$strong(icon("sliders-h"), " Disease-specific modules:"),
           " In Step 4 and Step 6 you can ", tags$strong("select any threshold"), " - GS P-value, MM correlation, and module p-value/correlation - to define which genes and modules are disease-related. Hover over ", icon("question-circle"), " next to each parameter for help.",
           tags$br(),
-          tags$small(icon("lightbulb"), " Tip: After selecting top variable genes, check the sample dendrogram for outliers (Step 1); one bad sample can ruin the network. Use Step 2 to pick a soft-threshold power (R² > 0.8); grey module = unassigned genes.")
+          tags$small(icon("lightbulb"), " Tip: After selecting top variable genes, check the sample dendrogram for outliers (Step 1); one bad sample can ruin the network. Use Step 2 to pick a soft-threshold power (R^2 > 0.8); grey module = unassigned genes.")
         )
       )
     ),

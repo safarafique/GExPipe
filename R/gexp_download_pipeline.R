@@ -524,7 +524,7 @@ gexp_download_normalize_ids_for_overlap <- function(
           log_text <- paste0(
             log_text, "  ", gse,
             ": conversion did not yield recognizable symbols; kept original IDs",
-            " (probe/custom IDs will not overlap across platforms — need GPL gene symbols)\n"
+            " (probe/custom IDs will not overlap across platforms - need GPL gene symbols)\n"
           )
         }
       } else {

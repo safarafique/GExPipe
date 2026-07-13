@@ -325,7 +325,7 @@ server_normalize <- function(input, output, session, rv) {
       # Sample a subset of genes for faster plotting (if too many)
       n_genes <- nrow(expr_before)
       if (n_genes > 10000) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_genes <- sample(1:n_genes, 10000)
         expr_before <- expr_before[sample_genes, ]
         expr_after <- expr_after[sample_genes, ]
@@ -334,7 +334,7 @@ server_normalize <- function(input, output, session, rv) {
       # Prepare data for plotting
       n_samples <- min(50, ncol(expr_before))  # Limit to 50 samples for readability
       if (ncol(expr_before) > n_samples) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
         expr_before <- expr_before[, sample_idx]
         expr_after <- expr_after[, sample_idx]
@@ -474,7 +474,7 @@ server_normalize <- function(input, output, session, rv) {
       # Sample genes if too many
       n_genes <- nrow(expr_before)
       if (n_genes > 50000) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_genes <- sample(seq_len(n_genes), 50000)
         expr_before <- expr_before[sample_genes, ]
         expr_after <- expr_after[sample_genes, ]
@@ -539,7 +539,7 @@ server_normalize <- function(input, output, session, rv) {
       # Limit samples for performance
       n_samples <- min(30, ncol(expr_before))
       if (ncol(expr_before) > n_samples) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
         expr_before <- expr_before[, sample_idx]
       }
@@ -592,7 +592,7 @@ server_normalize <- function(input, output, session, rv) {
       # Limit samples for performance
       n_samples <- min(30, ncol(expr_after))
       if (ncol(expr_after) > n_samples) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_idx <- sample(seq_len(ncol(expr_after)), n_samples)
         expr_after <- expr_after[, sample_idx]
       }
@@ -653,7 +653,7 @@ server_normalize <- function(input, output, session, rv) {
       # Sample genes for Q-Q plot
       n_genes <- min(10000, nrow(expr_before))
       if (nrow(expr_before) > n_genes) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
         expr_before <- expr_before[sample_genes, ]
         expr_after <- expr_after[sample_genes, ]
@@ -706,7 +706,7 @@ server_normalize <- function(input, output, session, rv) {
       # Limit samples for readability
       n_samples <- min(50, ncol(expr_after))
       if (ncol(expr_after) > n_samples) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_idx <- sample(seq_len(ncol(expr_after)), n_samples)
         expr_after <- expr_after[, sample_idx]
       }
@@ -780,7 +780,7 @@ server_normalize <- function(input, output, session, rv) {
       # Sample genes if too many
       n_genes <- min(50000, nrow(expr_before))
       if (nrow(expr_before) > n_genes) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
         expr_before <- expr_before[sample_genes, ]
         expr_after <- expr_after[sample_genes, ]
@@ -789,7 +789,7 @@ server_normalize <- function(input, output, session, rv) {
       # Limit samples
       n_samples <- min(20, ncol(expr_before))
       if (ncol(expr_before) > n_samples) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_idx <- sample(seq_len(ncol(expr_before)), n_samples)
         expr_before <- expr_before[, sample_idx]
         expr_after <- expr_after[, sample_idx]
@@ -882,7 +882,7 @@ server_normalize <- function(input, output, session, rv) {
       # Sample genes
       n_genes <- min(10000, nrow(expr_before))
       if (nrow(expr_before) > n_genes) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
         expr_before <- expr_before[sample_genes, ]
         expr_after <- expr_after[sample_genes, ]
@@ -985,7 +985,7 @@ server_normalize <- function(input, output, session, rv) {
       # Sample genes
       n_genes <- min(10000, nrow(expr_before))
       if (nrow(expr_before) > n_genes) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_genes <- sample(seq_len(nrow(expr_before)), n_genes)
         expr_before <- expr_before[sample_genes, ]
         expr_after <- expr_after[sample_genes, ]

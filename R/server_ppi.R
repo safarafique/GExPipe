@@ -568,7 +568,7 @@ server_ppi <- function(input, output, session, rv) {
   ppi_safe_layout <- function(g_sub, method = "fr") {
     n <- igraph::vcount(g_sub)
     if (n <= 0) return(NULL)
-    set.seed(123)
+    withr::local_seed(123)
     if (n == 1) return(matrix(c(0, 0), 1, 2))
     if (n == 2) return(igraph::layout_in_circle(g_sub))
     if (method == "fr") return(igraph::layout_with_fr(g_sub, niter = 3500, start.temp = sqrt(n)))
@@ -602,7 +602,7 @@ server_ppi <- function(input, output, session, rv) {
     if (is.null(g_sub) || igraph::vcount(g_sub) == 0) return(NULL)
     tg <- tidygraph::as_tbl_graph(g_sub)
     tg <- tg %>% tidygraph::activate(nodes) %>% dplyr::mutate(hub_status = ifelse(is_hub, "Hub", "Other"))
-    set.seed(123)
+    withr::local_seed(123)
     ggraph::ggraph(tg, layout = "fr", niter = 3500) +
       ggraph::geom_edge_link(alpha = 0.4, color = "#FF9800", width = 0.55) +
       ggraph::geom_node_point(aes(size = degree, color = hub_status), alpha = 0.92, stroke = 0.8) +
@@ -725,7 +725,7 @@ server_ppi <- function(input, output, session, rv) {
         main_title <- ppi_plot_title("3. ggraph", sel$mode, sel$n_val)
         tg <- tidygraph::as_tbl_graph(g_sub)
         tg <- tg %>% tidygraph::activate(nodes) %>% dplyr::mutate(hub_status = ifelse(is_hub, "Hub", "Other"))
-        set.seed(123)
+        withr::local_seed(123)
         p <- ggraph::ggraph(tg, layout = "fr", niter = 3500) +
           ggraph::geom_edge_link(alpha = 0.4, color = "#FF9800", width = 0.55) +
           ggraph::geom_node_point(aes(size = degree, color = hub_status), alpha = 0.92, stroke = 0.8) +
@@ -1086,7 +1086,7 @@ server_ppi <- function(input, output, session, rv) {
     dev_fun(file, ...)
     op <- par(mar = c(2, 2, 3, 2), cex.main = 1.2, col.main = "#37474F")
     on.exit(par(op), add = TRUE)
-    set.seed(123)
+    withr::local_seed(123)
     layout_fr <- igraph::layout_with_fr(g, niter = 1500)
     node_colors <- ifelse(igraph::V(g)$is_hub, ppi_col_hub, ppi_col_other)
     node_sizes <- scales::rescale(igraph::V(g)$degree, to = c(6, 18))

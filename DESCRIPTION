@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.34
+Version: 0.99.35
 Authors@R: person("Safa", "Rafique",
            email = "safa.sandhu@gmail.com",
            role = c("aut", "cre"))
@@ -91,10 +91,17 @@ Suggests:
     BiocCheck,
     BiocManager,
     BiocStyle,
+    bslib,
     chromote,
+    crosstalk,
+    devtools,
+    fontawesome,
+    htmltools,
+    htmlwidgets,
     knitr,
     pak,
     pkgload,
+    rmda,
     rmarkdown,
     remotes,
     shinytest2,
