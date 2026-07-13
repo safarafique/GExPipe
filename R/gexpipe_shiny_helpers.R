@@ -409,7 +409,7 @@ gexp_ml_prepare_upset_df <- function(sets) {
   as.data.frame(upset_matrix)
 }
 
-# Draw ML methods overlap plot (Venn for 2–5 non-empty sets; UpSet otherwise).
+# Draw ML methods overlap plot (Venn for 2-5 non-empty sets; UpSet otherwise).
 #' @noRd
 gexp_draw_ml_methods_venn <- function(sets,
                                       title = "Common Genes Across Selected ML Methods",
@@ -609,8 +609,8 @@ platform_to_annot <- list(
   # Clariom S / ENSG transcript IDs (symbols via org.Hs.eg.db ENSEMBL, not probe .db)
   "GPL30033" = NA_character_,
   "GPL16025" = NA_character_,
-  "GPL21827" = NA_character_,  # Arraystar LncRNA V4 — use GPL table / biomaRt
-  "GPL26963" = NA_character_,  # Arraystar LncRNA V5 — use GPL table / biomaRt
+  "GPL21827" = NA_character_,  # Arraystar LncRNA V4 - use GPL table / biomaRt
+  "GPL26963" = NA_character_,  # Arraystar LncRNA V5 - use GPL table / biomaRt
   "GPL23432" = "hgu133plus2.db",
   "GPL24299" = "clarionshuman.db",
   "GPL24532" = "hugene21sttranscriptcluster.db",
@@ -1755,7 +1755,7 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
     if (length(sym) == n_probes) sym else NULL
   }
 
-  # fData from GEO (GeneName / Symbol / Entrez) — primary path for Arraystar, Agilent, etc.
+  # fData from GEO (GeneName / Symbol / Entrez) - primary path for Arraystar, Agilent, etc.
   if (!is.null(fdata) && is.data.frame(fdata) && nrow(fdata) == n_probes) {
     fd_sym <- .gexpipe_extract_fdata_symbols(fdata)
     checked <- .safe_sym(fd_sym)

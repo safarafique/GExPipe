@@ -292,7 +292,7 @@ server_roc <- function(input, output, session, rv) {
     res <- roc_combined_panel()
     if (is.null(res)) {
       plot.new()
-      text(0.5, 0.5, "Multi-variable ROC not available (need ≥ 2 panel genes with valid ROC).", cex = 0.9, col = "gray40")
+      text(0.5, 0.5, "Multi-variable ROC not available (need >= 2 panel genes with valid ROC).", cex = 0.9, col = "gray40")
       return()
     }
 

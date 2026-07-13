@@ -198,7 +198,7 @@ server_results <- function(input, output, session, rv) {
           if (length(common_samples) < 3) {
             showNotification(
               tags$div(icon("exclamation-triangle"), tags$strong(" Too few samples."),
-                       " DESeq2 needs ≥ 3 samples matching between raw counts and metadata."),
+                       " DESeq2 needs >= 3 samples matching between raw counts and metadata."),
               type = "error", duration = 8)
             rv$de_running <- FALSE
             return()
@@ -374,7 +374,7 @@ server_results <- function(input, output, session, rv) {
           if (length(common_samples) < 3) {
             showNotification(
               tags$div(icon("exclamation-triangle"), tags$strong(" Too few samples."),
-                       " limma-voom needs ≥ 3 samples matching between raw counts and metadata."),
+                       " limma-voom needs >= 3 samples matching between raw counts and metadata."),
               type = "error", duration = 8)
             rv$de_running <- FALSE
             return()

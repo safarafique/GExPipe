@@ -291,7 +291,7 @@ server_download <- function(input, output, session, rv) {
             )) {
               extra_log <- paste0(
                 extra_log, "  ", gse_id,
-                ": probe/custom IDs detected — STEP 2b will map via GPL/fData\n"
+                ": probe/custom IDs detected - STEP 2b will map via GPL/fData\n"
               )
             } else {
               rownames(micro_expr) <- gene_symbols
