@@ -1,5 +1,13 @@
 # GExPipe NEWS
 
+## Version 0.99.38
+
+### Bioconductor NOTES cleanup
+- Move optional feature packages from Imports to Suggests: Boruta, car, cicerone,
+  corrplot, dcurves, kernlab, mixOmics, SHAPforxgboost (use requireNamespace guards).
+- Prefer seq_len/seq_along; replace cat()/redundant stop-warn prefixes in Shiny servers.
+- Treat Suggests packages as optional during attach/bootstrap (core Imports remain required).
+
 ## Version 0.99.37
 
 ### Package hygiene

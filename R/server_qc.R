@@ -211,10 +211,10 @@ server_qc <- function(input, output, session, rv) {
         # Create a more detailed Venn diagram with better visibility
         # Calculate all intersections manually first to ensure they exist
         all_intersect_4 <- Reduce(intersect, sets)
-        intersect_123 <- Reduce(intersect, sets[1:3])
-        intersect_124 <- Reduce(intersect, sets[c(1,2,4)])
-        intersect_134 <- Reduce(intersect, sets[c(1,3,4)])
-        intersect_234 <- Reduce(intersect, sets[2:4])
+        intersect_123 <- Reduce(intersect, sets[seq_len(3L)])
+        intersect_124 <- Reduce(intersect, sets[c(1L, 2L, 4L)])
+        intersect_134 <- Reduce(intersect, sets[c(1L, 3L, 4L)])
+        intersect_234 <- Reduce(intersect, sets[c(2L, 3L, 4L)])
         
         venn.plot <- venn.diagram(
           x = sets,
