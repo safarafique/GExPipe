@@ -4,7 +4,7 @@
 #
 # WGCNA best practices (signed network):
 #   - Use batch-corrected expression; samples = rows, genes = columns in datExpr.
-#   - Soft threshold: aim for scale-free R² > 0.8; typical power 6-12.
+#   - Soft threshold: aim for scale-free R^2 > 0.8; typical power 6-12.
 #   - minModuleSize: 30-50 for discovery; 20 if few genes.
 #   - mergeCutHeight: 0.25 merges modules with eigengene cor > 0.75.
 #   - Grey module = unassigned genes; exclude from trait correlation.
@@ -267,7 +267,7 @@ server_wgcna <- function(input, output, session, rv) {
       style = "margin-bottom: 0;",
       tags$strong(icon("list"), " Genes used in WGCNA: ", n, " genes."),
       " These are the top variable genes (by variance across samples) that passed the minimum-sample filter. ",
-      "Higher variance means the gene’s expression varies more across samples.",
+      "Higher variance means the gene's expression varies more across samples.",
       tags$br(),
       tags$div(
         style = "margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;",
@@ -604,7 +604,7 @@ server_wgcna <- function(input, output, session, rv) {
     on.exit(par(op), add = TRUE)
     x1 <- sft$fitIndices[, 1]
     y1 <- -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2]
-    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "Scale Free Topology Model Fit, signed R²",
+    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "Scale Free Topology Model Fit, signed R^2",
          type = "n", main = "Scale independence", col.main = "#1a252f")
     points(x1, y1, pch = 19, col = "#2980b9", cex = 1.2)
     text(x1, y1, labels = powers, cex = 0.85, col = "#1a252f", pos = 4, offset = 0.3)
@@ -638,11 +638,11 @@ server_wgcna <- function(input, output, session, rv) {
     
     if (is.na(best_power)) {
       best_hint <- if (length(power_at_max) && !is.na(power_at_max))
-        paste0("Best R² = ", round(max_r2, 2), " at power ", power_at_max, ". ") else ""
+        paste0("Best R^2 = ", round(max_r2, 2), " at power ", power_at_max, ". ") else ""
       tags$div(
         class = "alert alert-warning",
         icon("info-circle"),
-        "No power reached R² > 0.8. ", best_hint,
+        "No power reached R^2 > 0.8. ", best_hint,
         "Choose power manually (typically 6-12); higher power = fewer connections."
       )
     } else {

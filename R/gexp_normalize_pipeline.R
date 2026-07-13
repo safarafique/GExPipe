@@ -38,17 +38,18 @@ utils::globalVariables(c("."))
 #'   \item{log_text}{character string with a human-readable log}
 #'
 #' @examples
-#' set.seed(1)
-#' m1 <- matrix(abs(rnorm(120)), nrow = 20, ncol = 6)
-#' m2 <- matrix(abs(rnorm(120)), nrow = 20, ncol = 6)
-#' rownames(m1) <- rownames(m2) <- paste0("Gene", seq_len(20))
-#' colnames(m1) <- paste0("D1_S", seq_len(6))
-#' colnames(m2) <- paste0("D2_S", seq_len(6))
-#' out <- gexp_normalize_and_intersect(
-#'   micro_expr_list = list(D1 = m1, D2 = m2),
-#'   rna_counts_list = list(),
-#'   de_method = "limma"
-#' )
+#' out <- withr::with_seed(1, {
+#'   m1 <- matrix(abs(rnorm(120)), nrow = 20, ncol = 6)
+#'   m2 <- matrix(abs(rnorm(120)), nrow = 20, ncol = 6)
+#'   rownames(m1) <- rownames(m2) <- paste0("Gene", seq_len(20))
+#'   colnames(m1) <- paste0("D1_S", seq_len(6))
+#'   colnames(m2) <- paste0("D2_S", seq_len(6))
+#'   gexp_normalize_and_intersect(
+#'     micro_expr_list = list(D1 = m1, D2 = m2),
+#'     rna_counts_list = list(),
+#'     de_method = "limma"
+#'   )
+#' })
 #' dim(out$combined_expr)
 #' @param micro_eset_list optional named list of ExpressionSet objects per GSE (for RMA ID mapping).
 #' @param apply_global_quantile logical; if TRUE, apply limma quantile normalization across all samples.
