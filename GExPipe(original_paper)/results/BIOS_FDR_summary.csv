@@ -1,0 +1,3 @@
+"Method","k","n_perm","Observed_threshold","Mean_null_discoveries_at_threshold","Empirical_FDR","Observed_mean_score_topk","Null_mean_score_topk_mean","Empirical_P_mean_topk"
+"BIOS_Rank_topk",20,100,0.800213094824471,0.03,0.0015,0.906526274728798,0.630786027781167,0.0099009900990099
+"limma_adjP_topk",20,100,1.10916597784077e-23,0,0,0.7451540687649,0.266841413951376,NA

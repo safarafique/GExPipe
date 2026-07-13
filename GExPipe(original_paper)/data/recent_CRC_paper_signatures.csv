@@ -1,0 +1,8 @@
+Paper_ID,Year,Citation,DOI_or_PMID,Datasets_used,Gene_list,Notes
+P1_JGO_2022,2022,"Li et al. J Gastrointest Oncol (LASSO+SVM diagnostic genes)",10.21037/jgo-22-536;PMID36072320,GSE41328;GSE106582;GSE110225,"ASCL2,BEST4,CFD,DPEP1,FOXQ1,TRIB3,KLF4,MMP7,MMP11,PYY,PDK4",11-gene diagnostic intersection; SVM also ranked GUCA2B;CLDN1
+P1b_JGO_SVM_extra,2022,"Li et al. JGO SVM candidate pool (extras overlapping BIOS)",10.21037/jgo-22-536,GSE41328;GSE106582,"GUCA2B,CLDN1,ASCL2,BEST4,FOXQ1,MMP7,KLF4",SVM-side genes shared with common CRC signatures
+P2_Genes_2023,2023,"Ahmed et al. Genes (CA2/CA7/ITM2C ML signature)",10.3390/genes14101836;PMC10606805,TCGA-CRC;GSE50760;GSE142279,"CA2,CA7,ITM2C",Early-detection 3-gene signature; same RNA-seq cohort family as D1
+P3_BMCMedGenomics_2023,2023,"Mosharaf et al. BMC Med Genomics (11 key genes multi-GEO)",10.1186/s12920-023-01488-w,GSE9348;GSE110224;GSE23878;GSE35279;GSE50760,"CXCL8,CEMIP,MMP7,CA4,ADH1C,GUCA2A,GUCA2B,ZG16,CLCA4,MS4A12,CLDN1",Includes GSE9348+GSE50760 (your D3/D1 RNA)
+P4_SPIB_AQP8_GUCA2B_2023,2023,"Huang/Li et al. SPIB-AQP8-GUCA2B co-network (in silico+in vitro)",PMC10695778;10.1089/hum.2023.207,TCGA;GEO multi,"SPIB,AQP8,GUCA2B",qPCR/WB/IHC co-regulatory early CRC suppressors
+P5_OTOP2_2022,2022,"OTOP2 functional validation (used GSE50760)",PMID35418782;PMC9000554,GSE50760;GSE104178,"OTOP2,BEST4,GUCA2B",Hub/functional; OTOP2 wet-lab; BEST4/GUCA2B co-listed in related hubs
+P6_Union_recent_CRC_diag,2023,"Union of P1+P2+P3+P4 core diagnostic genes (meta recent)",meta,multiple,"ASCL2,BEST4,FOXQ1,MMP7,CA7,CA2,ITM2C,GUCA2B,CLCA4,CLDN1,SPIB,AQP8,MMP11,KLF4,DPEP1,ZG16,MS4A12,CEMIP,CXCL8,ADH1C,GUCA2A,CA4,CFD,PYY,PDK4,TRIB3",Combined recent-paper diagnostic universe for enrichment
