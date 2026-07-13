@@ -7,14 +7,10 @@ dummy_imports <- function() {
   AnnotationDbi::mapIds
   Biobase::exprs
   biomaRt::useMart
-  Boruta::Boruta
-  car::vif
   caret::createFolds
-  cicerone::Cicerone
   circlize::chordDiagram
   clusterProfiler::enrichGO
   clusterProfiler::GSEA
-  corrplot::corrplot
   data.table::fread
   DESeq2::DESeqDataSetFromMatrix
   dplyr::mutate
@@ -31,9 +27,7 @@ dummy_imports <- function() {
   glmnet::cv.glmnet
   gridExtra::grid.arrange
   igraph::graph_from_data_frame
-  kernlab::ksvm
   limma::lmFit
-  mixOmics::splsda
   msigdbr::msigdbr
   oligo::read.celfiles
   org.Hs.eg.db::org.Hs.eg.db
@@ -45,9 +39,7 @@ dummy_imports <- function() {
   RColorBrewer::brewer.pal
   reshape2::melt
   rms::lrm
-  dcurves::dca
   scales::comma
-  SHAPforxgboost::shap.values
   shiny::shinyApp
   shinydashboard::dashboardPage
   shinyjs::useShinyjs
