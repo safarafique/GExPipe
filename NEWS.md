@@ -1,5 +1,12 @@
 # GExPipe NEWS
 
+## Version 0.99.35
+
+### Bioconductor check warnings
+- Replace non-ASCII characters in R/ with ASCII equivalents.
+- Declare Suggests: bslib, crosstalk, devtools, fontawesome, htmltools, htmlwidgets, rmda.
+- Replace `set.seed()` with `withr::local_seed()` / `withr::with_seed()` (BiocCheck).
+
 ## Version 0.99.34
 
 ### SPB / R CMD check

@@ -11,7 +11,7 @@ ui_common_genes <- tabItem(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       tags$p(tags$strong("Purpose:"), " Intersect differentially expressed genes (DEG) with genes in significant WGCNA modules to obtain a high-confidence gene set, then perform GO and KEGG pathway enrichment for biological interpretation.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Workflow:"), " 1) Compute Common Genes (DEG ∩ WGCNA) -> 2) Run GO and optionally KEGG enrichment -> 3) Choose next step: Path 1 = PPI then ML, or Path 2 = direct to ML.", style = "margin-bottom: 8px;"),
+      tags$p(tags$strong("Workflow:"), " 1) Compute Common Genes (DEG n WGCNA) -> 2) Run GO and optionally KEGG enrichment -> 3) Choose next step: Path 1 = PPI then ML, or Path 2 = direct to ML.", style = "margin-bottom: 8px;"),
       tags$p(tags$strong("Requirements:"), " Step 6 (DE Analysis) and Step 7 (WGCNA, including Identify Significant Modules) must be completed.", style = "margin-bottom: 0;")
     )
   ),
@@ -19,7 +19,7 @@ ui_common_genes <- tabItem(
   # ========== COMMON GENES ==========
   fluidRow(
     box(
-      title = tags$span(icon("search"), " 1. Find Common Genes (DEG ∩ WGCNA)"),
+      title = tags$span(icon("search"), " 1. Find Common Genes (DEG n WGCNA)"),
       width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE,
       tags$div(
         style = "padding: 15px 0;",

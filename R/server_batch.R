@@ -863,7 +863,7 @@ server_batch <- function(input, output, session, rv) {
       # Limit samples for performance
       n_samples <- min(50, ncol(rv$expr_filtered))
       if (ncol(rv$expr_filtered) > n_samples) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_idx <- sample(seq_len(ncol(rv$expr_filtered)), n_samples)
         expr_subset <- rv$expr_filtered[, sample_idx]
         metadata_subset <- rv$unified_metadata[sample_idx, ]
@@ -921,7 +921,7 @@ server_batch <- function(input, output, session, rv) {
       # Limit samples for performance
       n_samples <- min(50, ncol(rv$batch_corrected))
       if (ncol(rv$batch_corrected) > n_samples) {
-        set.seed(123)
+        withr::local_seed(123)
         sample_idx <- sample(seq_len(ncol(rv$batch_corrected)), n_samples)
         expr_subset <- rv$batch_corrected[, sample_idx]
         metadata_subset <- rv$unified_metadata[sample_idx, ]
@@ -1121,7 +1121,7 @@ server_batch <- function(input, output, session, rv) {
     expr_mat <- if (before) rv$expr_filtered else rv$batch_corrected
     if (is.null(expr_mat)) return()
     n_samples <- min(50, ncol(expr_mat))
-    if (ncol(expr_mat) > n_samples) { set.seed(123); sample_idx <- sample(seq_len(ncol(expr_mat)), n_samples); expr_subset <- expr_mat[, sample_idx]; metadata_subset <- rv$unified_metadata[sample_idx, ] } else { expr_subset <- expr_mat; metadata_subset <- rv$unified_metadata }
+    if (ncol(expr_mat) > n_samples) { withr::local_seed(123); sample_idx <- sample(seq_len(ncol(expr_mat)), n_samples); expr_subset <- expr_mat[, sample_idx]; metadata_subset <- rv$unified_metadata[sample_idx, ] } else { expr_subset <- expr_mat; metadata_subset <- rv$unified_metadata }
     cor_matrix <- cor(expr_subset, use = "pairwise.complete.obs")
     dist_matrix <- as.dist(1 - cor_matrix)
     hclust_result <- hclust(dist_matrix, method = "ward.D2")

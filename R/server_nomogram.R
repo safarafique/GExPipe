@@ -262,7 +262,7 @@ server_nomogram <- function(input, output, session, rv) {
 
     } else {
       # INTERNAL MODE: 70/30 stratified split
-      set.seed(123)
+      withr::local_seed(123)
       train_idx <- caret::createDataPartition(nomogram_data$Outcome, p = 0.7, list = FALSE)
       train_data <- nomogram_data[train_idx, ]
       validation_data <- nomogram_data[-train_idx, ]

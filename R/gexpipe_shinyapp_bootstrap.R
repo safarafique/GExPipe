@@ -165,13 +165,13 @@ gexpipe_shinyapp_ensure_package <- function() {
        h2{color:#ff6b6b;} code{background:#333;padding:2px 6px;border-radius:3px;}
        .pkg{color:#ff9800;font-weight:bold;} .fix{color:#69db7c;}"
     )),
-    shiny::h2("GExPipe could not start — missing packages"),
+    shiny::h2("GExPipe could not start - missing packages"),
     shiny::p("The following required packages are not installed:"),
     shiny::tags$ul(lapply(failed_required, function(p) {
       shiny::tags$li(shiny::tags$span(class = "pkg", p))
     })),
     shiny::hr(),
-    shiny::p(shiny::tags$strong("Fix — run in R:")),
+    shiny::p(shiny::tags$strong("Fix - run in R:")),
     shiny::tags$pre(class = "fix", paste0(
       'options(timeout = 3600)\n',
       'BiocManager::install(c(\n  ',
@@ -205,7 +205,7 @@ gexpipe_shinyapp_ensure_package <- function() {
 gexpipe_shinyapp_bootstrap <- function(verbose = TRUE) {
   if (verbose) {
     message("\n======================================================================")
-    message("  GExPipe — Gene Expression Pipeline")
+    message("  GExPipe - Gene Expression Pipeline")
     message("  R ", R.version.string)
     message("======================================================================")
   }
@@ -276,7 +276,7 @@ gexpipe_shinyapp_bootstrap <- function(verbose = TRUE) {
 
   if (isTRUE(.gexpipe_runtime_install_enabled())) {
     if (verbose) {
-      message("  Installing/updating dependencies (first run may take 10–40 min)...")
+      message("  Installing/updating dependencies (first run may take 10-40 min)...")
     }
     options(gexpipe.prelaunch_install_done = NULL)
     still_missing <- .gexpipe_batch_install(.gexpipe_all_pkgs(include_optional = TRUE))
@@ -303,7 +303,7 @@ gexpipe_shinyapp_bootstrap <- function(verbose = TRUE) {
   failed_required <- .gexpipe_missing_required_pkgs(.gexpipe_all_pkgs(include_optional = TRUE), gexpipe_lib)
   if (length(failed_required) > 0L) {
     if (verbose) {
-      message("  Status       : blocked — missing ", length(failed_required), " required package(s)\n")
+      message("  Status       : blocked - missing ", length(failed_required), " required package(s)\n")
     }
     return(.gexpipe_shinyapp_blocked_app(failed_required))
   }
@@ -318,7 +318,7 @@ gexpipe_shinyapp_bootstrap <- function(verbose = TRUE) {
   options(stringsAsFactors = FALSE)
 
   if (verbose) {
-    message("  Status       : ready — opening app...\n")
+    message("  Status       : ready - opening app...\n")
   }
   list(status = "ready", ui = NULL, server = NULL)
 }

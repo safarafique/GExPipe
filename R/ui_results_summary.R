@@ -142,7 +142,7 @@ ui_results_summary <- tabItem(
 
   # ----- 6. Common genes & GO/KEGG -----
   step_card(
-    "8", "venus-double", "Common genes (DEG ∩ WGCNA)",
+    "8", "venus-double", "Common genes (DEG n WGCNA)",
     "Intersection of DEGs and WGCNA module genes. This set is used for GO/KEGG enrichment and PPI.",
     "success",
     uiOutput("results_summary_common_genes")
