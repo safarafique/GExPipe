@@ -7,9 +7,9 @@ server_results <- function(input, output, session, rv) {
   .record_de_transparency <- function(meta_used, method, formula_desc, filter_note,
                                       total_meta = NULL) {
     if (is.null(total_meta)) total_meta <- rv$unified_metadata
-    rv$de_design_formula <<- formula_desc
-    rv$de_gene_filter_note <<- filter_note
-    rv$de_sample_info <<- .gexpipe_call(
+    rv$de_design_formula <- formula_desc
+    rv$de_gene_filter_note <- filter_note
+    rv$de_sample_info <- .gexpipe_call(
       "gexpipe_de_sample_info",
       meta_used, total_meta = total_meta, method = method
     )
@@ -684,7 +684,7 @@ server_results <- function(input, output, session, rv) {
         ) +
         ggplot2::scale_x_continuous(breaks = pretty(volcano_data$logFC, n = 8)) +
         ggplot2::scale_y_continuous(breaks = pretty(volcano_data$neg_log10_padj, n = 8))
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.6, "Volcano plot error", cex = 1.5, font = 2)

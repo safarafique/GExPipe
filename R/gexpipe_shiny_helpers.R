@@ -2379,7 +2379,8 @@ gexpipe_spearman_cor <- function(x) {
 #' @keywords internal
 .gexpipe_capture_console <- function(expr) {
   res <- NULL
-  err <- NULL
+  err_box <- new.env(parent = emptyenv())
+  err_box$err <- NULL
   tryCatch(
     {
       invisible(utils::capture.output(
@@ -2389,11 +2390,11 @@ gexpipe_spearman_cor <- function(x) {
       ))
     },
     error = function(e) {
-      err <<- e
+      err_box$err <- e
     }
   )
-  if (!is.null(err)) {
-    stop(err)
+  if (!is.null(err_box$err)) {
+    stop(err_box$err)
   }
   res
 }

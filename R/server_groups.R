@@ -115,7 +115,7 @@ server_groups <- function(input, output, session, rv) {
     })
     
     # Remove NULL tabs
-    tabs <- tabs[!sapply(tabs, is.null)]
+    tabs <- tabs[!vapply(tabs, is.null, logical(1))]
     
     if (length(tabs) == 0) {
       return(tags$div(class = "alert alert-warning",
@@ -338,7 +338,7 @@ server_groups <- function(input, output, session, rv) {
     })
     
     # Remove NULL boxes
-    selector_boxes <- selector_boxes[!sapply(selector_boxes, is.null)]
+    selector_boxes <- selector_boxes[!vapply(selector_boxes, is.null, logical(1))]
     
     if (length(selector_boxes) == 0) {
       return(tags$div(class = "alert alert-warning",
@@ -772,7 +772,7 @@ server_groups <- function(input, output, session, rv) {
       })
       
       # Remove NULL elements
-      group_uis <- group_uis[!sapply(group_uis, is.null)]
+      group_uis <- group_uis[!vapply(group_uis, is.null, logical(1))]
       
       if (length(group_uis) == 0) {
         return(tags$div(

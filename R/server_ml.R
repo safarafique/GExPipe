@@ -43,7 +43,7 @@ server_ml <- function(input, output, session, rv) {
     mode(X) <- "numeric"
     n_features <- ncol(X)
     ranked_list <- c()
-    remaining_features <- 1:n_features
+    remaining_features <- seq_len(n_features)
     feature_names <- colnames(X)
     iteration <- 0
     while (length(remaining_features) > 1) {

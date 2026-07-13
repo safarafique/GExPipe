@@ -479,7 +479,7 @@ server_batch <- function(input, output, session, rv) {
 
   output$gene_variance_plot <- renderPlot({
     p <- batch_gene_variance_plot()
-    if (!is.null(p)) print(p)
+    if (!is.null(p)) p
   })
 
   output$download_gene_variance_png <- downloadHandler(
@@ -974,13 +974,13 @@ server_batch <- function(input, output, session, rv) {
   # PVCA (Principal Variance Component Analysis) - Before
   output$pvca_before <- renderPlot({
     p <- .batch_pvca_render(before = TRUE)
-    if (!is.null(p)) print(p)
+    if (!is.null(p)) p
   })
   
   # PVCA (Principal Variance Component Analysis) - After
   output$pvca_after <- renderPlot({
     p <- .batch_pvca_render(before = FALSE)
-    if (!is.null(p)) print(p)
+    if (!is.null(p)) p
   })
   
   output$next_to_results_btn <- renderUI({

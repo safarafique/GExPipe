@@ -1,5 +1,15 @@
 # GExPipe NEWS
 
+## Version 0.99.36
+
+### SPB NOTES cleanup (reviewer request)
+- Expand NAMESPACE `importFrom` for grDevices/graphics/stats/utils/shiny/ggplot2/DT/grid.
+- Expand `utils::globalVariables()` for NSE column names and Shiny symbols.
+- Replace `sapply()` with `vapply()`; prefer `seq_len()` / `sample.int()`.
+- Replace ggplot `print(p)` with returning `p` in `renderPlot`.
+- Remove `<<-` via env boxes / reactiveValues assignment.
+- Fix `gexp_fetch_geo_series_matrix_metadata` call in validation server.
+
 ## Version 0.99.35
 
 ### Bioconductor check warnings
