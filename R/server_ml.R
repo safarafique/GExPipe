@@ -212,7 +212,7 @@ server_ml <- function(input, output, session, rv) {
 
     withProgress(message = "Running ML analysis...", value = 0.1, {
       tryCatch({
-        set.seed(123)
+        withr::local_seed(123)
         gene_lists <- list()
         method_names <- character(0)
 
@@ -233,7 +233,7 @@ server_ml <- function(input, output, session, rv) {
         }
         if ("elastic" %in% methods_sel) {
           incProgress(step_inc, detail = "Elastic Net...")
-          set.seed(123)
+          withr::local_seed(123)
           cv_elastic <- .glmnet_cv_fit(x, y, alpha = 0.5)
           coef_elastic <- as.matrix(coef(cv_elastic, s = cv_elastic$lambda.min))
           elastic_df <- data.frame(Gene = rownames(coef_elastic), Coefficient = coef_elastic[, 1], stringsAsFactors = FALSE)
@@ -249,7 +249,7 @@ server_ml <- function(input, output, session, rv) {
         }
         if ("ridge" %in% methods_sel) {
           incProgress(step_inc, detail = "Ridge...")
-          set.seed(123)
+          withr::local_seed(123)
           cv_ridge <- .glmnet_cv_fit(x, y, alpha = 0)
           coef_ridge <- as.matrix(coef(cv_ridge, s = cv_ridge$lambda.min))
           ridge_df <- data.frame(Gene = rownames(coef_ridge), Coefficient = coef_ridge[, 1], stringsAsFactors = FALSE)
@@ -265,7 +265,7 @@ server_ml <- function(input, output, session, rv) {
         }
         if ("rf" %in% methods_sel) {
           incProgress(step_inc, detail = "Random Forest...")
-          set.seed(123)
+          withr::local_seed(123)
           rf_model <- randomForest::randomForest(x = x, y = y, ntree = 500, importance = TRUE)
           imp <- randomForest::importance(rf_model)
           rf_df <- data.frame(
@@ -284,7 +284,7 @@ server_ml <- function(input, output, session, rv) {
         }
         if ("svm" %in% methods_sel) {
           incProgress(step_inc, detail = "SVM-RFE...")
-          set.seed(123)
+          withr::local_seed(123)
           svm_ranking <- svmRFE(x, y)
           rv$ml_svm_ranking <- svm_ranking
           gene_lists[["SVM-RFE"]] <- head(rv$ml_svm_ranking$Gene, n_svm)
@@ -293,7 +293,7 @@ server_ml <- function(input, output, session, rv) {
         }
         if ("boruta" %in% methods_sel) {
           incProgress(step_inc, detail = "Boruta...")
-          set.seed(123)
+          withr::local_seed(123)
           x_df <- as.data.frame(x)
           boruta_fit <- tryCatch(
             Boruta::Boruta(x_df, y, maxRuns = 100, doTrace = 0),
@@ -315,7 +315,7 @@ server_ml <- function(input, output, session, rv) {
         }
         if ("splsda" %in% methods_sel) {
           incProgress(step_inc, detail = "sPLS-DA...")
-          set.seed(123)
+          withr::local_seed(123)
           n_keep <- min(n_splsda, ncol(x), 50)
           splsda_fit <- tryCatch({
             mixOmics::splsda(X = x, Y = y, ncomp = 2, keepX = c(n_keep, n_keep))
@@ -342,7 +342,7 @@ server_ml <- function(input, output, session, rv) {
         }
         if ("xgboost" %in% methods_sel) {
           incProgress(step_inc, detail = "XGBoost+SHAP...")
-          set.seed(123)
+          withr::local_seed(123)
           y_num <- as.numeric(y) - 1
           dtrain <- xgboost::xgb.DMatrix(data = x, label = y_num)
           xgb_fit <- tryCatch(
@@ -757,7 +757,7 @@ server_ml <- function(input, output, session, rv) {
     req(rv$ml_x, rv$ml_y)
     x <- rv$ml_x
     y <- rv$ml_y
-    set.seed(123)
+    withr::local_seed(123)
     train_idx <- sample(seq_len(nrow(x)), size = round(0.8 * nrow(x)))
     x_train <- x[train_idx, , drop = FALSE]
     y_train <- y[train_idx]

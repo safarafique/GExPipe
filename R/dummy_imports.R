@@ -71,5 +71,7 @@ dummy_imports <- function() {
   rlang::is_character
   vctrs::vec_size
   withr::with_options
+  withr::local_seed
+  withr::with_seed
   invisible(NULL)
 }
