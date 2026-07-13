@@ -145,7 +145,9 @@ server_gsea <- function(input, output, session, rv) {
 
         gene_sets <- unique(do.call(rbind, gene_sets_list))
         rv$gsea_collection_lookup <- unique(collection_lookup)
-        rv$gsea_collections_used <- unname(sapply(selected_colls, function(c) gsea_coll_map[[c]]$label))
+        rv$gsea_collections_used <- unname(vapply(
+          selected_colls, function(c) gsea_coll_map[[c]]$label, character(1)
+        ))
 
         results_by_gene <- list()
         n_genes <- length(target_in_data)
@@ -242,13 +244,13 @@ server_gsea <- function(input, output, session, rv) {
               geneSetID = top_terms,
               title = paste("GSEA for", g),
               base_size = 11,
-              subplots = 1:3,
+              subplots = seq_len(3),
               pvalue_table = FALSE,
               rel_heights = c(1.5, 0.3, 0.5)
             )
             if (inherits(p, "ggplot")) {
               p <- p + ggplot2::theme(plot.margin = ggplot2::margin(t = 50, r = 12, b = 12, l = 12, unit = "pt"))
-              print(p)
+              p
             } else if (inherits(p, "list")) {
               do.call(gridExtra::grid.arrange, p)
             } else {
@@ -283,7 +285,7 @@ server_gsea <- function(input, output, session, rv) {
             if (nrow(res_df) == 0 || length(top_terms) == 0) return()
             tryCatch({
               p <- enrichplot::gseaplot2(result, geneSetID = top_terms, title = paste("GSEA for", g),
-                base_size = 14, subplots = 1:3, pvalue_table = FALSE, rel_heights = c(1.2, 0.3, 0.5))
+                base_size = 14, subplots = seq_len(3), pvalue_table = FALSE, rel_heights = c(1.2, 0.3, 0.5))
               if (inherits(p, "ggplot")) {
                 ggplot2::ggsave(file, plot = p, width = 10, height = 8, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
               } else if (inherits(p, "list")) {
@@ -304,7 +306,7 @@ server_gsea <- function(input, output, session, rv) {
             if (nrow(res_df) == 0 || length(top_terms) == 0) return()
             tryCatch({
               p <- enrichplot::gseaplot2(result, geneSetID = top_terms, title = paste("GSEA for", g),
-                base_size = 14, subplots = 1:3, pvalue_table = FALSE, rel_heights = c(1.2, 0.3, 0.5))
+                base_size = 14, subplots = seq_len(3), pvalue_table = FALSE, rel_heights = c(1.2, 0.3, 0.5))
               if (inherits(p, "ggplot")) {
                 ggplot2::ggsave(file, plot = p, width = 10, height = 8, device = "pdf", bg = "white")
               } else if (inherits(p, "list")) {

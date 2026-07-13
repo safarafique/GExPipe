@@ -113,7 +113,7 @@ server_qc <- function(input, output, session, rv) {
     if (length(sets) == 2) {
       tryCatch({
         # Category names with totals displayed clearly
-        cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
+        cat_names <- paste0(names(sets), "\n", format(vapply(sets, length, integer(1)), big.mark = ","))
 
         venn.plot <- VennDiagram::venn.diagram(
           x = sets,
@@ -146,7 +146,7 @@ server_qc <- function(input, output, session, rv) {
       tryCatch({
         # Check if all sets are identical
         all_intersect <- Reduce(intersect, sets)
-        all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
+        all_same <- all(vapply(sets, function(s) length(s) == length(all_intersect), logical(1)))
         
         if (all_same) {
           plot.new()
@@ -157,10 +157,10 @@ server_qc <- function(input, output, session, rv) {
         }
         
         # Create category names with totals (like "Q = 16")
-        cat_names <- paste0(names(sets), " = ", format(sapply(sets, length), big.mark = ","))
+        cat_names <- paste0(names(sets), " = ", format(vapply(sets, length, integer(1)), big.mark = ","))
         
         # Create category names with totals
-        cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
+        cat_names <- paste0(names(sets), "\n", format(vapply(sets, length, integer(1)), big.mark = ","))
         
         venn.plot <- venn.diagram(
           x = sets,
@@ -192,7 +192,7 @@ server_qc <- function(input, output, session, rv) {
       tryCatch({
         # Check if all sets are identical
         all_intersect <- Reduce(intersect, sets)
-        all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
+        all_same <- all(vapply(sets, function(s) length(s) == length(all_intersect), logical(1)))
         
         if (all_same) {
           plot.new()
@@ -206,7 +206,7 @@ server_qc <- function(input, output, session, rv) {
         sets <- lapply(sets, unique)
         
         # Create category names with totals
-        cat_names <- paste0(names(sets), "\n", format(sapply(sets, length), big.mark = ","))
+        cat_names <- paste0(names(sets), "\n", format(vapply(sets, length, integer(1)), big.mark = ","))
         
         # Create a more detailed Venn diagram with better visibility
         # Calculate all intersections manually first to ensure they exist
@@ -252,7 +252,7 @@ server_qc <- function(input, output, session, rv) {
     } else {
       # For 5+ datasets, check if all identical
       all_intersect <- Reduce(intersect, sets)
-      all_same <- all(sapply(sets, function(s) length(s) == length(all_intersect)))
+      all_same <- all(vapply(sets, function(s) length(s) == length(all_intersect), logical(1)))
       
       if (all_same) {
         plot.new()
@@ -585,12 +585,12 @@ server_qc <- function(input, output, session, rv) {
   # ---- Render plots ----
   output$qc_pca_outlier_plot <- renderPlot({
     req(rv$qc_pca_scores)
-    print(make_qc_pca_plot())
+    make_qc_pca_plot()
   }, height = 420, res = 96)
 
   output$qc_connectivity_plot <- renderPlot({
     req(rv$qc_conn_k)
-    print(make_qc_conn_plot())
+    make_qc_conn_plot()
   }, height = 420, res = 96)
 
   # ---- Download handlers for plots ----
@@ -841,14 +841,14 @@ server_qc <- function(input, output, session, rv) {
     }
 
     # Build labels with detection method info
-    checkbox_choices <- setNames(outliers, sapply(outliers, function(s) {
+    checkbox_choices <- setNames(outliers, vapply(outliers, function(s) {
       methods <- c()
       if (s %in% rv$qc_pca_outliers) methods <- c(methods, "PCA")
       if (s %in% rv$qc_conn_outliers) methods <- c(methods, "Connectivity")
       dist_val <- round(rv$qc_pca_distances[s], 1)
       conn_val <- round(rv$qc_conn_k[s], 1)
       paste0(s, "  [", paste(methods, collapse = "+"), " | Dist:", dist_val, " | Conn:", conn_val, "]")
-    }))
+    }, character(1)))
 
     tags$div(
       style = "padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px;",
