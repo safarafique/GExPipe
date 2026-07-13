@@ -1,5 +1,10 @@
 # GExPipe NEWS
 
+## Version 0.99.37
+
+### Package hygiene
+- Exclude and untrack `GExPipe(original_paper)/` from the Bioconductor package tree (`.Rbuildignore` + `.gitignore`).
+
 ## Version 0.99.36
 
 ### SPB NOTES cleanup (reviewer request)

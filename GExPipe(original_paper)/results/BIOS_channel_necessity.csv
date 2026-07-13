@@ -1,6 +1,0 @@
-"Channel","Meaning","LOO_MinMedian","Delta_vs_full","Jaccard_panel_change","ONLY_MinMedian","Hurts_when_dropped","Role"
-"Ec","Condition strength (−log10 adjP × |βC|)",0.921200750469043,-0.00238285502513103,0.333333333333333,0.930555555555556,TRUE,"necessary (drop ↓ metric)"
-"Ep","Platform purity |βC|/(|βC|+|βP|)",0.923583605494175,0,0,0.918288050401872,FALSE,"saturated at this k (panel unchanged)"
-"Em","Trait-WGCNA module",0.923583605494175,0,0,0.938491649873764,FALSE,"saturated at this k (panel unchanged)"
-"Es","ML/consensus stability",0.930555555555556,0.00697195006138107,0.461538461538462,0.91963727329581,FALSE,"changes panel composition"
-"Ex","Cross-assay min AUC",0.922645519190235,-0.000938086303939989,0.0952380952380952,0.949968730456536,TRUE,"necessary (drop ↓ metric)"
