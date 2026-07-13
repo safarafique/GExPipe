@@ -217,7 +217,7 @@ server_validation <- function(input, output, session, rv) {
           rna_meta <- tryCatch({
             gl <- .gexpipe_geo_quiet(GEOquery::getGEO(gse_id, GSEMatrix = TRUE))
             Biobase::pData(if (is.list(gl)) gl[[1]] else gl)
-          }, error = function(e) { sm <- fetch_geo_series_matrix_metadata(gse_id); if (!is.null(sm)) sm else data.frame(title = colnames(count_matrix), row.names = colnames(count_matrix)) })
+          }, error = function(e) { sm <- gexp_fetch_geo_series_matrix_metadata(gse_id); if (!is.null(sm)) sm else data.frame(title = colnames(count_matrix), row.names = colnames(count_matrix)) })
           all_metadata_list[[gse_id]] <- rna_meta
           ext_log <- paste0(ext_log, "OK (", nrow(count_matrix), "g x ", ncol(count_matrix), "s)\n")
         }
@@ -737,7 +737,7 @@ server_validation <- function(input, output, session, rv) {
                                   box.padding = 0.5, segment.color = "gray50") +
         ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 15),
                        legend.position = "right")
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Volcano plot error:", conditionMessage(e)), cex = 0.9, col = "gray40")

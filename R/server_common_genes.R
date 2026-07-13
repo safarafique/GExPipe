@@ -331,7 +331,7 @@ server_common_genes <- function(input, output, session, rv) {
   output$go_bp_plot <- renderPlot({
     tryCatch({
       p <- make_go_dot_plot(rv$go_bp, "GO Biological Process")
-      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
+      if (!is.null(p)) p else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
@@ -341,7 +341,7 @@ server_common_genes <- function(input, output, session, rv) {
   output$go_mf_plot <- renderPlot({
     tryCatch({
       p <- make_go_dot_plot(rv$go_mf, "GO Molecular Function")
-      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
+      if (!is.null(p)) p else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
@@ -351,7 +351,7 @@ server_common_genes <- function(input, output, session, rv) {
   output$go_cc_plot <- renderPlot({
     tryCatch({
       p <- make_go_dot_plot(rv$go_cc, "GO Cellular Component")
-      if (!is.null(p)) print(p) else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
+      if (!is.null(p)) p else { plot.new(); text(0.5, 0.5, "No enrichment or not run yet", cex = 1.2) }
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 1, col = "red")
@@ -526,7 +526,7 @@ server_common_genes <- function(input, output, session, rv) {
     {
       tryCatch({
         p <- make_kegg_barplot()
-        if (!is.null(p)) print(p) else {
+        if (!is.null(p)) p else {
           plot.new()
           text(0.5, 0.5, if (is.null(rv$kegg_enrichment)) "Run KEGG enrichment first" else "No significant KEGG pathways", cex = 1.2)
         }

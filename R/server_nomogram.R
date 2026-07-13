@@ -484,7 +484,7 @@ server_nomogram <- function(input, output, session, rv) {
                 legend.position = "topright", lwd = 2)
     } else {
       p <- plot(dca_obj, smooth = FALSE)
-      print(p + ggplot2::scale_color_manual(values = c("grey60", model_col, "grey60")) +
+      (p + ggplot2::scale_color_manual(values = c("grey60", model_col, "grey60")) +
         ggplot2::theme(legend.position = c(0.99, 0.99), legend.justification = c(1, 1)))
     }
   }
