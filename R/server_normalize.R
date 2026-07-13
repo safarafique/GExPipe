@@ -326,7 +326,7 @@ server_normalize <- function(input, output, session, rv) {
       n_genes <- nrow(expr_before)
       if (n_genes > 10000) {
         withr::local_seed(123)
-        sample_genes <- sample(1:n_genes, 10000)
+        sample_genes <- sample.int(n_genes, 10000)
         expr_before <- expr_before[sample_genes, ]
         expr_after <- expr_after[sample_genes, ]
       }
@@ -387,8 +387,7 @@ server_normalize <- function(input, output, session, rv) {
           strip.text = element_text(color = "white", face = "bold")
         )
       norm_plots$plot <- p
-      print(p)
-      
+      p
     }, error = function(e) {
       # Fallback: Simple density plot
       tryCatch({
@@ -422,7 +421,7 @@ server_normalize <- function(input, output, session, rv) {
             legend.position = "top"
           )
         norm_plots$plot <- p
-        print(p)
+        p
       }, error = function(e2) {
         plot.new()
         text(0.5, 0.5, "Unable to generate normalization plot", cex = 1.2)
@@ -515,7 +514,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.minor = element_line(color = "gray95")
         )
       norm_plots$density <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
@@ -575,7 +574,7 @@ server_normalize <- function(input, output, session, rv) {
           legend.position = "right"
         )
       norm_plots$corr_before <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
@@ -628,7 +627,7 @@ server_normalize <- function(input, output, session, rv) {
           legend.position = "right"
         )
       norm_plots$corr_after <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
@@ -689,7 +688,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.minor = element_line(color = "gray95")
         )
       norm_plots$qq <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
@@ -755,7 +754,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.minor = element_line(color = "gray95")
         )
       norm_plots$median_range <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
@@ -857,7 +856,7 @@ server_normalize <- function(input, output, session, rv) {
           strip.text = element_text(color = "white", face = "bold")
         )
       norm_plots$distribution_overlap <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
@@ -960,7 +959,7 @@ server_normalize <- function(input, output, session, rv) {
           )
       }
       norm_plots$ma_plot <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)
@@ -1032,7 +1031,7 @@ server_normalize <- function(input, output, session, rv) {
           panel.grid.minor = element_line(color = "gray95")
         )
       norm_plots$mean_variance <- p
-      print(p)
+      p
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2)

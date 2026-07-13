@@ -8,7 +8,8 @@ gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
     versions <- c("12.0", "11.5", "11")   # latest first - most likely to succeed
   }
   n_retry <- 3L
-  errs    <- character(0)
+  state <- new.env(parent = emptyenv())
+  state$errs <- character(0)
   for (sv in versions) {
     for (attempt in seq_len(n_retry)) {
       db <- tryCatch(
@@ -20,15 +21,17 @@ gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
         ),
         error = function(e) {
           msg <- conditionMessage(e)
-          errs <<- c(errs, paste0("STRING v", sv, " attempt ", attempt, ": ", msg))
+          state$errs <- c(state$errs, paste0("STRING v", sv, " attempt ", attempt, ": ", msg))
           NULL
         }
       )
-      if (!is.null(db)) return(list(db = db, version_used = sv, try_errors = errs))
+      if (!is.null(db)) {
+        return(list(db = db, version_used = sv, try_errors = state$errs))
+      }
       if (attempt < n_retry) Sys.sleep(3)   # brief pause before retry
     }
   }
-  list(db = NULL, version_used = NA_character_, try_errors = errs)
+  list(db = NULL, version_used = NA_character_, try_errors = state$errs)
 }
 
 gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_directory = "") {
@@ -37,7 +40,9 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     versions <- c("12.0", "11.5", "11")   # latest first
   }
   n_retry <- 3L
-  errs    <- character(0)
+  state <- new.env(parent = emptyenv())
+  state$errs <- character(0)
+  state$timeout_seen <- FALSE
 
   for (sv in versions) {
     string_db <- NULL
@@ -51,7 +56,10 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
         ),
         error = function(e) {
           msg <- conditionMessage(e)
-          errs <<- c(errs, paste0("STRING init v", sv, " attempt ", attempt, ": ", msg))
+          state$errs <- c(
+            state$errs,
+            paste0("STRING init v", sv, " attempt ", attempt, ": ", msg)
+          )
           NULL
         }
       )
@@ -65,12 +73,15 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
         string_db$map(data.frame(SYMBOL = valid_genes), "SYMBOL", removeUnmappedRows = TRUE)
       ),
       error = function(e) {
-        errs <<- c(errs, paste0("STRING map v", sv, ": ", conditionMessage(e)))
+        state$errs <- c(state$errs, paste0("STRING map v", sv, ": ", conditionMessage(e)))
         NULL
       }
     )
     if (is.null(mapped) || nrow(mapped) == 0) {
-      errs <- c(errs, paste0("STRING map v", sv, ": no genes could be mapped to STRING identifiers"))
+      state$errs <- c(
+        state$errs,
+        paste0("STRING map v", sv, ": no genes could be mapped to STRING identifiers")
+      )
       next
     }
 
@@ -93,19 +104,22 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
       .gexpipe_stringdb_quiet(string_db$get_interactions(valid_ids)),
       error = function(e) {
         msg <- conditionMessage(e)
-        errs <<- c(errs, paste0("STRING interactions v", sv, ": ", msg))
-        if (grepl("timeout", msg, ignore.case = TRUE)) timeout_seen <<- TRUE
+        state$errs <- c(state$errs, paste0("STRING interactions v", sv, ": ", msg))
+        if (grepl("timeout", msg, ignore.case = TRUE)) state$timeout_seen <- TRUE
         NULL
       }
     )
 
     if (is.null(interactions)) {
-      if (isTRUE(timeout_seen)) break
+      if (isTRUE(state$timeout_seen)) break
       next
     }
     if (!is.data.frame(interactions)) interactions <- as.data.frame(interactions, stringsAsFactors = FALSE)
     if (nrow(interactions) == 0) {
-      errs <- c(errs, paste0("STRING v", sv, ": 0 interactions found - score threshold may be too high"))
+      state$errs <- c(
+        state$errs,
+        paste0("STRING v", sv, ": 0 interactions found - score threshold may be too high")
+      )
       next
     }
 
@@ -115,7 +129,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
       id_col       = id_col,
       version_used = sv,
       pct_mapped   = pct_mapped,
-      try_errors   = errs
+      try_errors   = state$errs
     ))
   }
 
@@ -124,7 +138,7 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     interactions = NULL,
     id_col = NA_character_,
     version_used = NA_character_,
-    try_errors = errs
+    try_errors = state$errs
   )
 }
 
@@ -740,7 +754,7 @@ server_ppi <- function(input, output, session, rv) {
             plot.subtitle = ggplot2::element_text(size = 9, color = "#546E7A"),
             plot.margin = ggplot2::margin(4, 4, 4, 4, "pt")
           )
-        print(p)
+        p
       }, error = function(e) { plot.new(); text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red") })
     },
     width = 560, height = 520, res = 96

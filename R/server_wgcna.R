@@ -154,7 +154,7 @@ server_wgcna <- function(input, output, session, rv) {
             if (!is.null(input$wgcna_top_genes)) as.integer(input$wgcna_top_genes) else 5000L,
             length(vars)
           )
-          keep_genes <- names(sort(vars, decreasing = TRUE))[1:top_n]
+          keep_genes <- names(sort(vars, decreasing = TRUE))[seq_len(top_n)]
           expr_top <- expr_mat[keep_genes, , drop = FALSE]
           add_wgcna_log(paste("Selected top", top_n, "most variable genes"))
         }
@@ -320,7 +320,7 @@ server_wgcna <- function(input, output, session, rv) {
     height <- ht$height
     join_height <- numeric(n)
     for (k in seq_len(n - 1)) {
-      for (side in 1:2) {
+      for (side in seq_len(2)) {
         if (merge[k, side] < 0) {
           leaf <- -merge[k, side]
           join_height[leaf] <- height[k]
@@ -1585,10 +1585,10 @@ server_wgcna <- function(input, output, session, rv) {
     sig_mods <- rv$significant_modules
     sig_mods$Module <- factor(sig_mods$Module,
                              levels = sig_mods$Module[order(abs(sig_mods$Correlation), decreasing = TRUE)])
-    sig_mods$orig_color <- sapply(as.character(sig_mods$Module), function(m) {
+    sig_mods$orig_color <- vapply(as.character(sig_mods$Module), function(m) {
       x <- sub("^ME", "", m)
       if (x %in% colors()) x else "gray50"
-    })
+    }, character(1))
     y_range <- max(sig_mods$Correlation, na.rm = TRUE) - min(sig_mods$Correlation, na.rm = TRUE)
     strip_height <- if (y_range > 0) 0.02 * y_range else 0.02
     bar_df <- data.frame(
@@ -1841,7 +1841,7 @@ server_wgcna <- function(input, output, session, rv) {
       title(main = paste("No genes in module", input$select_module))
       return(invisible(NULL))
     }
-    print(p)
+    p
   }, height = 420, res = 96)
 
   output$download_gs_mm_plot_png <- downloadHandler(
@@ -1919,7 +1919,7 @@ server_wgcna <- function(input, output, session, rv) {
       on.exit(dev.off(), add = TRUE)
       for (mod in modules) {
         p <- make_gs_mm_plot(mod, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
-        if (!is.null(p)) print(p)
+        if (!is.null(p)) p
       }
     }
   )
