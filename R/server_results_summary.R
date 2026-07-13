@@ -219,7 +219,7 @@ server_results_summary <- function(input, output, session, rv) {
         ggplot2::labs(title = "Volcano Plot", subtitle = paste0("DEGs: ", n_up + n_down, " (Up: ", n_up, ", Down: ", n_down), x = "Log2 FC", y = "-Log10 adj.P.Val") +
         ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40") +
         ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40")
-      print(p)
+      p
     }, error = function(e) { plot.new(); text(0.5, 0.5, paste("Error:", conditionMessage(e)), cex = 0.9, col = "red") })
   }, height = 260)
 
@@ -456,9 +456,9 @@ server_results_summary <- function(input, output, session, rv) {
     n_genes <- if (is.null(by_gene)) 0L else length(by_gene)
     n_pathways <- 0L
     if (length(by_gene) > 0) {
-      n_pathways <- sum(sapply(by_gene, function(x) {
+      n_pathways <- sum(vapply(by_gene, function(x) {
         if (inherits(x, c("gseaResult", "enrichResult"))) nrow(as.data.frame(x)) else 0L
-      }))
+      }, integer(1)))
     }
     tags$div(
       tags$p(tags$strong("GSEA target genes:"), format(n_genes, big.mark = ",")),
@@ -479,7 +479,7 @@ server_results_summary <- function(input, output, session, rv) {
       top_id <- if ("p.adjust" %in% names(df)) df$ID[order(df$p.adjust)][1] else df$ID[1]
       p <- enrichplot::gseaplot2(result, geneSetID = top_id, title = paste0("GSEA: ", gene_name))
       if (inherits(p, "ggplot")) {
-        print(p)
+        p
       } else if (inherits(p, "list")) {
         do.call(gridExtra::grid.arrange, p)
       } else {
@@ -784,7 +784,13 @@ server_results_summary <- function(input, output, session, rv) {
     gene_name <- names(by_gene)[1]
     top_id <- if ("p.adjust" %in% names(df)) df$ID[order(df$p.adjust)][1] else df$ID[1]
     p <- enrichplot::gseaplot2(result, geneSetID = top_id, title = paste0("GSEA: ", gene_name))
-    if (inherits(p, "ggplot")) print(p) else if (inherits(p, "list")) do.call(gridExtra::grid.arrange, p) else grid::grid.draw(p)
+    if (inherits(p, "ggplot")) {
+      p
+    } else if (inherits(p, "list")) {
+      do.call(gridExtra::grid.arrange, p)
+    } else {
+      grid::grid.draw(p)
+    }
   }
 
   add_rs_jpg_pdf("batch_before_after", draw_rs_batch_before_after, "ResultsSummary_Batch_Before_After", 9, 4.5)
