@@ -3,6 +3,10 @@ title: "GExPipe: An Integrated Pipeline for Gene Expression Analysis"
 author:
   - name: Safa Rafique
     affiliation: University of the Punjab
+  - name: Naeem Mahmood
+    affiliation: University of the Punjab
+  - name: Muhammad Farooq Sabar
+    affiliation: University of the Punjab
 date: "`r Sys.Date()`"
 output:
   BiocStyle::html_document:
