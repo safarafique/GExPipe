@@ -113,13 +113,13 @@ server_gsea <- function(input, output, session, rv) {
       tryCatch({
         # ---- Fetch selected gene set collections ----
         gsea_coll_map <- list(
-          "H"           = list(cat = "H",  sub = NULL,          label = "Hallmark"),
-          "C5_BP"       = list(cat = "C5", sub = "GO:BP",       label = "GO:BP"),
-          "C5_MF"       = list(cat = "C5", sub = "GO:MF",       label = "GO:MF"),
-          "C2_KEGG"     = list(cat = "C2", sub = "CP:KEGG",     label = "KEGG"),
-          "C2_REACTOME" = list(cat = "C2", sub = "CP:REACTOME", label = "Reactome"),
-          "C7"          = list(cat = "C7", sub = NULL,          label = "Immunologic"),
-          "C6"          = list(cat = "C6", sub = NULL,          label = "Oncogenic")
+          "H"           = list(msig_category = "H",  sub = NULL,          label = "Hallmark"),
+          "C5_BP"       = list(msig_category = "C5", sub = "GO:BP",       label = "GO:BP"),
+          "C5_MF"       = list(msig_category = "C5", sub = "GO:MF",       label = "GO:MF"),
+          "C2_KEGG"     = list(msig_category = "C2", sub = "CP:KEGG",     label = "KEGG"),
+          "C2_REACTOME" = list(msig_category = "C2", sub = "CP:REACTOME", label = "Reactome"),
+          "C7"          = list(msig_category = "C7", sub = NULL,          label = "Immunologic"),
+          "C6"          = list(msig_category = "C6", sub = NULL,          label = "Oncogenic")
         )
         selected_colls <- input$gsea_collection
         if (is.null(selected_colls) || length(selected_colls) == 0) selected_colls <- "H"
@@ -132,9 +132,9 @@ server_gsea <- function(input, output, session, rv) {
           if (is.null(params)) next
           incProgress(0, detail = paste("Fetching", params$label, "gene sets..."))
           gs <- if (is.null(params$sub)) {
-            msigdbr::msigdbr(species = "Homo sapiens", category = params$cat)
+            msigdbr::msigdbr(species = "Homo sapiens", category = params$msig_category)
           } else {
-            msigdbr::msigdbr(species = "Homo sapiens", category = params$cat, subcategory = params$sub)
+            msigdbr::msigdbr(species = "Homo sapiens", category = params$msig_category, subcategory = params$sub)
           }
           gs_df <- gs %>% dplyr::select(.data$gs_name, .data$gene_symbol)
           gene_sets_list[[coll_id]] <- as.data.frame(gs_df)
