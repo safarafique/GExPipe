@@ -1,0 +1,10 @@
+B4 definition (updated)
+TRUE B4 = genes selected by ≥2 of LASSO / RF / SVM from the DE gene universe (NO WGCNA filter).
+DE candidate pool size = 7051; ML input after variance cap = 200
+length(B4 true)=20
+length(B4leg legacy export)=20
+length(B5 consensus)=20
+identical(B4,B5)=FALSE
+identical(B4leg,B5)=TRUE
+Jaccard(B4,B5)=0.481
+Jaccard(B4,B4leg)=0.481
