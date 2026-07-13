@@ -1,0 +1,9 @@
+# Large / regenerable artifacts
+results/cache/
+**/*.rds
+.RData*
+.Rhistory
+*.log
+_ablation_run_log.txt
+results/paper_heterogeneous_compare_run.log
+results/d3_work/
