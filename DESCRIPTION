@@ -1,10 +1,11 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.39
+Version: 0.99.40
 Authors@R: c(
     person("Safa", "Rafique",
            email = "safa.sandhu@gmail.com",
-           role = c("aut", "cre")),
+           role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-2646-8106")),
     person("Naeem", "Mahmood",
            email = "naeem.sbb@pu.edu.pk",
            role = "aut"),
