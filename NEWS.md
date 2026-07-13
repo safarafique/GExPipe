@@ -1,5 +1,11 @@
 # GExPipe NEWS
 
+## Version 0.99.40
+
+### BiocCheck
+- Rename GSEA map field `cat` to `msig_category` so BiocCheck no longer flags a false `cat()` hit.
+- Add maintainer ORCID (`0000-0003-2646-8106`) in Authors@R.
+
 ## Version 0.99.39
 
 ### Authors
