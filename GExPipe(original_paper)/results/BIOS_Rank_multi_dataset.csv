@@ -1,0 +1,16 @@
+"Dataset","Panel","k","Primary_metric","Primary_value","Secondary_RF_panel_AUC","Med_AUC_train_or_micro","Med_AUC_test_or_rna"
+"D1_GSE89076_x_GSE50760_crossplatform","BIOS_Rank_topk",20,"min_median_cross_assay_gene_AUC",0.923583605494175,NA,0.941525953721076,0.936728395061728
+"D1_GSE89076_x_GSE50760_crossplatform","BIOS_ConsensusHard_topk",19,"min_median_cross_assay_gene_AUC",0.919324577861163,NA,0.92432770481551,0.941358024691358
+"D1_GSE89076_x_GSE50760_crossplatform","Merged_limma_topk",19,"min_median_cross_assay_gene_AUC",0.884259259259259,NA,0.966228893058161,0.884259259259259
+"D1_GSE89076_x_GSE50760_crossplatform","Separate_intersect_topk",19,"min_median_cross_assay_gene_AUC",0.884259259259259,NA,0.966228893058161,0.884259259259259
+"D1_GSE89076_x_GSE50760_crossplatform","JPCT_export_consensus",19,"min_median_cross_assay_gene_AUC",0.919324577861163,NA,0.92432770481551,0.941358024691358
+"D1_GSE89076_x_GSE50760_crossplatform","Random_matched_k",20,"min_median_cross_assay_gene_AUC",0.807379612257661,NA,0.877110694183865,0.827160493827161
+"D2_GSE50760_train_GSE104836_external","BIOS_Rank_topk",20,"median_gene_AUC_external",0.98,1,0.947530864197531,0.98
+"D2_GSE50760_train_GSE104836_external","BIOS_ConsensusHard_topk",20,"median_gene_AUC_external",0.98,1,0.947530864197531,0.98
+"D2_GSE50760_train_GSE104836_external","JPCT_export_consensus",20,"median_gene_AUC_external",0.98,1,0.947530864197531,0.98
+"D2_GSE50760_train_GSE104836_external","limma_topk",20,"median_gene_AUC_external",0.98,1,0.967592592592593,0.98
+"D2_GSE50760_train_GSE104836_external","limma_voom_topk",20,"median_gene_AUC_external",0.965,1,0.955246913580247,0.965
+"D2_GSE50760_train_GSE104836_external","Random_matched_k",20,"median_gene_AUC_external",0.67,0.96,0.596450617283951,0.67
+"D3_GSE9348_x_GSE50760_crossplatform","BIOS_Rank_topk",20,"min_median_cross_assay_gene_AUC",0.945987654320988,NA,1,0.945987654320988
+"D3_GSE9348_x_GSE50760_crossplatform","Merged_limma_topk",20,"min_median_cross_assay_gene_AUC",0.945987654320988,NA,1,0.945987654320988
+"D3_GSE9348_x_GSE50760_crossplatform","Random_matched_k",20,"min_median_cross_assay_gene_AUC",0.780864197530864,NA,0.882142857142857,0.817901234567901

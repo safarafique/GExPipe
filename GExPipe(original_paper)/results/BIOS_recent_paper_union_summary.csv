@@ -1,0 +1,5 @@
+"Panel","Hits_in_recent_union","Frac","Emp_P_vs_random"
+"BIOS_v2_noEx_equal",8,0.4,0
+"BIOS_v2_ExTrain_locked",9,0.45,NA
+"Merged_limma_topk20",3,0.15,NA
+"Random_mean",0.032,0.0016,NA
