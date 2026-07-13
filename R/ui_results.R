@@ -70,13 +70,13 @@ box(
           style = "margin: 0 0 12px 0; padding-left: 20px;",
           tags$li("Confirm groups in ", tags$strong("Step 3 (Define Groups)"), " - Disease vs Normal (or your contrast) are correctly assigned. Wrong labels will flip or invalidate DEGs."),
           tags$li("Check the ", tags$strong("Pipeline verification"), " box above: it shows which DE method and batch correction were used. The volcano uses the actual statistics from that model."),
-          tags$li("Sample size: ensure you have enough samples per group (e.g. ≥ 3 per group for DESeq2). Small n can give unstable estimates."),
+          tags$li("Sample size: ensure you have enough samples per group (e.g. >= 3 per group for DESeq2). Small n can give unstable estimates."),
           tags$li("Optional: compare top DEGs with published results for the same disease or GSE to spot-check.")
         ),
         tags$p(tags$strong("ML / prediction (Steps 10-12):"), style = "margin-bottom: 6px;"),
         tags$ul(
           style = "margin: 0; padding-left: 20px;",
-          tags$li(tags$strong("Step 12 (ROC):"), " AUC ≥ 0.8 suggests good discrimination. Use ", tags$strong("Step 11 (Validation)"), " to load an external dataset - ROC and Nomogram then show training vs external AUC; similar values suggest the model generalizes."),
+          tags$li(tags$strong("Step 12 (ROC):"), " AUC >= 0.8 suggests good discrimination. Use ", tags$strong("Step 11 (Validation)"), " to load an external dataset - ROC and Nomogram then show training vs external AUC; similar values suggest the model generalizes."),
           tags$li(tags$strong("Step 12 (Nomogram):"), " Training vs validation AUC (70/30 split) - if validation AUC is much lower than training, the model may be overfitting. External validation (Step 11) is the strongest check.")
         )
       )

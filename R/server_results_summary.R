@@ -288,7 +288,7 @@ server_results_summary <- function(input, output, session, rv) {
     y2 <- sft$fitIndices[, 5]
     op <- par(mfrow = c(1, 2), bg = "#f8fafb", fg = "#2c3e50", col.main = "#1a252f", col.axis = "#34495e", col.lab = "#34495e")
     on.exit(par(op), add = TRUE)
-    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "signed R²", type = "n", main = "Scale independence")
+    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "signed R^2", type = "n", main = "Scale independence")
     points(x1, y1, pch = 19, col = "#2980b9", cex = 1)
     text(x1, y1, labels = powers, cex = 0.75, col = "#1a252f", pos = 4, offset = 0.2)
     abline(h = 0.8, col = "#e74c3c", lty = 2, lwd = 1.2)
@@ -341,7 +341,7 @@ server_results_summary <- function(input, output, session, rv) {
     genes <- rv$common_genes_de_wgcna
     n <- if (is.null(genes)) 0L else length(genes)
     tags$div(
-      tags$p(tags$strong("Common significant genes (DEG ∩ WGCNA):"), format(n, big.mark = ",")),
+      tags$p(tags$strong("Common significant genes (DEG n WGCNA):"), format(n, big.mark = ",")),
       if (n > 0) tags$p(paste(head(genes, 50), collapse = ", "), if (n > 50) paste0(" ... and ", n - 50, " more") else ""),
       if (n == 0) tags$p(style = "color: #7f8c8d;", "Run Common Genes (Step 8) to see the list here.")
     )
@@ -656,7 +656,7 @@ server_results_summary <- function(input, output, session, rv) {
     x1 <- sft$fitIndices[, 1]; y1 <- -sign(sft$fitIndices[, 3]) * sft$fitIndices[, 2]; y2 <- sft$fitIndices[, 5]
     op <- par(mfrow = c(1, 2), bg = "#f8fafb", fg = "#2c3e50", col.main = "#1a252f", col.axis = "#34495e", col.lab = "#34495e")
     on.exit(par(op), add = TRUE)
-    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "signed R²", type = "n", main = "Scale independence")
+    plot(x1, y1, xlab = "Soft Threshold (power)", ylab = "signed R^2", type = "n", main = "Scale independence")
     points(x1, y1, pch = 19, col = "#2980b9", cex = 1); text(x1, y1, labels = powers, cex = 0.75, col = "#1a252f", pos = 4, offset = 0.2)
     abline(h = 0.8, col = "#e74c3c", lty = 2, lwd = 1.2); box(col = "#dfe6e9", lwd = 1)
     plot(x1, y2, xlab = "Soft Threshold (power)", ylab = "Mean Connectivity", type = "n", main = "Mean connectivity")

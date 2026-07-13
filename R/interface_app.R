@@ -516,7 +516,7 @@ gexp_app_head <- function() {
           color: #ffffff !important;
         }
 
-        /* Step badges (View, Process, …) — white text, refined pills */
+        /* Step badges (View, Process, ...) - white text, refined pills */
         .sidebar-menu .label,
         .sidebar-menu > li > a .label,
         .sidebar-menu > li > a .pull-right-container .label,
