@@ -1,5 +1,10 @@
 # GExPipe NEWS
 
+## Version 0.99.39
+
+### Authors
+- Add co-authors Naeem Mahmood and Muhammad Farooq Sabar; Safa Rafique remains maintainer (`cre`).
+
 ## Version 0.99.38
 
 ### Bioconductor NOTES cleanup
