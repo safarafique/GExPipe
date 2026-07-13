@@ -88,3 +88,7 @@ po/*~
 rsconnect/
 /doc/
 /Meta/
+
+# Local manuscript / BIOS-Rank scratch (not part of Bioconductor package)
+GExPipe(original_paper)/
+*.docx
