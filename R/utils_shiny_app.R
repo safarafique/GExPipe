@@ -9,15 +9,17 @@
     "RColorBrewer", "pheatmap", "ggrepel", "VennDiagram", "UpSetR",
     "WGCNA", "clusterProfiler", "enrichplot", "circlize", "STRINGdb",
     "DESeq2", "igraph", "ggraph", "tidygraph", "tidyr",
-    "randomForest", "caret", "glmnet", "pROC", "kernlab",
-    "tibble", "msigdbr", "ggpubr", "reshape2", "corrplot", "R.utils",
+    "randomForest", "caret", "glmnet", "pROC",
+    "tibble", "msigdbr", "ggpubr", "reshape2", "R.utils",
     "dynamicTreeCut", "scales",
-    "biomaRt", "Boruta", "car", "cicerone", "mixOmics",
-    "xgboost", "SHAPforxgboost", "rms", "dcurves",
+    "biomaRt", "xgboost", "rms",
     "cli", "glue", "lifecycle", "rlang", "vctrs",
     "Matrix", "Rcpp", "withr", "pillar"
   )
-  optional <- character(0)
+  optional <- c(
+    "Boruta", "car", "cicerone", "corrplot", "dcurves",
+    "kernlab", "mixOmics", "SHAPforxgboost"
+  )
   if (include_optional) c(required, core, optional) else c(required, core)
 }
 
@@ -138,8 +140,9 @@
 }
 
 ## Report missing Imports without installing (Bioconductor default).
+## Optional Suggests packages are excluded unless include_optional = TRUE.
 .gexpipe_verify_imports <- function(
-    pkgs = .gexpipe_all_pkgs(include_optional = TRUE),
+    pkgs = .gexpipe_all_pkgs(include_optional = FALSE),
     quiet = FALSE) {
   missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1L), quietly = TRUE)]
   if (length(missing) == 0L) return(invisible(character(0L)))
@@ -1053,17 +1056,20 @@ gexp_app_attach_packages <- function() {
   # real work if the user called shiny::runApp() without going through
   # runGExPipe() first, or if the pre-launch install partially failed.
   if (!isTRUE(getOption("gexpipe.prelaunch_install_done", FALSE))) {
-    .gexpipe_batch_install(.gexpipe_all_pkgs(include_optional = TRUE))
+    # Prefer core Imports; optional Suggests install only when auto-install is on.
+    .gexpipe_batch_install(.gexpipe_all_pkgs(include_optional = .gexpipe_runtime_install_enabled()))
   }
 
-  pkgs    <- unique(.gexpipe_all_pkgs(include_optional = TRUE))
+  core_pkgs <- unique(.gexpipe_all_pkgs(include_optional = FALSE))
+  optional_pkgs <- setdiff(.gexpipe_all_pkgs(include_optional = TRUE), core_pkgs)
+  pkgs    <- unique(c(core_pkgs, optional_pkgs))
   n_total <- length(pkgs)
 
   # -- Native packages (glmnet, xgboost, ...) must match this R version ---------
   tryCatch(.gexpipe_ensure_all_native_pkgs(quiet = TRUE), error = function(e) NULL)
 
   # -- Detect and auto-fix any other broken DLL packages before attach ---------
-  broken_pre <- .gexpipe_detect_broken_pkgs(pkgs)
+  broken_pre <- .gexpipe_detect_broken_pkgs(core_pkgs)
   if (length(broken_pre) > 0L) {
     .gexpipe_fix_broken_pkgs(broken_pre)
   }
@@ -1082,8 +1088,13 @@ gexp_app_attach_packages <- function() {
     p     <- pkgs[i]
     label <- formatC(p, width = -18L, flag = "-")
     idx   <- sprintf("  [%2d/%2d]", i, n_total)
+    is_optional <- p %in% optional_pkgs
 
     if (!requireNamespace(p, quietly = TRUE)) {
+      if (is_optional) {
+        message(idx, " ", label, "... (Suggests, skipped)")
+        next
+      }
       message(idx, " ", label, "... \u2717 MISSING")
       if (p %in% hard_required) pkg_state$missing <- c(pkg_state$missing, p)
       pkg_state$failed <- c(pkg_state$failed, p)

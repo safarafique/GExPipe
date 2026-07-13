@@ -533,7 +533,7 @@ server_wgcna <- function(input, output, session, rv) {
       }
       
       power_max <- max(12L, min(30L, as.integer(input$wgcna_power_max)))
-      powers <- c(1:10, seq(12, power_max, by = 2))
+      powers <- c(seq_len(10L), seq(12, power_max, by = 2))
       add_wgcna_log(paste("Calculating soft threshold for powers:", paste(powers, collapse = ", ")))
       
       # Use a local copy of datExpr to avoid reactive access during long computation
@@ -887,7 +887,7 @@ server_wgcna <- function(input, output, session, rv) {
         }
         
         if (length(rv$dynamicColors) != ncol(rv$datExpr)) {
-          stop("ERROR: dynamicColors and datExpr mismatch. Rebuild network.")
+          stop("dynamicColors and datExpr mismatch. Rebuild network.")
         }
         
         add_wgcna_log("Calculating module eigengenes...")
