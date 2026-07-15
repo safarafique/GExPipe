@@ -1,9 +1,26 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.37
-Authors@R: person("Safa", "Rafique",
-           email = "safa.sandhu@gmail.com",
-           role = c("aut", "cre"))
+Version: 0.99.40
+Authors@R: c(
+    person(
+        given = "Safa",
+        family = "Rafique",
+        email = "safa.sandhu@gmail.com",
+        role = c("aut", "cre")
+    ),
+    person(
+        given = "Naeem",
+        family = "Mahmood",
+        email = "naeem.sbb@pu.edu.pk",
+        role = "aut"
+    ),
+    person(
+        given = "Muhammad Farooq",
+        family = "Sabar",
+        email = "farooq.sbb@pu.edu.pk",
+        role = "aut"
+    )
+)
 Description: Shiny application (GExPipe) for high-throughput genomic analysis of bulk RNA-seq and
     microarray data (e.g. from GEO). Integrates with Bioconductor (GEOquery, Biobase,
     limma, DESeq2, edgeR, clusterProfiler) for a single workflow: download, QC,
@@ -26,14 +43,10 @@ Imports:
     AnnotationDbi (>= 1.64.0),
     Biobase (>= 2.62.0),
     biomaRt (>= 2.58.0),
-    Boruta (>= 8.0.0),
-    car (>= 3.1.0),
     caret (>= 6.0.94),
-    cicerone (>= 1.0.4),
     circlize (>= 0.4.16),
     cli (>= 3.6.0),
     clusterProfiler (>= 4.10.0),
-    corrplot (>= 0.92),
     data.table (>= 1.15.0),
     DESeq2 (>= 1.42.0),
     dplyr (>= 1.1.0),
@@ -50,11 +63,9 @@ Imports:
     glue (>= 1.6.0),
     gridExtra (>= 2.3),
     igraph (>= 2.0.0),
-    kernlab (>= 0.9.32),
     lifecycle (>= 1.0.0),
     limma (>= 3.58.0),
     Matrix (>= 1.6.0),
-    mixOmics (>= 6.26.0),
     msigdbr (>= 7.5.1),
     oligo (>= 1.66.0),
     org.Hs.eg.db (>= 3.17.0),
@@ -70,9 +81,7 @@ Imports:
     reshape2 (>= 1.4.4),
     rlang (>= 1.1.0),
     rms (>= 6.7.0),
-    dcurves (>= 0.5.0),
     scales (>= 1.3.0),
-    SHAPforxgboost (>= 0.1.0),
     shiny (>= 1.8.0),
     shinydashboard (>= 0.7.2),
     shinyjs (>= 2.1.0),
@@ -91,19 +100,27 @@ Suggests:
     BiocCheck,
     BiocManager,
     BiocStyle,
+    Boruta (>= 8.0.0),
     bslib,
+    car (>= 3.1.0),
     chromote,
+    cicerone (>= 1.0.4),
+    corrplot (>= 0.92),
     crosstalk,
+    dcurves (>= 0.5.0),
     devtools,
     fontawesome,
     htmltools,
     htmlwidgets,
+    kernlab (>= 0.9.32),
     knitr,
+    mixOmics (>= 6.26.0),
     pak,
     pkgload,
     rmda,
     rmarkdown,
     remotes,
+    SHAPforxgboost (>= 0.1.0),
     shinytest2,
     stringi,
     testthat
