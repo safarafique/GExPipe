@@ -88,8 +88,10 @@ gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_
     n_mapped   <- nrow(mapped)
     n_total    <- length(valid_genes)
     pct_mapped <- round(100 * n_mapped / n_total)
-    cat(sprintf("  STRINGdb v%s: %d / %d genes mapped (%d%% mapped, %d%% unmapped - normal)\n",
-                sv, n_mapped, n_total, pct_mapped, 100L - pct_mapped))
+    message(sprintf(
+      "  STRINGdb v%s: %d / %d genes mapped (%d%% mapped, %d%% unmapped - normal)",
+      sv, n_mapped, n_total, pct_mapped, 100L - pct_mapped
+    ))
 
     id_col <- if ("STRING_id" %in% colnames(mapped)) {
       "STRING_id"
