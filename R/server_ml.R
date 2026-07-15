@@ -53,10 +53,12 @@ server_ml <- function(input, output, session, rv) {
       for (fold in folds) {
         train_X <- X[-fold, remaining_features, drop = FALSE]
         train_y <- y[-fold]
-        model <- tryCatch(
-          kernlab::ksvm(train_X, train_y, kernel = "vanilladot", C = 1, scaled = FALSE),
-          error = function(e) NULL
-        )
+        model <- tryCatch({
+          if (!requireNamespace("kernlab", quietly = TRUE)) {
+            stop("Package 'kernlab' must be installed to use SVM-RFE.", call. = FALSE)
+          }
+          kernlab::ksvm(train_X, train_y, kernel = "vanilladot", C = 1, scaled = FALSE)
+        }, error = function(e) NULL)
         if (is.null(model) || is.null(model@coef) || length(model@coef[[1]]) == 0) next
         weights <- tryCatch(
           t(model@coef[[1]]) %*% model@xmatrix[[1]],
@@ -283,6 +285,9 @@ server_ml <- function(input, output, session, rv) {
           prog <- prog + step_inc
         }
         if ("svm" %in% methods_sel) {
+          if (!requireNamespace("kernlab", quietly = TRUE)) {
+            showNotification("Install Suggests package 'kernlab' to run SVM-RFE.", type = "warning", duration = 8)
+          } else {
           incProgress(step_inc, detail = "SVM-RFE...")
           withr::local_seed(123)
           svm_ranking <- svmRFE(x, y)
@@ -290,8 +295,12 @@ server_ml <- function(input, output, session, rv) {
           gene_lists[["SVM-RFE"]] <- head(rv$ml_svm_ranking$Gene, n_svm)
           method_names <- c(method_names, "SVM-RFE")
           prog <- prog + step_inc
+          }
         }
         if ("boruta" %in% methods_sel) {
+          if (!requireNamespace("Boruta", quietly = TRUE)) {
+            showNotification("Install Suggests package 'Boruta' to run Boruta.", type = "warning", duration = 8)
+          } else {
           incProgress(step_inc, detail = "Boruta...")
           withr::local_seed(123)
           x_df <- as.data.frame(x)
@@ -312,8 +321,12 @@ server_ml <- function(input, output, session, rv) {
             rv$ml_boruta_df <- NULL
           }
           prog <- prog + step_inc
+          }
         }
         if ("splsda" %in% methods_sel) {
+          if (!requireNamespace("mixOmics", quietly = TRUE)) {
+            showNotification("Install Suggests package 'mixOmics' to run sPLS-DA.", type = "warning", duration = 8)
+          } else {
           incProgress(step_inc, detail = "sPLS-DA...")
           withr::local_seed(123)
           n_keep <- min(n_splsda, ncol(x), 50)
@@ -339,6 +352,7 @@ server_ml <- function(input, output, session, rv) {
             rv$ml_splsda_df <- NULL
           }
           prog <- prog + step_inc
+          }
         }
         if ("xgboost" %in% methods_sel) {
           incProgress(step_inc, detail = "XGBoost+SHAP...")

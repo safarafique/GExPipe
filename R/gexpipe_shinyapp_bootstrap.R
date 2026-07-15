@@ -138,9 +138,10 @@ gexpipe_shinyapp_ensure_package <- function() {
   p <- normalizePath(lib, winslash = "/", mustWork = FALSE)
   for (pat in c("OneDrive", "Dropbox", "Google Drive", "iCloud", "Box Sync", "Mega")) {
     if (grepl(pat, p, ignore.case = TRUE)) {
-      message(
-        "GExPipe WARNING: library path is inside a cloud-sync folder (", pat, ").\n",
-        "  Set LOCALAPPDATA to a non-synced path if installs fail."
+      warning(
+        "Library path is inside a cloud-sync folder (", pat, "). ",
+        "Set LOCALAPPDATA to a non-synced path if installs fail.",
+        call. = FALSE
       )
       break
     }
@@ -300,7 +301,10 @@ gexpipe_shinyapp_bootstrap <- function(verbose = TRUE) {
     message("  Auto-install skipped (use BiocManager::install('GExPipe', dependencies = TRUE)).")
   }
 
-  failed_required <- .gexpipe_missing_required_pkgs(.gexpipe_all_pkgs(include_optional = TRUE), gexpipe_lib)
+  failed_required <- .gexpipe_missing_required_pkgs(
+    .gexpipe_all_pkgs(include_optional = FALSE),
+    gexpipe_lib
+  )
   if (length(failed_required) > 0L) {
     if (verbose) {
       message("  Status       : blocked - missing ", length(failed_required), " required package(s)\n")
