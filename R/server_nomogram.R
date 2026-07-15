@@ -212,7 +212,7 @@ server_nomogram <- function(input, output, session, rv) {
       epv <- min_events / length(available_genes)
     } else if (length(available_genes) > 15) {
       gene_var <- apply(expr_mat[available_genes, ], 1, var, na.rm = TRUE)
-      available_genes <- names(sort(gene_var, decreasing = TRUE))[1:15]
+      available_genes <- names(sort(gene_var, decreasing = TRUE))[seq_len(min(15L, length(available_genes)))]
       epv <- min_events / length(available_genes)
     }
     if (sum(outcome == 1) < 10 || sum(outcome == 0) < 10) {
@@ -304,7 +304,11 @@ server_nomogram <- function(input, output, session, rv) {
     validation_data$Predicted_Class <- ifelse(validation_data$Predicted_Prob > optimal_threshold, 1, 0)
 
     glm_fit <- glm(formula_obj, data = train_data, family = binomial())
-    vif_vals <- tryCatch(car::vif(glm_fit), error = function(e) setNames(rep(NA, length(available_genes)), available_genes))
+    vif_vals <- if (requireNamespace("car", quietly = TRUE)) {
+      tryCatch(car::vif(glm_fit), error = function(e) setNames(rep(NA, length(available_genes)), available_genes))
+    } else {
+      setNames(rep(NA, length(available_genes)), available_genes)
+    }
     if (length(vif_vals) != length(available_genes)) vif_vals <- setNames(rep(NA, length(available_genes)), available_genes)
     coefs <- coef(nomogram_model)[-1]
     se <- sqrt(diag(vcov(nomogram_model)))[-1]
