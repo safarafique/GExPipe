@@ -1,5 +1,24 @@
 # GExPipe NEWS
 
+## Version 0.99.40
+
+### BiocCheck
+- Rename GSEA map field `cat` to `msig_category` so BiocCheck no longer flags a false `cat()` hit.
+- Add maintainer ORCID (`0000-0003-2646-8106`) in Authors@R.
+
+## Version 0.99.39
+
+### Authors
+- Add co-authors Naeem Mahmood and Muhammad Farooq Sabar; Safa Rafique remains maintainer (`cre`).
+
+## Version 0.99.38
+
+### Bioconductor NOTES cleanup
+- Move optional feature packages from Imports to Suggests: Boruta, car, cicerone,
+  corrplot, dcurves, kernlab, mixOmics, SHAPforxgboost (use requireNamespace guards).
+- Prefer seq_len/seq_along; replace cat()/redundant stop-warn prefixes in Shiny servers.
+- Treat Suggests packages as optional during attach/bootstrap (core Imports remain required).
+
 ## Version 0.99.37
 
 ### Package hygiene
