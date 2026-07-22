@@ -1,3 +1,8 @@
+# GExPipe 0.99.43
+
+- Correct co-author names to **Naeem Mahmood Ashraf** and **Prof. Dr. Muhammad Farooq Sabar**.
+- Remove unavailable Suggests package `rmda` (Bioconductor CHECK ERROR). Nomogram DCA uses `dcurves` (already preferred in code).
+
 # GExPipe NEWS
 
 ## Version 0.99.40
@@ -9,7 +14,7 @@
 ## Version 0.99.39
 
 ### Authors
-- Add co-authors Naeem Mahmood and Muhammad Farooq Sabar; Safa Rafique remains maintainer (`cre`).
+- Add co-authors Naeem Mahmood Ashraf and Prof. Dr. Muhammad Farooq Sabar; Safa Rafique remains maintainer (`cre`).
 
 ## Version 0.99.38
 
