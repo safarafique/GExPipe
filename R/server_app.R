@@ -208,6 +208,8 @@ gexp_app_server <- function(input, output, session) {
     ext_val_log = NULL,
     ext_val_raw_expr = NULL,
     ext_val_metadata = NULL,
+    ext_val_expr_list = NULL,
+    ext_val_meta_list = NULL,
     ext_val_downloaded = NULL,
     ext_val_de_results = NULL,
     ext_val_sig_genes = NULL,
