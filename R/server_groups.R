@@ -56,35 +56,182 @@ server_groups <- function(input, output, session, rv) {
   })
   
   # ==============================================================================
+
+  # Case-insensitive phenodata lookup (RNA preferred over micro)
+  .gexpipe_get_pdata_for_gse <- function(gse) {
+    rna_key <- .gexpipe_resolve_metadata_key(names(rv$rna_metadata_list), gse)
+    if (!is.na(rna_key)) {
+      return(rv$rna_metadata_list[[rna_key]])
+    }
+    micro_key <- .gexpipe_resolve_metadata_key(names(rv$micro_metadata_list), gse)
+    if (!is.na(micro_key)) {
+      return(rv$micro_metadata_list[[micro_key]])
+    }
+    NULL
+  }
+
+  # Collect GSE IDs from every available session source
+  .gexpipe_available_gses <- function() {
+    from_meta <- c(names(rv$micro_metadata_list), names(rv$rna_metadata_list))
+    from_expr <- c(names(rv$micro_expr_list), names(rv$rna_counts_list))
+    from_unified <- if (!is.null(rv$unified_metadata) && is.data.frame(rv$unified_metadata) &&
+                        "Dataset" %in% names(rv$unified_metadata)) {
+      as.character(rv$unified_metadata$Dataset)
+    } else {
+      character(0)
+    }
+    all_gses <- unique(as.character(c(from_meta, from_expr, from_unified)))
+    all_gses <- all_gses[!is.na(all_gses) & nzchar(all_gses)]
+    all_gses
+  }
+
+  # Sample IDs actually present in this dataset's expression/count matrix.
+  # GEO phenodata often lists more samples than the count file provides (extra
+  # platform, samples dropped as >90% NA, or QC exclusions), so group
+  # assignment must follow the matrix, not the series.
+  .gexpipe_expr_sample_ids_for_gse <- function(gse) {
+    g <- tolower(as.character(gse)[[1L]])
+    pick <- function(lst) {
+      nms <- names(lst)
+      if (is.null(nms) || length(nms) == 0L) return(NULL)
+      key <- if (gse %in% nms) {
+        gse
+      } else {
+        hit <- nms[tolower(nms) == g]
+        if (length(hit) >= 1L) hit[[1L]] else NA_character_
+      }
+      if (is.na(key)) return(NULL)
+      mat <- lst[[key]]
+      if (is.null(mat) || is.null(ncol(mat)) || ncol(mat) == 0L) return(NULL)
+      colnames(mat)
+    }
+    ids <- pick(rv$rna_counts_list)
+    if (is.null(ids)) ids <- pick(rv$micro_expr_list)
+    if (is.null(ids) && !is.null(rv$unified_metadata) && is.data.frame(rv$unified_metadata) &&
+        all(c("Dataset", "SampleID") %in% names(rv$unified_metadata))) {
+      hit <- as.character(rv$unified_metadata$Dataset) == as.character(gse)
+      ids <- as.character(rv$unified_metadata$SampleID[hit])
+    }
+    if (is.null(ids)) character(0) else as.character(ids)
+  }
+
+  # Restrict phenodata to matrix samples so the badge, preview and extraction
+  # all describe the same set. Falls back to the full table when IDs disagree.
+  .gexpipe_align_pdata_to_expr <- function(gse, pdata) {
+    if (is.null(pdata) || !is.data.frame(pdata) || nrow(pdata) == 0L) return(pdata)
+    expr_ids <- .gexpipe_expr_sample_ids_for_gse(gse)
+    if (length(expr_ids) == 0L) return(pdata)
+    stripped <- sub(paste0("^", as.character(gse)[[1L]], "_"), "", expr_ids)
+    keep <- intersect(unique(c(expr_ids, stripped)), rownames(pdata))
+    if (length(keep) >= max(2L, floor(0.5 * length(expr_ids)))) {
+      return(pdata[keep, , drop = FALSE])
+    }
+    pdata
+  }
+
+  .gexpipe_sample_count_for_gse <- function(gse, pdata = NULL) {
+    n_expr <- length(.gexpipe_expr_sample_ids_for_gse(gse))
+    if (isTRUE(n_expr > 0L)) return(as.integer(n_expr))
+    if (!is.null(rv$unified_metadata) && is.data.frame(rv$unified_metadata) &&
+        "Dataset" %in% names(rv$unified_metadata)) {
+      n <- sum(as.character(rv$unified_metadata$Dataset) == as.character(gse), na.rm = TRUE)
+      if (isTRUE(n > 0L)) return(as.integer(n))
+    }
+    if (!is.null(pdata) && is.data.frame(pdata)) return(nrow(pdata))
+    0L
+  }
+
+  .gexpipe_pdata_display_df <- function(pdata) {
+    if (is.null(pdata) || !is.data.frame(pdata) || ncol(pdata) == 0L) {
+      return(NULL)
+    }
+    rn <- rownames(pdata)
+    if (is.null(rn) || length(rn) == 0L) {
+      rn <- paste0("Sample_", seq_len(nrow(pdata)))
+    }
+    data.frame(SampleID = rn, pdata, check.names = FALSE, stringsAsFactors = FALSE)
+  }
+
+  # Enrich thin phenodata AFTER the browser UI has been sent to the client,
+  # so NCBI fetches never leave the Phenodata Browser / column selector blank.
+  phenodata_enrich_scheduled <- shiny::reactiveVal(FALSE)
+  observe({
+    all_gses <- .gexpipe_available_gses()
+    if (length(all_gses) == 0L) {
+      return()
+    }
+    needs_enrich <- any(vapply(all_gses, function(gse) {
+      .gexpipe_pdata_is_thin(.gexpipe_get_pdata_for_gse(gse))
+    }, logical(1)))
+    if (!isTRUE(needs_enrich) || isTRUE(shiny::isolate(phenodata_enrich_scheduled()))) {
+      return()
+    }
+    phenodata_enrich_scheduled(TRUE)
+    session$onFlushed(function() {
+      on.exit(phenodata_enrich_scheduled(FALSE), add = TRUE)
+      gses <- shiny::isolate(.gexpipe_available_gses())
+      for (gse in gses) {
+        p <- shiny::isolate(.gexpipe_get_pdata_for_gse(gse))
+        if (.gexpipe_pdata_is_thin(p)) {
+          shiny::isolate(gexp_enrich_and_store_pdata(rv, gse, p))
+        }
+      }
+    }, once = TRUE)
+  })
+
   # PHENODATA BROWSER - Full interactive table per dataset
   # ==============================================================================
   output$phenodata_browser_ui <- renderUI({
-    req(rv$download_complete)
-    
-    # Get all dataset names from whichever metadata source is available
-    all_gses <- c(names(rv$micro_metadata_list), names(rv$rna_metadata_list))
-    all_gses <- unique(all_gses)
-    
-    if (length(all_gses) == 0) {
-      return(tags$div(class = "alert alert-warning",
-                      icon("exclamation-triangle"),
-                      " No phenodata available. Complete data download first."))
+    # Show as soon as any phenodata / expression exists (do not hang on enrich)
+    all_gses <- .gexpipe_available_gses()
+    if (length(all_gses) == 0L) {
+      if (!isTRUE(rv$download_complete)) {
+        return(tags$div(
+          class = "alert alert-info",
+          icon("info-circle"),
+          " Complete Step 1 (Download) first. The full phenodata table for each GSE will appear here."
+        ))
+      }
+      return(tags$div(
+        class = "alert alert-warning",
+        icon("exclamation-triangle"),
+        " No phenodata available. Re-run download or reload a workspace that includes metadata."
+      ))
     }
-    
-    # Create a tabsetPanel with one tab per dataset
+
     tabs <- lapply(all_gses, function(gse) {
-      pdata <- if (gse %in% names(rv$rna_metadata_list)) {
-        rv$rna_metadata_list[[gse]]
-      } else if (gse %in% names(rv$micro_metadata_list)) {
-        rv$micro_metadata_list[[gse]]
+      pdata <- .gexpipe_get_pdata_for_gse(gse)
+      if (is.null(pdata) || !is.data.frame(pdata) || ncol(pdata) == 0L) {
+        return(tabPanel(
+          title = tags$span(icon("database"), paste0(" ", gse)),
+          tags$div(
+            class = "alert alert-warning",
+            style = "margin-top: 12px;",
+            icon("exclamation-triangle"),
+            paste0(" No phenotype table found for ", gse, " yet.")
+          )
+        ))
+      }
+
+      platform_label <- if (!is.na(.gexpipe_resolve_metadata_key(names(rv$rna_metadata_list), gse)) ||
+                            !is.na(.gexpipe_resolve_metadata_key(names(rv$rna_counts_list), gse))) {
+        "RNA-seq"
+      } else {
+        "Microarray"
+      }
+      col_names <- gexp_pdata_column_names(pdata)
+      n_expr_samples <- length(.gexpipe_expr_sample_ids_for_gse(gse))
+      thin_note <- if (.gexpipe_pdata_is_thin(pdata)) {
+        tags$div(
+          class = "alert alert-info",
+          style = "margin: 8px 0; padding: 8px 12px; font-size: 12px;",
+          icon("sync", class = "fa-spin", style = "margin-right: 6px;"),
+          "Fetching full GEO phenodata columns in the background. The table below will update automatically."
+        )
       } else {
         NULL
       }
-      
-      if (is.null(pdata) || ncol(pdata) == 0) return(NULL)
-      
-      platform_label <- if (gse %in% names(rv$rna_metadata_list)) "RNA-seq" else "Microarray"
-      
+
       tabPanel(
         title = tags$span(icon("database"), paste0(" ", gse, " (", platform_label, ")")),
         tags$div(
@@ -93,71 +240,87 @@ server_groups <- function(input, output, session, rv) {
             style = "display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 12px;",
             tags$span(
               class = "badge", style = "background: #3498db; font-size: 13px; padding: 6px 12px;",
-              icon("vial"), paste0(" Samples: ", nrow(pdata))
+              icon("vial"), paste0(" GEO samples: ", nrow(pdata))
+            ),
+            tags$span(
+              class = "badge",
+              style = paste0(
+                "background: ",
+                if (n_expr_samples > 0L && n_expr_samples < nrow(pdata)) "#e67e22" else "#16a085",
+                "; font-size: 13px; padding: 6px 12px;"
+              ),
+              icon("vials"), paste0(" In expression matrix: ", n_expr_samples)
             ),
             tags$span(
               class = "badge", style = "background: #2ecc71; font-size: 13px; padding: 6px 12px;",
-              icon("columns"), paste0(" Columns: ", ncol(pdata))
+              icon("columns"), paste0(" Columns: ", length(col_names))
             ),
             tags$span(
-              class = "badge", style = paste0("background: ", if (platform_label == "RNA-seq") "#e74c3c" else "#9b59b6", "; font-size: 13px; padding: 6px 12px;"),
+              class = "badge",
+              style = paste0(
+                "background: ", if (platform_label == "RNA-seq") "#e74c3c" else "#9b59b6",
+                "; font-size: 13px; padding: 6px 12px;"
+              ),
               icon("microchip"), paste0(" ", platform_label)
+            )
+          ),
+          thin_note,
+          tags$div(
+            style = "margin-bottom: 10px; padding: 8px 10px; background: #f8f9fa; border-radius: 5px; max-height: 90px; overflow-y: auto;",
+            tags$strong(icon("list"), " Available columns: ", style = "color: #495057; font-size: 12px;"),
+            tags$span(
+              paste(col_names, collapse = ", "),
+              style = "font-size: 12px; color: #2c3e50; word-break: break-word;"
             )
           ),
           DT::DTOutput(paste0("phenodata_table_", gse)),
           tags$p(
             icon("info-circle", style = "color: #17a2b8; margin-right: 5px;"),
-            tags$em("Tip: If no condition column exists (e.g. GSE108413), select ", tags$strong("title"), ". GExPipe extracts text after \"under\" (control vs cytokine treatment). You can still manually set each group to Normal, Disease, or None below."),
+            tags$em(
+              "Tip: Scroll horizontally to browse all columns, then pick the group column in ",
+              tags$strong("Select Phenotype Columns"),
+              " below. If no condition column exists, try ",
+              tags$strong("title"),
+              " or a ",
+              tags$strong("characteristics_ch1"),
+              " field."
+            ),
             style = "color: #6c757d; font-size: 12px; margin-top: 10px;"
           )
         )
       )
     })
-    
-    # Remove NULL tabs
+
     tabs <- tabs[!vapply(tabs, is.null, logical(1))]
-    
-    if (length(tabs) == 0) {
-      return(tags$div(class = "alert alert-warning",
-                      "No phenodata tables available."))
+    if (length(tabs) == 0L) {
+      return(tags$div(class = "alert alert-warning", "No phenodata tables available."))
     }
-    
     do.call(tabsetPanel, c(list(id = "phenodata_tabs", type = "pills"), tabs))
   })
-  
-  # Render DT tables for each dataset
+
+  # Render DT tables for each dataset (display only — no network enrich here)
   observe({
-    req(rv$download_complete)
-    
-    all_gses <- c(names(rv$micro_metadata_list), names(rv$rna_metadata_list))
-    all_gses <- unique(all_gses)
-    
+    all_gses <- .gexpipe_available_gses()
     for (gse in all_gses) {
       local({
         gse_local <- gse
-        
         output[[paste0("phenodata_table_", gse_local)]] <- DT::renderDT({
-          pdata <- if (gse_local %in% names(rv$rna_metadata_list)) {
-            rv$rna_metadata_list[[gse_local]]
-          } else if (gse_local %in% names(rv$micro_metadata_list)) {
-            rv$micro_metadata_list[[gse_local]]
-          } else {
-            return(NULL)
+          pdata <- .gexpipe_get_pdata_for_gse(gse_local)
+          display_df <- .gexpipe_pdata_display_df(pdata)
+          if (is.null(display_df)) {
+            return(DT::datatable(
+              data.frame(Message = "No phenodata rows to display."),
+              rownames = FALSE,
+              options = list(dom = "t", ordering = FALSE)
+            ))
           }
-          
-          if (is.null(pdata) || ncol(pdata) == 0) return(NULL)
-          
-          # Add SampleID column from rownames for clarity
-          display_df <- data.frame(SampleID = rownames(pdata), pdata,
-                                   check.names = FALSE, stringsAsFactors = FALSE)
-          
           DT::datatable(
             display_df,
             options = list(
               scrollX = TRUE,
               scrollY = "350px",
               pageLength = 10,
-              lengthMenu = c(5, 10, 25, 50),
+              lengthMenu = c(5, 10, 25, 50, 100),
               dom = "lfrtip",
               autoWidth = FALSE,
               columnDefs = list(
@@ -174,11 +337,11 @@ server_groups <- function(input, output, session, rv) {
       })
     }
   })
-  
+
   # ==============================================================================
   # HELPER FUNCTIONS
   # ==============================================================================
-  
+
   # Safe trim function for cleaning group values
   safe_trim <- function(x) {
     x <- as.character(x)
@@ -186,39 +349,41 @@ server_groups <- function(input, output, session, rv) {
     x[x == ""] <- NA_character_
     x
   }
-  
+
   # Get expression column names and GSM IDs for a GSE (for alignment)
   get_expr_and_gsm_for_gse <- function(gse, pdata = NULL) {
     tryCatch({
       # Get expression data for this GSE
       expr_cols <- NULL
-      
-      if (!is.null(rv$rna_counts_list) && gse %in% names(rv$rna_counts_list)) {
-        expr_data <- rv$rna_counts_list[[gse]]
+
+      rna_key <- .gexpipe_resolve_metadata_key(names(rv$rna_counts_list), gse)
+      micro_key <- .gexpipe_resolve_metadata_key(names(rv$micro_expr_list), gse)
+      if (!is.na(rna_key)) {
+        expr_data <- rv$rna_counts_list[[rna_key]]
         if (!is.null(expr_data) && ncol(expr_data) > 0) {
           expr_cols <- colnames(expr_data)
         }
-      } else if (!is.null(rv$micro_expr_list) && gse %in% names(rv$micro_expr_list)) {
-        expr_data <- rv$micro_expr_list[[gse]]
+      } else if (!is.na(micro_key)) {
+        expr_data <- rv$micro_expr_list[[micro_key]]
         if (!is.null(expr_data) && ncol(expr_data) > 0) {
           expr_cols <- colnames(expr_data)
         }
       }
-      
+
       if (is.null(expr_cols) || length(expr_cols) == 0) {
         return(list(expr_cols = character(0), gsm_ids = character(0)))
       }
-      
+
       # Try to get GSM IDs from sample_id_map if available
       gsm_ids <- expr_cols  # Default: use expression column names
-      
+
       # If we have phenotype data, try to match
       if (!is.null(pdata) && is.data.frame(pdata) && nrow(pdata) > 0) {
         pdata_rownames <- rownames(pdata)
         if (!is.null(pdata_rownames) && length(pdata_rownames) > 0) {
           # Try matching expression column names with phenotype rownames
           match_count <- sum(expr_cols %in% pdata_rownames)
-          
+
           # If fewer than 20% match by ID, use positional alignment
           if (match_count < max(2, floor(0.2 * length(expr_cols)))) {
             n <- min(length(expr_cols), nrow(pdata))
@@ -231,79 +396,91 @@ server_groups <- function(input, output, session, rv) {
           }
         }
       }
-      
+
       list(expr_cols = as.character(expr_cols), gsm_ids = as.character(gsm_ids))
     }, error = function(e) {
       # Return empty lists on error
       list(expr_cols = character(0), gsm_ids = character(0))
     })
   }
-  
+
   # ==============================================================================
   # GROUP SELECTOR UI - Per-GSE Column Selection
   # ==============================================================================
-  
+
   output$group_selector_ui <- renderUI({
-    req(rv$download_complete)
-    
-    # Get dataset names: prefer unified_metadata, fallback to metadata lists
-    if (!is.null(rv$unified_metadata) && nrow(rv$unified_metadata) > 0) {
-      all_gses <- unique(rv$unified_metadata$Dataset)
-    } else {
-      # Fallback: derive from the raw metadata lists (before normalization finishes)
-      all_gses <- unique(c(names(rv$micro_metadata_list), names(rv$rna_metadata_list)))
-    }
-    
-    if (length(all_gses) == 0) {
-      return(tags$div(class = "alert alert-warning",
-                      icon("exclamation-triangle"),
-                      " No datasets available. Please complete data download and normalization first."))
-    }
-    
-    # If unified_metadata not ready yet (DESeq2 auto-normalize still running), show a message
-    if (is.null(rv$unified_metadata) || nrow(rv$unified_metadata) == 0) {
+    all_gses <- .gexpipe_available_gses()
+
+    if (length(all_gses) == 0L) {
+      if (!isTRUE(rv$download_complete)) {
+        return(tags$div(
+          class = "alert alert-info",
+          icon("info-circle"),
+          " Complete Step 1 (Download) first, then choose a phenotype column per GSE here."
+        ))
+      }
       return(tags$div(
-        class = "alert alert-info",
-        style = "padding: 15px; border-radius: 8px;",
-        icon("spinner", class = "fa-spin", style = "margin-right: 8px;"),
-        tags$strong("Normalization is still processing..."),
-        tags$br(),
-        tags$span("Please wait a moment. The phenotype column selector will appear once normalization completes.",
-                  style = "font-size: 13px; color: #495057;")
+        class = "alert alert-warning",
+        icon("exclamation-triangle"),
+        " No datasets available for column selection."
       ))
     }
-    
-    # Create UI for each GSE
+
+    # Create UI for each GSE from current phenodata (no blocking enrich)
     selector_boxes <- lapply(all_gses, function(gse) {
-      # Get phenotype data
-      pdata <- if (gse %in% names(rv$rna_metadata_list)) {
-        rv$rna_metadata_list[[gse]]
-      } else if (gse %in% names(rv$micro_metadata_list)) {
-        rv$micro_metadata_list[[gse]]
-      } else {
-        NULL
+      pdata_all <- .gexpipe_get_pdata_for_gse(gse)
+      pdata <- .gexpipe_align_pdata_to_expr(gse, pdata_all)
+      if (is.null(pdata) || !is.data.frame(pdata) || ncol(pdata) == 0L) {
+        return(box(
+          title = tags$span(
+            icon("database", style = "margin-right: 8px; color: #3498db;"),
+            tags$strong(gse, style = "font-size: 16px; color: #2c3e50;")
+          ),
+          width = 6, status = "warning", solidHeader = TRUE,
+          tags$div(
+            class = "alert alert-warning",
+            style = "margin: 0;",
+            "Phenodata not available yet for this dataset."
+          )
+        ))
       }
-      
-      if (is.null(pdata) || ncol(pdata) == 0) {
-        return(NULL)
-      }
-      
-      # Collect ALL phenotype column names (use both colnames and names to avoid missing any)
-      col_names <- unique(c(colnames(pdata), names(pdata)))
-      col_names <- as.character(col_names[!is.na(col_names) & nzchar(trimws(col_names))])
-      if (length(col_names) == 0) return(NULL)
-      # Put likely group-like columns first for convenience; list still contains ALL columns
-      likely <- col_names[grepl("characteristics|tissue|group|condition|disease|type|source|title|description|sample", 
-                                col_names, ignore.case = TRUE)]
-      other <- setdiff(col_names, likely)
-      group_cols <- c(likely, other)
-      # Build choices as explicit list so every column appears in the dropdown (no truncation)
-      choices_list <- list("-- Select Column --" = "")
-      for (col in group_cols) choices_list[[col]] <- col
-      choices_vec <- unlist(choices_list, use.names = TRUE)
+
+      col_names <- gexp_pdata_column_names(pdata)
+      if (length(col_names) == 0L) return(NULL)
+      choices_vec <- gexp_phenotype_column_choices(col_names)
       default_col <- gexp_suggest_group_column(col_names)
       if (!default_col %in% choices_vec) {
         default_col <- ""
+      }
+      n_samples <- .gexpipe_sample_count_for_gse(gse, pdata)
+      n_geo <- if (is.null(pdata_all) || !is.data.frame(pdata_all)) 0L else nrow(pdata_all)
+      n_excluded <- if (!is.null(rv$qc_excluded_samples)) {
+        sum(rv$qc_excluded_samples %in% rownames(pdata_all), na.rm = TRUE)
+      } else {
+        0L
+      }
+      count_note <- if (n_samples > 0L && n_geo > n_samples) {
+        tags$div(
+          class = "alert alert-warning",
+          style = "margin: 8px 0 0 0; padding: 8px 10px; font-size: 12px;",
+          icon("exclamation-triangle", style = "margin-right: 6px;"),
+          tags$strong(paste0("GEO lists ", n_geo, " samples, but only ", n_samples,
+                             " are in this dataset's expression matrix.")),
+          tags$br(),
+          tags$span(
+            if (n_excluded > 0L) {
+              paste0(n_excluded, " were removed in QC; the rest are missing from the count file (",
+                     "extra platform in the series, or samples dropped as >90% NA). ")
+            } else {
+              paste0("The count file covers fewer samples than the series (extra platform in the ",
+                     "series, or samples dropped as >90% NA). ")
+            },
+            "Groups are assigned from the ", n_samples, " matrix samples only.",
+            style = "color: #7d6608;"
+          )
+        )
+      } else {
+        NULL
       }
 
       box(
@@ -315,20 +492,35 @@ server_groups <- function(input, output, session, rv) {
         collapsed = FALSE,
         tags$div(
           style = "padding: 10px 0;",
+          tags$p(
+            style = "margin: 0 0 8px 0; color: #6c757d; font-size: 12px;",
+            icon("columns", style = "margin-right: 4px;"),
+            paste0(length(col_names), " phenotype columns available — pick the column that defines Normal vs Disease.")
+          ),
           selectInput(
             inputId = paste0("group_col_", gse),
             label = tags$span(icon("list"), " Select phenotype column:"),
             choices = choices_vec,
             selected = default_col,
+            selectize = FALSE,
             width = "100%"
           ),
           tags$div(
             style = "margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 5px;",
             tags$span(icon("vial"), style = "margin-right: 5px; color: #17a2b8;"),
-            tags$strong("Samples: ", style = "color: #495057;"),
-            tags$span(sum(rv$unified_metadata$Dataset == gse), 
-                     style = "color: #3498db; font-weight: bold; font-size: 16px;")
+            tags$strong("Samples in expression matrix: ", style = "color: #495057;"),
+            tags$span(
+              n_samples,
+              style = "color: #3498db; font-weight: bold; font-size: 16px;"
+            ),
+            if (n_geo > 0L) {
+              tags$span(
+                paste0(" (GEO series lists ", n_geo, ")"),
+                style = "color: #6c757d; font-size: 12px; margin-left: 6px;"
+              )
+            }
           ),
+          count_note,
           tags$div(
             style = "margin-top: 15px;",
             uiOutput(paste0("group_preview_", gse))
@@ -336,24 +528,26 @@ server_groups <- function(input, output, session, rv) {
         )
       )
     })
-    
+
     # Remove NULL boxes
     selector_boxes <- selector_boxes[!vapply(selector_boxes, is.null, logical(1))]
-    
-    if (length(selector_boxes) == 0) {
-      return(tags$div(class = "alert alert-warning",
-                      "No phenotype data available for group selection."))
+
+    if (length(selector_boxes) == 0L) {
+      return(tags$div(
+        class = "alert alert-warning",
+        "No phenotype data available for group selection."
+      ))
     }
-    
+
     # Display in rows of 2
     fluidRow(selector_boxes)
   })
-  
+
   # Store selected columns when they change and show preview
   observe({
-    req(rv$download_complete, rv$unified_metadata)
-    all_gses <- unique(rv$unified_metadata$Dataset)
-    
+    all_gses <- .gexpipe_available_gses()
+    req(length(all_gses) > 0L)
+
     sel_cols <- list()
     for (gse in all_gses) {
       col_input <- input[[paste0("group_col_", gse)]]
@@ -363,11 +557,11 @@ server_groups <- function(input, output, session, rv) {
     }
     selected_columns(sel_cols)
   })
-  
+
   # Show preview for each GSE when column is selected (using reactive pattern)
   observe({
-    req(rv$download_complete, rv$unified_metadata)
-    all_gses <- unique(rv$unified_metadata$Dataset)
+    all_gses <- .gexpipe_available_gses()
+    req(length(all_gses) > 0L)
     
     # Create observers for each GSE only once
     for (gse in all_gses) {
@@ -376,14 +570,12 @@ server_groups <- function(input, output, session, rv) {
         observeEvent(input[[paste0("group_col_", gse_local)]], {
           col_input <- input[[paste0("group_col_", gse_local)]]
           
-          # Get phenotype data
-          pdata <- if (gse_local %in% names(rv$rna_metadata_list)) {
-            rv$rna_metadata_list[[gse_local]]
-          } else if (gse_local %in% names(rv$micro_metadata_list)) {
-            rv$micro_metadata_list[[gse_local]]
-          } else {
-            NULL
-          }
+          # Get phenotype data (case-insensitive key resolve), limited to the
+          # samples present in the expression matrix
+          pdata <- .gexpipe_align_pdata_to_expr(
+            gse_local,
+            .gexpipe_get_pdata_for_gse(gse_local)
+          )
           
           if (is.null(col_input) || col_input == "" || is.null(pdata) || !(col_input %in% colnames(pdata))) {
             output[[paste0("group_preview_", gse_local)]] <- renderUI({
@@ -427,6 +619,20 @@ server_groups <- function(input, output, session, rv) {
                 icon("eye", style = "margin-right: 8px; color: #3498db; font-size: 18px;"),
                 tags$strong("Column Preview:", style = "color: #2c3e50; font-size: 16px;")
               ),
+              if (length(unique_vals) < 2L) {
+                tags$div(
+                  class = "alert alert-danger",
+                  style = "padding: 8px 10px; font-size: 12px;",
+                  icon("times-circle", style = "margin-right: 6px;"),
+                  tags$strong("This column has one value for every sample"),
+                  tags$br(),
+                  tags$span(
+                    paste0("\"", unique_vals[1], "\" cannot separate Normal from Disease. ",
+                           "Pick a characteristics_ch1 / disease state / tissue column instead."),
+                    style = "color: #922b21;"
+                  )
+                )
+              },
               tags$div(
                 style = "max-height: 200px; overflow-y: auto;",
                 tags$table(
@@ -509,14 +715,9 @@ server_groups <- function(input, output, session, rv) {
         
         col_input <- sel_cols[[gse]]
         
-        # Get phenotype data
-        pdata <- if (gse %in% names(rv$rna_metadata_list)) {
-          rv$rna_metadata_list[[gse]]
-        } else if (gse %in% names(rv$micro_metadata_list)) {
-          rv$micro_metadata_list[[gse]]
-        } else {
-          NULL
-        }
+        # Get phenotype data (case-insensitive key resolve), limited to the
+        # samples present in the expression matrix so alignment cannot shift
+        pdata <- .gexpipe_align_pdata_to_expr(gse, .gexpipe_get_pdata_for_gse(gse))
         
         if (is.null(pdata) || !(col_input %in% colnames(pdata))) {
           next

@@ -58,6 +58,13 @@
 #'   shiny::runApp(app, port = 3838L)  # Step 2: start the server
 #' }
 runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
+  # Make installed vs source mismatch obvious in the console.
+  if (interactive()) {
+    pkg_ver <- tryCatch(as.character(utils::packageVersion("GExPipe")), error = function(e) NA_character_)
+    pkg_path <- tryCatch(find.package("GExPipe", quiet = TRUE), error = function(e) "")
+    message("GExPipe: packageVersion=", pkg_ver, " path=", pkg_path)
+  }
+
   # When running from the package source tree, load latest R/ code (not stale install).
   if (interactive() && !isTRUE(getOption("gexpipe.no_auto_dev_load"))) {
     desc <- file.path(getwd(), "DESCRIPTION")

@@ -1,3 +1,22 @@
+# GExPipe 0.99.49
+
+- Step 4 Phenodata Browser: show the full GSE phenodata table immediately (with column list),
+  and run GEO enrich only after the UI flush so the browser and column selector no longer
+  stay blank while NCBI metadata is fetched. Column selection no longer waits on normalization.
+
+# GExPipe 0.99.48
+
+- Phenodata Browser: skip reactiveValues write-back when enrich does not change the table,
+  and isolate thin-only enrich in renderUI/DT so badge/DT no longer re-enter on every flush
+  (fixes stuck "Columns: 1" after successful enrich).
+
+# GExPipe 0.99.47
+
+- Phenodata enrich: case-insensitive GSE key write-back so enriched columns update the RNA/micro list the browser actually reads (not a mismatched micro stub).
+- Replace whole metadata lists when storing enrich results (reactiveValues-safe).
+- Treat title/geo_accession-only tables as thin; warn when enrich cannot add columns.
+- Re-enrich thin phenodata lists before setting download_complete so Groups badge/DT see rich columns.
+
 # GExPipe 0.99.44
 
 - Remove all `requireNamespace("rmda")` / `rmda` code paths from the nomogram DCA module (fixes R CMD check WARNING about undeclared dependency).

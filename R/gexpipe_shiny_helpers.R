@@ -139,32 +139,289 @@ gexp_ggsave_from_file <- function(file, plot, width, height, dpi = IMAGE_DPI) {
 #' @param col_names Character vector of pData column names.
 #' @return Column name or empty string.
 #' @keywords internal
+#' Test whether a pData column is GEO bookkeeping rather than phenotype
+#'
+#' GEO series carry administrative columns (\code{status},
+#' \code{submission_date}, \code{type}, protocol text, contact details) that
+#' hold one constant value per series and therefore cannot define groups.
+#'
+#' @param col_names Character vector of pData column names.
+#' @return Logical vector, same length as \code{col_names}.
+#' @keywords internal
+.gexpipe_is_admin_pdata_column <- function(col_names) {
+  admin_pattern <- paste0(
+    "^(status|submission_date|last_update_date|type|channel_count|",
+    "data_row_count|platform_id|series_id|geo_accession|instrument_model|",
+    "taxid_ch[0-9]*|organism_ch[0-9]*|molecule_ch[0-9]*|label(_protocol)?_ch[0-9]*|",
+    "hyb_protocol|scan_protocol|data_processing[0-9]*|",
+    "(extract|growth|treatment)_protocol_ch[0-9]*|",
+    "library_(strategy|source|selection)|supplementary_file.*|",
+    "relation[0-9]*|contact_.*)$"
+  )
+  grepl(admin_pattern, trimws(as.character(col_names)), ignore.case = TRUE)
+}
+
 gexp_suggest_group_column <- function(col_names) {
   col_names <- unique(as.character(col_names[!is.na(col_names) & nzchar(trimws(col_names))]))
   if (length(col_names) == 0L) {
     return("")
   }
-  cond <- col_names[grepl(
-    "condition|disease|treatment|group|status|type|characteristics.*ch1",
-    col_names,
+  # Never suggest GEO bookkeeping columns (e.g. status = "Public on Nov 06 2023")
+  usable <- col_names[!.gexpipe_is_admin_pdata_column(col_names)]
+  if (length(usable) == 0L) {
+    usable <- col_names
+  }
+  cond <- usable[grepl(
+    paste0(
+      "disease|diagnos|condition|phenotype|genotype|treatment|group|",
+      "tumor|tumour|cancer|normal|control|case|state|grade|stage|",
+      "tissue.*type|cell.*type|sample.*type"
+    ),
+    usable,
     ignore.case = TRUE
   )]
   if (length(cond) > 0L) {
     return(cond[[1L]])
   }
-  if ("title" %in% col_names) {
+  ch <- usable[grepl("^characteristics", usable, ignore.case = TRUE)]
+  if (length(ch) > 0L) {
+    return(ch[[1L]])
+  }
+  src <- usable[grepl("source_name|tissue|source|description", usable, ignore.case = TRUE)]
+  if (length(src) > 0L) {
+    return(src[[1L]])
+  }
+  if ("title" %in% usable) {
     return("title")
   }
-  likely <- col_names[grepl(
-    "characteristics|tissue|source|description|sample",
-    col_names,
+  usable[[1L]]
+}
+
+
+#' Return all phenotype column names from a pData-like object
+#'
+#' @param pdata data.frame, DataFrame, or similar sample metadata.
+#' @return Character vector of unique non-empty column names.
+#' @keywords internal
+gexp_pdata_column_names <- function(pdata) {
+  if (is.null(pdata)) {
+    return(character(0))
+  }
+  cols <- tryCatch(colnames(pdata), error = function(e) NULL)
+  if (is.null(cols) || length(cols) == 0L) {
+    cols <- tryCatch(names(pdata), error = function(e) NULL)
+  }
+  if (is.null(cols)) {
+    return(character(0))
+  }
+  unique(as.character(cols[!is.na(cols) & nzchar(trimws(cols))]))
+}
+
+#' Build selectInput choices listing every phenotype column
+#'
+#' @param col_names Character vector of column names.
+#' @return Named character vector suitable for shiny::selectInput choices.
+#' @keywords internal
+gexp_phenotype_column_choices <- function(col_names) {
+  col_names <- unique(as.character(col_names[!is.na(col_names) & nzchar(trimws(col_names))]))
+  is_admin <- .gexpipe_is_admin_pdata_column(col_names)
+  usable <- col_names[!is_admin]
+  likely <- usable[grepl(
+    "characteristics|tissue|group|condition|disease|treatment|status|type|source|title|description|sample",
+    usable,
     ignore.case = TRUE
   )]
-  if (length(likely) > 0L) {
-    return(likely[[1L]])
+  other <- setdiff(usable, likely)
+  # GEO bookkeeping columns stay selectable but are listed last
+  ordered <- c(likely, other, col_names[is_admin])
+  choices <- c("-- Select Column --" = "")
+  if (length(ordered) > 0L) {
+    choices <- c(choices, stats::setNames(ordered, ordered))
   }
-  col_names[[1L]]
+  choices
 }
+
+#' Test whether phenotype table is too thin for group selection
+#' @keywords internal
+.gexpipe_pdata_is_thin <- function(pdata) {
+  if (is.null(pdata) || !is.data.frame(pdata) || ncol(pdata) == 0L) {
+    return(TRUE)
+  }
+  if (ncol(pdata) <= 1L) {
+    return(TRUE)
+  }
+  cn <- tolower(trimws(as.character(colnames(pdata))))
+  # Title-only stubs may also carry geo_accession / SampleID / Dataset
+  meaningful <- setdiff(cn, c("title", "geo_accession", "x", "sample", "sampleid", "sample_id", "dataset"))
+  length(meaningful) == 0L
+}
+
+#' Resolve GSE key in a named list (case-insensitive)
+#' @keywords internal
+.gexpipe_resolve_metadata_key <- function(nm, gse) {
+  if (is.null(nm) || length(nm) == 0L) {
+    return(NA_character_)
+  }
+  gse <- as.character(gse)[[1L]]
+  if (gse %in% nm) {
+    return(gse)
+  }
+  hit <- nm[tolower(nm) == tolower(gse)]
+  if (length(hit) >= 1L) hit[[1L]] else NA_character_
+}
+
+#' Enrich thin GEO phenotype tables with full series phenotype columns
+#'
+#' Uses \code{gexp_fetch_full_pdata} (getGEO first, then series-matrix FTP).
+#' Title-only / single-column stubs are always replaced when a richer table
+#' can be fetched.
+#'
+#' @param pdata Existing phenotype data.frame (may be NULL/thin).
+#' @param gse_id GEO series accession.
+#' @param force If TRUE, re-fetch even when pdata already has multiple columns.
+#' @return Enriched data.frame, or original pdata on failure.
+#' @keywords internal
+gexp_enrich_pdata_columns <- function(pdata, gse_id, force = FALSE) {
+  n_now <- if (is.null(pdata) || !is.data.frame(pdata)) 0L else ncol(pdata)
+  sample_ids <- if (!is.null(pdata) && is.data.frame(pdata) && nrow(pdata) > 0L) {
+    as.character(rownames(pdata))
+  } else {
+    NULL
+  }
+  thin <- .gexpipe_pdata_is_thin(pdata)
+
+  # Skip only when already rich UNLESS force; still expand characteristics_*
+  if (!isTRUE(force) && !isTRUE(thin) && n_now > 1L) {
+    if (any(grepl("^characteristics", colnames(pdata), ignore.case = TRUE))) {
+      pdata <- tryCatch(gexp_expand_geo_characteristics(pdata), error = function(e) pdata)
+    }
+    return(pdata)
+  }
+
+  full <- tryCatch(
+    gexp_fetch_full_pdata(gse_id, sample_ids = sample_ids),
+    error = function(e) NULL
+  )
+  # Second pass without alignment if first path failed / stayed thin
+  if (is.null(full) || !is.data.frame(full) || nrow(full) == 0L || ncol(full) <= 1L) {
+    full <- tryCatch(gexp_fetch_full_pdata(gse_id, sample_ids = NULL), error = function(e) NULL)
+  }
+  if (is.null(full) || !is.data.frame(full) || nrow(full) == 0L || ncol(full) == 0L) {
+    return(pdata)
+  }
+
+  if (is.null(pdata) || !is.data.frame(pdata) || nrow(pdata) == 0L || n_now <= 1L) {
+    if (!is.null(pdata) && is.data.frame(pdata) && nrow(pdata) > 0L && n_now <= 1L) {
+      return(.gexpipe_align_pdata_to_primary(pdata, full))
+    }
+    return(full)
+  }
+
+  .gexpipe_merge_pdata_columns(pdata, full)
+}
+
+#' Enrich thin phenotype tables and write them back into rv metadata lists
+#'
+#' @param rv Shiny reactiveValues with rna_metadata_list / micro_metadata_list.
+#' @param gse GEO series accession.
+#' @param pdata Existing phenotype data.frame (may be NULL/thin).
+#' @return Enriched pdata (may be unchanged on failure).
+#' @keywords internal
+gexp_enrich_and_store_pdata <- function(rv, gse, pdata) {
+  original <- pdata
+  n_before <- if (is.null(pdata) || !is.data.frame(pdata)) 0L else ncol(pdata)
+  force <- isTRUE(n_before <= 1L) || .gexpipe_pdata_is_thin(pdata)
+  pdata <- tryCatch(
+    gexp_enrich_pdata_columns(pdata, gse, force = force),
+    error = function(e) {
+      warning(
+        "GExPipe phenodata enrich failed for ", gse, ": ",
+        conditionMessage(e),
+        call. = FALSE
+      )
+      pdata
+    }
+  )
+  if (is.null(pdata) || !is.data.frame(pdata) || ncol(pdata) == 0L) {
+    return(pdata)
+  }
+  if (ncol(pdata) > n_before) {
+    message("GExPipe: ", gse, " (phenodata columns: ", ncol(pdata), ")")
+  } else if (isTRUE(force) && .gexpipe_pdata_is_thin(pdata)) {
+    warning(
+      "GExPipe: phenotype enrich for ", gse,
+      " left thin phenodata (ncol=", ncol(pdata),
+      "). Check NCBI GEO network access.",
+      call. = FALSE
+    )
+  }
+
+  # Skip reactiveValues write when unchanged to avoid renderUI/DT re-entrancy
+  # that can leave the Phenodata Browser badge stuck at Columns: 1.
+  improved <- !isTRUE(identical(
+    list(
+      nr = if (is.null(original) || !is.data.frame(original)) 0L else nrow(original),
+      nc = n_before,
+      cn = if (is.null(original) || !is.data.frame(original)) character(0) else colnames(original),
+      rn = if (is.null(original) || !is.data.frame(original)) character(0) else rownames(original)
+    ),
+    list(
+      nr = nrow(pdata),
+      nc = ncol(pdata),
+      cn = colnames(pdata),
+      rn = rownames(pdata)
+    )
+  ))
+  if (!improved) {
+    return(pdata)
+  }
+
+  rna_key <- .gexpipe_resolve_metadata_key(names(rv$rna_metadata_list), gse)
+  micro_key <- .gexpipe_resolve_metadata_key(names(rv$micro_metadata_list), gse)
+  counts_key <- .gexpipe_resolve_metadata_key(names(rv$rna_counts_list), gse)
+
+  if (!is.na(rna_key)) {
+    lst <- rv$rna_metadata_list
+    if (is.null(lst)) lst <- list()
+    lst[[rna_key]] <- pdata
+    rv$rna_metadata_list <- lst
+  } else if (!is.na(micro_key)) {
+    lst <- rv$micro_metadata_list
+    if (is.null(lst)) lst <- list()
+    lst[[micro_key]] <- pdata
+    rv$micro_metadata_list <- lst
+  } else if (!is.na(counts_key)) {
+    lst <- rv$rna_metadata_list
+    if (is.null(lst)) lst <- list()
+    lst[[counts_key]] <- pdata
+    rv$rna_metadata_list <- lst
+  } else {
+    lst <- rv$micro_metadata_list
+    if (is.null(lst)) lst <- list()
+    lst[[as.character(gse)]] <- pdata
+    rv$micro_metadata_list <- lst
+  }
+  pdata
+}
+
+#' Re-enrich thin entries in a named phenotype metadata list
+#' @keywords internal
+gexp_enrich_thin_metadata_list <- function(meta_list) {
+  if (!is.list(meta_list) || length(meta_list) == 0L) {
+    return(meta_list)
+  }
+  for (gse in names(meta_list)) {
+    pdata <- meta_list[[gse]]
+    if (is.null(pdata) || !is.data.frame(pdata) || .gexpipe_pdata_is_thin(pdata)) {
+      meta_list[[gse]] <- tryCatch(
+        gexp_enrich_pdata_columns(pdata, gse, force = TRUE),
+        error = function(e) pdata
+      )
+    }
+  }
+  meta_list
+}
+
 
 #' Normalize phenotype labels for group extraction (e.g. parse GEO title text)
 #'

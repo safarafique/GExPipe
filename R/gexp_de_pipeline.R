@@ -5,6 +5,43 @@
 #' @importFrom edgeR filterByExpr
 utils::globalVariables(c("."))
 
+#' Does a matrix contain negative values?
+#'
+#' Count-based DE engines (DESeq2, edgeR, limma-voom) require non-negative
+#' values. Several GEO series only publish normalized or log-scale tables named
+#' like counts (for example `*_normalized.counts.txt.gz`); those contain
+#' negatives and make DESeq2 abort with "some values in assay are negative".
+#'
+#' @param m Matrix or data frame.
+#' @return TRUE when at least one finite value is below zero.
+#' @keywords internal
+.gexpipe_matrix_has_negative <- function(m) {
+  if (is.null(m) || length(m) == 0L) {
+    return(FALSE)
+  }
+  v <- suppressWarnings(as.numeric(as.matrix(m)))
+  v <- v[is.finite(v)]
+  length(v) > 0L && min(v) < 0
+}
+
+#' Datasets whose stored "counts" are not usable as counts
+#'
+#' @param counts_list Named list of count matrices.
+#' @param combined Optional combined count matrix used as a fallback check.
+#' @return Character vector of offending dataset names (empty when all valid).
+#' @keywords internal
+.gexpipe_negative_count_datasets <- function(counts_list, combined = NULL) {
+  bad <- character(0)
+  if (length(counts_list) > 0) {
+    flags <- vapply(counts_list, .gexpipe_matrix_has_negative, logical(1))
+    bad <- names(counts_list)[flags]
+  }
+  if (length(bad) == 0L && .gexpipe_matrix_has_negative(combined)) {
+    bad <- "combined count matrix"
+  }
+  bad
+}
+
 #' Independent filtering for DE (limma filterByExpr)
 #'
 #' Removes lowly expressed genes using a design-aware filter so filtering is

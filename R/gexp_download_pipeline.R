@@ -320,6 +320,313 @@ gexp_download_finalize_common_genes <- function(
   )
 }
 
+#' GEO series FTP folder name (e.g. GSE50760 -> GSE50nnn)
+#' @keywords internal
+.gexpipe_geo_series_folder <- function(gse_id) {
+  gse_id <- toupper(trimws(as.character(gse_id)[[1L]]))
+  if (!nzchar(gse_id) || nchar(gse_id) < 4L) {
+    return(gse_id)
+  }
+  paste0(substr(gse_id, 1L, nchar(gse_id) - 3L), "nnn")
+}
+
+#' Strip GEO series-matrix quoting from sample attribute values
+#' @keywords internal
+.gexpipe_strip_geo_quotes <- function(x) {
+  x <- as.character(x)
+  x <- gsub("^\"|\"$", "", x)
+  x
+}
+
+
+#' Extract phenotype table from ExpressionSet or SummarizedExperiment
+#' @keywords internal
+.gexpipe_extract_geo_pdata <- function(gse) {
+  if (is.null(gse)) {
+    return(NULL)
+  }
+  pd <- NULL
+  if (inherits(gse, "ExpressionSet")) {
+    pd <- tryCatch(Biobase::pData(gse), error = function(e) NULL)
+  } else if (inherits(gse, "SummarizedExperiment") ||
+             inherits(gse, "RangedSummarizedExperiment")) {
+    if (requireNamespace("SummarizedExperiment", quietly = TRUE)) {
+      pd <- tryCatch(
+        as.data.frame(SummarizedExperiment::colData(gse)),
+        error = function(e) NULL
+      )
+    }
+  }
+  if (is.null(pd)) {
+    pd <- tryCatch(Biobase::pData(gse), error = function(e) NULL)
+  }
+  if (is.null(pd) && requireNamespace("SummarizedExperiment", quietly = TRUE)) {
+    pd <- tryCatch(
+      as.data.frame(SummarizedExperiment::colData(gse)),
+      error = function(e) NULL
+    )
+  }
+  if (is.null(pd) || nrow(pd) == 0L) {
+    return(NULL)
+  }
+  as.data.frame(pd, stringsAsFactors = FALSE, check.names = FALSE)
+}
+
+#' Stack per-platform sample tables from a multi-platform GEO series
+#'
+#' A series distributed over several platforms yields one partial sample table
+#' per platform. Stack them on the union of columns and drop samples that repeat
+#' across platforms, so the series is represented by all of its samples.
+#'
+#' @param pds List of phenotype data.frames (NULL entries are ignored).
+#' @return Single data.frame, or NULL when nothing usable was supplied.
+#' @keywords internal
+.gexpipe_rbind_pdata_parts <- function(pds) {
+  if (!is.list(pds)) {
+    pds <- list(pds)
+  }
+  pds <- Filter(function(x) is.data.frame(x) && nrow(x) > 0L && ncol(x) > 0L, pds)
+  if (length(pds) == 0L) {
+    return(NULL)
+  }
+  if (length(pds) == 1L) {
+    return(pds[[1L]])
+  }
+  all_cols <- unique(unlist(lapply(pds, colnames), use.names = FALSE))
+  row_ids <- as.character(unlist(lapply(pds, rownames), use.names = FALSE))
+  pds <- lapply(pds, function(df) {
+    df <- as.data.frame(df, stringsAsFactors = FALSE, check.names = FALSE)
+    for (cn in all_cols) {
+      df[[cn]] <- if (cn %in% colnames(df)) as.character(df[[cn]]) else NA_character_
+    }
+    df[, all_cols, drop = FALSE]
+  })
+  out <- do.call(rbind, pds)
+  if (length(row_ids) == nrow(out)) {
+    rownames(out) <- make.unique(row_ids, sep = "_")
+  }
+  key <- if ("geo_accession" %in% colnames(out)) {
+    as.character(out[["geo_accession"]])
+  } else {
+    rownames(out)
+  }
+  dup <- duplicated(key) & !is.na(key) & nzchar(trimws(key))
+  out[!dup, , drop = FALSE]
+}
+
+#' Prefer ExpressionSet from getGEO when the argument is available
+#' @keywords internal
+.gexpipe_getgeo_series <- function(gse_id, ...) {
+  # Default getGPL=FALSE for speed; caller ... can override.
+  dots <- list(...)
+  args <- list(GEO = gse_id, GSEMatrix = TRUE, getGPL = FALSE)
+  if (length(dots) > 0L) {
+    args[names(dots)] <- dots
+  }
+  fmls <- tryCatch(names(formals(GEOquery::getGEO)), error = function(e) character(0))
+  if ("returnType" %in% fmls && !"returnType" %in% names(args)) {
+    args$returnType <- "ExpressionSet"
+  }
+  .gexpipe_geo_quiet(do.call(GEOquery::getGEO, args))
+}
+
+#' Align an enriched phenotype table onto primary sample IDs
+#'
+#' Matches by rownames, geo_accession, title, then positional fallback when
+#' nrow matches (RNA-seq count headers like 7_S13 often differ from GSM IDs).
+#' @keywords internal
+.gexpipe_align_pdata_to_primary <- function(primary, extra) {
+  if (is.null(extra) || !is.data.frame(extra) || nrow(extra) == 0L || ncol(extra) == 0L) {
+    return(primary)
+  }
+  if (is.null(primary) || !is.data.frame(primary) || nrow(primary) == 0L) {
+    return(extra)
+  }
+  primary <- as.data.frame(primary, stringsAsFactors = FALSE, check.names = FALSE)
+  extra <- as.data.frame(extra, stringsAsFactors = FALSE, check.names = FALSE)
+  prim_ids <- as.character(rownames(primary))
+  map_idx <- match(prim_ids, rownames(extra))
+  if (all(is.na(map_idx)) && "geo_accession" %in% colnames(extra)) {
+    map_idx <- match(prim_ids, as.character(extra[["geo_accession"]]))
+  }
+  if (all(is.na(map_idx)) && "title" %in% colnames(extra)) {
+    map_idx <- match(prim_ids, as.character(extra[["title"]]))
+  }
+  if (all(is.na(map_idx)) && "title" %in% colnames(primary) && "title" %in% colnames(extra)) {
+    map_idx <- match(as.character(primary[["title"]]), as.character(extra[["title"]]))
+  }
+  if (all(is.na(map_idx)) && nrow(primary) == nrow(extra)) {
+    map_idx <- seq_len(nrow(primary))
+  }
+  if (all(is.na(map_idx))) {
+    return(extra)
+  }
+  out <- extra[map_idx, , drop = FALSE]
+  rownames(out) <- prim_ids
+  out
+}
+
+#' Expand GEO characteristics_ch* "key: value" fields into selectable columns
+#'
+#' @param pdata Sample phenotype data.frame.
+#' @return data.frame with original columns plus one column per characteristic key.
+#' @keywords internal
+gexp_expand_geo_characteristics <- function(pdata) {
+  if (is.null(pdata) || !is.data.frame(pdata) || ncol(pdata) == 0L || nrow(pdata) == 0L) {
+    return(pdata)
+  }
+  char_cols <- grep("^characteristics", colnames(pdata), ignore.case = TRUE, value = TRUE)
+  if (length(char_cols) == 0L) {
+    return(pdata)
+  }
+  out <- pdata
+  for (cc in char_cols) {
+    vals <- .gexpipe_strip_geo_quotes(out[[cc]])
+    has_key <- !is.na(vals) & grepl("^[^:]+:\\s*.+", vals)
+    if (!any(has_key)) {
+      next
+    }
+    keys <- rep(NA_character_, length(vals))
+    keys[has_key] <- trimws(sub("^([^:]+):\\s*.*$", "\\1", vals[has_key]))
+    uniq_keys <- unique(keys[!is.na(keys) & nzchar(keys)])
+    for (k in uniq_keys) {
+      new_col <- make.names(k)
+      base <- new_col
+      suffix <- 1L
+      while (new_col %in% colnames(out)) {
+        existing <- out[[new_col]]
+        if (all(is.na(existing) | !nzchar(trimws(as.character(existing))))) {
+          break
+        }
+        suffix <- suffix + 1L
+        new_col <- paste0(base, ".", suffix)
+      }
+      col_vals <- rep(NA_character_, nrow(out))
+      hit <- which(keys == k)
+      col_vals[hit] <- trimws(sub("^[^:]+:\\s*", "", vals[hit]))
+      if (new_col %in% colnames(out)) {
+        miss <- is.na(out[[new_col]]) | !nzchar(trimws(as.character(out[[new_col]])))
+        out[[new_col]][miss] <- col_vals[miss]
+      } else {
+        out[[new_col]] <- col_vals
+      }
+    }
+  }
+  out
+}
+
+#' Merge two phenotype tables by sample ID, keeping the union of columns
+#' @keywords internal
+.gexpipe_merge_pdata_columns <- function(primary, extra) {
+  if (is.null(extra) || !is.data.frame(extra) || nrow(extra) == 0L || ncol(extra) == 0L) {
+    return(primary)
+  }
+  if (is.null(primary) || !is.data.frame(primary) || nrow(primary) == 0L) {
+    return(extra)
+  }
+  primary <- as.data.frame(primary, stringsAsFactors = FALSE, check.names = FALSE)
+  extra <- as.data.frame(extra, stringsAsFactors = FALSE, check.names = FALSE)
+  # When primary is thin (title-only stub), prefer fully aligned enriched table
+  if (ncol(primary) <= 1L && ncol(extra) > ncol(primary)) {
+    return(.gexpipe_align_pdata_to_primary(primary, extra))
+  }
+  map_idx <- match(rownames(primary), rownames(extra))
+  if (all(is.na(map_idx)) && "geo_accession" %in% colnames(primary) &&
+      "geo_accession" %in% colnames(extra)) {
+    map_idx <- match(
+      as.character(primary[["geo_accession"]]),
+      as.character(extra[["geo_accession"]])
+    )
+  }
+  if (all(is.na(map_idx)) && "title" %in% colnames(extra)) {
+    map_idx <- match(as.character(rownames(primary)), as.character(extra[["title"]]))
+  }
+  if (all(is.na(map_idx)) && "title" %in% colnames(primary) && "title" %in% colnames(extra)) {
+    map_idx <- match(as.character(primary[["title"]]), as.character(extra[["title"]]))
+  }
+  if (all(is.na(map_idx)) && nrow(primary) == nrow(extra)) {
+    map_idx <- seq_len(nrow(primary))
+  }
+  for (cn in colnames(extra)) {
+    if (!cn %in% colnames(primary)) {
+      primary[[cn]] <- NA_character_
+    }
+    if (all(is.na(map_idx))) {
+      next
+    }
+    hit <- which(!is.na(map_idx))
+    prim_vals <- as.character(primary[[cn]])
+    fill <- hit[is.na(prim_vals[hit]) | !nzchar(trimws(prim_vals[hit]))]
+    if (length(fill) > 0L) {
+      primary[[cn]][fill] <- as.character(extra[[cn]])[map_idx[fill]]
+    }
+  }
+  primary
+}
+
+
+#' Fetch full GEO phenotype data for any series
+#'
+#' Universal path for download + Groups UI: try getGEO pData/colData first
+#' (same as a typical GEOquery workflow), expand characteristics_* key:value
+#' columns, fall back to series-matrix FTP when still thin/NULL, then optionally
+#' align rownames to count/expression sample IDs.
+#'
+#' @param gse_id GEO series accession.
+#' @param sample_ids Optional character vector of primary sample IDs
+#'   (count/expression colnames) used to align rownames.
+#' @return data.frame with all available phenotype columns, or NULL.
+#' @keywords internal
+gexp_fetch_full_pdata <- function(gse_id, sample_ids = NULL) {
+  gse_id <- toupper(trimws(as.character(gse_id)[[1L]]))
+  if (!nzchar(gse_id)) {
+    return(NULL)
+  }
+
+  pd <- tryCatch({
+    gse_list <- .gexpipe_getgeo_series(gse_id)
+    # getGEO returns one element per platform. Series split across platforms
+    # (e.g. GSE114007 on GPL11154 + GPL18573) must contribute every sample,
+    # otherwise the expected sample count is capped at one platform's share.
+    parts <- if (inherits(gse_list, "list")) gse_list else list(gse_list)
+    .gexpipe_rbind_pdata_parts(lapply(parts, .gexpipe_extract_geo_pdata))
+  }, error = function(e) NULL)
+
+  if (!is.null(pd) && is.data.frame(pd) && nrow(pd) > 0L) {
+    pd <- gexp_expand_geo_characteristics(pd)
+  }
+
+  thin <- is.null(pd) || !is.data.frame(pd) || nrow(pd) == 0L || ncol(pd) <= 1L ||
+    (ncol(pd) == 1L && grepl("^title$", colnames(pd)[[1L]], ignore.case = TRUE))
+  if (isTRUE(thin)) {
+    sm <- tryCatch(gexp_fetch_geo_series_matrix_metadata(gse_id), error = function(e) NULL)
+    if (!is.null(sm) && is.data.frame(sm) && nrow(sm) > 0L && ncol(sm) > 0L) {
+      sm <- gexp_expand_geo_characteristics(sm)
+      if (is.null(pd) || !is.data.frame(pd) || nrow(pd) == 0L || ncol(sm) > ncol(pd)) {
+        pd <- sm
+      } else {
+        pd <- .gexpipe_merge_pdata_columns(pd, sm)
+      }
+    }
+  }
+
+  if (is.null(pd) || !is.data.frame(pd) || nrow(pd) == 0L || ncol(pd) == 0L) {
+    return(NULL)
+  }
+
+  if (!is.null(sample_ids) && length(sample_ids) > 0L) {
+    sample_ids <- as.character(sample_ids)
+    primary <- data.frame(
+      title = sample_ids,
+      row.names = sample_ids,
+      stringsAsFactors = FALSE
+    )
+    pd <- .gexpipe_align_pdata_to_primary(primary, pd)
+  }
+
+  pd
+}
+
 #' Fetch sample metadata from GEO series matrix fallback
 #'
 #' @param gse_id GEO series ID.
@@ -332,16 +639,85 @@ gexp_download_finalize_common_genes <- function(
 #' }
 #' @export
 gexp_fetch_geo_series_matrix_metadata <- function(gse_id) {
-  conn <- NULL
-  tryCatch({
-    url_str <- sprintf(
-      "https://ftp.ncbi.nlm.nih.gov/geo/series/%s/%s/matrix/%s_series_matrix.txt.gz",
-      substr(gse_id, 1, 3), gse_id, gse_id
+  gse_id <- toupper(trimws(as.character(gse_id)[[1L]]))
+  urls <- .gexpipe_series_matrix_urls(gse_id)
+  if (length(urls) == 0L) {
+    return(NULL)
+  }
+  parts <- lapply(urls, .gexpipe_parse_series_matrix_url)
+  .gexpipe_rbind_pdata_parts(parts)
+}
+
+#' Candidate series-matrix URLs for a GEO series
+#'
+#' Multi-platform series have no plain \code{GSE_series_matrix.txt.gz}; they ship
+#' one \code{GSE-GPLxxxxx_series_matrix.txt.gz} per platform. List the matrix
+#' directory so every platform file is picked up.
+#'
+#' @param gse_id GEO series ID.
+#' @return Character vector of URLs (plain file first when no listing is found).
+#' @keywords internal
+.gexpipe_series_matrix_urls <- function(gse_id) {
+  gse_id <- toupper(trimws(as.character(gse_id)[[1L]]))
+  base_url <- sprintf(
+    "https://ftp.ncbi.nlm.nih.gov/geo/series/%s/%s/matrix/",
+    .gexpipe_geo_series_folder(gse_id), gse_id
+  )
+  listing <- tryCatch({
+    conn <- url(base_url, open = "rb")
+    on.exit(try(close(conn), silent = TRUE), add = TRUE)
+    readLines(conn, warn = FALSE)
+  }, error = function(e) character(0))
+  names_found <- character(0)
+  if (length(listing) > 0L) {
+    hits <- regmatches(
+      listing,
+      gregexpr(paste0(gse_id, "[A-Za-z0-9_.-]*_series_matrix\\.txt\\.gz"), listing)
     )
-    conn <- url(url_str, open = "rb")
-    raw_lines <- readLines(conn, warn = FALSE, encoding = "UTF-8")
+    names_found <- unique(unlist(hits, use.names = FALSE))
+  }
+  if (length(names_found) == 0L) {
+    return(paste0(base_url, gse_id, "_series_matrix.txt.gz"))
+  }
+  paste0(base_url, names_found)
+}
+
+#' Download and parse the sample metadata block of one series-matrix file
+#'
+#' @param url_str URL of a \code{*_series_matrix.txt.gz} file.
+#' @return data.frame of sample metadata, or NULL.
+#' @keywords internal
+.gexpipe_parse_series_matrix_url <- function(url_str) {
+  conn <- NULL
+  tmp_gz <- NULL
+  tryCatch({
+    # Series matrix files are gzip-compressed; url()+readLines alone never
+    # decompresses, so !sample_ lines are invisible unless we wrap with gzcon.
+    raw_lines <- character(0)
+    tryCatch({
+      conn <- gzcon(url(url_str, open = "rb"))
+      raw_lines <- readLines(conn, warn = FALSE, encoding = "UTF-8")
+      try(close(conn), silent = TRUE)
+      conn <- NULL
+    }, error = function(e) {
+      if (!is.null(conn)) {
+        try(close(conn), silent = TRUE)
+        conn <<- NULL
+      }
+      tmp_gz <<- tempfile(fileext = ".txt.gz")
+      utils::download.file(url_str, destfile = tmp_gz, mode = "wb", quiet = TRUE)
+      conn <<- gzfile(tmp_gz, open = "rt")
+      raw_lines <<- readLines(conn, warn = FALSE, encoding = "UTF-8")
+      try(close(conn), silent = TRUE)
+      conn <<- NULL
+    })
     if (length(raw_lines) == 0) {
       return(NULL)
+    }
+    # Stop before expression table for speed (sample metadata is above this marker)
+    table_begin <- grep("^!series_matrix_table_begin", raw_lines, ignore.case = TRUE)
+    if (length(table_begin) > 0L) {
+      raw_lines <- raw_lines[seq_len(max(1L, table_begin[[1L]] - 1L))]
     }
     idx <- grep("^!sample_", raw_lines, ignore.case = TRUE)
     if (length(idx) == 0) {
@@ -353,8 +729,18 @@ gexp_fetch_geo_series_matrix_metadata <- function(gse_id) {
     if (n_samples < 1) {
       return(NULL)
     }
-    sample_ids <- lines[[1]][-1]
+    # Prefer GSM accessions as rownames (first !Sample_ line is usually title)
+    acc_idx <- which(tolower(attr_names) == "geo_accession")
+    if (length(acc_idx) > 0L) {
+      sample_ids <- .gexpipe_strip_geo_quotes(lines[[acc_idx[[1L]]]][-1])
+    } else {
+      sample_ids <- .gexpipe_strip_geo_quotes(lines[[1]][-1])
+    }
     sample_ids <- head(sample_ids, n_samples)
+    if (length(sample_ids) < n_samples) {
+      sample_ids <- c(sample_ids, paste0("sample_", seq_len(n_samples - length(sample_ids))))
+    }
+    sample_ids <- make.unique(as.character(sample_ids), sep = "_")
     out <- as.data.frame(
       matrix(NA_character_, nrow = length(sample_ids), ncol = length(attr_names)),
       stringsAsFactors = FALSE
@@ -362,13 +748,14 @@ gexp_fetch_geo_series_matrix_metadata <- function(gse_id) {
     colnames(out) <- make.names(attr_names, unique = TRUE)
     rownames(out) <- sample_ids
     for (j in seq_along(lines)) {
-      vals <- lines[[j]][-1]
+      vals <- .gexpipe_strip_geo_quotes(lines[[j]][-1])
       n <- min(length(vals), nrow(out))
       if (n > 0) out[seq_len(n), j] <- vals[seq_len(n)]
     }
-    out
+    gexp_expand_geo_characteristics(out)
   }, error = function(e) NULL, finally = {
     if (!is.null(conn)) try(close(conn), silent = TRUE)
+    if (!is.null(tmp_gz) && file.exists(tmp_gz)) try(unlink(tmp_gz), silent = TRUE)
   })
 }
 
@@ -1004,6 +1391,45 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   micro_expr  <- eset_parse$expr_mat
   pdata       <- eset_parse$pdata
   if (is.null(pdata)) pdata <- data.frame(row.names = colnames(micro_expr))
+  # Supplementary-only parses can yield empty pData; expand/enrich for group UI.
+  if (!is.null(pdata) && is.data.frame(pdata) && ncol(pdata) > 0L) {
+    pdata <- gexp_expand_geo_characteristics(
+      as.data.frame(pdata, stringsAsFactors = FALSE, check.names = FALSE)
+    )
+  }
+  # Always ensure full GEO phenotype columns for the Groups UI
+  sample_ids <- if (!is.null(micro_expr)) colnames(micro_expr) else NULL
+  if (is.null(pdata) || !is.data.frame(pdata) || ncol(pdata) <= 1L) {
+    full <- tryCatch(gexp_fetch_full_pdata(gse_id, sample_ids = sample_ids), error = function(e) NULL)
+    if (!is.null(full) && is.data.frame(full) && ncol(full) > 0L) {
+      if (is.null(pdata) || !is.data.frame(pdata) || nrow(pdata) == 0L) {
+        pdata <- full
+      } else {
+        pdata <- .gexpipe_align_pdata_to_primary(pdata, full)
+      }
+    } else {
+      pdata <- tryCatch(
+        gexp_enrich_pdata_columns(
+          if (is.null(pdata) || !is.data.frame(pdata) || nrow(pdata) == 0L) {
+            data.frame(row.names = colnames(micro_expr), stringsAsFactors = FALSE)
+          } else {
+            pdata
+          },
+          gse_id,
+          force = TRUE
+        ),
+        error = function(e) pdata
+      )
+    }
+  } else {
+    pdata <- tryCatch(
+      gexp_enrich_pdata_columns(pdata, gse_id),
+      error = function(e) pdata
+    )
+  }
+  if (!is.null(pdata) && is.data.frame(pdata) && ncol(pdata) > 0L) {
+    out$log <- paste0(out$log, "(phenodata columns: ", ncol(pdata), ") ")
+  }
 
   # ---- NA-sample detection and removal ----
   # Some GEO samples have all-NA or mostly-NA expression values (failed
@@ -1114,14 +1540,34 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   }
   nsamp <- info$nsamp
   ngenes <- info$nrow
-  is_matrix_name <- grepl("matrix", basename(info$path), ignore.case = TRUE)
+  base_name <- if (length(info$path) == 0L) "" else basename(info$path[[1]])
+  is_matrix_name <- grepl("matrix", base_name, ignore.case = TRUE)
   samp_match <- if (!is.na(n_meta) && n_meta > 0L) {
     -abs(nsamp - n_meta) * 1e6 + nsamp * 1e3
   } else {
     nsamp * 1e3
   }
   matrix_bonus <- if (is_matrix_name) 1e4 else 0L
-  samp_match + matrix_bonus + ngenes
+  # Files named "normalized"/FPKM/TPM/rlog hold continuous (often log-scale)
+  # values, which count-based DE engines cannot use. Break ties towards the
+  # raw table whenever a series ships both.
+  scale_bonus <- if (.gexpipe_is_normalized_count_name(base_name)) {
+    -5e4
+  } else if (grepl("raw", base_name, ignore.case = TRUE)) {
+    5e4
+  } else {
+    0L
+  }
+  samp_match + matrix_bonus + scale_bonus + ngenes
+}
+
+#' Does a count-file name indicate normalized (non-count) values?
+#' @keywords internal
+.gexpipe_is_normalized_count_name <- function(x) {
+  grepl(
+    "normali[sz]ed|fpkm|tpm|rpkm|[^a-z]cpm|vst|rlog|log2|z[-_]?score",
+    basename(x), ignore.case = TRUE
+  )
 }
 
 #' Pick the best count file from candidates using sample count then gene rows
@@ -1184,6 +1630,80 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
   unique(per_sample)
 }
 
+#' Detect count files that each cover only part of a series
+#'
+#' Some series split processed counts by group instead of shipping one table
+#' (e.g. GSE114007 provides OA and normal counts separately). Such files each
+#' hold several samples, so they are invisible to the per-sample merge.
+#'
+#' @param files Candidate file paths from the GSE download directory.
+#' @param n_meta Expected sample count from GEO metadata.
+#' @return Character vector of partial count files.
+#' @keywords internal
+.gexpipe_find_partial_count_files <- function(files, n_meta = NA_integer_) {
+  if (is.na(n_meta) || n_meta <= 1L) {
+    return(character(0))
+  }
+  candidates <- .gexpipe_collect_supp_count_candidates(files)
+  candidates <- candidates[!grepl("matrix", basename(candidates), ignore.case = TRUE)]
+  partial <- character(0)
+  for (cand in candidates) {
+    info <- .gexpipe_preview_count_file(cand)
+    if (!is.null(info) && info$nsamp >= 1L && info$nsamp < n_meta && info$nrow >= 10L) {
+      partial <- c(partial, cand)
+    }
+  }
+  unique(partial)
+}
+
+#' Merge count files that each hold a subset of samples
+#'
+#' Joins on the gene column and keeps genes shared by every file. Columns
+#' already present are skipped, so files describing the same samples twice
+#' cannot inflate the sample count.
+#'
+#' @param paths Character vector of count file paths.
+#' @return data.frame (gene column first) or NULL.
+#' @keywords internal
+.gexpipe_merge_count_files <- function(paths) {
+  paths <- unique(paths[nzchar(paths)])
+  if (length(paths) < 2L) {
+    return(NULL)
+  }
+  merged <- NULL
+  for (p in paths) {
+    df <- tryCatch(.gexpipe_fread_counts(p), error = function(e) NULL)
+    if (is.null(df) || ncol(df) < 2L || nrow(df) < 10L) {
+      next
+    }
+    df <- as.data.frame(df, stringsAsFactors = FALSE, check.names = FALSE)
+    piece <- df[, -1L, drop = FALSE]
+    if (ncol(piece) == 1L) {
+      nm <- sub("\\.[^.]+(\\.gz)?$", "", basename(p))
+      colnames(piece) <- sub("\\.htseq-count$", "", nm, ignore.case = TRUE)
+    }
+    piece <- cbind(gene = as.character(df[[1L]]), piece, stringsAsFactors = FALSE)
+    piece <- piece[!duplicated(piece$gene) & !is.na(piece$gene) & nzchar(piece$gene), , drop = FALSE]
+    if (is.null(merged)) {
+      merged <- piece
+      next
+    }
+    new_cols <- setdiff(colnames(piece)[-1L], colnames(merged))
+    if (length(new_cols) == 0L) {
+      next
+    }
+    merged <- merge(
+      merged,
+      piece[, c("gene", new_cols), drop = FALSE],
+      by = "gene", all = FALSE
+    )
+  }
+  if (is.null(merged) || ncol(merged) < 3L || nrow(merged) < 10L) {
+    return(NULL)
+  }
+  as.data.frame(merged, stringsAsFactors = FALSE, check.names = FALSE)
+}
+
 #' Merge per-sample count files (genes x one sample each) into one matrix
 #' @keywords internal
 .gexpipe_merge_per_sample_count_files <- function(paths) {
@@ -1221,24 +1741,12 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir) {
 #' Fetch GEO metadata early for expected sample count
 #' @keywords internal
 .gexpipe_fetch_rnaseq_metadata_early <- function(gse_id) {
-  tryCatch(
-    {
-      gse_list <- .gexpipe_geo_quiet(GEOquery::getGEO(gse_id, GSEMatrix = TRUE))
-      gse <- if (inherits(gse_list, "list") && length(gse_list) >= 1) {
-        gse_list[[1]]
-      } else {
-        gse_list
-      }
-      pheno <- Biobase::pData(gse)
-      if (is.null(pheno) || nrow(pheno) == 0) {
-        stop("empty pData")
-      }
-      pheno
-    },
-    error = function(e) {
-      gexp_fetch_geo_series_matrix_metadata(gse_id)
-    }
-  )
+  # Universal full-pdata path (getGEO -> characteristics expand -> series-matrix).
+  pheno <- tryCatch(gexp_fetch_full_pdata(gse_id), error = function(e) NULL)
+  if (is.null(pheno) || !is.data.frame(pheno) || nrow(pheno) == 0L) {
+    return(NULL)
+  }
+  pheno
 }
 
 #' Choose between GEO supplementary and NCBI count matrices
@@ -1292,6 +1800,7 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   supp_state$err <- NULL
   count_file <- NULL
   count_df_merged <- NULL
+  count_df_merged_src <- NULL
   tryCatch(
     {
       .gexpipe_geo_quiet(
@@ -1344,12 +1853,32 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
         per_sample <- .gexpipe_find_per_sample_count_files(files)
         if (length(per_sample) >= 2L) {
           merged_df <- .gexpipe_merge_per_sample_count_files(per_sample)
-          merged_nsamp <- if (!is.null(merged_df)) ncol(merged_df) else 0L
+          merged_nsamp <- if (!is.null(merged_df)) ncol(merged_df) - 1L else 0L
           if (!is.null(merged_df) && merged_nsamp >= 2L &&
             (is.null(best_info) || merged_nsamp > best_info$nsamp)) {
             count_df_merged <- merged_df
+            count_df_merged_src <- per_sample
             count_file <- NULL
             out$log <- paste0(out$log, "(merged ", merged_nsamp, " per-sample files) ")
+          }
+        }
+        # Counts split by group (e.g. GSE114007 OA + normal) hold several
+        # samples each, so combine them into the full series matrix.
+        if (is.null(count_df_merged)) {
+          partial <- .gexpipe_find_partial_count_files(files, n_meta)
+          if (length(partial) >= 2L) {
+            merged_df <- .gexpipe_merge_count_files(partial)
+            merged_nsamp <- if (!is.null(merged_df)) ncol(merged_df) - 1L else 0L
+            if (!is.null(merged_df) && merged_nsamp >= 2L &&
+              (is.null(best_info) || merged_nsamp > best_info$nsamp)) {
+              count_df_merged <- merged_df
+              count_df_merged_src <- partial
+              count_file <- NULL
+              out$log <- paste0(
+                out$log, "(merged ", length(partial), " partial count files -> ",
+                merged_nsamp, " samples) "
+              )
+            }
           }
         }
       }
@@ -1363,10 +1892,14 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
   ncbi_best <- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
   chosen <- .gexpipe_choose_supp_or_ncbi(count_file, ncbi_best, n_meta)
   if (!is.null(count_df_merged)) {
-    merged_nsamp <- ncol(count_df_merged)
+    # First column holds gene IDs, so it must not count as a sample
+    merged_nsamp <- ncol(count_df_merged) - 1L
     merged_ngenes <- nrow(count_df_merged)
+    # Score under a source file name so a merged set of normalized tables does
+    # not outrank a genuine raw count matrix with the same sample count.
+    merged_path <- if (length(count_df_merged_src) > 0) count_df_merged_src[[1]] else "merged"
     merged_score <- .gexpipe_score_count_candidate(
-      list(path = "merged", nrow = merged_ngenes, ncol = merged_nsamp + 1L, nsamp = merged_nsamp),
+      list(path = merged_path, nrow = merged_ngenes, ncol = merged_nsamp + 1L, nsamp = merged_nsamp),
       n_meta
     )
     chosen_score <- .gexpipe_score_count_candidate(chosen$info, n_meta)
@@ -1525,6 +2058,39 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir) {
     if (length(common_samples) > 0) {
       rna_metadata <- rna_metadata[common_samples, , drop = FALSE]
     }
+  }
+  # Enrich thin phenodata for group selection when needed
+  if (is.null(rna_metadata) || !is.data.frame(rna_metadata) || ncol(rna_metadata) <= 1L) {
+    primary_stub <- if (!is.null(rna_metadata) && is.data.frame(rna_metadata) && nrow(rna_metadata) > 0L) {
+      rna_metadata
+    } else {
+      data.frame(
+        title = colnames(count_matrix),
+        row.names = colnames(count_matrix),
+        stringsAsFactors = FALSE
+      )
+    }
+    enriched <- tryCatch(
+      gexp_fetch_full_pdata(gse_id, sample_ids = rownames(primary_stub)),
+      error = function(e) NULL
+    )
+    if (is.null(enriched) || !is.data.frame(enriched) || ncol(enriched) <= 1L) {
+      enriched <- tryCatch(
+        gexp_enrich_pdata_columns(primary_stub, gse_id, force = TRUE),
+        error = function(e) NULL
+      )
+    }
+    if (!is.null(enriched) && is.data.frame(enriched) && ncol(enriched) > 0L) {
+      # Keep count-matrix sample IDs even when GEO rownames are GSM*
+      rna_metadata <- .gexpipe_align_pdata_to_primary(primary_stub, enriched)
+      common_samples <- intersect(colnames(count_matrix), rownames(rna_metadata))
+      if (length(common_samples) > 0L) {
+        rna_metadata <- rna_metadata[common_samples, , drop = FALSE]
+      }
+      out$log <- paste0(out$log, "(phenodata columns: ", ncol(rna_metadata), ") ")
+    }
+  } else if (!is.null(rna_metadata) && is.data.frame(rna_metadata)) {
+    out$log <- paste0(out$log, "(phenodata columns: ", ncol(rna_metadata), ") ")
   }
 
   gene_ids <- rownames(count_matrix)
