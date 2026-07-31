@@ -57,6 +57,15 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
       error = function(e) NULL
     )
   }
+
+  # Legacy workspaces may store thin/title-only phenodata; re-enrich for selectors.
+  if (is.list(rv$rna_metadata_list)) {
+    rv$rna_metadata_list <- gexp_enrich_thin_metadata_list(rv$rna_metadata_list)
+  }
+  if (is.list(rv$micro_metadata_list)) {
+    rv$micro_metadata_list <- gexp_enrich_thin_metadata_list(rv$micro_metadata_list)
+  }
+
   # Deferred analysis UI: legacy .rds may omit show_analysis; infer from pipeline progress.
   if (!("show_analysis" %in% names(state)) && !isTRUE(rv$show_analysis)) {
     if (isTRUE(rv$download_complete) || isTRUE(rv$normalization_complete) || isTRUE(rv$batch_complete)) {

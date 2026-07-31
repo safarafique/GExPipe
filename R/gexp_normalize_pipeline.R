@@ -248,15 +248,27 @@ gexp_normalize_and_intersect <- function(
       }
     }
     if (length(raw_counts_list) > 0) {
+      negative_sources <- names(raw_counts_list)[vapply(
+        raw_counts_list, .gexpipe_matrix_has_negative, logical(1)
+      )]
       raw_counts_for_deseq2 <- do.call(cbind, raw_counts_list)
       raw_counts_for_deseq2 <- round(raw_counts_for_deseq2)
       storage.mode(raw_counts_for_deseq2) <- "integer"
+      attr(raw_counts_for_deseq2, "negative_sources") <- negative_sources
       log_text <- paste0(
         log_text,
         "  \u2713 Raw counts saved for DESeq2/edgeR/voom: ",
         format(nrow(raw_counts_for_deseq2), big.mark = ","), " genes \u00d7 ",
         format(ncol(raw_counts_for_deseq2), big.mark = ","), " samples\n"
       )
+      if (length(negative_sources) > 0) {
+        log_text <- paste0(
+          log_text,
+          "  \u26a0 Negative values detected in: ", paste(negative_sources, collapse = ", "),
+          " - GEO supplied normalized/log-scale values instead of raw counts.\n",
+          "    Count-based DE (DESeq2/edgeR/voom) cannot use these; limma will be used instead.\n"
+        )
+      }
     }
   }
 
