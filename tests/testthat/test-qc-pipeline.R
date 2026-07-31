@@ -59,6 +59,34 @@ test_that("gexp_suggest_group_column prefers condition then title", {
   expect_equal(suggest(c("characteristics_ch1", "title")), "characteristics_ch1")
 })
 
+test_that("gexp_phenotype_column_choices lists every column", {
+  skip_if_not_installed("GExPipe")
+  choices_fun <- getFromNamespace("gexp_phenotype_column_choices", "GExPipe")
+  cols <- c("geo_accession", "title", "characteristics_ch1", "source_name_ch1", "disease")
+  ch <- choices_fun(cols)
+  expect_true(all(cols %in% ch))
+  expect_equal(unname(ch[["title"]]), "title")
+  expect_true("-- Select Column --" %in% names(ch))
+  expect_equal(unname(ch[["-- Select Column --"]]), "")
+})
+
+test_that("gexp_pdata_column_names returns all colnames", {
+  skip_if_not_installed("GExPipe")
+  fun <- getFromNamespace("gexp_pdata_column_names", "GExPipe")
+  pdata <- data.frame(
+    title = c("a", "b"),
+    characteristics_ch1 = c("normal", "tumor"),
+    source_name_ch1 = c("colon", "colon"),
+    row.names = c("GSM1", "GSM2"),
+    stringsAsFactors = FALSE
+  )
+  expect_equal(
+    sort(fun(pdata)),
+    sort(c("title", "characteristics_ch1", "source_name_ch1"))
+  )
+})
+
+
 test_that("gexp_normalize_group_labels parses GEO title conditions", {
   skip_if_not_installed("GExPipe")
   norm <- getFromNamespace("gexp_normalize_group_labels", "GExPipe")
