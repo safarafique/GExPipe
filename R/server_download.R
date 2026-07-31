@@ -408,6 +408,10 @@ server_download <- function(input, output, session, rv) {
             )
           }
 
+          # Ensure thin/title-only stubs are enriched before Groups UI reads them
+          rv$rna_metadata_list <- gexp_enrich_thin_metadata_list(rv$rna_metadata_list)
+          rv$micro_metadata_list <- gexp_enrich_thin_metadata_list(rv$micro_metadata_list)
+
           rv$download_complete <- TRUE
           if (is.null(rv$download_complete_at)) rv$download_complete_at <- Sys.time()
         }

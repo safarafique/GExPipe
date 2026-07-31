@@ -143,6 +143,38 @@ server_results <- function(input, output, session, rv) {
         TRUE
       }
 
+      # ------------------------------------------------------------------
+      # Helper: reject non-count data before it reaches the count engines.
+      # A series that only published normalized / log-scale values otherwise
+      # fails inside DESeq2 with "some values in assay are negative".
+      # ------------------------------------------------------------------
+      .counts_usable_for <- function(engine) {
+        bad <- .gexpipe_call(
+          ".gexpipe_negative_count_datasets",
+          rv$rna_counts_list,
+          combined = rv$raw_counts_for_deseq2
+        )
+        if (length(bad) == 0L) return(TRUE)
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong(paste0(" ", engine, " needs raw counts.")),
+            tags$p(
+              paste0("Negative values were found in: ", paste(bad, collapse = ", "),
+                     ". GEO published normalized (log-scale) values for these series, ",
+                     "not raw integer counts."),
+              style = "margin-top: 8px; font-size: 12px;"
+            ),
+            tags$p(
+              "Falling back to limma, which is the correct model for continuous log-scale data.",
+              style = "margin-top: 4px; font-size: 12px;"
+            )
+          ),
+          type = "warning", duration = 12
+        )
+        FALSE
+      }
+
       # Pre-checks for count-based methods (DESeq2 / edgeR / limma-voom).
       # For each method, if raw counts are missing we first try to rebuild
       # them from the stored rna_counts_list.  Only if that also fails (pure
@@ -161,6 +193,8 @@ server_results <- function(input, output, session, rv) {
                      " Automatically falling back to limma for differential expression."),
             type = "warning", duration = 10)
           method <- "limma"
+        } else if (!.counts_usable_for("DESeq2")) {
+          method <- "limma"
         }
       }
       if (method == "edger") {
@@ -171,6 +205,8 @@ server_results <- function(input, output, session, rv) {
                      " Automatically falling back to limma for differential expression."),
             type = "warning", duration = 10)
           method <- "limma"
+        } else if (!.counts_usable_for("edgeR")) {
+          method <- "limma"
         }
       }
       if (method == "limma_voom") {
@@ -180,6 +216,8 @@ server_results <- function(input, output, session, rv) {
                      " limma-voom requires integer counts. Your data appears to be microarray-based.",
                      " Automatically falling back to limma for differential expression."),
             type = "warning", duration = 10)
+          method <- "limma"
+        } else if (!.counts_usable_for("limma-voom")) {
           method <- "limma"
         }
       }
@@ -509,10 +547,19 @@ server_results <- function(input, output, session, rv) {
         })
       }
     }, error = function(e) {
+      msg <- conditionMessage(e)
+      hint <- NULL
+      if (grepl("negative", msg, ignore.case = TRUE)) {
+        hint <- paste0(
+          " GEO likely published normalized/log-scale values (not raw integer counts). ",
+          "Re-run DE with limma, or re-download so NCBI raw counts are preferred over ",
+          "normalized supplementary tables."
+        )
+      }
       showNotification(
         tags$div(icon("times-circle"), tags$strong(" DE analysis failed: "),
-                 conditionMessage(e)),
-        type = "error", duration = 10)
+                 msg, hint),
+        type = "error", duration = 12)
     })
 
     rv$de_running <- FALSE
