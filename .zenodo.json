@@ -1,0 +1,29 @@
+{
+  "title": "GExPipe: Gene Expression Pipeline Shiny Application",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "MIT",
+  "language": "eng",
+  "version": "0.99.51",
+  "keywords": [
+    "bioinformatics",
+    "gene expression",
+    "RNA-seq",
+    "microarray",
+    "transcriptomics",
+    "differential expression",
+    "WGCNA",
+    "pathway enrichment",
+    "protein-protein interaction",
+    "machine learning",
+    "Shiny",
+    "Bioconductor",
+    "GEO"
+  ],
+  "creators": [
+    {"name": "Rafique, Safa", "orcid": "0000-0003-2646-8106"},
+    {"name": "Ashraf, Naeem Mahmood", "orcid": "0000-0003-3614-0702"},
+    {"name": "Sabar, Muhammad Farooq", "orcid": "0000-0003-0135-2991"}
+  ],
+  "description": "GExPipe is an R/Bioconductor-based Shiny application for high-throughput analysis of bulk RNA-seq and microarray gene-expression data."
+}
