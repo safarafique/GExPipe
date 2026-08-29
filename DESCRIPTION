@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.51
+Version: 0.99.54
 Authors@R: c(
     person(
         given = "Safa",
@@ -87,6 +87,7 @@ Imports:
     shinydashboard (>= 0.7.2),
     shinyjs (>= 2.1.0),
     STRINGdb (>= 2.14.0),
+    SummarizedExperiment (>= 1.32.0),
     sva (>= 3.50.0),
     tibble (>= 3.2.0),
     tidyr (>= 1.3.0),

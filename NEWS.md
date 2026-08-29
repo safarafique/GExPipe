@@ -1,3 +1,21 @@
+# GExPipe 0.99.54
+
+- `runGExPipe()`: do not `pkgload::load_all()` from an older source checkout when a
+  newer GExPipe is already installed (fixes Shiny using stale code from `E:/GExPipe`).
+
+# GExPipe 0.99.53
+
+- Microarray GEO download: support `RangedSummarizedExperiment` from newer GEOquery
+  (not only `ExpressionSet`); fix series-matrix fallback search path and tab separator
+  when supplementary parsing is needed.
+
+# GExPipe 0.99.52
+
+- Microarray GEO download: handle SummarizedExperiment series matrices via
+  `.gexpipe_geo_expr_matrix()`, `.gexpipe_geo_fdata()`, and `.gexpipe_geo_annotation()`
+  helpers so expression, feature metadata, and platform IDs work for both
+  ExpressionSet and SummarizedExperiment objects.
+
 # GExPipe 0.99.49
 
 - Step 4 Phenodata Browser: show the full GSE phenodata table immediately (with column list),

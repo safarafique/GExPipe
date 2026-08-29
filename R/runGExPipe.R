@@ -66,19 +66,37 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   }
 
   # When running from the package source tree, load latest R/ code (not stale install).
+  # Skip when the installed package is newer — otherwise an old E:/GExPipe checkout
+  # overrides a fixed install (e.g. 0.99.53) and microarray download breaks again.
   if (interactive() && !isTRUE(getOption("gexpipe.no_auto_dev_load"))) {
     desc <- file.path(getwd(), "DESCRIPTION")
     if (file.exists(desc)) {
       hdr <- tryCatch(readLines(desc, n = 12L, warn = FALSE), error = function(e) character(0))
       if (any(grepl("^Package:\\s*GExPipe\\s*$", hdr))) {
-        if (requireNamespace("pkgload", quietly = TRUE)) {
-          message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
-          pkgload::load_all(getwd(), quiet = TRUE, export_all = FALSE)
-          options(gexpipe.run_source = "source-tree")
-        } else if (requireNamespace("devtools", quietly = TRUE)) {
-          message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
-          devtools::load_all(getwd(), quiet = TRUE)
-          options(gexpipe.run_source = "source-tree")
+        src_ver <- tryCatch({
+          as.character(utils::packageVersion("GExPipe", lib.loc = normalizePath(getwd(), winslash = "/")))
+        }, error = function(e) NA_character_)
+        inst_ver <- tryCatch(as.character(utils::packageVersion("GExPipe")), error = function(e) NA_character_)
+        use_src <- is.na(inst_ver) || is.na(src_ver) || utils::compareVersion(src_ver, inst_ver) >= 0
+        if (isTRUE(use_src)) {
+          if (requireNamespace("pkgload", quietly = TRUE)) {
+            message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
+            pkgload::load_all(getwd(), quiet = TRUE, export_all = FALSE)
+            options(gexpipe.run_source = "source-tree")
+          } else if (requireNamespace("devtools", quietly = TRUE)) {
+            message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
+            devtools::load_all(getwd(), quiet = TRUE)
+            options(gexpipe.run_source = "source-tree")
+          }
+        } else {
+          message(
+            "GExPipe: installed package (", inst_ver,
+            ") is newer than source in ", normalizePath(getwd(), winslash = "/"),
+            " (", src_ver, "). Using installed package. ",
+            "To force source: options(gexpipe.no_auto_dev_load = FALSE) after git pull; ",
+            "to always use install: options(gexpipe.no_auto_dev_load = TRUE)."
+          )
+          options(gexpipe.run_source = "installed")
         }
       }
     }
