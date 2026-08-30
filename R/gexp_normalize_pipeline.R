@@ -85,7 +85,7 @@ gexp_normalize_and_intersect <- function(
           } else {
             NULL
           }
-          fdata <- if (!is.null(micro_eset)) Biobase::fData(micro_eset) else data.frame()
+          fdata <- if (!is.null(micro_eset)) .gexpipe_geo_fdata(micro_eset) else data.frame()
           gene_symbols <- map_microarray_ids(probe_mat, fdata, micro_eset, gse_id = gse)
           if (length(gene_symbols) != nrow(probe_mat)) {
             log_text <- paste0(

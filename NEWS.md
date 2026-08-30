@@ -1,3 +1,25 @@
+# GExPipe 0.99.60
+
+- RNA-seq: restore 0.99.53 download order (metadata + NCBI before GEO supp), reject
+  tiny supplementary tables, and skip HTML/captcha cached files. Fixes GSE50760
+  regression while keeping GSE89076 microarray support.
+
+# GExPipe 0.99.59
+
+- RNA-seq: reject tiny GEO supplementary tables (<500 genes); always prefer NCBI
+  `rnaseq_counts` via GEOquery. Fixes GSE50760 picking a 3-row metadata table.
+
+# GExPipe 0.99.58
+
+- RNA-seq: use GEOquery `getRNASeqQuantResults()` / NCBI `rnaseq_counts` first for
+  any human/mouse GSE with SRA data (fixes GSE50760 and similar RAW.tar-only series).
+
+# GExPipe 0.99.57
+
+- RNA-seq download: support more GEO layouts for any GSE — broader supplementary
+  file patterns, merge per-sample TXT/TSV from RAW.tar, always try NCBI
+  `rnaseq_counts` fallback, and clearer errors when only FPKM/processed files exist.
+
 # GExPipe 0.99.56
 
 - Faster GEO downloads: reuse `micro_data`/`rna_data` cache by default (no wipe each run),

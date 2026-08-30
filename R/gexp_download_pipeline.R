@@ -1610,13 +1610,62 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  out
 }
 
-#' Preview nrow/ncol of a tabular count file
+#' Quick sample count from getGEO (no phenodata enrichment)
 #' @keywords internal
-.gexpipe_preview_count_file <- function(path) {
+.gexpipe_getgeo_sample_count <- function(gse_id) {
+ tryCatch({
+ gse_list <- .gexpipe_getgeo_series(gse_id)
+ parts <- if (inherits(gse_list, "list")) gse_list else list(gse_list)
+ ns <- vapply(parts, function(x) {
+ pd <- .gexpipe_geo_pdata(x)
+ if (is.null(pd)) 0L else nrow(pd)
+ }, integer(1))
+ n <- sum(ns)
+ if (n > 0L) n else NA_integer_
+ }, error = function(e) NA_integer_)
+}
+
+#' Minimum gene rows for a plausible RNA-seq count matrix
+#' @keywords internal
+.gexpipe_rnaseq_min_genes <- function() {
+ as.integer(getOption("gexpipe.rnaseq_min_genes", 500L))
+}
+
+#' Is a tabular count candidate too small to be a gene x sample matrix?
+#' @keywords internal
+.gexpipe_rnaseq_count_df_invalid <- function(count_df) {
+ min_genes <- .gexpipe_rnaseq_min_genes()
+ is.null(count_df) || !is.data.frame(count_df) ||
+ ncol(count_df) < 2L || nrow(count_df) < min_genes
+}
+
+#' Load a count table from file path
+#' @keywords internal
+.gexpipe_rnaseq_read_count_df <- function(path) {
+ if (is.null(path) || !nzchar(path) || !file.exists(path)) {
+ return(NULL)
+ }
+ if (.gexpipe_file_looks_like_html(path)) {
+ return(NULL)
+ }
+ tryCatch(read_count_matrix(path), error = function(e) .gexpipe_fread_counts(path))
+}
+
+#' Preview nrow/ncol of a tabular count file
+#' @param path File path.
+#' @param min_genes Minimum gene rows required (default: RNA-seq threshold).
+#' @keywords internal
+.gexpipe_preview_count_file <- function(path, min_genes = NULL) {
+ if (is.null(min_genes)) {
+ min_genes <- .gexpipe_rnaseq_min_genes()
+ }
  tryCatch(
  {
+ if (.gexpipe_file_looks_like_html(path)) {
+ return(NULL)
+ }
  df <- .gexpipe_fread_counts(path, nrows = 1e6)
- if (is.null(df) || ncol(df) < 2L || nrow(df) < 2L) {
+ if (is.null(df) || ncol(df) < 2L || nrow(df) < min_genes) {
  return(NULL)
  }
  list(
@@ -1630,14 +1679,34 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  )
 }
 
+#' Detect HTML/CAPTCHA pages saved instead of GEO tabular data
+#' @keywords internal
+.gexpipe_file_looks_like_html <- function(path) {
+ if (is.null(path) || !nzchar(path) || !file.exists(path)) {
+ return(FALSE)
+ }
+ head <- tryCatch({
+ con <- if (grepl("\\.gz$", path, ignore.case = TRUE)) gzfile(path, "r") else file(path, "r")
+ on.exit(close(con), add = TRUE)
+ readLines(con, n = 3L, warn = FALSE)
+ }, error = function(e) character(0))
+ if (length(head) == 0L) {
+ return(FALSE)
+ }
+ any(grepl("^<!doctype html>|^<html|recaptcha|challengepage", head, ignore.case = TRUE))
+}
+
 #' Score a count-file candidate (higher is better)
 #' @keywords internal
 .gexpipe_score_count_candidate <- function(info, n_meta = NA_integer_) {
  if (is.null(info)) {
  return(-Inf)
  }
- nsamp <- info$nsamp
  ngenes <- info$nrow
+ if (!is.finite(ngenes) || ngenes < .gexpipe_rnaseq_min_genes()) {
+ return(-Inf)
+ }
+ nsamp <- info$nsamp
  base_name <- if (length(info$path) == 0L) "" else basename(info$path[[1]])
  is_matrix_name <- grepl("matrix", base_name, ignore.case = TRUE)
  samp_match <- if (!is.na(n_meta) && n_meta > 0L) {
@@ -1692,7 +1761,10 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
 #' @keywords internal
 .gexpipe_collect_supp_count_candidates <- function(files) {
  files <- files[!grepl("\\.tar$", files, ignore.case = TRUE)]
- patterns <- c("count", "raw", "matrix", "htseq")
+ patterns <- c(
+ "count", "raw", "matrix", "htseq", "htcount", "reads",
+ "gene", "expr", "rna", "featurecount", "read.count", "counts_mat"
+ )
  candidates <- character(0)
  for (pattern in patterns) {
  matches <- files[grepl(pattern, basename(files), ignore.case = TRUE)]
@@ -1721,7 +1793,30 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  per_sample <- character(0)
  for (cand in candidates) {
  info <- .gexpipe_preview_count_file(cand)
- if (!is.null(info) && info$nsamp == 1L && info$nrow >= 10L) {
+ if (!is.null(info) && info$nsamp == 1L && info$nrow >= .gexpipe_rnaseq_min_genes()) {
+ per_sample <- c(per_sample, cand)
+ }
+ }
+ unique(per_sample)
+}
+
+#' Broad scan for per-sample two-column count files (any basename)
+#' @keywords internal
+.gexpipe_find_per_sample_count_files_broad <- function(files, min_genes = 100L) {
+ files <- files[!grepl(
+ "\\.tar$|series_matrix|\\.cel$|\\.bed$|\\.bw$|\\.bam$|\\.bai$|\\.fq|\\.fastq",
+ files, ignore.case = TRUE
+ )]
+ files <- files[grepl("\\.(txt|tsv|csv|tab)(\\.gz)?$", files, ignore.case = TRUE)]
+ if (length(files) == 0L) {
+ return(character(0))
+ }
+ sizes <- file.info(files)$size
+ files <- files[is.finite(sizes) & sizes > 200L & sizes < 5e7]
+ per_sample <- character(0)
+ for (cand in files) {
+ info <- .gexpipe_preview_count_file(cand)
+ if (!is.null(info) && info$nsamp == 1L && info$nrow >= min_genes) {
  per_sample <- c(per_sample, cand)
  }
  }
@@ -1850,14 +1945,28 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
 #' Choose between GEO supplementary and NCBI count matrices
 #' @keywords internal
 .gexpipe_choose_supp_or_ncbi <- function(supp_file, ncbi_file, n_meta = NA_integer_) {
+ min_genes <- .gexpipe_rnaseq_min_genes()
+ supp_info <- if (!is.null(supp_file) && nzchar(supp_file)) {
+ .gexpipe_preview_count_file(supp_file, min_genes = 10L)
+ } else {
+ NULL
+ }
+ if (!is.null(supp_info) && supp_info$nrow < min_genes) {
+ supp_file <- NULL
+ supp_info <- NULL
+ }
+ ncbi_info <- if (!is.null(ncbi_file) && nzchar(ncbi_file) && file.exists(ncbi_file) &&
+ !.gexpipe_file_looks_like_html(ncbi_file)) {
+ .gexpipe_preview_count_file(ncbi_file, min_genes = min_genes)
+ } else {
+ NULL
+ }
  if (is.null(supp_file) || !nzchar(supp_file)) {
- return(list(file = ncbi_file, source = "NCBI", info = .gexpipe_preview_count_file(ncbi_file)))
+ return(list(file = ncbi_file, source = "NCBI", info = ncbi_info))
  }
- if (is.null(ncbi_file) || !nzchar(ncbi_file)) {
- return(list(file = supp_file, source = "GEO supp", info = .gexpipe_preview_count_file(supp_file)))
+ if (is.null(ncbi_file) || !nzchar(ncbi_file) || is.null(ncbi_info)) {
+ return(list(file = supp_file, source = "GEO supp", info = supp_info))
  }
- supp_info <- .gexpipe_preview_count_file(supp_file)
- ncbi_info <- .gexpipe_preview_count_file(ncbi_file)
  supp_score <- .gexpipe_score_count_candidate(supp_info, n_meta)
  ncbi_score <- .gexpipe_score_count_candidate(ncbi_info, n_meta)
  if (ncbi_score > supp_score) {
@@ -1865,6 +1974,152 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  } else {
  list(file = supp_file, source = "GEO supp", info = supp_info)
  }
+}
+
+#' Fetch NCBI uniform RNA-seq counts (GEOquery rnaseq_counts API or file download)
+#' @keywords internal
+.gexpipe_fetch_ncbi_rnaseq_counts <- function(gse_id, dest_dir) {
+ min_genes <- .gexpipe_rnaseq_min_genes()
+ mat <- NULL
+ log_pfx <- ""
+ if (requireNamespace("GEOquery", quietly = TRUE)) {
+ gq <- asNamespace("GEOquery")
+ if (exists("getRNASeqQuantResults", envir = gq, inherits = FALSE)) {
+ get_quants <- get("getRNASeqQuantResults", envir = gq)
+ res <- tryCatch(get_quants(gse_id), error = function(e) NULL)
+ if (!is.null(res) && !is.null(res$quants)) {
+ mat_try <- as.matrix(res$quants)
+ mode(mat_try) <- "numeric"
+ if (ncol(mat_try) >= 2L && nrow(mat_try) >= min_genes) {
+ mat <- mat_try
+ log_pfx <- "(GEOquery NCBI rnaseq_counts) "
+ }
+ }
+ }
+ }
+ if (is.null(mat)) {
+ ncbi_path <- tryCatch(download_ncbi_raw_counts_best(gse_id, dest_dir), error = function(e) NULL)
+ if (!is.null(ncbi_path)) {
+ df <- .gexpipe_rnaseq_read_count_df(ncbi_path)
+ if (!.gexpipe_rnaseq_count_df_invalid(df)) {
+ oriented <- gexp_orient_count_dataframe(df, metadata = NULL)
+ if (!is.null(oriented$matrix) &&
+ ncol(oriented$matrix) >= 2L &&
+ nrow(oriented$matrix) >= min_genes) {
+ mat <- oriented$matrix
+ log_pfx <- paste0(log_pfx, "(NCBI raw_counts file) ")
+ }
+ }
+ }
+ }
+ if (is.null(mat) || ncol(mat) < 2L || nrow(mat) < min_genes) {
+ return(NULL)
+ }
+ metadata <- tryCatch({
+ gse_list <- .gexpipe_getgeo_series(gse_id)
+ parts <- if (inherits(gse_list, "list")) gse_list else list(gse_list)
+ pd <- .gexpipe_rbind_pdata_parts(lapply(parts, .gexpipe_geo_pdata))
+ if (!is.null(pd)) gexp_expand_geo_characteristics(pd) else NULL
+ }, error = function(e) NULL)
+ list(count_matrix = mat, metadata = metadata, log = log_pfx)
+}
+
+#' Finalize RNA-seq download: align samples, QC, optional enrich, return out list
+#' @keywords internal
+.gexpipe_rnaseq_finish <- function(gse_id, count_matrix, rna_metadata, out, fast = TRUE) {
+ count_matrix <- gexp_align_rnaseq_sample_names(count_matrix, rna_metadata, gse_id)
+ if (gexp_is_generic_sample_names(colnames(count_matrix))) {
+ out$log <- paste0(out$log, "(generic sample names; limited GEO metadata) ")
+ }
+ n_total_samp_rna <- ncol(count_matrix)
+ na_frac_rna <- colMeans(is.na(count_matrix) | !is.finite(count_matrix))
+ bad_samp_rna <- names(which(na_frac_rna > 0.90))
+ rna_na_log <- ""
+ if (length(bad_samp_rna) > 0) {
+ rna_na_log <- paste0(
+ " | ", length(bad_samp_rna), "/", n_total_samp_rna,
+ " sample(s) removed (>90% NA): ",
+ paste(head(bad_samp_rna, 5), collapse = ", "),
+ if (length(bad_samp_rna) > 5) paste0(" (+", length(bad_samp_rna) - 5, " more)") else ""
+ )
+ good_samp_rna <- setdiff(colnames(count_matrix), bad_samp_rna)
+ count_matrix <- count_matrix[, good_samp_rna, drop = FALSE]
+ }
+ if (ncol(count_matrix) == 0) {
+ out$reason <- "all samples were NA - no usable data"
+ return(out)
+ }
+ out$log <- paste0(out$log, rna_na_log)
+ if (is.null(rna_metadata) || nrow(rna_metadata) == 0L) {
+ rna_metadata <- data.frame(
+ title = colnames(count_matrix),
+ row.names = colnames(count_matrix),
+ stringsAsFactors = FALSE
+ )
+ } else {
+ count_cols <- colnames(count_matrix)
+ if (!all(count_cols %in% rownames(rna_metadata))) {
+ outm <- as.data.frame(
+ matrix(NA_character_, nrow = length(count_cols), ncol = ncol(rna_metadata)),
+ stringsAsFactors = FALSE
+ )
+ colnames(outm) <- colnames(rna_metadata)
+ rownames(outm) <- count_cols
+ common_meta <- intersect(count_cols, rownames(rna_metadata))
+ if (length(common_meta) > 0L) {
+ outm[common_meta, ] <- rna_metadata[common_meta, , drop = FALSE]
+ } else {
+ n <- min(length(count_cols), nrow(rna_metadata))
+ if (n > 0L) outm[seq_len(n), ] <- rna_metadata[seq_len(n), , drop = FALSE]
+ }
+ rna_metadata <- outm
+ }
+ common_samples <- intersect(colnames(count_matrix), rownames(rna_metadata))
+ if (length(common_samples) > 0L) {
+ rna_metadata <- rna_metadata[common_samples, , drop = FALSE]
+ }
+ }
+ if (!isTRUE(fast) && (is.null(rna_metadata) || ncol(rna_metadata) <= 1L)) {
+ primary_stub <- data.frame(
+ title = colnames(count_matrix),
+ row.names = colnames(count_matrix),
+ stringsAsFactors = FALSE
+ )
+ enriched <- tryCatch(
+ gexp_fetch_full_pdata(gse_id, sample_ids = rownames(primary_stub)),
+ error = function(e) NULL
+ )
+ if (is.null(enriched) || ncol(enriched) <= 1L) {
+ enriched <- tryCatch(
+ gexp_enrich_pdata_columns(primary_stub, gse_id, force = TRUE),
+ error = function(e) NULL
+ )
+ }
+ if (!is.null(enriched) && ncol(enriched) > 0L) {
+ rna_metadata <- .gexpipe_align_pdata_to_primary(primary_stub, enriched)
+ out$log <- paste0(out$log, "(phenodata columns: ", ncol(rna_metadata), ") ")
+ }
+ } else if (!is.null(rna_metadata) && ncol(rna_metadata) > 0L) {
+ out$log <- paste0(out$log, "(phenodata columns: ", ncol(rna_metadata), ") ")
+ }
+ if (!isTRUE(fast)) {
+ gene_ids <- rownames(count_matrix)
+ gene_symbols <- convert_rnaseq_ids(gene_ids, gse_id)
+ rownames(count_matrix) <- gene_symbols
+ valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
+ count_matrix <- count_matrix[valid, , drop = FALSE]
+ if (nrow(count_matrix) == 0) {
+ out$reason <- "no genes after ID mapping"
+ return(out)
+ }
+ if (any(duplicated(rownames(count_matrix)))) {
+ count_matrix <- limma::avereps(count_matrix, ID = rownames(count_matrix))
+ }
+ }
+ out$ok <- TRUE
+ out$count_matrix <- count_matrix
+ out$metadata <- rna_metadata
+ out
 }
 
 #' Download and parse one RNA-seq GSE
@@ -1875,7 +2130,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
 #'
 #' @examples
 #' if (interactive()) {
-#' out <- gexp_download_one_rnaseq_gse("GSE50760", tempdir())
+#' out <- gexp_download_one_rnaseq_gse("GSE114007", tempdir())
 #' out$ok
 #' }
 #' @export
@@ -1887,18 +2142,36 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  gse_dir <- file.path(rna_dir, gse_id)
  dir.create(gse_dir, showWarnings = FALSE, recursive = TRUE)
 
- rna_metadata <- if (!isTRUE(fast)) {
- tryCatch(
+ # Always fetch sample metadata first (0.99.53 behaviour; needed for n_meta matching)
+ rna_metadata <- tryCatch(
  .gexpipe_fetch_rnaseq_metadata_early(gse_id),
  error = function(e) NULL
  )
- } else {
- NULL
- }
  n_meta <- if (!is.null(rna_metadata) && nrow(rna_metadata) > 0L) {
  nrow(rna_metadata)
  } else {
  NA_integer_
+ }
+ if (is.na(n_meta)) {
+ n_meta <- .gexpipe_getgeo_sample_count(gse_id)
+ }
+
+ # 1) NCBI uniform counts (GEOquery API or raw_counts file) — best path for GSE50760
+ ncbi_early <- tryCatch(
+ .gexpipe_fetch_ncbi_rnaseq_counts(gse_id, gse_dir),
+ error = function(e) NULL
+ )
+ if (!is.null(ncbi_early)) {
+ out$log <- paste0(out$log, ncbi_early$log)
+ md <- if (!is.null(ncbi_early$metadata)) ncbi_early$metadata else rna_metadata
+ return(.gexpipe_rnaseq_finish(gse_id, ncbi_early$count_matrix, md, out, fast))
+ }
+
+ # 2) Pre-download NCBI file before GEO supplementary (0.99.53 order)
+ ncbi_best <- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
+ if (!is.null(ncbi_best) && .gexpipe_file_looks_like_html(ncbi_best)) {
+ file.remove(ncbi_best)
+ ncbi_best <- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
  }
 
  supp_state <- new.env(parent = emptyenv())
@@ -1935,7 +2208,8 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  files <- .gexpipe_list_gse_related_files(gse_dir, rna_dir, gse_id)
 
  matrix_candidates <- files[
- grepl("matrix\\.htseq-count(\\.txt)?(\\.gz)?$", basename(files), ignore.case = TRUE)
+ grepl("matrix\\.htseq-count(\\.txt)?(\\.gz)?$", basename(files), ignore.case = TRUE) |
+ grepl("counts?_mat|count[_-]?matrix|raw[_-]?counts", basename(files), ignore.case = TRUE)
  ]
  if (length(matrix_candidates) > 0L) {
  count_file <- .gexpipe_pick_best_count_file(matrix_candidates, n_meta)
@@ -1956,6 +2230,9 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  )
  if (isTRUE(need_merge) || is.null(count_file)) {
  per_sample <- .gexpipe_find_per_sample_count_files(files)
+ if (length(per_sample) < 2L) {
+ per_sample <- .gexpipe_find_per_sample_count_files_broad(files)
+ }
  if (length(per_sample) >= 2L) {
  merged_df <- .gexpipe_merge_per_sample_count_files(per_sample)
  merged_nsamp <- if (!is.null(merged_df)) ncol(merged_df) - 1L else 0L
@@ -1994,11 +2271,20 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  }
  )
 
- ncbi_best <- if (!isTRUE(fast) || is.null(count_file)) {
- tryCatch(download_ncbi_raw_counts_best(gse_id, gse_dir), error = function(e) NULL)
+ if (!is.null(ncbi_best) && !is.null(count_file) && is.null(count_df_merged)) {
+ ncbi_info_pre <- .gexpipe_preview_count_file(ncbi_best, min_genes = .gexpipe_rnaseq_min_genes())
+ supp_info_pre <- if (!is.null(count_file)) {
+ .gexpipe_preview_count_file(count_file, min_genes = 10L)
  } else {
  NULL
  }
+ if (!is.null(ncbi_info_pre) && (is.null(supp_info_pre) ||
+ supp_info_pre$nrow < .gexpipe_rnaseq_min_genes())) {
+ count_file <- ncbi_best
+ out$log <- paste0(out$log, "(using NCBI counts over small GEO supp) ")
+ }
+ }
+
  chosen <- .gexpipe_choose_supp_or_ncbi(count_file, ncbi_best, n_meta)
  if (!is.null(count_df_merged)) {
  # First column holds gene IDs, so it must not count as a sample
@@ -2021,6 +2307,13 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  if (!is.null(chosen$file)) {
  count_file <- chosen$file
  info <- chosen$info
+ if (!is.null(info) && !is.null(info$nrow) && info$nrow < .gexpipe_rnaseq_min_genes()) {
+ out$log <- paste0(
+ out$log, "(rejected tiny GEO supp: ", info$nrow, " rows; need NCBI counts) "
+ )
+ count_file <- ncbi_best
+ info <- if (!is.null(count_file)) .gexpipe_preview_count_file(count_file) else NULL
+ }
  if (!is.null(info) && !is.null(info$nrow)) {
  out$log <- paste0(out$log, "(", chosen$source, " ", info$nrow, " rows, ", info$nsamp, " samples) ")
  }
@@ -2030,7 +2323,11 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  count_file <- ncbi_best
  }
  if (is.null(count_file) && is.null(count_df_merged)) {
- out$reason <- "no count file (check internet or GSE may not have GEO supp or NCBI counts)"
+ out$reason <- paste0(
+ "no usable RNA-seq count matrix for ", gse_id,
+ " (need gene x sample integer counts). Tried GEO supplementary files, ",
+ "per-sample merge, and NCBI rnaseq_counts."
+ )
  if (!is.null(supp_state$err) && nzchar(supp_state$err)) {
  out$reason <- if (grepl("connection|timeout|hostname|resolve|HTTP|ssl", supp_state$err, ignore.case = TRUE)) {
  "network/HTTP - check internet connection"
@@ -2046,7 +2343,17 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  count_df <- if (!is.null(count_df_merged)) {
  count_df_merged
  } else {
- tryCatch(read_count_matrix(count_file), error = function(e) .gexpipe_fread_counts(count_file))
+ .gexpipe_rnaseq_read_count_df(count_file)
+ }
+ # If GEO supplementary parse failed, try NCBI counts before giving up
+ if (.gexpipe_rnaseq_count_df_invalid(count_df) && !is.null(ncbi_best) &&
+ !identical(count_file, ncbi_best)) {
+ ncbi_df <- .gexpipe_rnaseq_read_count_df(ncbi_best)
+ if (!.gexpipe_rnaseq_count_df_invalid(ncbi_df)) {
+ count_df <- ncbi_df
+ count_file <- ncbi_best
+ out$log <- paste0(out$log, "(NCBI rnaseq_counts fallback) ")
+ }
  }
  # Hard safeguard: if selected table has too few sample columns versus metadata,
  # force-switch to matrix.htseq-count or NCBI candidate with more samples.
@@ -2074,8 +2381,22 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  }
  }
  }
- if (is.null(count_df) || ncol(count_df) < 2 || nrow(count_df) < 10) {
- out$reason <- "count file format invalid or too small"
+ if (.gexpipe_rnaseq_count_df_invalid(count_df)) {
+ ncbi_retry <- tryCatch(
+ .gexpipe_fetch_ncbi_rnaseq_counts(gse_id, gse_dir),
+ error = function(e) NULL
+ )
+ if (!is.null(ncbi_retry)) {
+ out$log <- paste0(out$log, "(NCBI fallback) ", ncbi_retry$log)
+ md <- if (!is.null(ncbi_retry$metadata)) ncbi_retry$metadata else rna_metadata
+ return(.gexpipe_rnaseq_finish(gse_id, ncbi_retry$count_matrix, md, out, fast))
+ }
+ out$reason <- paste0(
+ "count file format invalid or too small for ", gse_id,
+ " (need >= ", .gexpipe_rnaseq_min_genes(), " genes). ",
+ "Tried NCBI rnaseq_counts and GEO supplementary. ",
+ "[GExPipe ", as.character(utils::packageVersion("GExPipe")), "]"
+ )
  return(out)
  }
 
@@ -2091,134 +2412,26 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
 
  oriented <- gexp_orient_count_dataframe(count_df, metadata = rna_metadata)
  count_matrix <- oriented$matrix
- if (is.null(count_matrix) || ncol(count_matrix) < 1L || nrow(count_matrix) < 10L) {
- out$reason <- "count file format invalid or too small"
+ if (is.null(count_matrix) || ncol(count_matrix) < 2L ||
+ nrow(count_matrix) < .gexpipe_rnaseq_min_genes()) {
+ ncbi_retry <- tryCatch(
+ .gexpipe_fetch_ncbi_rnaseq_counts(gse_id, gse_dir),
+ error = function(e) NULL
+ )
+ if (!is.null(ncbi_retry)) {
+ out$log <- paste0(out$log, "(NCBI orientation fallback) ", ncbi_retry$log)
+ md <- if (!is.null(ncbi_retry$metadata)) ncbi_retry$metadata else rna_metadata
+ return(.gexpipe_rnaseq_finish(gse_id, ncbi_retry$count_matrix, md, out, fast))
+ }
+ out$reason <- paste0(
+ "count file format invalid or too small for ", gse_id,
+ " after orientation. Supplementary files may be FPKM/TPM, not raw counts."
+ )
  return(out)
  }
  if (nzchar(oriented$log)) {
  out$log <- paste0(out$log, oriented$log, " ")
  }
 
- count_matrix <- gexp_align_rnaseq_sample_names(count_matrix, rna_metadata, gse_id)
- if (gexp_is_generic_sample_names(colnames(count_matrix))) {
- out$log <- paste0(out$log, "(generic sample names; limited GEO metadata) ")
- }
-
- # ---- NA-sample detection and removal (RNA-seq) ----
- n_total_samp_rna <- ncol(count_matrix)
- na_frac_rna <- colMeans(is.na(count_matrix) | !is.finite(count_matrix))
- bad_samp_rna <- names(which(na_frac_rna > 0.90))
- rna_na_log <- ""
- if (length(bad_samp_rna) > 0) {
- rna_na_log <- paste0(
- " | ", length(bad_samp_rna), "/", n_total_samp_rna,
- " sample(s) removed (>90% NA): ",
- paste(head(bad_samp_rna, 5), collapse = ", "),
- if (length(bad_samp_rna) > 5) paste0(" (+", length(bad_samp_rna) - 5, " more)") else ""
- )
- good_samp_rna <- setdiff(colnames(count_matrix), bad_samp_rna)
- count_matrix <- count_matrix[, good_samp_rna, drop = FALSE]
- }
- if (ncol(count_matrix) > 0) {
- partial_na_rna <- colMeans(is.na(count_matrix) | !is.finite(count_matrix))
- partial_bad_rna <- names(which(partial_na_rna > 0.10 & partial_na_rna <= 0.90))
- if (length(partial_bad_rna) > 0) {
- rna_na_log <- paste0(rna_na_log,
- " | ", length(partial_bad_rna), " sample(s) have 10-90% NA values")
- }
- }
- if (ncol(count_matrix) == 0) {
- out$reason <- "all samples were NA - no usable data"
- return(out)
- }
- out$log <- paste0(out$log, rna_na_log)
-
- if (is.null(rna_metadata) || nrow(rna_metadata) == 0L) {
- count_cols <- colnames(count_matrix)
- rna_metadata <- data.frame(
- title = count_cols,
- row.names = count_cols,
- stringsAsFactors = FALSE
- )
- } else {
- count_cols <- colnames(count_matrix)
- if (!all(count_cols %in% rownames(rna_metadata))) {
- outm <- as.data.frame(
- matrix(NA_character_, nrow = length(count_cols), ncol = ncol(rna_metadata)),
- stringsAsFactors = FALSE
- )
- colnames(outm) <- colnames(rna_metadata)
- rownames(outm) <- count_cols
- common_meta <- intersect(count_cols, rownames(rna_metadata))
- if (length(common_meta) > 0L) {
- outm[common_meta, ] <- rna_metadata[common_meta, , drop = FALSE]
- } else {
- n <- min(length(count_cols), nrow(rna_metadata))
- if (n > 0L) {
- outm[seq_len(n), ] <- rna_metadata[seq_len(n), , drop = FALSE]
- }
- }
- rna_metadata <- outm
- }
- }
-
- if (!is.null(rna_metadata) && nrow(rna_metadata) > 0) {
- common_samples <- intersect(colnames(count_matrix), rownames(rna_metadata))
- if (length(common_samples) > 0) {
- rna_metadata <- rna_metadata[common_samples, , drop = FALSE]
- }
- }
- # Enrich thin phenodata for group selection when not in fast mode
- if (!isTRUE(fast) && (is.null(rna_metadata) || !is.data.frame(rna_metadata) || ncol(rna_metadata) <= 1L)) {
- primary_stub <- if (!is.null(rna_metadata) && is.data.frame(rna_metadata) && nrow(rna_metadata) > 0L) {
- rna_metadata
- } else {
- data.frame(
- title = colnames(count_matrix),
- row.names = colnames(count_matrix),
- stringsAsFactors = FALSE
- )
- }
- enriched <- tryCatch(
- gexp_fetch_full_pdata(gse_id, sample_ids = rownames(primary_stub)),
- error = function(e) NULL
- )
- if (is.null(enriched) || !is.data.frame(enriched) || ncol(enriched) <= 1L) {
- enriched <- tryCatch(
- gexp_enrich_pdata_columns(primary_stub, gse_id, force = TRUE),
- error = function(e) NULL
- )
- }
- if (!is.null(enriched) && is.data.frame(enriched) && ncol(enriched) > 0L) {
- # Keep count-matrix sample IDs even when GEO rownames are GSM*
- rna_metadata <- .gexpipe_align_pdata_to_primary(primary_stub, enriched)
- common_samples <- intersect(colnames(count_matrix), rownames(rna_metadata))
- if (length(common_samples) > 0L) {
- rna_metadata <- rna_metadata[common_samples, , drop = FALSE]
- }
- out$log <- paste0(out$log, "(phenodata columns: ", ncol(rna_metadata), ") ")
- }
- } else if (!is.null(rna_metadata) && is.data.frame(rna_metadata)) {
- out$log <- paste0(out$log, "(phenodata columns: ", ncol(rna_metadata), ") ")
- }
-
- if (!isTRUE(fast)) {
- gene_ids <- rownames(count_matrix)
- gene_symbols <- convert_rnaseq_ids(gene_ids, gse_id)
- rownames(count_matrix) <- gene_symbols
- valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
- count_matrix <- count_matrix[valid, , drop = FALSE]
- if (nrow(count_matrix) == 0) {
- out$reason <- "no genes after ID mapping"
- return(out)
- }
- if (any(duplicated(rownames(count_matrix)))) {
- count_matrix <- limma::avereps(count_matrix, ID = rownames(count_matrix))
- }
- }
-
- out$ok <- TRUE
- out$count_matrix <- count_matrix
- out$metadata <- rna_metadata
- out
+ return(.gexpipe_rnaseq_finish(gse_id, count_matrix, rna_metadata, out, fast))
 }

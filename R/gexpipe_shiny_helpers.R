@@ -2066,7 +2066,7 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
 
   platform_id <- tryCatch(
     {
-      if (!is.null(micro_eset)) Biobase::annotation(micro_eset) else NULL
+      if (!is.null(micro_eset)) .gexpipe_geo_annotation(micro_eset) else NULL
     },
     error = function(e) NULL
   )
@@ -2422,9 +2422,9 @@ run_gse_annotation_and_download <- function(gse_id, dest_dir = getwd(), save_ann
   }
 
   micro_eset <- if (inherits(gse, "list")) gse[[1]] else gse
-  platform_id <- Biobase::annotation(micro_eset)
-  micro_expr <- Biobase::exprs(micro_eset)
-  fdata <- Biobase::fData(micro_eset)
+platform_id <- .gexpipe_geo_annotation(micro_eset)
+micro_expr <- .gexpipe_geo_expr_matrix(micro_eset)
+fdata <- .gexpipe_geo_fdata(micro_eset)
 
   gene_symbols <- map_microarray_ids(micro_expr, fdata, micro_eset, gse_id = gse_id)
   rownames(micro_expr) <- gene_symbols
