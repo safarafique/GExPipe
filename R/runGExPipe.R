@@ -112,6 +112,20 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   options(gexpipe.attach.allow_full_now = NULL)
   options(gexpipe.prelaunch_install_done = NULL)
 
+  # Fast GEO download defaults (override with options() before runGExPipe if needed)
+  if (is.null(getOption("gexpipe.fast_download"))) {
+    options(gexpipe.fast_download = TRUE)
+  }
+  if (is.null(getOption("gexpipe.clear_download_cache"))) {
+    options(gexpipe.clear_download_cache = FALSE)
+  }
+  if (is.null(getOption("gexpipe.download_cel"))) {
+    options(gexpipe.download_cel = FALSE)
+  }
+  if (getOption("timeout", 60L) < 600L) {
+    options(timeout = 600L)
+  }
+
   # -- Auto-install all missing dependencies BEFORE the app opens --------------
   # This runs only in interactive sessions (not during R CMD check or vignette
   # build, where interactive() is FALSE). The user sees a progress log in the

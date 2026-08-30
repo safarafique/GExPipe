@@ -115,7 +115,8 @@ server_download <- function(input, output, session, rv) {
       prep_logs <- gexp_prepare_download_dirs(
         base_dir = getwd(),
         has_micro = length(micro_ids) > 0,
-        has_rna = length(rnaseq_ids) > 0
+        has_rna = length(rnaseq_ids) > 0,
+        clear_cache = isTRUE(input$clear_download_cache)
       )
       if (length(prep_logs) > 0) {
         log_text <- paste0(log_text, paste0(prep_logs, collapse = "\n"), "\n")
@@ -155,7 +156,9 @@ server_download <- function(input, output, session, rv) {
           gse_id <- micro_ids[i]
           log_text <- paste0(log_text, "[", i, "/", length(micro_ids), "] ", gse_id, "... ")
           refresh_log()
-          res <- gexp_download_one_microarray_gse(gse_id, micro_dir)
+          download_cel <- !is.null(input$micro_norm_method) &&
+            identical(input$micro_norm_method, "rma")
+          res <- gexp_download_one_microarray_gse(gse_id, micro_dir, download_cel = download_cel)
           if (!isTRUE(res$ok)) {
             log_text <- paste0(log_text, "FAILED (", res$reason, "). Skipped.\n")
             skip_fail_reasons[[gse_id]] <- paste0("Microarray: ", res$reason)
@@ -271,7 +274,7 @@ server_download <- function(input, output, session, rv) {
             if (is.null(micro_eset)) {
               return(list(ok = "skip", msg = paste0("  ", gse_id, ": skipped mapping (GEO object unavailable during remap)\n")))
             }
-            fdata <- tryCatch(Biobase::fData(micro_eset), error = function(e) data.frame())
+            fdata <- tryCatch(.gexpipe_geo_fdata(micro_eset), error = function(e) data.frame())
             gene_symbols <- tryCatch(
               map_microarray_ids(micro_expr, fdata, micro_eset, gse_id),
               error = function(e) rownames(micro_expr)
@@ -408,9 +411,11 @@ server_download <- function(input, output, session, rv) {
             )
           }
 
-          # Ensure thin/title-only stubs are enriched before Groups UI reads them
-          rv$rna_metadata_list <- gexp_enrich_thin_metadata_list(rv$rna_metadata_list)
-          rv$micro_metadata_list <- gexp_enrich_thin_metadata_list(rv$micro_metadata_list)
+          # Groups tab enriches thin phenodata after UI flush (fast download mode)
+          if (!isTRUE(getOption("gexpipe.fast_download", TRUE))) {
+            rv$rna_metadata_list <- gexp_enrich_thin_metadata_list(rv$rna_metadata_list)
+            rv$micro_metadata_list <- gexp_enrich_thin_metadata_list(rv$micro_metadata_list)
+          }
 
           rv$download_complete <- TRUE
           if (is.null(rv$download_complete_at)) rv$download_complete_at <- Sys.time()

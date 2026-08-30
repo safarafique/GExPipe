@@ -1,3 +1,16 @@
+# GExPipe 0.99.56
+
+- Faster GEO downloads: reuse `micro_data`/`rna_data` cache by default (no wipe each run),
+  skip redundant phenodata enrichment and CEL supplementary files during download,
+  defer NCBI count fetch when GEO supplementary already has counts, and enrich
+  phenodata on the Groups tab instead of blocking Step 1. Control via
+  `options(gexpipe.fast_download = TRUE)` and `options(gexpipe.clear_download_cache = TRUE)`.
+
+# GExPipe 0.99.55
+
+- Microarray download: use `getGPL = FALSE` (via `.gexpipe_getgeo_series()`) so series
+  like GSE89076 work when a corrupt/HTML GPL cache would otherwise break `getGEO()`.
+
 # GExPipe 0.99.54
 
 - `runGExPipe()`: do not `pkgload::load_all()` from an older source checkout when a
