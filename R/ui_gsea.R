@@ -6,14 +6,13 @@
 
 ui_gsea <- tabItem(
   tabName = "gsea",
-  h2(icon("project-diagram"), " Step 14: GSEA Analysis (Signature Genes)"),
+  h2(icon("project-diagram"), " Step 15: GSEA Analysis (Signature Genes)"),
 
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " Gene Set Enrichment Analysis (GSEA) for each target gene separately. For each gene, ranks all genes by correlation with that gene, runs GSEA with selected MSigDB collection(s) (Hallmark, GO, KEGG, Reactome, etc.), and shows one plot and one pathway list per gene.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Requirements:"), " Run ML (Step 10) for common genes, or have common genes from Step 8. Batch-corrected expression must be available.", style = "margin-bottom: 0;")
+      uiOutput("gsea_about_ui")
     )
   ),
 

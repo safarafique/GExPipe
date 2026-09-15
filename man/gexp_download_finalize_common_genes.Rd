@@ -7,7 +7,9 @@
 gexp_download_finalize_common_genes(
   micro_expr_list,
   rna_counts_list,
-  all_genes_list
+  all_genes_list,
+  subset_matrices = FALSE,
+  keep_platforms_separate = FALSE
 )
 }
 \arguments{
@@ -16,6 +18,12 @@ gexp_download_finalize_common_genes(
 \item{rna_counts_list}{Named list of RNA-seq matrices (genes x samples).}
 
 \item{all_genes_list}{Named list of rowname vectors per dataset.}
+
+\item{subset_matrices}{If \code{TRUE}, also subset stored lists to common genes
+(legacy merge-first behaviour). Default \code{FALSE}.}
+
+\item{keep_platforms_separate}{If \code{TRUE} (Parallel DE), do not subset each
+platform to the intersecting gene set. Overlap is still reported for QC.}
 }
 \value{
 List with updated lists, common_genes, combined_expr_raw, and status.

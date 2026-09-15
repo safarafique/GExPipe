@@ -12,25 +12,29 @@ gexp_parse_gse_inputs(
 )
 }
 \arguments{
-\item{analysis_type}{One of "rnaseq", "microarray", or "merged".}
+\item{analysis_type}{One of "rnaseq", "microarray", "merged", or "parallel".}
 
 \item{rnaseq_gses}{Text field for RNA-seq IDs.}
 
 \item{microarray_gses}{Text field for microarray IDs.}
 
-\item{dataset_mode}{"single" or "multi".}
+\item{dataset_mode}{"single" or "multi". Single truncates only for
+RNA-seq-only or microarray-only. Merged and Parallel keep every GSE
+in each platform box.}
 }
 \value{
-List with rnaseq_ids, micro_ids, dataset_mode, and messages.
+List with rnaseq_ids, micro_ids, dataset_mode, analysis_type, and messages.
 }
 \description{
-Parse GSE IDs from Shiny text inputs
+RNA-seq and microarray boxes are always read. If both contain GSE IDs and
+the user did not choose Parallel, the run is treated as Merged. Parallel
+keeps both platforms separate through DE and accepts several GSEs per box.
 }
 \examples{
 x <- gexp_parse_gse_inputs(
-  analysis_type = "merged",
+  analysis_type = "parallel",
   rnaseq_gses = "GSE1, GSE2",
-  microarray_gses = "GSE3",
+  microarray_gses = "GSE3, GSE4",
   dataset_mode = "single"
 )
 x$rnaseq_ids

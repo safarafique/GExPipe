@@ -702,8 +702,7 @@ gexp_draw_ml_methods_venn <- function(sets,
     invisible(NULL)
   }
 
-  use_upset <- n_sets > 5L || any_empty || sum(non_empty) < 2L
-  if (use_upset) {
+  .draw_upset <- function() {
     upset_df <- gexp_ml_prepare_upset_df(sets)
     if (is.null(upset_df) || ncol(upset_df) == 0L) {
       graphics::plot.new()
@@ -760,47 +759,53 @@ gexp_draw_ml_methods_venn <- function(sets,
       graphics::plot.new()
       graphics::text(0.5, 0.5, paste("UpSet error:", conditionMessage(e)), cex = 1 * text_scale, col = "red")
     })
+    invisible(NULL)
+  }
+
+  use_upset <- n_sets > 5L || any_empty || sum(non_empty) < 2L
+  if (use_upset) {
+    .draw_upset()
     return(invisible(NULL))
   }
 
   sets_draw <- lapply(sets, function(g) unique(as.character(g)))
   cat_names <- names(sets_draw)
+  n_draw <- length(sets_draw)
+  # scaled/euler only work for 2-3 circles. rotation= matches multiple
+  # formals in 5-set venn.diagram and used to blank this plot.
+  scaled_ok <- n_draw <= 3L
+  venn_args <- list(
+    x = sets_draw,
+    category.names = cat_names,
+    filename = NULL,
+    output = TRUE,
+    disable.logging = TRUE,
+    print.mode = "raw",
+    scaled = scaled_ok,
+    euler.d = scaled_ok,
+    lwd = 2.2,
+    lty = "solid",
+    fill = fill_colors,
+    alpha = 0.58,
+    cex = if (n_draw >= 5L) 0.95 * text_scale else 1.35 * text_scale,
+    fontface = "bold",
+    fontfamily = "sans",
+    cat.cex = if (n_draw >= 5L) 0.85 * text_scale else 1.12 * text_scale,
+    cat.fontface = "bold",
+    cat.fontfamily = "sans",
+    cat.col = fill_colors,
+    margin = if (n_draw >= 4L) 0.18 else 0.11,
+    main = title,
+    main.cex = 1.15 * text_scale,
+    main.fontface = "bold"
+  )
   grid::grid.newpage()
   vp <- tryCatch(
-    VennDiagram::venn.diagram(
-      x = sets_draw,
-      category.names = cat_names,
-      filename = NULL,
-      output = TRUE,
-      disable.logging = TRUE,
-      print.mode = "raw",
-      scaled = TRUE,
-      euler.d = TRUE,
-      lwd = 2.2,
-      lty = "solid",
-      col = grDevices::adjustcolor("white", alpha.f = 0.85),
-      fill = fill_colors,
-      alpha = 0.58,
-      cex = 1.35 * text_scale,
-      fontface = "bold",
-      fontfamily = "sans",
-      cat.cex = 1.12 * text_scale,
-      cat.fontface = "bold",
-      cat.fontfamily = "sans",
-      cat.col = fill_colors,
-      cat.default.pos = "outer",
-      margin = 0.11,
-      rotation = -12,
-      main = title,
-      main.cex = 1.25 * text_scale,
-      main.fontface = "bold",
-      main.dist = 0.06
-    ),
+    do.call(VennDiagram::venn.diagram, venn_args),
     error = function(e) NULL
   )
   if (is.null(vp)) {
-    graphics::plot.new()
-    graphics::text(0.5, 0.5, "Could not draw Venn diagram for these gene sets.", cex = 1.1 * text_scale, col = "gray40")
+    .draw_upset()
     return(invisible(NULL))
   }
   grid::grid.draw(vp)
@@ -2066,7 +2071,7 @@ map_microarray_ids <- function(micro_expr, fdata, micro_eset = NULL, gse_id = NU
 
   platform_id <- tryCatch(
     {
-      if (!is.null(micro_eset)) Biobase::annotation(micro_eset) else NULL
+      if (!is.null(micro_eset)) .gexpipe_geo_annotation(micro_eset) else NULL
     },
     error = function(e) NULL
   )
@@ -2422,9 +2427,9 @@ run_gse_annotation_and_download <- function(gse_id, dest_dir = getwd(), save_ann
   }
 
   micro_eset <- if (inherits(gse, "list")) gse[[1]] else gse
-  platform_id <- Biobase::annotation(micro_eset)
-  micro_expr <- Biobase::exprs(micro_eset)
-  fdata <- Biobase::fData(micro_eset)
+platform_id <- .gexpipe_geo_annotation(micro_eset)
+micro_expr <- .gexpipe_geo_expr_matrix(micro_eset)
+fdata <- .gexpipe_geo_fdata(micro_eset)
 
   gene_symbols <- map_microarray_ids(micro_expr, fdata, micro_eset, gse_id = gse_id)
   rownames(micro_expr) <- gene_symbols
@@ -2530,33 +2535,23 @@ download_ncbi_raw_counts <- function(gse_id, dest_dir) {
     "GRCh38.p11_NCBI", "GRCh38.p10_NCBI", "GRCh37.p13_NCBI",
     "GRCh38_NCBI", "GRCh37_NCBI"
   )
+  dir.create(dest_dir, showWarnings = FALSE, recursive = TRUE)
   for (genome in genome_versions) {
     filename <- paste0(gse_id, "_raw_counts_", genome, ".tsv.gz")
     dest_file <- file.path(dest_dir, filename)
-    if (file.exists(dest_file) && file.info(dest_file)$size > 1000) {
-      return(dest_file)
-    }
     url <- paste0(
       "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=",
       gse_id, "&format=file&file=", filename
     )
-    result <- tryCatch(
-      {
-        download.file(url, dest_file, mode = "wb", quiet = TRUE)
-        if (file.exists(dest_file) && file.info(dest_file)$size > 1000) {
-          return(dest_file)
-        }
-        if (file.exists(dest_file)) file.remove(dest_file)
-        NULL
-      },
-      error = function(e) NULL,
-      warning = function(w) NULL
+    path <- tryCatch(
+      .gexpipe_download_binary_url(url, dest_file),
+      error = function(e) NULL
     )
-    if (!is.null(result)) {
-      return(result)
+    if (!is.null(path)) {
+      return(path)
     }
   }
-  return(NULL)
+  NULL
 }
 
 # Try all NCBI genome versions and return the path with the MOST rows (fullest matrix).
@@ -2566,36 +2561,33 @@ download_ncbi_raw_counts_best <- function(gse_id, dest_dir) {
     "GRCh38.p11_NCBI", "GRCh38.p10_NCBI", "GRCh37.p13_NCBI",
     "GRCh38_NCBI", "GRCh37_NCBI"
   )
+  dir.create(dest_dir, showWarnings = FALSE, recursive = TRUE)
   best_path <- NULL
   best_nrow <- 0L
   for (genome in genome_versions) {
     filename <- paste0(gse_id, "_raw_counts_", genome, ".tsv.gz")
     dest_file <- file.path(dest_dir, filename)
-    if (!file.exists(dest_file) || file.info(dest_file)$size < 1000) {
-      url <- paste0(
-        "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=",
-        gse_id, "&format=file&file=", filename
-      )
-      tryCatch(
-        {
-          download.file(url, dest_file, mode = "wb", quiet = TRUE)
-        },
-        error = function(e) NULL,
-        warning = function(w) NULL
-      )
+    url <- paste0(
+      "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=",
+      gse_id, "&format=file&file=", filename
+    )
+    path <- tryCatch(
+      .gexpipe_download_binary_url(url, dest_file),
+      error = function(e) NULL
+    )
+    if (is.null(path)) {
+      next
     }
-    if (file.exists(dest_file) && file.info(dest_file)$size > 1000) {
-      n <- tryCatch(
-        {
-          df <- .gexpipe_fread_counts(dest_file, nrows = 500000L)
-          nrow(df)
-        },
-        error = function(e) 0L
-      )
-      if (n > best_nrow) {
-        best_nrow <- n
-        best_path <- dest_file
-      }
+    n <- tryCatch(
+      {
+        df <- .gexpipe_fread_counts(path, nrows = 500000L)
+        nrow(df)
+      },
+      error = function(e) 0L
+    )
+    if (is.finite(n) && n > best_nrow) {
+      best_nrow <- n
+      best_path <- path
     }
   }
   best_path
@@ -2712,10 +2704,16 @@ gexpipe_spearman_cor <- function(x) {
 #' Read tabular count files (GEO supplementary files are often messy)
 #' @keywords internal
 .gexpipe_fread_counts <- function(path, ...) {
+  args <- list(...)
+  if (!"quote" %in% names(args)) {
+    args$quote <- ""
+  }
+  args$input <- path
+  args$data.table <- FALSE
   withCallingHandlers(
-    data.table::fread(path, data.table = FALSE, ...),
+    do.call(data.table::fread, args),
     warning = function(w) {
-      if (grepl("Column name|EOF|stopped early", conditionMessage(w), ignore.case = TRUE)) {
+      if (grepl("Column name|EOF|stopped early|improper quoting", conditionMessage(w), ignore.case = TRUE)) {
         invokeRestart("muffleWarning")
       }
     }

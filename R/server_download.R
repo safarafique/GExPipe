@@ -8,6 +8,21 @@
 
 server_download <- function(input, output, session, rv) {
 
+  output$download_log_micro <- renderText({
+    if (!is.null(rv$download_log_micro) && nzchar(rv$download_log_micro)) {
+      rv$download_log_micro
+    } else {
+      "Download microarray data to see this run log."
+    }
+  })
+  output$download_log_rna <- renderText({
+    if (!is.null(rv$download_log_rna) && nzchar(rv$download_log_rna)) {
+      rv$download_log_rna
+    } else {
+      "Download RNA-seq data to see this run log."
+    }
+  })
+
   output$download_timer <- renderText({
     if (!isTRUE(rv$download_running) || is.null(rv$download_start)) return("00:00")
     invalidateLater(1000, session)
@@ -26,8 +41,9 @@ server_download <- function(input, output, session, rv) {
     n_micro <- length(rv$micro_expr_list)
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 1 complete."), " Combined matrix: ", format(n_genes, big.mark = ","), " genes \u00d7 ", format(n_samples, big.mark = ","), " samples."),
-      tags$p("RNA-seq datasets: ", n_rna, ". Microarray datasets: ", n_micro, ". Common genes (intersection) retained. See log below for details."))
+      tags$p(tags$strong("Step 1 complete."), " Overlap view: ", format(n_genes, big.mark = ","), " shared genes \u00d7 ", format(n_samples, big.mark = ","), " samples."),
+      tags$p("RNA-seq datasets: ", n_rna, ". Microarray datasets: ", n_micro,
+             ". Each GSE is kept at full gene coverage; analysis merge happens after per-dataset normalization (Step 3)."))
   })
 
   observeEvent(input$start_processing, {
@@ -68,6 +84,25 @@ server_download <- function(input, output, session, rv) {
         rnaseq_ids <- parsed$rnaseq_ids
         micro_ids <- parsed$micro_ids
         rv$dataset_mode <- parsed$dataset_mode
+        rv$analysis_type <- if (!is.null(parsed$analysis_type)) {
+          parsed$analysis_type
+        } else {
+          input$analysis_type
+        }
+        if (!identical(input$analysis_type, rv$analysis_type)) {
+          tryCatch(
+            updateRadioButtons(session, "analysis_type", selected = rv$analysis_type),
+            error = function(e) NULL
+          )
+        }
+        if (identical(rv$analysis_type, "merged") &&
+            !is.null(input$de_method) &&
+            input$de_method %in% c("deseq2", "edger", "limma_voom")) {
+          tryCatch(
+            updateRadioButtons(session, "de_method", selected = "limma"),
+            error = function(e) NULL
+          )
+        }
         if (length(parsed$messages) > 0) {
           for (msg in parsed$messages) {
             showNotification(msg, type = "warning", duration = 6)
@@ -94,7 +129,22 @@ server_download <- function(input, output, session, rv) {
         rv$disease_name <- disease
       }
       log_text <- paste0(log_text, "Mode: ", if (identical(rv$dataset_mode, "single")) "Single dataset" else "Multiple datasets", "\n")
-      log_text <- paste0(log_text, "RNA-seq: ", length(rnaseq_ids), " | Microarray: ", length(micro_ids), "\n\n")
+      log_text <- paste0(
+        log_text, "Platform: ",
+        switch(
+          as.character(rv$analysis_type),
+          rnaseq = "RNA-seq",
+          microarray = "Microarray",
+          parallel = "Parallel DE, then merge",
+          "Merged (RNA-seq + microarray)"
+        ),
+        "\n"
+      )
+      log_text <- paste0(log_text, "RNA-seq: ", length(rnaseq_ids), " | Microarray: ", length(micro_ids), "\n")
+      log_text <- paste0(
+        log_text,
+        "Each platform box accepts one or more GSE IDs.\n\n"
+      )
       refresh_log()
 
       if (length(rnaseq_ids) == 0 && length(micro_ids) == 0) {
@@ -115,7 +165,8 @@ server_download <- function(input, output, session, rv) {
       prep_logs <- gexp_prepare_download_dirs(
         base_dir = getwd(),
         has_micro = length(micro_ids) > 0,
-        has_rna = length(rnaseq_ids) > 0
+        has_rna = length(rnaseq_ids) > 0,
+        clear_cache = isTRUE(input$clear_download_cache)
       )
       if (length(prep_logs) > 0) {
         log_text <- paste0(log_text, paste0(prep_logs, collapse = "\n"), "\n")
@@ -155,7 +206,9 @@ server_download <- function(input, output, session, rv) {
           gse_id <- micro_ids[i]
           log_text <- paste0(log_text, "[", i, "/", length(micro_ids), "] ", gse_id, "... ")
           refresh_log()
-          res <- gexp_download_one_microarray_gse(gse_id, micro_dir)
+          download_cel <- !is.null(input$micro_norm_method) &&
+            identical(input$micro_norm_method, "rma")
+          res <- gexp_download_one_microarray_gse(gse_id, micro_dir, download_cel = download_cel)
           if (!isTRUE(res$ok)) {
             log_text <- paste0(log_text, "FAILED (", res$reason, "). Skipped.\n")
             skip_fail_reasons[[gse_id]] <- paste0("Microarray: ", res$reason)
@@ -249,7 +302,7 @@ server_download <- function(input, output, session, rv) {
       # STEP 2: GENE IDENTIFIER MAPPING & STANDARDIZATION (pipeline: map, remove NA, avereps)
       # --------------------------------------------------------------------------
 
-      log_text <- paste0(log_text, "\nSTEP 2: Gene ID mapping...\n")
+      log_text <- paste0(log_text, "\nGene ID mapping (Step 1)...\n")
       refresh_log()
 
       if (length(rv$micro_expr_list) > 0) {
@@ -258,20 +311,9 @@ server_download <- function(input, output, session, rv) {
             micro_expr <- rv$micro_expr_list[[gse_id]]
             micro_eset <- rv$micro_eset_list[[gse_id]]
             if (is.null(micro_eset)) {
-              micro_data <- tryCatch(
-                .gexpipe_geo_quiet(GEOquery::getGEO(gse_id, GSEMatrix = TRUE, getGPL = TRUE)),
-                error = function(e) NULL
-              )
-              micro_eset <- if (!is.null(micro_data) && is.list(micro_data) && length(micro_data) >= 1) {
-                micro_data[[1]]
-              } else {
-                micro_data
-              }
-            }
-            if (is.null(micro_eset)) {
               return(list(ok = "skip", msg = paste0("  ", gse_id, ": skipped mapping (GEO object unavailable during remap)\n")))
             }
-            fdata <- tryCatch(Biobase::fData(micro_eset), error = function(e) data.frame())
+            fdata <- tryCatch(.gexpipe_geo_fdata(micro_eset), error = function(e) data.frame())
             gene_symbols <- tryCatch(
               map_microarray_ids(micro_expr, fdata, micro_eset, gse_id),
               error = function(e) rownames(micro_expr)
@@ -348,16 +390,38 @@ server_download <- function(input, output, session, rv) {
       # --------------------------------------------------------------------------
 
       if (length(rv$all_genes_list) > 0) {
-        finalized <- gexp_download_finalize_common_genes(
-          micro_expr_list = rv$micro_expr_list,
-          rna_counts_list = rv$rna_counts_list,
-          all_genes_list = rv$all_genes_list
+        keep_sep <- identical(rv$analysis_type, "parallel") || identical(input$analysis_type, "parallel")
+        finalized <- tryCatch(
+          gexp_download_finalize_common_genes(
+            micro_expr_list = rv$micro_expr_list,
+            rna_counts_list = rv$rna_counts_list,
+            all_genes_list = rv$all_genes_list,
+            keep_platforms_separate = keep_sep
+          ),
+          error = function(e) {
+            list(
+              ok = isTRUE(keep_sep),
+              common_genes = character(0),
+              micro_expr_list = rv$micro_expr_list,
+              rna_counts_list = rv$rna_counts_list,
+              combined_expr_raw = NULL,
+              .error = conditionMessage(e)
+            )
+          }
         )
+        if (!is.null(finalized$.error)) {
+          log_text <- paste0(
+            log_text,
+            "\nWarning: could not build the combined overlap matrix (",
+            finalized$.error,
+            "). Per-dataset matrices were kept.\n"
+          )
+        }
         rv$micro_expr_list <- finalized$micro_expr_list
         rv$rna_counts_list <- finalized$rna_counts_list
         rv$common_genes <- finalized$common_genes
 
-        if (!isTRUE(finalized$ok) || length(rv$common_genes) == 0) {
+        if (!isTRUE(keep_sep) && (!isTRUE(finalized$ok) || length(rv$common_genes) == 0)) {
             log_text <- paste0(log_text, gexp_no_common_genes_diagnostic_log(rv$all_genes_list))
             showNotification(
               tags$div(
@@ -375,18 +439,81 @@ server_download <- function(input, output, session, rv) {
               type = "warning",
               duration = 15
             )
+        } else if (isTRUE(keep_sep) && !isTRUE(finalized$ok)) {
+          log_text <- paste0(log_text, "\nParallel download: no expression matrices after mapping.\n")
         } else {
           rv$combined_expr_raw <- finalized$combined_expr_raw
 
-          n_genes <- nrow(rv$combined_expr_raw)
-          n_samples <- ncol(rv$combined_expr_raw)
-          log_text <- paste0(log_text, "\nCommon genes (rows): ", n_genes, "\n")
-          log_text <- paste0(log_text, "Total samples (columns): ", n_samples, "\n")
-          log_text <- paste0(log_text, "Combined matrix: ", n_genes, " genes x ", n_samples, " samples\n")
-          if (length(rv$common_genes) < 1000) {
-            log_text <- paste0(log_text, "Few common genes - check ID mapping if needed.\n")
+          n_genes <- if (is.null(rv$combined_expr_raw)) 0L else nrow(rv$combined_expr_raw)
+          n_samples <- if (is.null(rv$combined_expr_raw)) 0L else ncol(rv$combined_expr_raw)
+          if (isTRUE(keep_sep)) {
+            n_mg <- if (length(rv$micro_expr_list) > 0L) {
+              sum(vapply(rv$micro_expr_list, nrow, integer(1)))
+            } else {
+              0L
+            }
+            n_ms <- if (length(rv$micro_expr_list) > 0L) {
+              sum(vapply(rv$micro_expr_list, ncol, integer(1)))
+            } else {
+              0L
+            }
+            n_rg <- if (length(rv$rna_counts_list) > 0L) {
+              sum(vapply(rv$rna_counts_list, nrow, integer(1)))
+            } else {
+              0L
+            }
+            n_rs <- if (length(rv$rna_counts_list) > 0L) {
+              sum(vapply(rv$rna_counts_list, ncol, integer(1)))
+            } else {
+              0L
+            }
+            micro_body <- paste0(
+              paste(vapply(names(rv$micro_expr_list), function(gse) {
+                paste0(
+                  "  ", gse, ": ", ncol(rv$micro_expr_list[[gse]]), " samples, ",
+                  format(nrow(rv$micro_expr_list[[gse]]), big.mark = ","), " genes\n"
+                )
+              }, character(1)), collapse = ""),
+              "\nOK Microarray download complete.\n",
+              "  Genes:   ", format(n_mg, big.mark = ","), "\n",
+              "  Samples: ", format(n_ms, big.mark = ","), "\n",
+              "  Merged with RNA-seq: no\n"
+            )
+            rna_body <- paste0(
+              paste(vapply(names(rv$rna_counts_list), function(gse) {
+                paste0(
+                  "  ", gse, ": ", ncol(rv$rna_counts_list[[gse]]), " samples, ",
+                  format(nrow(rv$rna_counts_list[[gse]]), big.mark = ","), " genes\n"
+                )
+              }, character(1)), collapse = ""),
+              "\nOK RNA-seq download complete.\n",
+              "  Genes:   ", format(n_rg, big.mark = ","), "\n",
+              "  Samples: ", format(n_rs, big.mark = ","), "\n",
+              "  Merged with microarray: no\n"
+            )
+            rv$download_log_micro <- gexpipe_format_separate_run_log(1L, "MICROARRAY", micro_body)
+            rv$download_log_rna <- gexpipe_format_separate_run_log(2L, "RNA-SEQ", rna_body)
+            log_text <- paste0(
+              log_text,
+              "\nParallel DE: two separate downloads (gene lists not intersected).\n\n",
+              rv$download_log_micro, "\n",
+              rv$download_log_rna, "\n",
+              "Symbol overlap (information only): ",
+              format(length(rv$common_genes), big.mark = ","), "\n",
+              "Proceed to Step 2 (Normalize each platform separately).\n"
+            )
+          } else {
+            log_text <- paste0(log_text, "\nShared-gene overlap (QC view): ", n_genes, "\n")
+            log_text <- paste0(log_text, "Total samples: ", n_samples, "\n")
+            log_text <- paste0(
+              log_text,
+              "Per-dataset matrices kept at full gene coverage (normalize each GSE first, then merge in Step 3).\n"
+            )
+            if (length(rv$common_genes) < 1000) {
+              log_text <- paste0(log_text, "Few overlapping genes - check ID mapping if needed.\n")
+            }
+            log_text <- paste0(log_text, "Proceed to QC (per-dataset), then Normalize to merge.\n")
           }
-          log_text <- paste0(log_text, "Proceed to QC tab.\n")
 
           generic_rna <- any(vapply(
             rv$rna_counts_list,
@@ -408,9 +535,11 @@ server_download <- function(input, output, session, rv) {
             )
           }
 
-          # Ensure thin/title-only stubs are enriched before Groups UI reads them
-          rv$rna_metadata_list <- gexp_enrich_thin_metadata_list(rv$rna_metadata_list)
-          rv$micro_metadata_list <- gexp_enrich_thin_metadata_list(rv$micro_metadata_list)
+          # Groups tab enriches thin phenodata after UI flush (fast download mode)
+          if (!isTRUE(getOption("gexpipe.fast_download", TRUE))) {
+            rv$rna_metadata_list <- gexp_enrich_thin_metadata_list(rv$rna_metadata_list)
+            rv$micro_metadata_list <- gexp_enrich_thin_metadata_list(rv$micro_metadata_list)
+          }
 
           rv$download_complete <- TRUE
           if (is.null(rv$download_complete_at)) rv$download_complete_at <- Sys.time()
@@ -448,19 +577,29 @@ server_download <- function(input, output, session, rv) {
     }, error = function(e) {
       closeAllConnections()
       msg <- conditionMessage(e)
+      rv$download_running <- FALSE
       # Sentinel thrown by the "all downloads failed" guard - notification was
       # already shown; do not overwrite the log or show a second error popup.
       if (identical(msg, "__gexpipe_all_downloads_failed__")) return()
-      err_log <- paste0(log_text, "\n\nError: ", msg, "\nConnections were reset. Please check your network and try again.")
+      is_network <- grepl(
+        "connection|timeout|hostname|resolve|ssl|Could not resolve|Connections were reset",
+        msg,
+        ignore.case = TRUE
+      )
+      err_log <- if (is_network) {
+        paste0(log_text, "\n\nError: ", msg, "\nConnections were reset. Please check your network and try again.")
+      } else {
+        paste0(log_text, "\n\nError: ", msg, "\n")
+      }
       output$download_log <- renderText({ err_log })
-      rv$download_running <- FALSE
-      if (grepl("connection|timeout|hostname|resolve", msg, ignore.case = TRUE)) {
+      if (is_network) {
         showNotification("Download failed: network or connection limit. Connections were reset. Please try again in a moment.", type = "error", duration = 12)
       } else {
         showNotification(paste("Download failed:", msg), type = "error", duration = 10)
       }
     }, finally = {
       closeAllConnections()
+      rv$download_running <- FALSE
       shinyjs::enable("start_processing")
       shinyjs::html("start_processing", HTML('<i class="fa fa-play-circle"></i> Start Processing'))
       removeNotification("download_processing")

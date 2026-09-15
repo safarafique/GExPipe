@@ -13,7 +13,8 @@ gexp_normalize_and_intersect(
   platform_per_gse = NULL,
   micro_eset_list = NULL,
   de_method = "limma",
-  apply_global_quantile = TRUE
+  apply_global_quantile = TRUE,
+  keep_platforms_separate = FALSE
 )
 }
 \arguments{
@@ -36,13 +37,20 @@ save raw counts for DESeq2/edgeR/limma-voom); one of "limma",
 "limma_voom", "deseq2", "edger".}
 
 \item{apply_global_quantile}{logical; if TRUE, apply limma quantile normalization across all samples.}
+
+\item{keep_platforms_separate}{logical; if TRUE (Parallel DE), normalize each
+platform on its own gene set. Do not intersect RNA-seq with microarray,
+do not drop genes low on the other platform, and do not apply global
+quantile. Matrices meet only at Step 7 consensus DEGs.}
 }
 \value{
 A list with elements:
 \item{combined_expr}{globally quantile-normalized matrix (genes x samples)}
 \item{combined_expr_before_global}{matrix before global quantile}
-\item{all_expr_norm_list}{normalized per-dataset matrices (common genes only)}
-\item{common_genes}{character vector of common genes}
+\item{all_expr_norm_list}{normalized per-dataset matrices}
+\item{expr_micro}{microarray-only normalized matrix (or NULL)}
+\item{expr_rna}{RNA-seq-only normalized matrix (or NULL)}
+\item{common_genes}{character vector of overlapping symbols (applied to matrices only when not keep_platforms_separate)}
 \item{normalization_stats}{list of per-dataset normalization info}
 \item{normalization_summary_table}{data.frame summarizing gene counts}
 \item{raw_counts_for_deseq2}{integer matrix of RNA-seq counts (optional)}
@@ -51,7 +59,7 @@ A list with elements:
 \item{log_text}{character string with a human-readable log}
 }
 \description{
-This is a non-Shiny helper version of the Step 3 logic:
+This is a non-Shiny helper version of the Step 2 (Normalize) logic:
 \itemize{
 \item per-dataset normalization (microarray + RNA-seq),
 \item intersection of gene sets (common genes),

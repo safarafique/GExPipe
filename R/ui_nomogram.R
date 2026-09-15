@@ -9,17 +9,18 @@
 
 ui_nomogram <- tabItem(
   tabName = "nomogram",
-  h2(icon("calculator"), " Step 13: Diagnostic Nomogram Model"),
+  h2(icon("calculator"), " Step 14: Diagnostic Nomogram Model"),
 
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " Build a diagnostic nomogram using common ML genes (or common DEG+WGCNA genes) and batch-corrected expression data.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("External Validation mode:"), " Model is trained on ALL samples; external dataset (from Step 11) is used for validation. No 70/30 split.", style = "margin-bottom: 4px;"),
-      tags$p(tags$strong("Internal Validation mode:"), " 70/30 stratified split-sample validation. EPV >= 10 enforced; optimal threshold by Youden index.", style = "margin-bottom: 4px;"),
-      tags$p(tags$strong("Requirements:"), " Batch correction (Step 5), sample/group metadata (WGCNA or unified), and common genes from ML (Step 10) or Step 8.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Why can validation AUC be ~0.5 when per-gene AUCs are high?"), " In Step 12 (ROC), ", tags$em("Validation AUC"), " is computed for each gene ", tags$em("on the external dataset alone"), " (single-gene ROC). The nomogram uses a ", tags$strong("fixed linear combination"), " of genes (coefficients from training). If the external cohort has a different expression scale, platform, or population, that same combination can fail to separate classes (AUC ~ 0.5) even when each gene alone still discriminates. Use similar cohorts and normalization for better external validation.", style = "margin-bottom: 0; font-size: 12px; color: #555;")
+      uiOutput("nomogram_about_ui"),
+      tags$p(
+        tags$strong("Why can nomogram AUC be ~0.5 when per-gene AUCs are high?"),
+        " ROC (Step 13) scores each gene alone. The nomogram uses a fixed linear combination from training. A different platform or scale can break that combination. Use a similar technology for external validation.",
+        style = "margin: 8px 0 0 0; font-size: 12px; color: #555;"
+      )
     )
   ),
 

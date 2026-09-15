@@ -9,14 +9,31 @@ ui_groups <- tabItem(
     # DE Method Banner — tells user which pipeline is active
     uiOutput("groups_de_method_banner"),
 
-    fluidRow(
-      box(
-        title = tags$span(icon("info-circle"), " About this step"),
-        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p(tags$strong("Purpose:"), " Define phenotype groups (e.g. control vs disease) for differential expression and WGCNA. Samples are assigned to groups using metadata columns from your datasets.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("Disease-specific analysis:"), " Assign your condition groups to ", tags$strong("Disease"), " and controls to ", tags$strong("Normal"), ". Step 6 (DE) and Step 7 (WGCNA) will use these to find disease-associated genes and modules.", style = "margin-bottom: 8px; color: #2c3e50;"),
-        tags$p(tags$strong("Need both groups for DE:"), " Differential expression (Step 6) compares Normal vs Disease. You must have at least one sample in ", tags$strong("Normal"), " and one in ", tags$strong("Disease"), ". If you enter GSEs from the same sample source (e.g. same study with only one condition), you will not get DEGs until you add a dataset that contains the other condition.", style = "margin-bottom: 8px; color: #555;"),
-        tags$p(tags$strong("Workflow:"), " Browse the phenodata table below to understand your metadata, select the phenotype column per dataset, extract unique group labels, categorize each as Normal, Disease, or None, then apply.", style = "margin-bottom: 0;")
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("info-circle"), " About this step"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$p(tags$strong("Purpose:"), " Define phenotype groups (e.g. control vs disease) for differential expression and WGCNA. Samples are assigned to groups using metadata columns from your datasets.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Disease-specific analysis:"), " Assign your condition groups to ", tags$strong("Disease"), " and controls to ", tags$strong("Normal"), ". Step 6 (DE) and later steps will use these to find disease-associated genes and modules.", style = "margin-bottom: 8px; color: #2c3e50;"),
+          tags$p(tags$strong("Need both groups for DE:"), " Differential expression (Step 6) compares Normal vs Disease. You must have at least one sample in ", tags$strong("Normal"), " and one in ", tags$strong("Disease"), ". If you enter GSEs from the same sample source (e.g. same study with only one condition), you will not get DEGs until you add a dataset that contains the other condition.", style = "margin-bottom: 8px; color: #555;"),
+          tags$p(tags$strong("Workflow:"), " Browse the phenodata table below to understand your metadata, select the phenotype column per dataset, extract unique group labels, categorize each as Normal, Disease, or None, then apply.", style = "margin-bottom: 0;")
+        )
+      )
+    ),
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("info-circle"), " About this step"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$p(
+            tags$strong("Purpose:"),
+            " Assign Normal / Disease on RNA-seq (left) and microarray (right). One Apply writes Condition on both platforms so each DE can run.",
+            style = "margin-bottom: 0;"
+          )
+        )
       )
     ),
     fluidRow(
@@ -98,6 +115,7 @@ ui_groups <- tabItem(
         )
       )
     ),
+    gexp_ui_parallel_run_logs("groups_log_micro", "groups_log_rna"),
     
     fluidRow(
       box(title = tags$span(icon("chart-pie"), " Group Summary"), 
@@ -113,8 +131,6 @@ ui_groups <- tabItem(
     fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,
           tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
-                   actionButton("next_page_groups", "Next: Batch Correction",
-                                icon = icon("arrow-right"), class = "btn-success btn-lg",
-                                style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;")))
+                   uiOutput("groups_next_button_ui")))
     ),
   )

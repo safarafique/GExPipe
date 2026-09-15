@@ -41,11 +41,12 @@ ui_results_summary <- tabItem(
     style = "margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #ecf0f1;",
     tags$h2(
       icon("file-alt"),
-      " Results Summary",
+      " Step 16: Results Summary",
       style = "color: #2c3e50; font-weight: 700; margin: 0; font-size: 28px;"
     ),
+    uiOutput("results_summary_about_ui"),
     tags$p(
-      "Pipeline overview and key results in order. One summary below, then each step with a short description and figure.",
+      "Pipeline overview and key results in order. Download 300 dpi figures from each step for the paper.",
       style = "margin-top: 8px; margin-bottom: 0; color: #7f8c8d; font-size: 14px;"
     )
   ),
@@ -68,7 +69,7 @@ ui_results_summary <- tabItem(
     column(6,
       box(
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        title = tags$span(icon("balance-scale"), " Step 3: Normalization"),
+        title = tags$span(icon("balance-scale"), " Step 2: Normalization"),
         tags$p("Expression data normalized (e.g. log2, TMM, quantile). Gene counts and filtering applied.", style = "margin-bottom: 12px; font-size: 13px; color: #5a6c7d;"),
         uiOutput("results_summary_norm_batch")
       )

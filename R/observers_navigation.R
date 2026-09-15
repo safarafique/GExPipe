@@ -4,137 +4,135 @@
 
 gexp_register_navigation_observers <- function(input, output, session, rv) {
   # nocov start
+  .gexp_goto_tab <- function(tab) {
+    if (is.null(tab) || !nzchar(tab)) return()
+    shinydashboard::updateTabItems(session, "sidebar_menu", tab)
+    tab <- gsub("[^A-Za-z0-9_]", "", as.character(tab)[[1]])
+    js <- sprintf(
+      paste(
+        "var tab = '%s';",
+        "if (typeof gexpClickSidebarTab === 'function') { gexpClickSidebarTab(tab); }",
+        "else if (window.Shiny && Shiny.setInputValue) {",
+        "  Shiny.setInputValue('sidebar_menu', tab, {priority: 'event'});",
+        "  var link = $('a[data-value=\"' + tab + '\"]').first();",
+        "  if (link.length && link[0].click) link[0].click();",
+        "}",
+        "window.scrollTo(0, 0);"
+      ),
+      tab
+    )
+    try(shinyjs::runjs(js), silent = TRUE)
+  }
+
   output$qc_next_button <- shiny::renderUI({
-    if (!is.null(input$de_method) && input$de_method %in% c("deseq2", "edger", "limma_voom")) {
-      shiny::actionButton(
-        "next_to_normalize",
-        shiny::tagList(shiny::icon("arrow-right"), " Next: Select Groups (Normalize auto-handled)"),
-        class = "btn-success btn-lg",
-        style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
-      )
-    } else {
-      shiny::actionButton(
-        "next_to_normalize", "Next: Normalize Data",
-        icon = shiny::icon("arrow-right"), class = "btn-success btn-lg",
-        style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
-      )
-    }
+    shiny::actionButton(
+      "next_to_normalize",
+      shiny::tagList(shiny::icon("arrow-right"), " Next: Select Groups"),
+      class = "btn-success btn-lg",
+      style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
+    )
   })
 
   shiny::observeEvent(input$next_page_download, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "qc")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("normalize")
   })
   shiny::observeEvent(input$next_to_normalize, {
-    if (!is.null(input$de_method) && input$de_method %in% c("deseq2", "edger", "limma_voom")) {
-      shinydashboard::updateTabItems(session, "sidebar_menu", "groups")
-    shinyjs::runjs("window.scrollTo(0, 0);")
-    } else {
-      shinydashboard::updateTabItems(session, "sidebar_menu", "normalize")
-    shinyjs::runjs("window.scrollTo(0, 0);")
-    }
+    .gexp_goto_tab("groups")
   })
   shiny::observeEvent(input$next_page_normalize, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "groups")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("qc")
+  })
+  shiny::observeEvent(input$next_page_normalize_parallel, {
+    .gexp_goto_tab("qc")
   })
   shiny::observeEvent(input$go_to_groups, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "groups")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("qc")
   })
   shiny::observeEvent(input$go_to_groups_from_norm, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "groups")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("qc")
   })
   shiny::observeEvent(input$next_page_groups, {
-    if (isTRUE(rv$single_dataset)) {
-      shinydashboard::updateTabItems(session, "sidebar_menu", "results")
-    shinyjs::runjs("window.scrollTo(0, 0);")
-    } else {
-      shinydashboard::updateTabItems(session, "sidebar_menu", "batch")
-    shinyjs::runjs("window.scrollTo(0, 0);")
-    }
+    .gexp_goto_tab(if (isTRUE(rv$single_dataset)) "results" else "batch")
   })
   shiny::observeEvent(input$next_to_batch_btn, {
-    if (isTRUE(rv$single_dataset)) {
-      shinydashboard::updateTabItems(session, "sidebar_menu", "results")
-    shinyjs::runjs("window.scrollTo(0, 0);")
-    } else {
-      shinydashboard::updateTabItems(session, "sidebar_menu", "batch")
-    shinyjs::runjs("window.scrollTo(0, 0);")
-    }
+    .gexp_goto_tab(if (isTRUE(rv$single_dataset)) "results" else "batch")
   })
   shiny::observeEvent(input$go_to_results, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "results")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("results")
   })
   shiny::observeEvent(input$next_page_batch, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "results")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("results")
+  })
+  shiny::observeEvent(input$next_page_batch_end, {
+    .gexp_goto_tab("results")
   })
   shiny::observeEvent(input$next_page_results, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "wgcna")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab(if (isTRUE(rv$merge_after_de)) "consensus" else "wgcna")
+  })
+  shiny::observeEvent(input$next_page_results_parallel, {
+    .gexp_goto_tab("consensus")
+  })
+  shiny::observeEvent(input$next_page_results_parallel_end, {
+    .gexp_goto_tab("consensus")
+  })
+  shiny::observeEvent(input$next_page_consensus, {
+    if (isTRUE(rv$merge_after_de) && !isTRUE(rv$consensus_complete)) {
+      shiny::showNotification(
+        "Apply Step 7 (RNA-seq ∩ microarray) first. WGCNA does not use that DEG list; Step 9 does.",
+        type = "warning",
+        duration = 6
+      )
+      return()
+    }
+    .gexp_goto_tab("wgcna")
   })
   shiny::observeEvent(input$next_page_wgcna, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "common_genes")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("common_genes")
   })
   shiny::observeEvent(input$next_page_common_genes_end, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "ppi")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("ppi")
   })
   shiny::observeEvent(input$next_page_common_genes_to_ml, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "ml")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("ml")
   })
   shiny::observeEvent(input$next_page_ppi, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "ml")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("ml")
   })
   shiny::observeEvent(input$next_page_ml, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "download")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("validation")
   })
   shiny::observeEvent(input$next_page_ml_to_roc, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "validation")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("validation")
   })
   shiny::observeEvent(input$next_page_ml_to_validation, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "validation")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("validation")
   })
   shiny::observeEvent(input$next_page_roc, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "download")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("nomogram")
   })
   shiny::observeEvent(input$next_page_roc_to_nomogram, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "nomogram")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("nomogram")
   })
   shiny::observeEvent(input$next_page_roc_to_gsea, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "gsea")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("gsea")
   })
   shiny::observeEvent(input$next_page_nomogram_to_gsea, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "gsea")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("gsea")
   })
   shiny::observeEvent(input$next_page_nomogram_to_results, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "results_summary")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("results_summary")
   })
   shiny::observeEvent(input$next_page_gsea, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "download")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("results_summary")
   })
   shiny::observeEvent(input$next_page_gsea_to_results, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "results_summary")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("results_summary")
   })
   shiny::observeEvent(input$next_page_roc_to_results, {
-    shinydashboard::updateTabItems(session, "sidebar_menu", "results_summary")
-    shinyjs::runjs("window.scrollTo(0, 0);")
+    .gexp_goto_tab("results_summary")
+  })
+  shiny::observeEvent(input$next_page_validation_to_roc, {
+    .gexp_goto_tab("roc")
   })
   # nocov end
 }

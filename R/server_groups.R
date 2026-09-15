@@ -5,6 +5,29 @@
 # Includes improved GSM ID alignment and sample matching
 
 server_groups <- function(input, output, session, rv) {
+
+  output$groups_log_micro <- renderText({
+    if (!is.null(rv$groups_log_micro) && nzchar(rv$groups_log_micro)) rv$groups_log_micro
+    else "Apply groups to see the microarray run log."
+  })
+  output$groups_log_rna <- renderText({
+    if (!is.null(rv$groups_log_rna) && nzchar(rv$groups_log_rna)) rv$groups_log_rna
+    else "Apply groups to see the RNA-seq run log."
+  })
+
+  output$groups_next_button_ui <- renderUI({
+    label <- if (isTRUE(rv$single_dataset)) {
+      "Next: Differential Expression"
+    } else {
+      "Next: Batch Correction"
+    }
+    actionButton(
+      "next_page_groups",
+      tagList(icon("arrow-right"), " ", label),
+      class = "btn-success btn-lg",
+      style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"
+    )
+  })
   
   # Reactive to store extracted groups
   extracted_groups <- reactiveVal(list())
@@ -15,6 +38,27 @@ server_groups <- function(input, output, session, rv) {
   # DE METHOD BANNER - shows which pipeline is active on this step
   # ==============================================================================
   output$groups_de_method_banner <- renderUI({
+    if (isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")) {
+      rna_lab <- switch(
+        if (!is.null(input$de_method_rna) && nzchar(input$de_method_rna)) input$de_method_rna else "deseq2",
+        deseq2 = "DESeq2",
+        edger = "edgeR",
+        limma_voom = "limma-voom",
+        "limma"
+      )
+      return(fluidRow(
+        box(
+          width = 12, status = "info", solidHeader = TRUE,
+          title = tags$span(icon("object-ungroup"), " Parallel: RNA-seq left, microarray right"),
+          tags$p(
+            "RNA-seq DE will use ", tags$strong(rna_lab),
+            ". Microarray DE will use ", tags$strong("limma"),
+            ". Assign groups on both sides, then Apply once.",
+            style = "margin: 0; font-size: 14px;"
+          )
+        )
+      ))
+    }
     method <- if (!is.null(input$de_method)) input$de_method else "limma"
     if (method == "deseq2") {
       fluidRow(
@@ -68,6 +112,11 @@ server_groups <- function(input, output, session, rv) {
       return(rv$micro_metadata_list[[micro_key]])
     }
     NULL
+  }
+
+  .gexpipe_gse_is_rna <- function(gse) {
+    !is.na(.gexpipe_resolve_metadata_key(names(rv$rna_metadata_list), gse)) ||
+      !is.na(.gexpipe_resolve_metadata_key(names(rv$rna_counts_list), gse))
   }
 
   # Collect GSE IDs from every available session source
@@ -152,10 +201,14 @@ server_groups <- function(input, output, session, rv) {
     data.frame(SampleID = rn, pdata, check.names = FALSE, stringsAsFactors = FALSE)
   }
 
-  # Enrich thin phenodata AFTER the browser UI has been sent to the client,
-  # so NCBI fetches never leave the Phenodata Browser / column selector blank.
+  # Enrich thin phenodata after the Groups tab is visible. Do NOT re-call
+  # getGEO immediately after Step 1: NCBI rate-limits the extra fetch and
+  # the Shiny session looks frozen even though download already finished.
   phenodata_enrich_scheduled <- shiny::reactiveVal(FALSE)
   observe({
+    if (!identical(input$sidebar_menu, "groups")) {
+      return()
+    }
     all_gses <- .gexpipe_available_gses()
     if (length(all_gses) == 0L) {
       return()
@@ -169,6 +222,18 @@ server_groups <- function(input, output, session, rv) {
     phenodata_enrich_scheduled(TRUE)
     session$onFlushed(function() {
       on.exit(phenodata_enrich_scheduled(FALSE), add = TRUE)
+      shiny::showNotification(
+        shiny::tags$div(
+          shiny::icon("sync", class = "fa-spin"),
+          shiny::tags$strong(" Fetching full GEO phenotype columns..."),
+          " The app stays on this page; buttons will respond when NCBI returns."
+        ),
+        type = "message",
+        duration = NULL,
+        id = "pdata_enrich",
+        session = session
+      )
+      on.exit(shiny::removeNotification("pdata_enrich", session = session), add = TRUE)
       gses <- shiny::isolate(.gexpipe_available_gses())
       for (gse in gses) {
         p <- shiny::isolate(.gexpipe_get_pdata_for_gse(gse))
@@ -295,6 +360,32 @@ server_groups <- function(input, output, session, rv) {
     if (length(tabs) == 0L) {
       return(tags$div(class = "alert alert-warning", "No phenodata tables available."))
     }
+    parallel <- isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")
+    if (isTRUE(parallel) && length(all_gses) > 0L) {
+      is_rna <- vapply(all_gses, .gexpipe_gse_is_rna, logical(1))
+      rna_tabs <- tabs[is_rna]
+      micro_tabs <- tabs[!is_rna]
+      return(fluidRow(
+        column(
+          6,
+          tags$h4(icon("dna"), " RNA-seq", style = "color: #1e3a5f;"),
+          if (length(rna_tabs) == 0L) {
+            tags$p("No RNA-seq datasets.", style = "color: #6c757d;")
+          } else {
+            do.call(tabsetPanel, c(list(id = "phenodata_tabs_rna", type = "pills"), rna_tabs))
+          }
+        ),
+        column(
+          6,
+          tags$h4(icon("th"), " Microarray", style = "color: #1e3a5f;"),
+          if (length(micro_tabs) == 0L) {
+            tags$p("No microarray datasets.", style = "color: #6c757d;")
+          } else {
+            do.call(tabsetPanel, c(list(id = "phenodata_tabs_micro", type = "pills"), micro_tabs))
+          }
+        )
+      ))
+    }
     do.call(tabsetPanel, c(list(id = "phenodata_tabs", type = "pills"), tabs))
   })
 
@@ -410,6 +501,8 @@ server_groups <- function(input, output, session, rv) {
 
   output$group_selector_ui <- renderUI({
     all_gses <- .gexpipe_available_gses()
+    parallel <- isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")
+    box_width <- if (isTRUE(parallel)) 12 else 6
 
     if (length(all_gses) == 0L) {
       if (!isTRUE(rv$download_complete)) {
@@ -436,7 +529,7 @@ server_groups <- function(input, output, session, rv) {
             icon("database", style = "margin-right: 8px; color: #3498db;"),
             tags$strong(gse, style = "font-size: 16px; color: #2c3e50;")
           ),
-          width = 6, status = "warning", solidHeader = TRUE,
+          width = box_width, status = "warning", solidHeader = TRUE,
           tags$div(
             class = "alert alert-warning",
             style = "margin: 0;",
@@ -488,7 +581,7 @@ server_groups <- function(input, output, session, rv) {
           icon("database", style = "margin-right: 8px; color: #3498db;"),
           tags$strong(gse, style = "font-size: 16px; color: #2c3e50;")
         ),
-        width = 6, status = "primary", solidHeader = TRUE, collapsible = TRUE,
+        width = box_width, status = "primary", solidHeader = TRUE, collapsible = TRUE,
         collapsed = FALSE,
         tags$div(
           style = "padding: 10px 0;",
@@ -530,6 +623,7 @@ server_groups <- function(input, output, session, rv) {
     })
 
     # Remove NULL boxes
+    names(selector_boxes) <- all_gses
     selector_boxes <- selector_boxes[!vapply(selector_boxes, is.null, logical(1))]
 
     if (length(selector_boxes) == 0L) {
@@ -539,8 +633,24 @@ server_groups <- function(input, output, session, rv) {
       ))
     }
 
+    if (isTRUE(parallel)) {
+      is_rna <- vapply(names(selector_boxes), .gexpipe_gse_is_rna, logical(1))
+      return(fluidRow(
+        column(
+          6,
+          tags$h4(icon("dna"), " RNA-seq", style = "color: #1e3a5f;"),
+          fluidRow(unname(selector_boxes[is_rna]))
+        ),
+        column(
+          6,
+          tags$h4(icon("th"), " Microarray", style = "color: #1e3a5f;"),
+          fluidRow(unname(selector_boxes[!is_rna]))
+        )
+      ))
+    }
+
     # Display in rows of 2
-    fluidRow(selector_boxes)
+    fluidRow(unname(selector_boxes))
   })
 
   # Store selected columns when they change and show preview
@@ -1037,6 +1147,18 @@ server_groups <- function(input, output, session, rv) {
     batch_final <- batch_kept[idx]
 
     rv$combined_expr <- rv$combined_expr[, matched, drop = FALSE]
+    if (!is.null(rv$expr_micro) && is.matrix(rv$expr_micro)) {
+      keep_m <- intersect(matched, colnames(rv$expr_micro))
+      if (length(keep_m) > 0L) {
+        rv$expr_micro <- rv$expr_micro[, keep_m, drop = FALSE]
+      }
+    }
+    if (!is.null(rv$expr_rna) && is.matrix(rv$expr_rna)) {
+      keep_r <- intersect(matched, colnames(rv$expr_rna))
+      if (length(keep_r) > 0L) {
+        rv$expr_rna <- rv$expr_rna[, keep_r, drop = FALSE]
+      }
+    }
     rv$unified_metadata <- rv$unified_metadata[matched, , drop = FALSE]
     rv$unified_metadata$Condition <- labels_final
     rv$unified_metadata$Batch <- factor(batch_final)
@@ -1054,6 +1176,37 @@ server_groups <- function(input, output, session, rv) {
     rv$groups_applied <- TRUE
     rv$condition_ref_label <- "Normal"
     rv$condition_alt_label <- "Disease"
+
+    if (isTRUE(rv$merge_after_de) && !is.null(rv$unified_metadata) &&
+        "Platform" %in% names(rv$unified_metadata)) {
+      plat_counts <- function(plat) {
+        sub <- rv$unified_metadata[rv$unified_metadata$Platform == plat, , drop = FALSE]
+        tab <- table(as.character(sub$Condition))
+        paste0(
+          "  Samples: ", nrow(sub), "\n",
+          "  Normal:  ", if ("Normal" %in% names(tab)) tab[["Normal"]] else 0, "\n",
+          "  Disease: ", if ("Disease" %in% names(tab)) tab[["Disease"]] else 0, "\n"
+        )
+      }
+      rv$groups_log_micro <- gexpipe_format_separate_run_log(
+        1L, "MICROARRAY",
+        paste0(
+          "Groups applied on microarray samples only.\n",
+          plat_counts("Microarray"),
+          "  Merged with RNA-seq: no\n",
+          "\nOK Microarray groups complete.\n"
+        )
+      )
+      rv$groups_log_rna <- gexpipe_format_separate_run_log(
+        2L, "RNA-SEQ",
+        paste0(
+          "Groups applied on RNA-seq samples only.\n",
+          plat_counts("RNAseq"),
+          "  Merged with microarray: no\n",
+          "\nOK RNA-seq groups complete.\n"
+        )
+      )
+    }
 
     counts <- table(rv$unified_metadata$Condition)
     de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
@@ -1204,9 +1357,106 @@ server_groups <- function(input, output, session, rv) {
     })
   })
 
+  .gexpipe_group_counts_for_samples <- function(sample_ids) {
+    meta <- rv$unified_metadata
+    if (is.null(meta) || !is.data.frame(meta) || !"Condition" %in% names(meta)) {
+      return(table(character(0)))
+    }
+    if ("SampleID" %in% names(meta)) {
+      keep <- as.character(meta$SampleID) %in% as.character(sample_ids)
+    } else {
+      keep <- rownames(meta) %in% as.character(sample_ids)
+    }
+    table(as.character(meta$Condition[keep]))
+  }
+
+  .gexpipe_group_summary_banner <- function(heading, n_samples, n_genes, counts, ref_lab, alt_lab) {
+    card_specs <- list(
+      list(
+        label = ref_lab,
+        count = if (ref_lab %in% names(counts)) as.integer(counts[[ref_lab]]) else 0L,
+        role = "ref"
+      ),
+      list(
+        label = alt_lab,
+        count = if (alt_lab %in% names(counts)) as.integer(counts[[alt_lab]]) else 0L,
+        role = "alt"
+      )
+    )
+    tags$div(
+      tags$div(
+        style = "text-align: center; margin-bottom: 18px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;",
+        tags$h4(
+          icon("check-circle", style = "margin-right: 10px;"),
+          heading,
+          style = "margin: 0; font-weight: bold;"
+        ),
+        tags$div(
+          style = "margin-top: 15px; display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;",
+          tags$div(
+            tags$p(
+              tags$strong("Total Samples:", style = "font-size: 16px;"),
+              tags$br(),
+              tags$span(format(n_samples, big.mark = ","), style = "font-size: 20px; font-weight: bold;")
+            )
+          ),
+          tags$div(
+            tags$p(
+              tags$strong("Total Genes:", style = "font-size: 16px;"),
+              tags$br(),
+              tags$span(format(n_genes, big.mark = ","), style = "font-size: 20px; font-weight: bold;")
+            )
+          )
+        )
+      ),
+      tags$div(
+        style = "display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px;",
+        lapply(card_specs, function(spec) {
+          bg_color <- if (identical(spec$role, "ref")) {
+            "linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)"
+          } else {
+            "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)"
+          }
+          icon_name <- if (identical(spec$role, "ref")) "check-circle" else "exclamation-triangle"
+          tags$div(
+            style = paste0(
+              "min-width: 160px; padding: 20px; background: ", bg_color,
+              "; border-radius: 15px; color: white; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.2);"
+            ),
+            tags$div(icon(icon_name, class = "fa-2x"), style = "margin-bottom: 10px;"),
+            tags$h3(tags$strong(spec$label), style = "margin: 0 0 8px 0; font-size: 20px; font-weight: bold;"),
+            tags$div(style = "font-size: 32px; font-weight: bold;", spec$count),
+            tags$div(style = "margin-top: 8px; font-size: 13px; opacity: 0.9;", "samples")
+          )
+        })
+      )
+    )
+  }
+
   output$groups_process_summary_ui <- renderUI({
     if (is.null(rv$groups_applied) || !rv$groups_applied) {
       return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Apply group categorization to see process summary."))
+    }
+    parallel <- isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")
+    if (isTRUE(parallel)) {
+      rna_ids <- if (!is.null(rv$expr_rna)) colnames(rv$expr_rna) else character(0)
+      micro_ids <- if (!is.null(rv$expr_micro)) colnames(rv$expr_micro) else character(0)
+      rna_counts <- .gexpipe_group_counts_for_samples(rna_ids)
+      micro_counts <- .gexpipe_group_counts_for_samples(micro_ids)
+      return(tags$div(
+        style = "font-size: 14px; line-height: 1.6; color: #333;",
+        tags$p(
+          tags$strong("Step 4 complete (Parallel)."),
+          " RNA-seq: ", paste(names(rna_counts), rna_counts, sep = " = ", collapse = "; "),
+          " (", length(rna_ids), " samples, ",
+          format(if (is.null(rv$expr_rna)) 0L else nrow(rv$expr_rna), big.mark = ","), " genes)."
+        ),
+        tags$p(
+          "Microarray: ", paste(names(micro_counts), micro_counts, sep = " = ", collapse = "; "),
+          " (", length(micro_ids), " samples, ",
+          format(if (is.null(rv$expr_micro)) 0L else nrow(rv$expr_micro), big.mark = ","), " genes)."
+        )
+      ))
     }
     counts <- table(rv$unified_metadata$Condition)
     n_samp <- sum(counts)
@@ -1228,71 +1478,52 @@ server_groups <- function(input, output, session, rv) {
 
     ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
     alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
-    counts <- table(rv$unified_metadata$Condition)
-    total_samples <- sum(counts)
-    total_genes <- if (!is.null(rv$combined_expr)) nrow(rv$combined_expr) else 0
+    parallel <- isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")
 
-    card_specs <- list(
-      list(
-        label = ref_lab,
-        count = if (ref_lab %in% names(counts)) as.integer(counts[[ref_lab]]) else 0L,
-        role = "ref"
-      ),
-      list(
-        label = alt_lab,
-        count = if (alt_lab %in% names(counts)) as.integer(counts[[alt_lab]]) else 0L,
-        role = "alt"
+    summary_body <- if (isTRUE(parallel)) {
+      rna_ids <- if (!is.null(rv$expr_rna)) colnames(rv$expr_rna) else character(0)
+      micro_ids <- if (!is.null(rv$expr_micro)) colnames(rv$expr_micro) else character(0)
+      rna_genes <- if (is.null(rv$expr_rna)) 0L else nrow(rv$expr_rna)
+      micro_genes <- if (is.null(rv$expr_micro)) 0L else nrow(rv$expr_micro)
+      fluidRow(
+        column(
+          6,
+          .gexpipe_group_summary_banner(
+            "RNA-seq groups applied",
+            length(rna_ids),
+            rna_genes,
+            .gexpipe_group_counts_for_samples(rna_ids),
+            ref_lab,
+            alt_lab
+          )
+        ),
+        column(
+          6,
+          .gexpipe_group_summary_banner(
+            "Microarray groups applied",
+            length(micro_ids),
+            micro_genes,
+            .gexpipe_group_counts_for_samples(micro_ids),
+            ref_lab,
+            alt_lab
+          )
+        )
       )
-    )
+    } else {
+      counts <- table(rv$unified_metadata$Condition)
+      .gexpipe_group_summary_banner(
+        "Groups Successfully Applied!",
+        sum(counts),
+        if (!is.null(rv$combined_expr)) nrow(rv$combined_expr) else 0,
+        counts,
+        ref_lab,
+        alt_lab
+      )
+    }
 
     tags$div(
       style = "padding: 20px;",
-      tags$div(
-        style = "text-align: center; margin-bottom: 25px; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; color: white;",
-        tags$h4(
-          icon("check-circle", style = "margin-right: 10px;"),
-          "Groups Successfully Applied!",
-          style = "margin: 0; font-weight: bold;"
-        ),
-        tags$div(
-          style = "margin-top: 15px; display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;",
-          tags$div(
-            tags$p(
-              tags$strong("Total Samples:", style = "font-size: 16px;"),
-              tags$br(),
-              tags$span(format(total_samples, big.mark = ","), style = "font-size: 20px; font-weight: bold;")
-            )
-          ),
-          tags$div(
-            tags$p(
-              tags$strong("Total Genes:", style = "font-size: 16px;"),
-              tags$br(),
-              tags$span(format(total_genes, big.mark = ","), style = "font-size: 20px; font-weight: bold;")
-            )
-          )
-        )
-      ),
-      tags$div(
-        style = "display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 24px;",
-        lapply(card_specs, function(spec) {
-          bg_color <- if (identical(spec$role, "ref")) {
-            "linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)"
-          } else {
-            "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)"
-          }
-          icon_name <- if (identical(spec$role, "ref")) "check-circle" else "exclamation-triangle"
-          tags$div(
-            style = paste0(
-              "min-width: 200px; padding: 25px; background: ", bg_color,
-              "; border-radius: 15px; color: white; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.2);"
-            ),
-            tags$div(icon(icon_name, class = "fa-3x"), style = "margin-bottom: 15px;"),
-            tags$h3(tags$strong(spec$label), style = "margin: 0 0 10px 0; font-size: 24px; font-weight: bold;"),
-            tags$div(style = "font-size: 36px; font-weight: bold;", spec$count),
-            tags$div(style = "margin-top: 10px; font-size: 14px; opacity: 0.9;", "samples")
-          )
-        })
-      ),
+      summary_body,
       tags$div(
         style = "max-width: 720px; margin: 0 auto; padding: 18px 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px;",
         tags$h4(

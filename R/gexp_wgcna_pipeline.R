@@ -167,3 +167,165 @@ gexp_wgcna_prepare <- function(
     gene_variance_table = gene_variance_table
   )
 }
+
+#' Variance-stabilize RNA-seq counts for WGCNA (never raw counts or CPM)
+#'
+#' Uses DESeq2 `vst` (or `varianceStabilizingTransformation` when n < 7).
+#'
+#' @param counts Integer count matrix (genes x samples).
+#' @param sample_ids Optional sample IDs to keep.
+#' @return Numeric VST matrix (genes x samples).
+#' @noRd
+gexpipe_counts_to_vst <- function(counts, sample_ids = NULL) {
+  if (!requireNamespace("DESeq2", quietly = TRUE)) {
+    stop("DESeq2 is required to variance-stabilize RNA-seq counts for WGCNA.")
+  }
+  counts <- as.matrix(counts)
+  storage.mode(counts) <- "integer"
+  counts[is.na(counts) | counts < 0] <- 0L
+  if (!is.null(sample_ids)) {
+    sample_ids <- intersect(as.character(sample_ids), colnames(counts))
+    if (length(sample_ids) < 4L) {
+      stop("Need at least 4 RNA-seq samples for VST / WGCNA.")
+    }
+    counts <- counts[, sample_ids, drop = FALSE]
+  }
+  if (ncol(counts) < 4L) {
+    stop("Need at least 4 RNA-seq samples for VST / WGCNA.")
+  }
+  keep <- rowSums(counts) > 0
+  counts <- counts[keep, , drop = FALSE]
+  coldata <- data.frame(
+    row.names = colnames(counts),
+    .dummy = factor(rep("A", ncol(counts)))
+  )
+  dds <- DESeq2::DESeqDataSetFromMatrix(
+    countData = counts,
+    colData = coldata,
+    design = ~1
+  )
+  vs <- if (ncol(counts) < 7L || nrow(counts) < 1000L) {
+    DESeq2::varianceStabilizingTransformation(dds, blind = TRUE)
+  } else {
+    DESeq2::vst(dds, blind = TRUE)
+  }
+  as.matrix(SummarizedExperiment::assay(vs))
+}
+
+#' Default Parallel WGCNA choices (one network, not DEGs)
+#'
+#' Auto: the platform with more samples; top 5,000 variable genes.
+#' RNA-seq uses VST of counts; microarray uses the batch-corrected matrix.
+#' @noRd
+gexpipe_parallel_wgcna_defaults <- function(metadata) {
+  n_rna <- if (is.null(metadata)) 0L else {
+    length(gexpipe_platform_sample_ids(metadata, "RNAseq"))
+  }
+  n_micro <- if (is.null(metadata)) 0L else {
+    length(gexpipe_platform_sample_ids(metadata, "Microarray"))
+  }
+  plat <- if (n_rna >= n_micro) "rnaseq" else "microarray"
+  list(
+    platform = plat,
+    n_rna = n_rna,
+    n_micro = n_micro,
+    gene_mode = "top_variable",
+    top_genes = 5000L
+  )
+}
+
+#' Choose a continuous WGCNA input matrix (not a DEG list)
+#'
+#' RNA-seq uses VST when raw counts exist. Parallel DE uses one primary
+#' platform (RNA-seq VST or microarray normalized values). Merged / array
+#' use the batch-corrected log-scale matrix.
+#'
+#' @param rv App reactive values (or a list with the same fields).
+#' @param parallel_platform `"auto"`, `"rnaseq"`, or `"microarray"`.
+#' @return list with `expr`, `source`, `platform`.
+#' @noRd
+gexpipe_wgcna_input_expr <- function(rv, parallel_platform = "auto") {
+  meta <- rv$unified_metadata
+  counts <- rv$raw_counts_for_deseq2
+  base <- rv$batch_corrected
+  if (is.null(base)) base <- rv$combined_expr
+  parallel <- isTRUE(rv$merge_after_de)
+  mixed <- !is.null(meta) && isTRUE(gexpipe_has_mixed_platforms(meta))
+
+  if (isTRUE(parallel) && !is.null(meta)) {
+    plat <- parallel_platform
+    if (is.null(plat) || identical(plat, "auto")) {
+      n_rna <- length(gexpipe_platform_sample_ids(meta, "RNAseq"))
+      n_micro <- length(gexpipe_platform_sample_ids(meta, "Microarray"))
+      plat <- if (n_rna >= n_micro) "rnaseq" else "microarray"
+    }
+    if (identical(plat, "rnaseq")) {
+      ids <- gexpipe_platform_sample_ids(meta, "RNAseq")
+      if (!is.null(counts)) {
+        expr <- gexpipe_counts_to_vst(counts, ids)
+        return(list(expr = expr, source = "RNA-seq VST (blind)", platform = "RNAseq"))
+      }
+      rna_bc <- rv$batch_corrected_rna
+      if (!is.null(rna_bc) && is.matrix(rna_bc)) {
+        keep <- intersect(ids, colnames(rna_bc))
+        if (length(keep) >= 4L) {
+          return(list(
+            expr = rna_bc[, keep, drop = FALSE],
+            source = "RNA-seq log-scale (no counts for VST)",
+            platform = "RNAseq"
+          ))
+        }
+      }
+      if (!is.null(base)) {
+        keep <- intersect(ids, colnames(base))
+        if (length(keep) >= 4L) {
+          return(list(
+            expr = base[, keep, drop = FALSE],
+            source = "RNA-seq log-scale block (no counts for VST)",
+            platform = "RNAseq"
+          ))
+        }
+      }
+      stop("RNA-seq WGCNA needs RNA-seq counts (for VST) or the RNA-seq matrix with at least 4 samples.")
+    }
+    micro <- rv$batch_corrected_micro
+    if (is.null(micro)) micro <- rv$expr_micro
+    if (!is.null(micro)) {
+      ids <- intersect(gexpipe_platform_sample_ids(meta, "Microarray"), colnames(micro))
+      if (length(ids) >= 4L) {
+        return(list(
+          expr = micro[, ids, drop = FALSE],
+          source = "microarray normalized / batch-corrected",
+          platform = "Microarray"
+        ))
+      }
+    }
+    ids <- intersect(gexpipe_platform_sample_ids(meta, "Microarray"), colnames(base))
+    if (length(ids) < 4L) {
+      stop("Microarray WGCNA needs at least 4 samples in the normalized matrix.")
+    }
+    return(list(
+      expr = base[, ids, drop = FALSE],
+      source = "microarray normalized / batch-corrected",
+      platform = "Microarray"
+    ))
+  }
+
+  if (!is.null(counts) && !isTRUE(mixed)) {
+    expr <- gexpipe_counts_to_vst(counts, colnames(counts))
+    return(list(expr = expr, source = "RNA-seq VST (blind)", platform = "RNAseq"))
+  }
+
+  if (is.null(base)) {
+    stop("No expression matrix available for WGCNA. Complete normalization and batch correction.")
+  }
+  list(
+    expr = base,
+    source = if (isTRUE(mixed)) {
+      "merged batch-corrected log-scale matrix"
+    } else {
+      "batch-corrected / normalized expression"
+    },
+    platform = if (isTRUE(mixed)) "merged" else "single"
+  )
+}

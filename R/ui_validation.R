@@ -8,15 +8,13 @@
 
 ui_validation <- tabItem(
   tabName = "validation",
-  h2(icon("shield-alt"), " Step 11: Validation Setup"),
+  h2(icon("shield-alt"), " Step 12: Validation Setup"),
 
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " Choose how to validate your biomarker genes. External validation uses an independent GEO dataset; Internal validation uses a 70/30 train/test split of your current data.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("External Validation:"), " Download an independent GSE dataset, categorize groups (Normal/Disease), run DE, then ROC & Nomogram use this external cohort.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Internal Validation:"), " ROC is computed on the training data. Nomogram uses 70/30 stratified split-sample validation.", style = "margin-bottom: 0;")
+      uiOutput("validation_about_ui")
     )
   ),
 

@@ -77,6 +77,26 @@ test_that("ML Venn helpers handle empty overlap", {
   expect_length(sets, 2L)
 })
 
+test_that("5-method ML Venn draws instead of the blank failure message", {
+  skip_if_not_installed("GExPipe")
+  skip_if_not_installed("VennDiagram")
+  skip_if_not_installed("grid")
+  draw <- getFromNamespace("gexp_draw_ml_methods_venn", "GExPipe")
+  src <- paste(deparse(draw), collapse = "\n")
+  expect_false(grepl("rotation = -12", src, fixed = TRUE))
+  sets <- list(
+    LASSO = c("A", "B", "C", paste0("L", 1:8)),
+    `Elastic Net` = c("A", "B", "C", paste0("E", 1:7)),
+    Ridge = c("A", "B", "C", paste0("R", 1:6)),
+    `Random Forest` = c("A", "B", "C", paste0("F", 1:5)),
+    `SVM-RFE` = c("A", "B", "C", paste0("S", 1:4))
+  )
+  expect_equal(getFromNamespace("gexp_ml_common_gene_count", "GExPipe")(sets), 3L)
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  expect_no_error(draw(sets, show_footer = FALSE))
+})
+
 test_that("observers register without error when shiny is available", {
   skip_if_not_installed("shiny")
   skip_if_not_installed("GExPipe")

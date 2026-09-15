@@ -38,14 +38,29 @@ gexp_ui_download <- function() {
         )
       )
     ),
-    fluidRow(
-      box(
-        title = tags$span(icon("info-circle"), " About this step"),
-        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-        tags$p(tags$strong("Purpose:"), " Download expression data from NCBI GEO for RNA-seq and/or microarray. Data are mapped to gene symbols and merged to a common gene set for downstream analysis.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("Methods:"), " RNA-seq uses NCBI-provided raw counts with TMM normalization; microarray uses GEO Series Matrix with platform-specific annotation. Common genes (intersection across datasets) are retained.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("Storage:"), " Downloaded files are stored in ", tags$code("micro_data"), " (microarray/CEL) and ", tags$code("rna_data"), " (bulk RNA-seq). These folders are cleared at the start of each new run, so only the current run's data is kept-no accumulation across multiple uses.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("Output:"), " Combined expression matrix (genes \u00d7 samples), sample metadata, and gene overlap statistics for QC.", style = "margin-bottom: 0;")
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("info-circle"), " About this step"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+          tags$p(tags$strong("Purpose:"), " Download expression data from NCBI GEO for RNA-seq and/or microarray. Data are mapped to gene symbols and merged to a common gene set for downstream analysis.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Methods:"), " RNA-seq uses NCBI-provided raw counts with TMM normalization; microarray uses GEO Series Matrix with platform-specific annotation. Common genes (intersection across datasets) are retained.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Storage:"), " Downloaded files are stored in ", tags$code("micro_data"), " (microarray/CEL) and ", tags$code("rna_data"), " (bulk RNA-seq). These folders are cleared at the start of each new run, so only the current run's data is kept-no accumulation across multiple uses.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Output:"), " Combined expression matrix (genes \u00d7 samples), sample metadata, and gene overlap statistics for QC.", style = "margin-bottom: 0;")
+        )
+      )
+    ),
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("info-circle"), " About this step"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$p(tags$strong("Purpose:"), " Download RNA-seq and microarray as two separate pipelines. Each platform keeps its own genes and samples through DE.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Layout:"), " RNA-seq is on the left; microarray is on the right. There is no common-gene merge at download.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Storage:"), " Files go to ", tags$code("rna_data"), " (left) and ", tags$code("micro_data"), " (right). Folders are cleared at the start of each new run.", style = "margin-bottom: 0;")
+        )
       )
     ),
     fluidRow(
@@ -82,7 +97,8 @@ gexp_ui_download <- function() {
               choices = c(
                 "RNA-seq" = "rnaseq",
                 "Microarray" = "microarray",
-                "Merged (Both)" = "merged"
+                "Merged (Both)" = "merged",
+                "Parallel DE, then merge" = "parallel"
               ),
               selected = "rnaseq", inline = TRUE
             )
@@ -94,29 +110,58 @@ gexp_ui_download <- function() {
                 class = "alert alert-warning",
                 style = "margin-top: 10px; margin-bottom: 0; font-size: 13px; line-height: 1.6;",
                 icon("exclamation-triangle"),
-                tags$strong(" Merged microarray + RNA-seq \u2014 read before proceeding"),
+                tags$strong(" Merged (Both) \u2014 same as the previous app"),
                 tags$ul(
                   style = "margin: 8px 0 0 0; padding-left: 20px;",
-                  tags$li("This mode performs ", tags$strong("cross-platform integration"), ", not separate per-platform analyses."),
-                  tags$li("Use ", tags$strong("limma"), " for DE (recommended). DESeq2/edgeR/voom use RNA-seq counts only."),
-                  tags$li("Prefer ", tags$strong("multiple GSEs"), " so batch correction can run; use \u22652 datasets when possible."),
-                  tags$li("After batch correction, check ", tags$strong("Platform PCA"), " (Step 5) \u2014 platforms should intermingle."),
-                  tags$li("Treat results as ", tags$strong("hypothesis-generating"), "; validate findings on a held-out platform when possible.")
+                  tags$li("Normalize, QC, groups, then ", tags$strong("batch / merge first"), "."),
+                  tags$li("Each platform box accepts ", tags$strong("one or more GSE IDs"), " (comma-separated)."),
+                  tags$li("Step 6 is ", tags$strong("one limma DE"), " on the merged matrix. Use this path if you want the original merged workflow."),
+                  tags$li("For separate RNA-seq + microarray DE, then common genes, choose ", tags$strong("Parallel DE, then merge"), ".")
+                )
+              )
+            )
+          ),
+          conditionalPanel(
+            condition = "input.analysis_type == 'parallel'",
+            column(12,
+              tags$div(
+                class = "alert alert-info",
+                style = "margin-top: 10px; margin-bottom: 0; font-size: 13px; line-height: 1.6;",
+                icon("object-ungroup"),
+                tags$strong(" Parallel DE, then merge"),
+                tags$ul(
+                  style = "margin: 8px 0 0 0; padding-left: 20px;",
+                  tags$li("Normalize, QC, batch, and DE each platform on its own (no merge, no global quantile, no shared gene intersection)."),
+                  tags$li("Each box accepts ", tags$strong("one or more GSE IDs"), " (comma-separated). RNA-seq can have several studies and microarray can have several studies in the same run."),
+                  tags$li("After groups, Step 5 batch-corrects ", tags$strong("RNA-seq and microarray separately"), " (ComBat-ref if a platform has 2+ GSEs; one GSE is filtered only)."),
+                  tags$li("Step 6 runs both DEs on those separate matrices (RNA-seq = your method; microarray = limma). Step 7 is RNA-seq \u2229 microarray (common same-direction DEGs). Step 8 is one WGCNA on one processed platform matrix, not on that DEG list."),
+                  tags$li("Merged (Both) is unchanged: one shared normalize, one joint batch, one limma DE.")
                 )
               )
             )
           ),
           column(
             6,
-            radioButtons(
-              "dataset_mode",
-              "Datasets:",
-              choices = c(
-                "Single dataset (1 GSE) \u2014 skip batch correction" = "single",
-                "Multiple datasets (comma-separated) \u2014 batch correction recommended" = "multi"
-              ),
-              selected = "multi",
-              inline = TRUE
+            conditionalPanel(
+              condition = "input.analysis_type == 'rnaseq' || input.analysis_type == 'microarray'",
+              radioButtons(
+                "dataset_mode",
+                "Datasets:",
+                choices = c(
+                  "Single dataset (1 GSE) \u2014 skip batch correction" = "single",
+                  "Multiple datasets (comma-separated) \u2014 batch correction recommended" = "multi"
+                ),
+                selected = "multi",
+                inline = TRUE
+              )
+            ),
+            conditionalPanel(
+              condition = "input.analysis_type == 'merged' || input.analysis_type == 'parallel'",
+              tags$div(
+                style = "padding: 8px 0 0 0; font-size: 13px; color: #334155; line-height: 1.5;",
+                tags$strong("Multiple GSEs allowed."),
+                " Type several IDs in the RNA-seq box and/or the microarray box (comma-separated). All of them are downloaded. Batch correction runs when a platform has 2 or more GSEs."
+              )
             )
           ),
           column(
@@ -125,16 +170,65 @@ gexp_ui_download <- function() {
             tags$label("DE Method for Step 6:",
               style = "font-weight: 700; font-size: 14px; color: #2c3e50; display: block; margin-bottom: 4px;"
             ),
-            tags$div(
-              id = "de_method_wrapper",
-              radioButtons("de_method", label = NULL,
-                choices = c(
-                  "limma \u2014 empirical Bayes (recommended for microarray/mixed)" = "limma",
-                  "limma-voom \u2014 voom + limma (RNA-seq counts)" = "limma_voom",
-                  "DESeq2 \u2014 negative binomial (RNA-seq counts)" = "deseq2",
-                  "edgeR \u2014 quasi-likelihood (RNA-seq counts)" = "edger"
+            conditionalPanel(
+              condition = "input.analysis_type == 'parallel'",
+              tagList(
+                tags$p(
+                  style = "margin: 0 0 10px 0; font-size: 13px; color: #334155;",
+                  "Choose one method per platform. Both DEs run together when you click Run DE in Step 6."
                 ),
-                selected = "limma"
+                fluidRow(
+                  column(
+                    6,
+                    tags$div(
+                      style = "padding: 12px 14px; border: 1px solid #93c5fd; border-radius: 8px; background: #eff6ff; min-height: 170px;",
+                      tags$p(tags$strong("RNA-seq DE"), style = "margin: 0 0 8px 0; color: #1e3a5f;"),
+                      radioButtons(
+                        "de_method_rna",
+                        label = NULL,
+                        choices = c(
+                          "DESeq2 \u2014 negative binomial (recommended)" = "deseq2",
+                          "edgeR \u2014 quasi-likelihood" = "edger",
+                          "limma-voom \u2014 voom + limma" = "limma_voom",
+                          "limma \u2014 on TMM log-CPM" = "limma"
+                        ),
+                        selected = "deseq2"
+                      )
+                    )
+                  ),
+                  column(
+                    6,
+                    tags$div(
+                      style = "padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; min-height: 170px;",
+                      tags$p(tags$strong("Microarray DE"), style = "margin: 0 0 8px 0; color: #1e3a5f;"),
+                      radioButtons(
+                        "de_method_micro",
+                        label = NULL,
+                        choices = c("limma \u2014 empirical Bayes (fixed for microarray)" = "limma"),
+                        selected = "limma"
+                      ),
+                      tags$p(
+                        style = "margin: 8px 0 0 0; font-size: 12px; color: #64748b;",
+                        "Always limma. DESeq2 / edgeR are not used on arrays."
+                      )
+                    )
+                  )
+                )
+              )
+            ),
+            conditionalPanel(
+              condition = "input.analysis_type != 'parallel'",
+              tags$div(
+                id = "de_method_wrapper",
+                radioButtons("de_method", label = NULL,
+                  choices = c(
+                    "limma \u2014 empirical Bayes (recommended for microarray/mixed)" = "limma",
+                    "limma-voom \u2014 voom + limma (RNA-seq counts)" = "limma_voom",
+                    "DESeq2 \u2014 negative binomial (RNA-seq counts)" = "deseq2",
+                    "edgeR \u2014 quasi-likelihood (RNA-seq counts)" = "edger"
+                  ),
+                  selected = "limma"
+                )
               )
             ),
             tags$div(
@@ -188,7 +282,7 @@ gexp_ui_download <- function() {
           )
         ),
         conditionalPanel(
-          condition = "(input.de_method == 'deseq2' || input.de_method == 'edger' || input.de_method == 'limma_voom') && input.analysis_type != 'rnaseq'",
+          condition = "(input.de_method == 'deseq2' || input.de_method == 'edger' || input.de_method == 'limma_voom') && input.analysis_type != 'rnaseq' && input.analysis_type != 'parallel'",
           tags$div(
             class = "alert alert-warning", style = "margin-top: 10px; margin-bottom: 0;",
             icon("exclamation-triangle"),
@@ -202,32 +296,32 @@ gexp_ui_download <- function() {
     ),
     fluidRow(
       conditionalPanel(
-        condition = "input.analysis_type == 'rnaseq' || input.analysis_type == 'merged'",
+        condition = "input.analysis_type == 'rnaseq' || input.analysis_type == 'merged' || input.analysis_type == 'parallel'",
         box(
           title = tags$span(icon("dna"), " RNA-seq Datasets"),
           width = 6, status = "info", solidHeader = TRUE,
-          textAreaInput("rnaseq_gses", "GSE IDs (comma separated):",
+          textAreaInput("rnaseq_gses", "GSE IDs (comma separated; one or more):",
             value = "", placeholder = "e.g. GSE50760, GSE104836",
             rows = 3
           ),
           tags$p(
             style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE50760), comma-separated."
+            icon("lightbulb"), " One or more RNA-seq GEO Series IDs, comma-separated (e.g. GSE50760, GSE104836)."
           )
         )
       ),
       conditionalPanel(
-        condition = "input.analysis_type == 'microarray' || input.analysis_type == 'merged'",
+        condition = "input.analysis_type == 'microarray' || input.analysis_type == 'merged' || input.analysis_type == 'parallel'",
         box(
           title = tags$span(icon("microchip"), " Microarray Datasets"),
           width = 6, status = "warning", solidHeader = TRUE,
-          textAreaInput("microarray_gses", "GSE IDs (comma separated):",
+          textAreaInput("microarray_gses", "GSE IDs (comma separated; one or more):",
             value = "", placeholder = "e.g. GSE89076, GSE44076",
             rows = 3
           ),
           tags$p(
             style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-            icon("lightbulb"), " Enter one or more GEO Series IDs (e.g. GSE89076), comma-separated."
+            icon("lightbulb"), " One or more microarray GEO Series IDs, comma-separated (e.g. GSE89076, GSE44076)."
           )
         )
       )
@@ -258,22 +352,26 @@ gexp_ui_download <- function() {
         uiOutput("download_process_summary_ui")
       )
     ),
-    fluidRow(
-      box(
-        title = tags$span(icon("terminal"), " Download log"),
-        width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$div(
-          style = "display:flex; align-items:center; justify-content: space-between; margin-bottom: 10px;",
-          tags$div(tags$span(class = "step-timer", tags$span(class = "label", "Elapsed:"), textOutput("download_timer", inline = TRUE))),
-          actionButton("toggle_download_summary", tagList(icon("plus"), " Toggle summary"), class = "btn btn-sm btn-default")
-        ),
-        tags$pre(style = "white-space: pre-wrap;", textOutput("download_log"))
+    gexp_ui_parallel_run_logs("download_log_micro", "download_log_rna"),
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("terminal"), " Download log"),
+          width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$div(
+            style = "display:flex; align-items:center; justify-content: space-between; margin-bottom: 10px;",
+            tags$div(tags$span(class = "step-timer", tags$span(class = "label", "Elapsed:"), textOutput("download_timer", inline = TRUE))),
+            actionButton("toggle_download_summary", tagList(icon("plus"), " Toggle summary"), class = "btn btn-sm btn-default")
+          ),
+          tags$pre(style = "white-space: pre-wrap;", textOutput("download_log"))
+        )
       )
     ),
     fluidRow(
       column(12,
         class = "next-btn",
-        actionButton("next_page_download", tagList(icon("arrow-right"), " Next: QC & Visualization"),
+        actionButton("next_page_download", tagList(icon("arrow-right"), " Next: Normalize Data"),
           class = "btn btn-success btn-lg",
           style = "margin-top: 20px;"
         )

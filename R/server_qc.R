@@ -1,9 +1,61 @@
 # ==============================================================================
-# SERVER_QC.R - Step 2: QC & Visualization Module
+# SERVER_QC.R - Step 3: QC & Visualization Module
 # ==============================================================================
 
 server_qc <- function(input, output, session, rv) {
-  
+
+  output$qc_log_micro <- renderText({
+    if (!is.null(rv$qc_log_micro) && nzchar(rv$qc_log_micro)) rv$qc_log_micro
+    else "Complete Step 2 to see the microarray QC log."
+  })
+  output$qc_log_rna <- renderText({
+    if (!is.null(rv$qc_log_rna) && nzchar(rv$qc_log_rna)) rv$qc_log_rna
+    else "Complete Step 2 to see the RNA-seq QC log."
+  })
+
+  observe({
+    if (!isTRUE(rv$merge_after_de) || !isTRUE(rv$normalization_complete)) {
+      return()
+    }
+    micro <- rv$expr_micro
+    rna <- rv$expr_rna
+    n_mg <- if (is.null(micro)) 0L else nrow(micro)
+    n_ms <- if (is.null(micro)) 0L else ncol(micro)
+    n_rg <- if (is.null(rna)) 0L else nrow(rna)
+    n_rs <- if (is.null(rna)) 0L else ncol(rna)
+    rv$qc_log_micro <- gexpipe_format_separate_run_log(
+      1L, "MICROARRAY",
+      paste0(
+        "QC on microarray matrix only.\n",
+        "  Genes:   ", format(n_mg, big.mark = ","), "\n",
+        "  Samples: ", format(n_ms, big.mark = ","), "\n",
+        "  Merged with RNA-seq: no\n",
+        "  Common-gene intersection for DE: not applied\n",
+        "\nOK Microarray QC recorded.\n"
+      )
+    )
+    rv$qc_log_rna <- gexpipe_format_separate_run_log(
+      2L, "RNA-SEQ",
+      paste0(
+        "QC on RNA-seq matrix only.\n",
+        "  Genes:   ", format(n_rg, big.mark = ","), "\n",
+        "  Samples: ", format(n_rs, big.mark = ","), "\n",
+        "  Merged with microarray: no\n",
+        "  Common-gene intersection for DE: not applied\n",
+        "\nOK RNA-seq QC recorded.\n"
+      )
+    )
+  })
+
+  .qc_expr <- function() {
+    if (isTRUE(rv$normalization_complete) && !is.null(rv$combined_expr) &&
+        is.matrix(rv$combined_expr) && ncol(rv$combined_expr) > 0L) {
+      rv$combined_expr
+    } else {
+      rv$combined_expr_raw
+    }
+  }
+
   # ==============================================================================
   # INFO BOXES
   # ==============================================================================
@@ -19,7 +71,7 @@ server_qc <- function(input, output, session, rv) {
   })
   
   output$samples_box <- renderInfoBox({
-    n <- if (!is.null(rv$combined_expr_raw)) ncol(rv$combined_expr_raw) else 0
+    n <- if (!is.null(.qc_expr())) ncol(.qc_expr()) else 0
     infoBox(
       "Samples", 
       n, 
@@ -317,9 +369,10 @@ server_qc <- function(input, output, session, rv) {
   # ==============================================================================
   
   output$qc_boxplot <- renderPlot({
-    req(rv$combined_expr_raw)
+    expr <- .qc_expr()
+    req(expr)
     df <- gexp_qc_prepare_boxplot_data(
-      combined_expr_raw = rv$combined_expr_raw,
+      combined_expr_raw = expr,
       micro_expr_list = rv$micro_expr_list,
       rna_counts_list = rv$rna_counts_list,
       max_points = 500000L
@@ -328,15 +381,25 @@ server_qc <- function(input, output, session, rv) {
     ggplot(df, aes(x = Sample, y = Expression, fill = Platform)) +
       geom_boxplot(outlier.size = 0.5) +
       theme_bw() +
-      labs(title = "Expression Distribution - Raw Data", y = "Expression") +
+      labs(title = if (isTRUE(rv$normalization_complete)) {
+        "Expression Distribution - After Normalization"
+      } else {
+        "Expression Distribution - Raw Data (run Step 2 first)"
+      }, y = "Expression") +
       theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
             plot.title = element_text(face = "bold", size = 16))
   })
   
   output$qc_density <- renderPlot({
-    req(rv$combined_expr_raw)
-    dd <- gexp_qc_prepare_density_data(rv$combined_expr_raw, max_samples = 50L)
-    plot(dd$first, main = "Expression Density - Raw Data",
+    expr <- .qc_expr()
+    req(expr)
+    dd <- gexp_qc_prepare_density_data(expr, max_samples = 50L)
+    plot(dd$first,
+         main = if (isTRUE(rv$normalization_complete)) {
+           "Expression Density - After Normalization"
+         } else {
+           "Expression Density - Raw Data (run Step 2 first)"
+         },
          xlab = "Expression", col = "#3498db", lwd = 2,
          ylim = c(0, max(dd$first$y) * 1.2))
     if (length(dd$others) > 0) {
@@ -344,6 +407,118 @@ server_qc <- function(input, output, session, rv) {
         lines(dd$others[[i]], col = dd$colors[i + 1L], lwd = 1)
       }
     }
+  })
+
+  .qc_platform_boxplot <- function(expr, title, fill) {
+    if (is.null(expr) || !is.matrix(expr) || ncol(expr) < 1L) {
+      plot.new()
+      text(0.5, 0.5, "Complete Step 2 to see this plot.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
+    use <- expr
+    if (nrow(use) > 8000L) {
+      withr::local_seed(123)
+      use <- use[sample.int(nrow(use), 8000L), , drop = FALSE]
+    }
+    if (ncol(use) > 50L) {
+      withr::local_seed(123)
+      use <- use[, sample.int(ncol(use), 50L), drop = FALSE]
+    }
+    df <- data.frame(
+      Expression = as.vector(use),
+      Sample = rep(colnames(use), each = nrow(use)),
+      stringsAsFactors = FALSE
+    )
+    ggplot2::ggplot(df, ggplot2::aes(x = Sample, y = Expression)) +
+      ggplot2::geom_boxplot(fill = fill, outlier.size = 0.4, alpha = 0.85) +
+      ggplot2::theme_bw() +
+      ggplot2::labs(title = title, y = "Expression") +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(face = "bold", size = 13)
+      )
+  }
+
+  .qc_platform_density <- function(expr, title, color) {
+    if (is.null(expr) || !is.matrix(expr) || ncol(expr) < 1L) {
+      plot.new()
+      text(0.5, 0.5, "Complete Step 2 to see this plot.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
+    dd <- gexp_qc_prepare_density_data(expr, max_samples = 50L)
+    plot(dd$first, main = title, xlab = "Expression", col = color, lwd = 2,
+         ylim = c(0, max(dd$first$y, na.rm = TRUE) * 1.2))
+    if (length(dd$others) > 0L) {
+      for (i in seq_along(dd$others)) {
+        graphics::lines(dd$others[[i]], col = dd$colors[i + 1L], lwd = 1)
+      }
+    }
+  }
+
+  output$qc_boxplot_rna <- renderPlot({
+    .qc_platform_boxplot(rv$expr_rna, "RNA-seq QC boxplot", "#93c5fd")
+  })
+  output$qc_density_rna <- renderPlot({
+    .qc_platform_density(rv$expr_rna, "RNA-seq QC density", "#2563eb")
+  })
+  output$qc_boxplot_micro <- renderPlot({
+    .qc_platform_boxplot(rv$expr_micro, "Microarray QC boxplot", "#fde68a")
+  })
+  output$qc_density_micro <- renderPlot({
+    .qc_platform_density(rv$expr_micro, "Microarray QC density", "#d97706")
+  })
+
+  output$venn_plot_parallel <- renderPlot({
+    req(rv$all_genes_list)
+    draw_qc_venn_to_dev()
+  })
+  output$upset_plot_parallel <- renderPlot({
+    req(rv$all_genes_list)
+    draw_qc_upset_to_dev()
+  })
+
+  .qc_outlier_table_for <- function(sample_ids) {
+    if (!isTRUE(rv$qc_outlier_detection_complete) || is.null(sample_ids) || length(sample_ids) == 0L) {
+      return(DT::datatable(
+        data.frame(Message = "Run outlier detection to see this platform."),
+        rownames = FALSE, options = list(dom = "t")
+      ))
+    }
+    keep <- intersect(sample_ids, names(rv$qc_pca_distances))
+    if (length(keep) == 0L) keep <- intersect(sample_ids, colnames(rv$combined_expr_raw))
+    if (length(keep) == 0L) {
+      return(DT::datatable(
+        data.frame(Message = "No samples for this platform."),
+        rownames = FALSE, options = list(dom = "t")
+      ))
+    }
+    df <- data.frame(
+      Sample = keep,
+      Dataset = .qc_sample_dataset(keep),
+      Mahal_Distance = round(rv$qc_pca_distances[keep], 2),
+      PCA_Outlier = ifelse(keep %in% rv$qc_pca_outliers, "Yes", ""),
+      Connectivity = round(rv$qc_conn_k[keep], 2),
+      Conn_Outlier = ifelse(keep %in% rv$qc_conn_outliers, "Yes", ""),
+      Flagged = ifelse(keep %in% rv$qc_all_outliers, "OUTLIER", ""),
+      stringsAsFactors = FALSE
+    )
+    df <- df[order(-nchar(df$Flagged), -df$Mahal_Distance), , drop = FALSE]
+    dt <- DT::datatable(df, options = list(pageLength = 8, scrollX = TRUE, dom = "frtip"),
+                        rownames = FALSE, selection = "none")
+    DT::formatStyle(dt, "Flagged",
+                    backgroundColor = DT::styleEqual("OUTLIER", "#ffebee"),
+                    color = DT::styleEqual("OUTLIER", "#c62828"),
+                    fontWeight = DT::styleEqual("OUTLIER", "bold"))
+  }
+
+  output$qc_outlier_table_rna <- DT::renderDataTable({
+    ids <- if (!is.null(rv$expr_rna)) colnames(rv$expr_rna) else character(0)
+    .qc_outlier_table_for(ids)
+  })
+  output$qc_outlier_table_micro <- DT::renderDataTable({
+    ids <- if (!is.null(rv$expr_micro)) colnames(rv$expr_micro) else character(0)
+    .qc_outlier_table_for(ids)
   })
   
   # ==============================================================================
@@ -364,19 +539,61 @@ server_qc <- function(input, output, session, rv) {
 
   # ---- Run outlier detection ----
   observeEvent(input$run_outlier_detection, {
-    req(rv$combined_expr_raw)
-    expr <- rv$combined_expr_raw
-
-    if (ncol(expr) < 5) {
-      showNotification("Need at least 5 samples for outlier detection.", type = "warning", duration = 5)
-      return()
+    expr <- .qc_expr()
+    parallel_qc <- isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")
+    if (isTRUE(parallel_qc)) {
+      expr_rna <- rv$expr_rna
+      expr_micro <- rv$expr_micro
+      n_rna <- if (is.null(expr_rna)) 0L else ncol(expr_rna)
+      n_micro <- if (is.null(expr_micro)) 0L else ncol(expr_micro)
+      if (n_rna < 5L && n_micro < 5L) {
+        showNotification("Need at least 5 samples on a platform for outlier detection.", type = "warning", duration = 5)
+        return()
+      }
+    } else {
+      req(expr)
+      if (ncol(expr) < 5) {
+        showNotification("Need at least 5 samples for outlier detection.", type = "warning", duration = 5)
+        return()
+      }
     }
 
     withProgress(message = "Detecting sample outliers...", value = 0, {
       tryCatch({
         incProgress(0.2, detail = "PCA analysis...")
         incProgress(0.4, detail = "Connectivity analysis...")
-        qc <- gexp_qc_detect_outliers(expr, top_n = 5000L)
+        .merge_qc <- function(parts) {
+          parts <- parts[!vapply(parts, is.null, logical(1))]
+          if (length(parts) == 0L) return(NULL)
+          score_list <- lapply(parts, function(z) as.data.frame(z$scores))
+          list(
+            scores = tryCatch(do.call(rbind, score_list), error = function(e) score_list[[1L]]),
+            distances = unlist(lapply(parts, function(z) z$distances)),
+            pca_threshold = parts[[1L]]$pca_threshold,
+            pca_outliers = unique(unlist(lapply(parts, function(z) z$pca_outliers))),
+            pca_var_explained = parts[[1L]]$pca_var_explained,
+            connectivity = unlist(lapply(parts, function(z) z$connectivity)),
+            conn_threshold = parts[[1L]]$conn_threshold,
+            conn_outliers = unique(unlist(lapply(parts, function(z) z$conn_outliers))),
+            all_outliers = unique(unlist(lapply(parts, function(z) z$all_outliers)))
+          )
+        }
+        qc <- if (isTRUE(parallel_qc)) {
+          rna_qc <- if (!is.null(rv$expr_rna) && ncol(rv$expr_rna) >= 5L) {
+            gexp_qc_detect_outliers(rv$expr_rna, top_n = 5000L)
+          } else {
+            NULL
+          }
+          micro_qc <- if (!is.null(rv$expr_micro) && ncol(rv$expr_micro) >= 5L) {
+            gexp_qc_detect_outliers(rv$expr_micro, top_n = 5000L)
+          } else {
+            NULL
+          }
+          .merge_qc(list(rna_qc, micro_qc))
+        } else {
+          gexp_qc_detect_outliers(expr, top_n = 5000L)
+        }
+        if (is.null(qc)) stop("Outlier detection produced no results.")
         incProgress(0.3, detail = "Preparing results...")
 
         # Store results
@@ -406,15 +623,15 @@ server_qc <- function(input, output, session, rv) {
   })
 
   output$qc_process_summary_ui <- renderUI({
-    if (is.null(rv$combined_expr_raw) || ncol(rv$combined_expr_raw) == 0) {
-      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Complete Step 1 (Download) and view QC plots to see process summary."))
+    if (is.null(.qc_expr()) || ncol(.qc_expr()) == 0) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Complete Step 2 (Normalization) and view QC plots to see process summary."))
     }
-    n_samp <- ncol(rv$combined_expr_raw)
-    n_genes <- nrow(rv$combined_expr_raw)
+    n_samp <- ncol(.qc_expr())
+    n_genes <- nrow(.qc_expr())
     n_out <- length(rv$qc_all_outliers)
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 2 summary."), " ", format(n_genes, big.mark = ","), " genes, ", format(n_samp, big.mark = ","), " samples. Venn/UpSet show gene overlap; QC plots show expression distribution."),
+      tags$p(tags$strong("Step 3 summary."), " ", format(n_genes, big.mark = ","), " genes, ", format(n_samp, big.mark = ","), " samples after normalization. Venn/UpSet show common genes; QC plots show normalized expression."),
       if (isTRUE(rv$qc_outlier_detection_complete)) tags$p("Outlier detection: ", n_out, " sample(s) flagged (PCA and/or connectivity).") else NULL)
   })
 
@@ -424,7 +641,7 @@ server_qc <- function(input, output, session, rv) {
     n_pca <- length(rv$qc_pca_outliers)
     n_conn <- length(rv$qc_conn_outliers)
     n_total <- length(rv$qc_all_outliers)
-    n_samples <- ncol(rv$combined_expr_raw)
+    n_samples <- ncol(.qc_expr())
 
     tags$div(
       style = "display: flex; gap: 12px; flex-wrap: wrap; align-items: center;",
@@ -890,7 +1107,8 @@ server_qc <- function(input, output, session, rv) {
 
   # ---- Exclude selected outliers ----
   observeEvent(input$exclude_outliers_btn, {
-    req(rv$combined_expr_raw)
+    expr <- .qc_expr()
+    req(expr)
 
     samples_to_exclude <- input$qc_outlier_checkboxes
     if (is.null(samples_to_exclude) || length(samples_to_exclude) == 0) {
@@ -898,14 +1116,14 @@ server_qc <- function(input, output, session, rv) {
       return()
     }
 
-    keep_cols <- setdiff(colnames(rv$combined_expr_raw), samples_to_exclude)
+    keep_cols <- setdiff(colnames(expr), samples_to_exclude)
     if (length(keep_cols) < 3) {
       showNotification("Cannot exclude: would leave fewer than 3 samples.", type = "error", duration = 5)
       return()
     }
 
     upd <- gexp_qc_exclude_samples(
-      combined_expr_raw = rv$combined_expr_raw,
+      combined_expr_raw = if (!is.null(rv$combined_expr_raw)) rv$combined_expr_raw else expr,
       micro_expr_list = rv$micro_expr_list,
       rna_counts_list = rv$rna_counts_list,
       unified_metadata = rv$unified_metadata,
@@ -916,6 +1134,50 @@ server_qc <- function(input, output, session, rv) {
     rv$rna_counts_list <- upd$rna_counts_list
     rv$unified_metadata <- upd$unified_metadata
     keep_cols <- upd$remaining_samples
+
+    if (!is.null(rv$combined_expr) && is.matrix(rv$combined_expr)) {
+      keep_norm <- intersect(colnames(rv$combined_expr), keep_cols)
+      if (length(keep_norm) > 0L) {
+        rv$combined_expr <- rv$combined_expr[, keep_norm, drop = FALSE]
+      }
+    }
+
+    # Re-normalize remaining samples and recompute common genes
+    if (length(rv$micro_expr_list) > 0L || length(rv$rna_counts_list) > 0L) {
+      tryCatch({
+        micro_m <- if (!is.null(rv$last_micro_norm_method)) rv$last_micro_norm_method else "auto"
+        rna_m <- if (!is.null(rv$last_rnaseq_norm_method)) rv$last_rnaseq_norm_method else "auto"
+        de_m <- if (!is.null(rv$last_de_method)) rv$last_de_method else "limma"
+        gq <- if (!is.null(rv$last_apply_global_quantile)) isTRUE(rv$last_apply_global_quantile) else TRUE
+        keep_sep <- isTRUE(rv$last_keep_platforms_separate) || isTRUE(rv$merge_after_de)
+        if (isTRUE(keep_sep)) gq <- FALSE
+        norm_out <- gexp_normalize_and_intersect(
+          micro_expr_list = if (is.null(rv$micro_expr_list)) list() else rv$micro_expr_list,
+          rna_counts_list = if (is.null(rv$rna_counts_list)) list() else rv$rna_counts_list,
+          micro_norm_method = micro_m,
+          rnaseq_norm_method = rna_m,
+          micro_cel_paths = rv$micro_cel_paths,
+          platform_per_gse = rv$platform_per_gse,
+          micro_eset_list = rv$micro_eset_list,
+          de_method = de_m,
+          apply_global_quantile = gq,
+          keep_platforms_separate = keep_sep
+        )
+        rv$common_genes <- norm_out$common_genes
+        rv$all_expr_norm_list <- norm_out$all_expr_norm_list
+        rv$expr_micro <- norm_out$expr_micro
+        rv$expr_rna <- norm_out$expr_rna
+        rv$combined_expr_before_global_norm <- norm_out$combined_expr_before_global
+        rv$combined_expr <- norm_out$combined_expr
+        rv$raw_counts_for_deseq2 <- norm_out$raw_counts_for_deseq2
+        rv$raw_counts_metadata <- norm_out$raw_counts_metadata
+        rv$unified_metadata <- norm_out$unified_metadata
+        rv$normalization_complete <- TRUE
+      }, error = function(e) {
+        showNotification(paste("Re-normalization after exclusion failed:", conditionMessage(e)),
+                         type = "warning", duration = 8)
+      })
+    }
 
     # Track excluded samples
     if (is.null(rv$qc_excluded_samples)) rv$qc_excluded_samples <- character(0)
@@ -930,7 +1192,7 @@ server_qc <- function(input, output, session, rv) {
                tags$strong(paste0(" ", length(samples_to_exclude), " sample(s) excluded: ")),
                tags$span(paste(samples_to_exclude, collapse = ", "), style = "font-size: 12px;"),
                tags$br(),
-               tags$span(paste0("Remaining: ", length(keep_cols), " samples. QC plots updated. You may re-run detection to verify."),
+               tags$span(paste0("Remaining: ", length(keep_cols), " samples. Data were re-normalized and common genes updated."),
                          style = "font-size: 12px; color: #27ae60;")),
       type = "message", duration = 8)
   })

@@ -57,6 +57,58 @@
 #'   app <- GExPipe::runGExPipe()      # Step 1: build the app object
 #'   shiny::runApp(app, port = 3838L)  # Step 2: start the server
 #' }
+.gexpipe_port_is_free <- function(port, host = "127.0.0.1") {
+  port <- as.integer(port)[[1L]]
+  if (is.na(port) || port <= 0L) {
+    return(TRUE)
+  }
+  check_host <- if (identical(host, "0.0.0.0")) "127.0.0.1" else host
+  con <- tryCatch(
+    suppressWarnings(
+      socketConnection(
+        host = check_host, port = port, server = FALSE,
+        blocking = FALSE, timeout = 0.4
+      )
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(con)) {
+    return(TRUE)
+  }
+  close(con)
+  FALSE
+}
+
+.gexpipe_prepare_shiny_port <- function(port, host = "127.0.0.1") {
+  port <- as.integer(port)[[1L]]
+  if (is.na(port)) {
+    port <- 3838L
+  }
+  if (interactive() && requireNamespace("httpuv", quietly = TRUE)) {
+    n_before <- tryCatch(length(httpuv::listServers()), error = function(e) 0L)
+    try(httpuv::stopAllServers(), silent = TRUE)
+    if (isTRUE(n_before > 0L)) {
+      message(
+        "GExPipe: stopped ", n_before,
+        " leftover Shiny server(s) so the port can be reused."
+      )
+    }
+  }
+  if (identical(port, 0L)) {
+    return(0L)
+  }
+  if (.gexpipe_port_is_free(port, host)) {
+    return(port)
+  }
+  for (p in seq.int(port + 1L, port + 20L)) {
+    if (.gexpipe_port_is_free(p, host)) {
+      message("GExPipe: port ", port, " is in use; using ", p, " instead.")
+      return(as.integer(p))
+    }
+  }
+  port
+}
+
 runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 3838), host = getOption("shiny.host", "127.0.0.1")) {
   # Make installed vs source mismatch obvious in the console.
   if (interactive()) {
@@ -66,26 +118,44 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   }
 
   # When running from the package source tree, load latest R/ code (not stale install).
+  # Skip when the installed package is newer — otherwise an old E:/GExPipe checkout
+  # overrides a fixed install (e.g. 0.99.53) and microarray download breaks again.
   if (interactive() && !isTRUE(getOption("gexpipe.no_auto_dev_load"))) {
     desc <- file.path(getwd(), "DESCRIPTION")
     if (file.exists(desc)) {
       hdr <- tryCatch(readLines(desc, n = 12L, warn = FALSE), error = function(e) character(0))
       if (any(grepl("^Package:\\s*GExPipe\\s*$", hdr))) {
-        if (requireNamespace("pkgload", quietly = TRUE)) {
-          message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
-          pkgload::load_all(getwd(), quiet = TRUE, export_all = FALSE)
-          options(gexpipe.run_source = "source-tree")
-        } else if (requireNamespace("devtools", quietly = TRUE)) {
-          message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
-          devtools::load_all(getwd(), quiet = TRUE)
-          options(gexpipe.run_source = "source-tree")
+        src_ver <- tryCatch({
+          as.character(utils::packageVersion("GExPipe", lib.loc = normalizePath(getwd(), winslash = "/")))
+        }, error = function(e) NA_character_)
+        inst_ver <- tryCatch(as.character(utils::packageVersion("GExPipe")), error = function(e) NA_character_)
+        use_src <- is.na(inst_ver) || is.na(src_ver) || utils::compareVersion(src_ver, inst_ver) >= 0
+        if (isTRUE(use_src)) {
+          if (requireNamespace("pkgload", quietly = TRUE)) {
+            message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
+            pkgload::load_all(getwd(), quiet = TRUE, export_all = FALSE)
+            options(gexpipe.run_source = "source-tree")
+          } else if (requireNamespace("devtools", quietly = TRUE)) {
+            message("GExPipe: loading latest source from ", normalizePath(getwd(), winslash = "/"))
+            devtools::load_all(getwd(), quiet = TRUE)
+            options(gexpipe.run_source = "source-tree")
+          }
+        } else {
+          message(
+            "GExPipe: installed package (", inst_ver,
+            ") is newer than source in ", normalizePath(getwd(), winslash = "/"),
+            " (", src_ver, "). Using installed package. ",
+            "To force source: options(gexpipe.no_auto_dev_load = FALSE) after git pull; ",
+            "to always use install: options(gexpipe.no_auto_dev_load = TRUE)."
+          )
+          options(gexpipe.run_source = "installed")
         }
       }
     }
   }
   # Bioconductor Shiny guidance: do not launch the app inside the package.
   # This function must return a Shiny app object.
-  port <- as.integer(port)
+  port <- .gexpipe_prepare_shiny_port(port, host)
   options(shiny.launch.browser = isTRUE(launch.browser))
   options(shiny.host = host)
   options(shiny.port = port)
@@ -93,6 +163,20 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   options(gexpipe.attach.shiny_stack_only_done = NULL)
   options(gexpipe.attach.allow_full_now = NULL)
   options(gexpipe.prelaunch_install_done = NULL)
+
+  # Fast GEO download defaults (override with options() before runGExPipe if needed)
+  if (is.null(getOption("gexpipe.fast_download"))) {
+    options(gexpipe.fast_download = TRUE)
+  }
+  if (is.null(getOption("gexpipe.clear_download_cache"))) {
+    options(gexpipe.clear_download_cache = FALSE)
+  }
+  if (is.null(getOption("gexpipe.download_cel"))) {
+    options(gexpipe.download_cel = FALSE)
+  }
+  if (getOption("timeout", 60L) < 600L) {
+    options(timeout = 600L)
+  }
 
   # -- Auto-install all missing dependencies BEFORE the app opens --------------
   # This runs only in interactive sessions (not during R CMD check or vignette

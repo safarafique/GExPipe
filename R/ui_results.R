@@ -6,14 +6,31 @@ ui_results <- tabItem(
     tabName = "results",
     h2(icon("dna"), " Step 6: Differential Gene Expression Analysis"),
 
-    fluidRow(
-      box(
-        title = tags$span(icon("info-circle"), " About this step"),
-        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$p(tags$strong("Purpose:"), " Identify genes that are differentially expressed between groups (e.g. disease vs control). The method you selected in Step 1 determines the statistical approach.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("limma:"), " Empirical Bayes moderated t-statistics - uses batch-corrected, normalized expression.", style = "margin-bottom: 4px;"),
-        tags$p(tags$strong("DESeq2:"), " Negative binomial GLM - uses raw integer counts with batch as covariate. DESeq2 applies its own internal normalization (median-of-ratios), so it bypasses the app's normalization for DE.", style = "margin-bottom: 8px;"),
-        tags$p(tags$strong("Parameters:"), " LogFC cutoff (fold-change threshold), adjusted p-value cutoff (Benjamini-Hochberg), and number of top genes for heatmap. Results include volcano plot, top-DEG table, and heatmap.", style = "margin-bottom: 0;")
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("info-circle"), " About this step"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$p(tags$strong("Purpose:"), " Identify genes that are differentially expressed between groups (e.g. disease vs control).", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("limma:"), " Empirical Bayes moderated t-statistics - uses batch-corrected, normalized expression.", style = "margin-bottom: 4px;"),
+          tags$p(tags$strong("DESeq2:"), " Negative binomial GLM - uses raw integer counts with batch as covariate. DESeq2 applies its own internal normalization (median-of-ratios), so it bypasses the app's normalization for DE.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Parameters:"), " LogFC cutoff (fold-change threshold), adjusted p-value cutoff (Benjamini-Hochberg), and number of top genes for heatmap. Results include volcano plot, top-DEG table, and heatmap.", style = "margin-bottom: 0;")
+        )
+      )
+    ),
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("info-circle"), " About this step"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$p(
+            tags$strong("Purpose:"),
+            " One Run DE starts both engines. Set LogFC, adj. P, and heatmap genes separately for RNA-seq (left) and microarray (right). Auto: microarray limma; RNA-seq DESeq2 (or your Step 1 choice). Manual lets you pick the RNA engine. Matrices stay separate. Step 7 is RNA-seq \u2229 microarray (same-direction DEGs).",
+            style = "margin-bottom: 0;"
+          )
+        )
       )
     ),
     # Show which method is active
@@ -26,29 +43,135 @@ box(
         width = 12, status = "primary", solidHeader = TRUE,
         tags$div(
           style = "padding: 14px 18px; margin-bottom: 16px; border-radius: 10px; background: linear-gradient(135deg, #e8f4f8 0%, #e8f0ff 100%); border-left: 4px solid #3498db;",
-          tags$p(tags$strong(icon("info-circle"), " Disease-specific DEGs:"), " Set ", tags$strong("LogFC cutoff"), " and ", tags$strong("Adj. P-value"), " below. Genes with |log2FC| above the cutoff and adj.P.Val below the cutoff are your disease-associated set. Examples: 0.05 + 0.5 (standard), 0.01 + 1.0 (stringent). Hover over the ", icon("question-circle"), " for more.", style = "margin: 0; color: #2c3e50;")
+          tags$p(tags$strong(icon("info-circle"), " Disease-specific DEGs:"), " Set ", tags$strong("LogFC cutoff"), " and ", tags$strong("Adj. P-value"), " below. In Parallel, RNA-seq and microarray each have their own thresholds. Genes with |log2FC| above the cutoff and adj.P.Val below the cutoff are that platform's disease-associated set.", style = "margin: 0; color: #2c3e50;")
         ),
-        column(3,
-          numericInput("logfc_cutoff", tags$span("LogFC cutoff:",
-            tags$i(class = "fa fa-question-circle param-help",
-                   `data-toggle` = "tooltip", `data-placement` = "top",
-                   title = "Log2 fold-change threshold. Genes with |log2FC| above this value are considered differentially expressed.<br><b>0.5</b> = mild (1.4-fold), <b>1.0</b> = strong (2-fold), <b>1.5</b> = very strong (2.8-fold).")),
-            0.5, step = 0.1)),
-        column(3,
-          numericInput("padj_cutoff", tags$span("Adj. P-value:",
-            tags$i(class = "fa fa-question-circle param-help",
-                   `data-toggle` = "tooltip", `data-placement` = "top",
-                   title = "Benjamini-Hochberg adjusted p-value cutoff for multiple testing correction.<br><b>0.05</b> = standard (5% FDR), <b>0.01</b> = stringent. Lower values = fewer but more confident DEGs.")),
-            0.05, step = 0.01)),
-        column(3,
-          numericInput("top_genes", tags$span("Heatmap Genes:",
-            tags$i(class = "fa fa-question-circle param-help",
-                   `data-toggle` = "tooltip", `data-placement` = "top",
-                   title = "Number of top differentially expressed genes to display in the heatmap, ranked by adjusted p-value.<br><b>50</b> is a good default; use 20-30 for cleaner plots, 100+ for comprehensive views.")),
-            50, step = 10)),
-        column(3, br(), actionButton("run_de", "Run DE Analysis",
-                                     icon = icon("rocket"), class = "btn-success btn-lg",
-                                     style = "width:100%;"))
+        conditionalPanel(
+          condition = "input.analysis_type == 'parallel'",
+          tags$div(
+            style = "margin: 0 0 16px 0; padding: 12px 14px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;",
+            tags$label(
+              tags$strong(icon("magic"), " Parallel DE methods:"),
+              style = "font-size: 15px; color: #2c3e50; margin-bottom: 8px; display: block;"
+            ),
+            radioButtons(
+              "de_mode_parallel",
+              label = NULL,
+              choices = c(
+                "Auto (recommended) - microarray limma + RNA-seq best method" = "auto",
+                "Manual - choose the RNA-seq engine" = "manual"
+              ),
+              selected = "auto",
+              inline = TRUE
+            ),
+            uiOutput("de_parallel_guide_ui"),
+            conditionalPanel(
+              condition = "input.de_mode_parallel == 'manual'",
+              gexp_ui_parallel_two_col(
+                tags$div(
+                  tags$label("RNA-seq:", style = "font-weight: bold;"),
+                  radioButtons(
+                    "de_method_rna_step6",
+                    label = NULL,
+                    choices = list(
+                      "DESeq2 (recommended for counts)" = "deseq2",
+                      "edgeR" = "edger",
+                      "limma-voom" = "limma_voom",
+                      "limma on TMM log-CPM" = "limma"
+                    ),
+                    selected = "deseq2",
+                    width = "100%"
+                  )
+                ),
+                tags$div(
+                  tags$label("Microarray:", style = "font-weight: bold;"),
+                  tags$p(
+                    style = "margin: 6px 0 0 0; font-size: 13px; color: #334155;",
+                    tags$strong("limma"),
+                    " (fixed). DESeq2 / edgeR / voom are not valid on array intensities."
+                  )
+                )
+              )
+            )
+          )
+        ),
+        conditionalPanel(
+          condition = "input.analysis_type != 'parallel'",
+          fluidRow(
+            column(3, numericInput("logfc_cutoff", tags$span("LogFC cutoff:",
+              tags$i(class = "fa fa-question-circle param-help",
+                     `data-toggle` = "tooltip", `data-placement` = "top",
+                     title = "Log2 fold-change threshold. Genes with |log2FC| above this value are considered differentially expressed.<br><b>0.5</b> = mild (1.4-fold), <b>1.0</b> = strong (2-fold), <b>1.5</b> = very strong (2.8-fold).")),
+              0.5, step = 0.1)),
+            column(3, numericInput("padj_cutoff", tags$span("Adj. P-value:",
+              tags$i(class = "fa fa-question-circle param-help",
+                     `data-toggle` = "tooltip", `data-placement` = "top",
+                     title = "Benjamini-Hochberg adjusted p-value cutoff for multiple testing correction.<br><b>0.05</b> = standard (5% FDR), <b>0.01</b> = stringent. Lower values = fewer but more confident DEGs.")),
+              0.05, step = 0.01)),
+            column(3, numericInput("top_genes", tags$span("Heatmap Genes:",
+              tags$i(class = "fa fa-question-circle param-help",
+                     `data-toggle` = "tooltip", `data-placement` = "top",
+                     title = "Number of top differentially expressed genes to display in the heatmap, ranked by adjusted p-value.<br><b>50</b> is a good default; use 20-30 for cleaner plots, 100+ for comprehensive views.")),
+              50, step = 10)),
+            column(3, br(), actionButton("run_de", "Run DE Analysis",
+                                         icon = icon("rocket"), class = "btn-success btn-lg",
+                                         style = "width:100%;"))
+          )
+        ),
+        conditionalPanel(
+          condition = "input.analysis_type == 'parallel'",
+          gexp_ui_parallel_two_col(
+            tags$div(
+              style = "padding: 8px 10px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;",
+              tags$p(tags$strong(icon("dna"), " RNA-seq thresholds"), style = "margin: 0 0 8px 0; color: #1e3a8a;"),
+              gexp_ui_de_threshold_inputs("logfc_cutoff_rna", "padj_cutoff_rna", "top_genes_rna")
+            ),
+            tags$div(
+              style = "padding: 8px 10px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px;",
+              tags$p(tags$strong(icon("th"), " Microarray thresholds"), style = "margin: 0 0 8px 0; color: #9a3412;"),
+              gexp_ui_de_threshold_inputs("logfc_cutoff_micro", "padj_cutoff_micro", "top_genes_micro")
+            )
+          ),
+          tags$div(
+            style = "margin-top: 14px; text-align: center;",
+            actionButton("run_de_parallel", "Run DE Analysis",
+                         icon = icon("rocket"), class = "btn-success btn-lg",
+                         style = "min-width: 280px; font-size: 16px; padding: 12px 28px;")
+          )
+        )
+      )
+    ),
+    gexp_ui_parallel_run_logs("de_log_micro", "de_log_rna"),
+    shiny::conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      gexp_ui_next_tab_button("next_page_results_parallel", "Next: RNA-seq \u2229 microarray")
+    ),
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      gexp_ui_parallel_two_col(
+        tagList(
+          box(
+            title = tags$span(icon("mountain"), " RNA-seq volcano"),
+            width = 12, status = "info", solidHeader = TRUE,
+            plotOutput("volcano_plot_rna", height = "480px")
+          ),
+          box(
+            title = tags$span(icon("list-ol"), " RNA-seq top DEGs"),
+            width = 12, status = "info", solidHeader = TRUE,
+            DTOutput("top_degs_table_rna")
+          )
+        ),
+        tagList(
+          box(
+            title = tags$span(icon("mountain"), " Microarray volcano"),
+            width = 12, status = "warning", solidHeader = TRUE,
+            plotOutput("volcano_plot_micro", height = "480px")
+          ),
+          box(
+            title = tags$span(icon("list-ol"), " Microarray top DEGs"),
+            width = 12, status = "warning", solidHeader = TRUE,
+            DTOutput("top_degs_table_micro")
+          )
+        )
       )
     ),
     
@@ -81,26 +204,29 @@ box(
         )
       )
     ),
-    fluidRow(
-      box(title = tags$span(icon("mountain"), " Volcano Plot"),
-          width = 8, status = "danger", solidHeader = TRUE,
-          plotOutput("volcano_plot", height = "550px"),
-          tags$div(style = "margin-top: 10px;",
-            downloadButton("download_volcano_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_volcano_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_volcano_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))),
-      box(title = tags$span(icon("list-ol"), " Top DEGs"),
-          width = 4, status = "info", solidHeader = TRUE,
-          DTOutput("top_degs_table"))
-    ),
-    fluidRow(
-      box(title = tags$span(icon("th"), " Heatmap - Top DE Genes"),
-          width = 12, status = "success", solidHeader = TRUE,
-          plotOutput("heatmap_plot", height = "600px"),
-          tags$div(style = "margin-top: 10px;",
-            downloadButton("download_heatmap_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_heatmap_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")))
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(title = tags$span(icon("mountain"), " Volcano Plot"),
+            width = 8, status = "danger", solidHeader = TRUE,
+            plotOutput("volcano_plot", height = "550px"),
+            tags$div(style = "margin-top: 10px;",
+              downloadButton("download_volcano_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_volcano_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_volcano_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))),
+        box(title = tags$span(icon("list-ol"), " Top DEGs"),
+            width = 4, status = "info", solidHeader = TRUE,
+            DTOutput("top_degs_table"))
+      ),
+      fluidRow(
+        box(title = tags$span(icon("th"), " Heatmap - Top DE Genes"),
+            width = 12, status = "success", solidHeader = TRUE,
+            plotOutput("heatmap_plot", height = "600px"),
+            tags$div(style = "margin-top: 10px;",
+              downloadButton("download_heatmap_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_heatmap_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")))
+      )
     ),
     
     fluidRow(
@@ -121,35 +247,37 @@ box(
       )
     ),
     
-    fluidRow(
-      box(
-        width = 12, status = "info", solidHeader = FALSE,
-        tags$div(
-          style = "text-align: center; padding: 20px; background: linear-gradient(135deg, #e8f4f8 0%, #f0f4ff 100%); border-radius: 10px; border: 2px solid #3498db;",
-          tags$p(
-            tags$strong(icon("table"), " View Complete Results Table"),
-            style = "margin: 0 0 10px 0; color: #2c3e50; font-size: 18px;"
-          ),
-          tags$p(
-            "Click the button below to view all differential expression results in a searchable, sortable table",
-            style = "margin: 0 0 20px 0; color: #6c757d; font-size: 14px;"
-          ),
-          actionButton("toggle_all_results",
-                       tagList(icon("table"), " Show All Results Table"),
-                       class = "btn-info btn-lg",
-                       style = "font-size: 16px; padding: 12px 30px; border-radius: 25px; font-weight: bold;")
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(
+          width = 12, status = "info", solidHeader = FALSE,
+          tags$div(
+            style = "text-align: center; padding: 20px; background: linear-gradient(135deg, #e8f4f8 0%, #f0f4ff 100%); border-radius: 10px; border: 2px solid #3498db;",
+            tags$p(
+              tags$strong(icon("table"), " View Complete Results Table"),
+              style = "margin: 0 0 10px 0; color: #2c3e50; font-size: 18px;"
+            ),
+            tags$p(
+              "Click the button below to view all differential expression results in a searchable, sortable table",
+              style = "margin: 0 0 20px 0; color: #6c757d; font-size: 14px;"
+            ),
+            actionButton("toggle_all_results",
+                         tagList(icon("table"), " Show All Results Table"),
+                         class = "btn-info btn-lg",
+                         style = "font-size: 16px; padding: 12px 30px; border-radius: 25px; font-weight: bold;")
+          )
         )
-      )
-    ),
-    
-    fluidRow(
-      box(
-        title = tags$span(icon("table"), " All Results"), 
-        width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        id = "all_results_box",
-        tags$div(
-          id = "all_results_table_container",
-          DTOutput("all_de_table")
+      ),
+      fluidRow(
+        box(
+          title = tags$span(icon("table"), " All Results"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          id = "all_results_box",
+          tags$div(
+            id = "all_results_table_container",
+            DTOutput("all_de_table")
+          )
         )
       )
     ),
@@ -175,16 +303,12 @@ box(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("results_process_summary_ui"))
     ),
-    fluidRow(
-      box(
-        width = 12, status = "primary", solidHeader = FALSE,
-        tags$div(
-          style = "text-align: center; padding: 20px;",
-          actionButton("next_page_results",
-                      tagList(icon("arrow-right"), " Next: WGCNA Analysis"),
-                      class = "btn-primary btn-lg",
-                      style = "font-size: 16px; padding: 12px 30px; border-radius: 25px; font-weight: bold;")
-        )
-      )
+    shiny::conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      gexp_ui_next_tab_button("next_page_results_parallel_end", "Next: RNA-seq \u2229 microarray")
     ),
+    shiny::conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      gexp_ui_next_tab_button("next_page_results", "Next: WGCNA Analysis")
+    )
   )

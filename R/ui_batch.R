@@ -9,6 +9,26 @@ ui_batch <- tabItem(
     # When only one dataset is selected, batch correction is skipped automatically.
     uiOutput("batch_merged_platform_ui"),
     uiOutput("batch_single_dataset_ui"),
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("info-circle"), " About this step"),
+          width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$p(
+            tags$strong("Purpose:"),
+            " Batch-correct RNA-seq (left) and microarray (right) on their own matrices. No joint ComBat and no gene intersection.",
+            style = "margin-bottom: 8px;"
+          ),
+          tags$p(
+            tags$strong("Methods:"),
+            " Auto picks the usual method per platform (microarray: ComBat-ref; RNA-seq: limma if DESeq2/edgeR/voom, ComBat-ref if limma). One Apply runs both. A platform with one GSE is filtered only.",
+            style = "margin-bottom: 0;"
+          )
+        )
+      )
+    ),
+    gexp_ui_parallel_run_logs("batch_log_micro", "batch_log_rna"),
 
     fluidRow(
       box(
@@ -22,16 +42,38 @@ ui_batch <- tabItem(
       )
     ),
     
-    fluidRow(
-      box(title = tags$span(icon("chart-bar"), " Gene Variance Distribution"), 
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      gexp_ui_parallel_two_col(
+        box(
+          title = tags$span(icon("chart-bar"), " RNA-seq gene variance"),
+          width = 12, status = "warning", solidHeader = TRUE,
+          plotOutput("gene_variance_plot_rna", height = "300px")
+        ),
+        box(
+          title = tags$span(icon("chart-bar"), " Microarray gene variance"),
+          width = 12, status = "warning", solidHeader = TRUE,
+          plotOutput("gene_variance_plot_micro", height = "300px")
+        )
+      )
+    ),
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("chart-bar"), " Gene Variance Distribution"),
           width = 12, status = "warning", solidHeader = TRUE,
           plotOutput("gene_variance_plot", height = "300px"),
-          tags$div(style = "margin-top: 6px;",
+          tags$div(
+            style = "margin-top: 6px;",
             downloadButton("download_gene_variance_png", tagList(icon("download"), " PNG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
             downloadButton("download_gene_variance_jpg", tagList(icon("download"), " JPG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
-            downloadButton("download_gene_variance_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm"))
+            downloadButton("download_gene_variance_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm")
+          )
+        )
+      )
     ),
-    
+
     fluidRow(
       box(
         title = tags$span(icon("filter"), " Gene Filtering - Remove Low Variance Genes"), 
@@ -90,6 +132,9 @@ ui_batch <- tabItem(
             column(6,
                    tags$div(
                      style = "padding-left: 15px;",
+                     conditionalPanel(
+                       condition = "input.analysis_type != 'parallel'",
+                       tagList(
                      tags$label(
                        tags$strong(icon("magic"), " Batch Correction Method:"),
                        tags$i(class = "fa fa-question-circle param-help",
@@ -112,7 +157,66 @@ ui_batch <- tabItem(
                                     selected = "combat_ref",
                                     width = "100%")
                      ),
-                     uiOutput("batch_method_guidance_ui"),
+                     uiOutput("batch_method_guidance_ui")
+                       )
+                     ),
+                     conditionalPanel(
+                       condition = "input.analysis_type == 'parallel'",
+                       tagList(
+                         tags$label(
+                           tags$strong(icon("magic"), " Parallel batch methods:"),
+                           style = "font-size: 16px; color: #2c3e50; margin-bottom: 8px; display: block;"
+                         ),
+                         radioButtons(
+                           "batch_mode_parallel",
+                           label = NULL,
+                           choices = c(
+                             "Auto (recommended) - platform-specific methods" = "auto",
+                             "Manual - choose each platform" = "manual"
+                           ),
+                           selected = "auto",
+                           inline = TRUE
+                         ),
+                         uiOutput("batch_parallel_guide_ui"),
+                         conditionalPanel(
+                           condition = "input.batch_mode_parallel == 'manual'",
+                           gexp_ui_parallel_two_col(
+                             tags$div(
+                               tags$label("RNA-seq:", style = "font-weight: bold;"),
+                               radioButtons(
+                                 "batch_method_rna",
+                                 label = NULL,
+                                 choices = list(
+                                   "limma removeBatchEffect (count DE)" = "limma",
+                                   "ComBat-ref (limma DE / multi-GSE log)" = "combat_ref",
+                                   "SVA" = "sva",
+                                   "ComBat" = "combat"
+                                 ),
+                                 selected = "limma",
+                                 width = "100%"
+                               )
+                             ),
+                             tags$div(
+                               tags$label("Microarray:", style = "font-weight: bold;"),
+                               radioButtons(
+                                 "batch_method_micro",
+                                 label = NULL,
+                                 choices = list(
+                                   "ComBat-ref (recommended)" = "combat_ref",
+                                   "limma removeBatchEffect" = "limma",
+                                   "Quantile + limma" = "quantile_limma",
+                                   "Hybrid (quantile + ComBat)" = "hybrid",
+                                   "ComBat" = "combat",
+                                   "SVA" = "sva"
+                                 ),
+                                 selected = "combat_ref",
+                                 width = "100%"
+                               )
+                             )
+                           )
+                         )
+                       )
+                     ),
                      tags$div(
                        class = "alert alert-warning",
                        style = "margin: 10px 0 0 0; font-size: 12px; line-height: 1.55;",
@@ -141,6 +245,8 @@ ui_batch <- tabItem(
                    )
             )
           ),
+          conditionalPanel(
+            condition = "input.analysis_type != 'parallel'",
           tags$div(
             style = "margin-top: 20px; padding: 15px; background: #f8f9fa; border-left: 4px solid #3498db; border-radius: 5px;",
             tags$p(
@@ -209,13 +315,40 @@ ui_batch <- tabItem(
               tags$li(tags$strong("Hybrid:"), " Quantile normalization followed by ComBat.")
             )
           )
+          )
         )
       )
     ),
+
+    gexp_ui_next_tab_button("next_page_batch", "Next: Differential Expression"),
     
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      gexp_ui_parallel_two_col(
+        tagList(
+          box(
+            title = tags$span(icon("chart-line"), " RNA-seq PCA (before / after)"),
+            width = 12, status = "info", solidHeader = TRUE,
+            plotOutput("pca_before_dataset_rna", height = "280px"),
+            plotOutput("pca_after_dataset_rna", height = "280px")
+          )
+        ),
+        tagList(
+          box(
+            title = tags$span(icon("chart-line"), " Microarray PCA (before / after)"),
+            width = 12, status = "warning", solidHeader = TRUE,
+            plotOutput("pca_before_dataset_micro", height = "280px"),
+            plotOutput("pca_after_dataset_micro", height = "280px")
+          )
+        )
+      )
+    ),
+
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
     fluidRow(
       box(
-        title = tags$span(icon("chart-line"), " PCA Visualization - Batch Effect Assessment"), 
+        title = tags$span(icon("chart-line"), " PCA Visualization - Batch Effect Assessment"),
         width = 12, status = "primary", solidHeader = TRUE,
         tags$div(
           style = "padding: 10px 0; margin-bottom: 15px;",
@@ -330,6 +463,7 @@ ui_batch <- tabItem(
           )
         )
       )
+    )
     ),
     
     fluidRow(
@@ -381,11 +515,5 @@ ui_batch <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("batch_process_summary_ui"))
     ),
-    fluidRow(
-      box(width = 12, status = "info", solidHeader = FALSE,
-          tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
-                   actionButton("next_page_batch", "Next: Differential Expression",
-                                icon = icon("arrow-right"), class = "btn-success btn-lg",
-                                style = "font-size: 18px; padding: 12px 30px; border-radius: 25px;"))))
-    ),
+    gexp_ui_next_tab_button("next_page_batch_end", "Next: Differential Expression")
   )

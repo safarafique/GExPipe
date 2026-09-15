@@ -39,7 +39,7 @@ server_results_summary <- function(input, output, session, rv) {
     thresh <- if (!is.null(rv$nomogram_optimal_threshold)) round(rv$nomogram_optimal_threshold, 3) else NA
 
     s1 <- sprintf("This analysis pipeline processed %s genes across %s samples. ", format(n_genes_expr, big.mark = ","), format(n_samp, big.mark = ","))
-    s2 <- if (norm_ok) "Normalization (Step 3) was applied; " else "Normalization was not run. "
+    s2 <- if (norm_ok) "Normalization (Step 2) was applied; " else "Normalization was not run. "
     s3 <- if (batch_ok) "batch correction (Step 5) was performed to reduce technical variation, as shown in the before/after PCA. " else "Batch correction was not run. "
     s4 <- sprintf("Differential expression (limma) identified %s significant genes (%s up-regulated, %s down-regulated), summarized in the volcano plot and top-gene heatmap. ", format(n_sig, big.mark = ","), format(n_up, big.mark = ","), format(n_down, big.mark = ","))
     s5 <- sprintf("WGCNA yielded %s significant modules; the soft-threshold plot, sample clustering tree, gene dendrogram, and module-trait heatmap are shown. ", format(n_mods, big.mark = ","))
@@ -169,8 +169,8 @@ server_results_summary <- function(input, output, session, rv) {
   output$results_summary_norm_batch <- renderUI({
     norm_ok <- isTRUE(rv$normalization_complete)
     tags$div(
-      tags$p(tags$strong("Normalization:"), if (norm_ok) "Applied (Step 3)" else "Not run"),
-      if (!norm_ok) tags$p(style = "color: #7f8c8d;", "Complete Step 3 to see normalization here.")
+      tags$p(tags$strong("Normalization:"), if (norm_ok) "Applied (Step 2)" else "Not run"),
+      if (!norm_ok) tags$p(style = "color: #7f8c8d;", "Complete Step 2 to see normalization here.")
     )
   })
 
