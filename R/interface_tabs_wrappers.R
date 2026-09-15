@@ -96,6 +96,10 @@ gexp_ui_parallel_two_col <- function(rna_ui, micro_ui) {
 }
 
 #' Two side-by-side run logs shown only in Parallel DE (RNA-seq left)
+#'
+#' Collapsed by default (click the header's "+" to expand, "-" to collapse
+#' again) so the raw log text doesn't take up space above the step's actual
+#' results; callers place this at the end of the tab, after those results.
 #' @noRd
 gexp_ui_parallel_run_logs <- function(micro_id, rna_id) {
   shiny::conditionalPanel(
@@ -104,11 +108,13 @@ gexp_ui_parallel_run_logs <- function(micro_id, rna_id) {
       shinydashboard::box(
         title = shiny::tags$span(shiny::icon("dna"), " RNA-seq run log"),
         width = 12, status = "info", solidHeader = TRUE,
+        collapsible = TRUE, collapsed = TRUE,
         shiny::verbatimTextOutput(rna_id)
       ),
       shinydashboard::box(
         title = shiny::tags$span(shiny::icon("th"), " Microarray run log"),
         width = 12, status = "warning", solidHeader = TRUE,
+        collapsible = TRUE, collapsed = TRUE,
         shiny::verbatimTextOutput(micro_id)
       )
     )

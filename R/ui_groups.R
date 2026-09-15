@@ -115,10 +115,8 @@ ui_groups <- tabItem(
         )
       )
     ),
-    gexp_ui_parallel_run_logs("groups_log_micro", "groups_log_rna"),
-    
     fluidRow(
-      box(title = tags$span(icon("chart-pie"), " Group Summary"), 
+      box(title = tags$span(icon("chart-pie"), " Group Summary"),
           width = 12, status = "info", solidHeader = TRUE,
           uiOutput("group_summary_ui"))
     ),
@@ -128,6 +126,7 @@ ui_groups <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("groups_process_summary_ui"))
     ),
+    gexp_ui_parallel_run_logs("groups_log_micro", "groups_log_rna"),
     fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,
           tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",

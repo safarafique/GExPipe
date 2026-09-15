@@ -140,7 +140,6 @@ box(
         )
       )
     ),
-    gexp_ui_parallel_run_logs("de_log_micro", "de_log_rna"),
     shiny::conditionalPanel(
       condition = "input.analysis_type == 'parallel'",
       gexp_ui_next_tab_button("next_page_results_parallel", "Next: RNA-seq \u2229 microarray")
@@ -303,6 +302,7 @@ box(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("results_process_summary_ui"))
     ),
+    gexp_ui_parallel_run_logs("de_log_micro", "de_log_rna"),
     shiny::conditionalPanel(
       condition = "input.analysis_type == 'parallel'",
       gexp_ui_next_tab_button("next_page_results_parallel_end", "Next: RNA-seq \u2229 microarray")
