@@ -1,5 +1,5 @@
 # ==============================================================================
-# SERVER_NORMALIZE.R - Step 3: Normalization Module
+# SERVER_NORMALIZE.R - Step 2: Normalization Module
 # ==============================================================================
 
 server_normalize <- function(input, output, session, rv) {
@@ -17,6 +17,21 @@ server_normalize <- function(input, output, session, rv) {
     list(mixed = mixed, gq_on = gq_on, mixed_no_gq = mixed && !gq_on, mixed_gq = mixed && gq_on)
   }
 
+  output$normalization_log_micro <- renderText({
+    if (!is.null(rv$normalization_log_micro) && nzchar(rv$normalization_log_micro)) {
+      rv$normalization_log_micro
+    } else {
+      "Apply Normalization to see the microarray run log."
+    }
+  })
+  output$normalization_log_rna <- renderText({
+    if (!is.null(rv$normalization_log_rna) && nzchar(rv$normalization_log_rna)) {
+      rv$normalization_log_rna
+    } else {
+      "Apply Normalization to see the RNA-seq run log."
+    }
+  })
+
   # Store last ggplot for each normalization plot (for download)
   norm_plots <- reactiveValues(
     plot = NULL, density = NULL, qq = NULL, median_range = NULL,
@@ -24,22 +39,58 @@ server_normalize <- function(input, output, session, rv) {
     corr_before = NULL, corr_after = NULL
   )
 
-  # Auto vs manual normalization mode:
-  # - auto: force recommended defaults and disable method selectors
-  # - manual: allow user to choose alternatives
+  .norm_active_de_method <- function() {
+    if (identical(input$analysis_type, "parallel")) {
+      if (!is.null(input$de_method_rna) && nzchar(input$de_method_rna)) {
+        input$de_method_rna
+      } else {
+        "deseq2"
+      }
+    } else if (!is.null(input$de_method) && nzchar(input$de_method)) {
+      input$de_method
+    } else {
+      "limma"
+    }
+  }
+
+  output$norm_auto_guide_ui <- renderUI({
+    gexpipe_ui_norm_auto_guide(input$analysis_type, .norm_active_de_method())
+  })
+  output$norm_manual_guide_ui <- renderUI({
+    gexpipe_ui_norm_manual_guide(input$analysis_type, .norm_active_de_method())
+  })
+  output$norm_auto_guide_parallel_ui <- renderUI({
+    gexpipe_ui_norm_auto_guide("parallel", .norm_active_de_method())
+  })
+  output$norm_manual_guide_parallel_ui <- renderUI({
+    gexpipe_ui_norm_manual_guide("parallel", .norm_active_de_method())
+  })
+
+  # Auto vs manual: Auto forces pipeline defaults on Apply; radios exist only in Manual.
   observe({
     mode <- if (is.null(input$normalize_mode) || !nzchar(input$normalize_mode)) "auto" else input$normalize_mode
     if (!requireNamespace("shinyjs", quietly = TRUE)) return()
     if (identical(mode, "auto")) {
       tryCatch(updateRadioButtons(session, "micro_norm_method", selected = "quantile"), error = function(e) NULL)
       tryCatch(updateRadioButtons(session, "rnaseq_norm_method", selected = "TMM"), error = function(e) NULL)
-      tryCatch(shinyjs::disable("micro_norm_method"), error = function(e) NULL)
-      tryCatch(shinyjs::disable("rnaseq_norm_method"), error = function(e) NULL)
-      tryCatch(shinyjs::show("norm_auto_note"), error = function(e) NULL)
+    }
+  })
+
+  observe({
+    mode <- if (is.null(input$normalize_mode_parallel) || !nzchar(input$normalize_mode_parallel)) {
+      "auto"
     } else {
-      tryCatch(shinyjs::enable("micro_norm_method"), error = function(e) NULL)
-      tryCatch(shinyjs::enable("rnaseq_norm_method"), error = function(e) NULL)
-      tryCatch(shinyjs::hide("norm_auto_note"), error = function(e) NULL)
+      input$normalize_mode_parallel
+    }
+    if (!requireNamespace("shinyjs", quietly = TRUE)) return()
+    if (identical(mode, "auto")) {
+      tryCatch(updateRadioButtons(session, "micro_norm_method_parallel", selected = "quantile"), error = function(e) NULL)
+      tryCatch(updateRadioButtons(session, "rnaseq_norm_method_parallel", selected = "TMM"), error = function(e) NULL)
+      tryCatch(shinyjs::disable("micro_norm_method_parallel"), error = function(e) NULL)
+      tryCatch(shinyjs::disable("rnaseq_norm_method_parallel"), error = function(e) NULL)
+    } else {
+      tryCatch(shinyjs::enable("micro_norm_method_parallel"), error = function(e) NULL)
+      tryCatch(shinyjs::enable("rnaseq_norm_method_parallel"), error = function(e) NULL)
     }
   })
 
@@ -52,7 +103,8 @@ server_normalize <- function(input, output, session, rv) {
 
   # Single source of truth: R/gexp_normalize_pipeline.R
   .apply_norm_pipeline_to_rv <- function(rv, micro_norm_method, rnaseq_norm_method, de_method,
-                                       apply_global_quantile = TRUE) {
+                                       apply_global_quantile = TRUE,
+                                       keep_platforms_separate = FALSE) {
     micro_list <- if (is.null(rv$micro_expr_list)) list() else rv$micro_expr_list
     rna_list <- if (is.null(rv$rna_counts_list)) list() else rv$rna_counts_list
     if (length(micro_list) == 0L && length(rna_list) == 0L) {
@@ -69,11 +121,14 @@ server_normalize <- function(input, output, session, rv) {
       platform_per_gse = rv$platform_per_gse,
       micro_eset_list = rv$micro_eset_list,
       de_method = de_method,
-      apply_global_quantile = isTRUE(apply_global_quantile)
+      apply_global_quantile = isTRUE(apply_global_quantile),
+      keep_platforms_separate = isTRUE(keep_platforms_separate)
     )
 
     rv$common_genes <- norm_out$common_genes
     rv$all_expr_norm_list <- norm_out$all_expr_norm_list
+    rv$expr_micro <- norm_out$expr_micro
+    rv$expr_rna <- norm_out$expr_rna
     rv$combined_expr_before_global_norm <- norm_out$combined_expr_before_global
     rv$combined_expr <- norm_out$combined_expr
     rv$raw_counts_for_deseq2 <- norm_out$raw_counts_for_deseq2
@@ -93,57 +148,115 @@ server_normalize <- function(input, output, session, rv) {
     rnaseq_removed <- stats$rnaseq_removed
     final_count <- stats$final_count
 
-    rv$normalization_caption <- paste0(
-      "Gene Expression Normalization Pipeline: Starting with ",
-      format(initial_total, big.mark = ","), " total genes across ",
-      length(norm_out$all_expr_norm_list), " dataset(s)",
-      if (rnaseq_removed > 0) {
-        paste0(", ", format(rnaseq_removed, big.mark = ","),
-               " genes were removed due to low-expression filtering (RNA-seq)")
-      },
-      ", resulting in ", format(after_filter_total, big.mark = ","),
-      " genes after individual dataset normalization. ",
-      "After automatic filtering to common genes (intersection), ",
-      format(final_count, big.mark = ","),
-      " high-confidence genes present in all datasets were retained for downstream analysis."
-    )
-
-    log_text <- paste0(
-      norm_out$log_text,
-      "\n\u2713 Normalization Complete!\n",
-      "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-      "Gene Statistics Summary:\n",
-      "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n"
-    )
-    if (rnaseq_removed > 0) {
-      log_text <- paste0(
-        log_text,
-        "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
-        "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n"
+    rv$normalization_caption <- if (isTRUE(keep_platforms_separate)) {
+      paste0(
+        "Parallel normalization: each platform kept its own gene set. ",
+        "Microarray: ", format(if (is.null(rv$expr_micro)) 0L else nrow(rv$expr_micro), big.mark = ","),
+        " genes. RNA-seq: ",
+        format(if (is.null(rv$expr_rna)) 0L else nrow(rv$expr_rna), big.mark = ","),
+        " genes. Symbol overlap (", format(final_count, big.mark = ","),
+        ") is information only — batch and DE do not mix the matrices."
+      )
+    } else {
+      paste0(
+        "Gene Expression Normalization Pipeline: Starting with ",
+        format(initial_total, big.mark = ","), " total genes across ",
+        length(norm_out$all_expr_norm_list), " dataset(s)",
+        if (rnaseq_removed > 0) {
+          paste0(", ", format(rnaseq_removed, big.mark = ","),
+                 " genes were removed due to low-expression filtering (RNA-seq)")
+        },
+        ", resulting in ", format(after_filter_total, big.mark = ","),
+        " genes after individual dataset normalization. ",
+        "After automatic filtering to common genes (intersection), ",
+        format(final_count, big.mark = ","),
+        " high-confidence genes present in all datasets were retained for downstream analysis."
       )
     }
-    log_text <- paste0(
-      log_text,
-      "  Gene Filtering:           Filtered to common genes (intersection)\n",
-      "  Common genes retained: ", format(final_count, big.mark = ","), "\n",
-      "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-      "Final Dataset:\n",
-      "  Genes:   ", format(nrow(rv$combined_expr), big.mark = ","), "\n",
-      "  Samples: ", format(ncol(rv$combined_expr), big.mark = ","), "\n",
-      "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-      "\nNote: DE analysis applies independent gene filtering (filterByExpr) at Step 6.\n",
-      "      Batch correction may apply an optional variance filter in Step 5.\n"
+
+    if (isTRUE(keep_platforms_separate)) {
+      log_text <- norm_out$log_text
+    } else {
+      log_text <- paste0(
+        norm_out$log_text,
+        "\n\u2713 Normalization Complete!\n",
+        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+        "Gene Statistics Summary:\n",
+        "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n"
+      )
+      if (rnaseq_removed > 0) {
+        log_text <- paste0(
+          log_text,
+          "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
+          "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n"
+        )
+      }
+      log_text <- paste0(
+        log_text,
+        "  Gene Filtering:           Filtered to common genes (intersection)\n",
+        "  Common genes retained: ", format(final_count, big.mark = ","), "\n",
+        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+        "Final Dataset:\n",
+        "  Genes:   ", format(nrow(rv$combined_expr), big.mark = ","), "\n",
+        "  Samples: ", format(ncol(rv$combined_expr), big.mark = ","), "\n",
+        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
+        "\nNote: DE analysis applies independent gene filtering (filterByExpr) at Step 6.\n",
+        "      Batch correction may apply an optional variance filter in Step 5.\n"
+      )
+    }
+
+    .norm_method_label <- function(mat) {
+      info <- attr(mat, "normalization_info")
+      if (!is.null(info) && !is.null(info$method) && nzchar(as.character(info$method)[[1L]])) {
+        as.character(info$method)[[1L]]
+      } else {
+        "auto"
+      }
+    }
+    micro_method_lab <- if (!is.null(rv$expr_micro)) {
+      paste(unique(vapply(norm_out$all_expr_norm_list[intersect(names(micro_list), names(norm_out$all_expr_norm_list))],
+                          .norm_method_label, character(1))), collapse = ", ")
+    } else {
+      ""
+    }
+    rna_method_lab <- if (!is.null(rv$expr_rna)) {
+      paste(unique(vapply(norm_out$all_expr_norm_list[intersect(names(rna_list), names(norm_out$all_expr_norm_list))],
+                          .norm_method_label, character(1))), collapse = ", ")
+    } else {
+      ""
+    }
+    rv$last_norm_platform_summary <- list(
+      keep_separate = isTRUE(keep_platforms_separate),
+      micro_genes = if (is.null(rv$expr_micro)) 0L else nrow(rv$expr_micro),
+      micro_samples = if (is.null(rv$expr_micro)) 0L else ncol(rv$expr_micro),
+      micro_method = micro_method_lab,
+      rna_genes = if (is.null(rv$expr_rna)) 0L else nrow(rv$expr_rna),
+      rna_samples = if (is.null(rv$expr_rna)) 0L else ncol(rv$expr_rna),
+      rna_method = rna_method_lab,
+      display_genes = nrow(rv$combined_expr),
+      display_samples = ncol(rv$combined_expr)
     )
+    rv$normalization_log_micro <- norm_out$log_text_micro
+    rv$normalization_log_rna <- norm_out$log_text_rna
 
     list(
       log_text = log_text,
+      log_text_micro = norm_out$log_text_micro,
+      log_text_rna = norm_out$log_text_rna,
       total_genes = nrow(rv$combined_expr),
-      total_samples = ncol(rv$combined_expr)
+      total_samples = ncol(rv$combined_expr),
+      keep_separate = isTRUE(keep_platforms_separate),
+      platform_summary = rv$last_norm_platform_summary
     )
   }
   
   observeEvent(input$analysis_type, {
     if (identical(input$analysis_type, "merged")) {
+      tryCatch(
+        updateCheckboxInput(session, "apply_global_quantile", value = TRUE),
+        error = function(e) NULL
+      )
+    } else if (identical(input$analysis_type, "parallel")) {
       tryCatch(
         updateCheckboxInput(session, "apply_global_quantile", value = FALSE),
         error = function(e) NULL
@@ -151,7 +264,12 @@ server_normalize <- function(input, output, session, rv) {
     }
   })
 
-  observeEvent(input$apply_normalization, {
+  # Both buttons must run this handler. shinyjs::click() on the hidden
+  # legacy button does nothing in Parallel (conditionalPanel display:none),
+  # which looks like the app froze after download.
+  observeEvent(
+    list(input$apply_normalization, input$apply_normalization_parallel),
+    {
     if (!isTRUE(rv$download_complete)) {
       showNotification(
         tags$div(icon("exclamation-triangle"), tags$strong(" Step 1 required:"),
@@ -162,8 +280,14 @@ server_normalize <- function(input, output, session, rv) {
     
     # Disable button and show loading
     shinyjs::disable("apply_normalization")
-    shinyjs::html("apply_normalization", 
+    shinyjs::html("apply_normalization",
                   HTML('<i class="fa fa-spinner fa-spin"></i> Normalizing...'))
+    tryCatch(shinyjs::disable("apply_normalization_parallel"), error = function(e) NULL)
+    tryCatch(
+      shinyjs::html("apply_normalization_parallel",
+                    HTML('<i class="fa fa-spinner fa-spin"></i> Normalizing...')),
+      error = function(e) NULL
+    )
     
     rv$normalize_start <- Sys.time()
     rv$normalize_running <- TRUE
@@ -173,6 +297,11 @@ server_normalize <- function(input, output, session, rv) {
       tryCatch(shinyjs::enable("apply_normalization"), error = function(e) NULL)
       tryCatch(
         shinyjs::html("apply_normalization", HTML('<i class="fa fa-check-circle"></i> Apply Normalization')),
+        error = function(e) NULL
+      )
+      tryCatch(shinyjs::enable("apply_normalization_parallel"), error = function(e) NULL)
+      tryCatch(
+        shinyjs::html("apply_normalization_parallel", HTML('<i class="fa fa-check-circle"></i> Apply Normalization')),
         error = function(e) NULL
       )
       removeNotification("normalize_processing")
@@ -193,20 +322,62 @@ server_normalize <- function(input, output, session, rv) {
     )
     
     withProgress(message = 'Normalizing...', value = 0, {
-      mode <- if (is.null(input$normalize_mode) || !nzchar(input$normalize_mode)) "auto" else input$normalize_mode
+      keep_sep <- identical(input$analysis_type, "parallel") || isTRUE(rv$merge_after_de)
+      mode <- if (isTRUE(keep_sep)) {
+        if (is.null(input$normalize_mode_parallel) || !nzchar(input$normalize_mode_parallel)) {
+          "auto"
+        } else {
+          input$normalize_mode_parallel
+        }
+      } else if (is.null(input$normalize_mode) || !nzchar(input$normalize_mode)) {
+        "auto"
+      } else {
+        input$normalize_mode
+      }
+      de_method <- if (isTRUE(keep_sep)) {
+        if (!is.null(input$de_method_rna) && nzchar(input$de_method_rna)) {
+          input$de_method_rna
+        } else {
+          "deseq2"
+        }
+      } else if (!is.null(input$de_method)) {
+        input$de_method
+      } else {
+        "limma"
+      }
       if (identical(mode, "auto")) {
-        micro_norm_method <- "quantile"
-        rnaseq_norm_method <- "TMM"
+        micro_norm_method <- "auto"
+        rnaseq_norm_method <- "auto"
+      } else if (isTRUE(keep_sep)) {
+        micro_norm_method <- if (!is.null(input$micro_norm_method_parallel)) input$micro_norm_method_parallel else "quantile"
+        rnaseq_norm_method <- if (!is.null(input$rnaseq_norm_method_parallel)) input$rnaseq_norm_method_parallel else "TMM"
       } else {
         micro_norm_method <- if (!is.null(input$micro_norm_method)) input$micro_norm_method else "quantile"
         rnaseq_norm_method <- if (!is.null(input$rnaseq_norm_method)) input$rnaseq_norm_method else "TMM"
       }
-      de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
-      apply_gq <- if (!is.null(input$apply_global_quantile)) isTRUE(input$apply_global_quantile) else TRUE
+      # Count-based DE (RNA-seq only or Parallel RNA) must not use leftover TMM for DE.
+      # Merged always needs a log-scale RNA matrix for the one limma DE.
+      if (.gexpipe_is_count_de(de_method) && !identical(input$analysis_type, "merged")) {
+        rnaseq_norm_method <- "auto"
+      }
+      apply_gq <- if (isTRUE(keep_sep)) {
+        FALSE
+      } else if (!is.null(input$apply_global_quantile)) {
+        isTRUE(input$apply_global_quantile)
+      } else {
+        TRUE
+      }
+      rv$last_micro_norm_method <- micro_norm_method
+      rv$last_rnaseq_norm_method <- rnaseq_norm_method
+      rv$last_apply_global_quantile <- apply_gq
+      rv$last_de_method <- de_method
+      rv$last_keep_platforms_separate <- keep_sep
 
       norm_res <- tryCatch(
         .apply_norm_pipeline_to_rv(
-          rv, micro_norm_method, rnaseq_norm_method, de_method, apply_global_quantile = apply_gq
+          rv, micro_norm_method, rnaseq_norm_method, de_method,
+          apply_global_quantile = apply_gq,
+          keep_platforms_separate = keep_sep
         ),
         error = function(e) {
           .norm_reset_ui()
@@ -231,30 +402,67 @@ server_normalize <- function(input, output, session, rv) {
       rv$normalize_running <- FALSE
       
       output$normalization_log <- renderText({ log_text })
+      output$normalization_log_micro <- renderText({
+        if (!is.null(norm_res$log_text_micro)) norm_res$log_text_micro else "Microarray run log will appear after Apply Normalization."
+      })
+      output$normalization_log_rna <- renderText({
+        if (!is.null(norm_res$log_text_rna)) norm_res$log_text_rna else "RNA-seq run log will appear after Apply Normalization."
+      })
       
       shinyjs::enable("apply_normalization")
-      shinyjs::html("apply_normalization", 
+      shinyjs::html("apply_normalization",
                     HTML('<i class="fa fa-check-circle"></i> Apply Normalization'))
+      tryCatch(shinyjs::enable("apply_normalization_parallel"), error = function(e) NULL)
+      tryCatch(
+        shinyjs::html("apply_normalization_parallel",
+                      HTML('<i class="fa fa-check-circle"></i> Apply Normalization')),
+        error = function(e) NULL
+      )
       
       removeNotification("normalize_processing")
       
-      # Show notification with gene count
+      sm <- norm_res$platform_summary
       showNotification(
-        tags$div(
-          tags$strong("OK Normalization complete!"),
-          tags$br(),
-          tags$span("Genes: ", format(total_genes, big.mark = ","),
-                    " | Samples: ", format(total_samples, big.mark = ",")),
-          style = "font-size: 13px;"
-        ),
-        type = "message", duration = 6
+        if (isTRUE(norm_res$keep_separate) && !is.null(sm)) {
+          tags$div(
+            tags$strong("OK Normalization complete — two methods (not one joint method)."),
+            tags$br(),
+            tags$span(
+              "Microarray: ", format(sm$micro_samples, big.mark = ","), " samples, ",
+              format(sm$micro_genes, big.mark = ","), " genes (", sm$micro_method, ")."
+            ),
+            tags$br(),
+            tags$span(
+              "RNA-seq: ", format(sm$rna_samples, big.mark = ","), " samples, ",
+              format(sm$rna_genes, big.mark = ","), " genes (", sm$rna_method,
+              " for plots; raw counts kept for DESeq2/edgeR/voom)."
+            ),
+            tags$br(),
+            tags$span(
+              "Display union: ", format(sm$display_genes, big.mark = ","), " genes | ",
+              format(sm$display_samples, big.mark = ","), " samples (storage only; not one shared normalize)."
+            ),
+            style = "font-size: 13px;"
+          )
+        } else {
+          tags$div(
+            tags$strong("OK Normalization complete!"),
+            tags$br(),
+            tags$span("Genes: ", format(total_genes, big.mark = ","),
+                      " | Samples: ", format(total_samples, big.mark = ",")),
+            style = "font-size: 13px;"
+          )
+        },
+        type = "message", duration = 10
       )
     })
 
     if (!isTRUE(rv$normalization_complete)) {
       rv$normalize_running <- FALSE
     }
-  })
+  },
+  ignoreInit = TRUE
+  )
   
   # ==========================================================================
   # AUTO-NORMALIZE FOR COUNT-BASED METHODS (silent, no UI interaction)
@@ -266,13 +474,19 @@ server_normalize <- function(input, output, session, rv) {
     if (!isTRUE(rv$download_complete)) return()
     if (is.null(input$de_method) || !(input$de_method %in% c("deseq2", "edger", "limma_voom"))) return()
     if (isTRUE(rv$normalization_complete)) return()
+    if (identical(input$analysis_type, "parallel")) return()
     
     # Run the same normalization logic silently via R/ helper
     tryCatch({
       rv$normalize_running <- TRUE
       de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
       apply_gq <- if (!is.null(input$apply_global_quantile)) isTRUE(input$apply_global_quantile) else TRUE
-      .apply_norm_pipeline_to_rv(rv, "quantile", "TMM", de_method, apply_global_quantile = apply_gq)
+      .apply_norm_pipeline_to_rv(rv, "auto", "auto", de_method, apply_global_quantile = apply_gq)
+      rv$last_micro_norm_method <- "auto"
+      rv$last_rnaseq_norm_method <- "auto"
+      rv$last_apply_global_quantile <- apply_gq
+      rv$last_de_method <- de_method
+      rv$last_keep_platforms_separate <- FALSE
       rv$normalization_complete <- TRUE
       rv$normalize_running <- FALSE
       
@@ -294,8 +508,243 @@ server_normalize <- function(input, output, session, rv) {
     })
   })
   
+  .norm_platform_boxplot <- function(expr, title, fill = "#93c5fd") {
+    if (is.null(expr) || !is.matrix(expr) || ncol(expr) < 1L) {
+      plot.new()
+      text(0.5, 0.5, "Apply Normalization to see this plot.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
+    use <- expr
+    if (nrow(use) > 8000L) {
+      withr::local_seed(123)
+      use <- use[sample.int(nrow(use), 8000L), , drop = FALSE]
+    }
+    if (ncol(use) > 50L) {
+      withr::local_seed(123)
+      use <- use[, sample.int(ncol(use), 50L), drop = FALSE]
+    }
+    df <- data.frame(
+      Expression = as.vector(use),
+      Sample = rep(colnames(use), each = nrow(use)),
+      stringsAsFactors = FALSE
+    )
+    ggplot2::ggplot(df, ggplot2::aes(x = Sample, y = Expression)) +
+      ggplot2::geom_boxplot(fill = fill, outlier.size = 0.4, alpha = 0.85) +
+      ggplot2::theme_bw() +
+      ggplot2::labs(title = title, y = "Expression") +
+      ggplot2::theme(
+        axis.text.x = ggplot2::element_blank(),
+        axis.ticks.x = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(face = "bold", size = 13)
+      )
+  }
+
+  .norm_platform_density <- function(expr, title, color = "#2563eb") {
+    if (is.null(expr) || !is.matrix(expr) || ncol(expr) < 1L) {
+      plot.new()
+      text(0.5, 0.5, "Apply Normalization to see this plot.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
+    dd <- gexp_qc_prepare_density_data(expr, max_samples = 50L)
+    plot(
+      dd$first, main = title, xlab = "Expression", col = color, lwd = 2,
+      ylim = c(0, max(dd$first$y, na.rm = TRUE) * 1.2)
+    )
+    if (length(dd$others) > 0L) {
+      for (i in seq_along(dd$others)) {
+        graphics::lines(dd$others[[i]], col = dd$colors[i + 1L], lwd = 1)
+      }
+    }
+  }
+
+  .norm_is_parallel <- function() {
+    identical(input$analysis_type, "parallel") || isTRUE(rv$merge_after_de)
+  }
+
+  .norm_dataset_labels <- function(sample_ids) {
+    labs <- rep("Dataset", length(sample_ids))
+    meta <- rv$unified_metadata
+    if (!is.null(meta) && is.data.frame(meta)) {
+      key <- if ("SampleID" %in% names(meta)) {
+        match(sample_ids, as.character(meta$SampleID))
+      } else {
+        match(sample_ids, rownames(meta))
+      }
+      if ("Dataset" %in% names(meta)) {
+        hit <- as.character(meta$Dataset[key])
+        labs[!is.na(hit) & nzchar(hit)] <- hit[!is.na(hit) & nzchar(hit)]
+      }
+    }
+    labs
+  }
+
+  .norm_platform_comparison <- function(after) {
+    if (is.null(after) || !is.matrix(after) || ncol(after) < 1L) {
+      return(NULL)
+    }
+    before_all <- rv$combined_expr_before_global_norm
+    if (is.null(before_all)) before_all <- rv$combined_expr_raw
+    if (is.null(before_all) || !is.matrix(before_all)) {
+      return(list(before = after, after = after))
+    }
+    samp <- intersect(colnames(after), colnames(before_all))
+    genes <- intersect(rownames(after), rownames(before_all))
+    if (length(samp) == 0L || length(genes) == 0L) {
+      return(list(before = after, after = after))
+    }
+    list(
+      before = before_all[genes, samp, drop = FALSE],
+      after = after[genes, samp, drop = FALSE]
+    )
+  }
+
+  .norm_median_range_plot <- function(expr, title) {
+    if (is.null(expr) || !is.matrix(expr) || ncol(expr) < 1L) {
+      plot.new()
+      text(0.5, 0.5, "Apply Normalization to see this plot.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
+    use <- expr
+    if (ncol(use) > 50L) {
+      withr::local_seed(123)
+      use <- use[, sample.int(ncol(use), 50L), drop = FALSE]
+    }
+    ds <- .norm_dataset_labels(colnames(use))
+    plot_data <- data.frame(
+      Sample = rep(colnames(use), each = nrow(use)),
+      Expression = as.vector(use),
+      Dataset = rep(ds, each = nrow(use)),
+      stringsAsFactors = FALSE
+    )
+    ggplot2::ggplot(plot_data, ggplot2::aes(x = Sample, y = Expression, fill = Dataset)) +
+      ggplot2::geom_boxplot(alpha = 0.7, outlier.size = 0.4, outlier.alpha = 0.3) +
+      ggplot2::theme_bw(base_size = 11) +
+      ggplot2::labs(
+        title = title,
+        subtitle = "This platform only — datasets from the other platform are not included",
+        x = "Sample",
+        y = "Expression Value",
+        fill = "Dataset"
+      ) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(face = "bold", size = 13, hjust = 0.5),
+        plot.subtitle = ggplot2::element_text(size = 10, hjust = 0.5, color = "gray50"),
+        axis.text.x = ggplot2::element_text(angle = 90, hjust = 1, size = 7),
+        legend.position = "right"
+      )
+  }
+
+  .norm_distribution_overlap_plot <- function(cmp, title) {
+    if (is.null(cmp) || is.null(cmp$after) || ncol(cmp$after) < 1L) {
+      plot.new()
+      text(0.5, 0.5, "Apply Normalization to see this plot.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
+    expr_before <- cmp$before
+    expr_after <- cmp$after
+    n_genes <- min(20000L, nrow(expr_after))
+    if (nrow(expr_after) > n_genes) {
+      withr::local_seed(123)
+      keep <- sample.int(nrow(expr_after), n_genes)
+      expr_before <- expr_before[keep, , drop = FALSE]
+      expr_after <- expr_after[keep, , drop = FALSE]
+    }
+    n_samples <- min(20L, ncol(expr_after))
+    if (ncol(expr_after) > n_samples) {
+      withr::local_seed(123)
+      keep_s <- sample.int(ncol(expr_after), n_samples)
+      expr_before <- expr_before[, keep_s, drop = FALSE]
+      expr_after <- expr_after[, keep_s, drop = FALSE]
+    }
+    rows <- list()
+    for (i in seq_len(ncol(expr_after))) {
+      sample_name <- colnames(expr_after)[i]
+      dataset_name <- .norm_dataset_labels(sample_name)[[1L]]
+      dens_before <- stats::density(expr_before[, i], na.rm = TRUE)
+      dens_after <- stats::density(expr_after[, i], na.rm = TRUE)
+      rows[[length(rows) + 1L]] <- data.frame(
+        x = dens_before$x, y = dens_before$y,
+        Sample = sample_name, Dataset = dataset_name, Stage = "Before",
+        stringsAsFactors = FALSE
+      )
+      rows[[length(rows) + 1L]] <- data.frame(
+        x = dens_after$x, y = dens_after$y,
+        Sample = sample_name, Dataset = dataset_name, Stage = "After",
+        stringsAsFactors = FALSE
+      )
+    }
+    plot_data <- do.call(rbind, rows)
+    plot_data$Stage <- factor(plot_data$Stage, levels = c("Before", "After"))
+    ggplot2::ggplot(
+      plot_data,
+      ggplot2::aes(x = x, y = y, color = Stage, group = interaction(Sample, Stage))
+    ) +
+      ggplot2::geom_line(alpha = 0.65, linewidth = 0.7) +
+      ggplot2::scale_color_manual(values = c("Before" = "#e74c3c", "After" = "#2ecc71")) +
+      ggplot2::facet_wrap(~ Dataset, scales = "free", ncol = min(2L, length(unique(plot_data$Dataset)))) +
+      ggplot2::theme_bw(base_size = 12) +
+      ggplot2::labs(
+        title = title,
+        subtitle = "This platform only — the other platform is not on this plot",
+        x = "Expression Value",
+        y = "Density",
+        color = "Stage"
+      ) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(face = "bold", size = 13, hjust = 0.5),
+        plot.subtitle = ggplot2::element_text(size = 10, hjust = 0.5, color = "gray50"),
+        legend.position = "top",
+        strip.background = ggplot2::element_rect(fill = "#3498db", color = "white"),
+        strip.text = ggplot2::element_text(color = "white", face = "bold")
+      )
+  }
+
+  output$normalization_plot_rna <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_platform_boxplot(rv$expr_rna, "RNA-seq expression (this platform only)", "#93c5fd")
+  })
+  output$normalization_density_rna <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_platform_density(rv$expr_rna, "RNA-seq density (this platform only)", "#2563eb")
+  })
+  output$normalization_median_range_rna <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_median_range_plot(rv$expr_rna, "RNA-seq median & range")
+  })
+  output$normalization_distribution_overlap_rna <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_distribution_overlap_plot(
+      .norm_platform_comparison(rv$expr_rna),
+      "RNA-seq distribution overlap"
+    )
+  })
+  output$normalization_plot_micro <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_platform_boxplot(rv$expr_micro, "Microarray expression (this platform only)", "#fde68a")
+  })
+  output$normalization_density_micro <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_platform_density(rv$expr_micro, "Microarray density (this platform only)", "#d97706")
+  })
+  output$normalization_median_range_micro <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_median_range_plot(rv$expr_micro, "Microarray median & range")
+  })
+  output$normalization_distribution_overlap_micro <- renderPlot({
+    req(isTRUE(rv$normalization_complete))
+    .norm_distribution_overlap_plot(
+      .norm_platform_comparison(rv$expr_micro),
+      "Microarray distribution overlap"
+    )
+  })
+
   # Normalization quality visualization: Box plots showing distribution before/after
   output$normalization_plot <- renderPlot({
+    if (isTRUE(.norm_is_parallel())) {
+      plot.new()
+      text(0.5, 0.5, "Parallel: RNA-seq and microarray plots are separate.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
     req(rv$normalization_complete, rv$combined_expr)
     
     # Use before global normalization if available, otherwise use current combined_expr
@@ -697,6 +1146,11 @@ server_normalize <- function(input, output, session, rv) {
   
   # Plot 6: Median & Range Alignment - Boxplot
   output$normalization_median_range <- renderPlot({
+    if (isTRUE(.norm_is_parallel())) {
+      plot.new()
+      text(0.5, 0.5, "Parallel: RNA-seq and microarray median/range plots are separate.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
     req(rv$normalization_complete, rv$combined_expr)
     
     expr_after <- rv$combined_expr
@@ -763,6 +1217,11 @@ server_normalize <- function(input, output, session, rv) {
   
   # Plot 7: Distribution Overlap - Density Plot
   output$normalization_distribution_overlap <- renderPlot({
+    if (isTRUE(.norm_is_parallel())) {
+      plot.new()
+      text(0.5, 0.5, "Parallel: RNA-seq and microarray overlap plots are separate.", cex = 1.1, col = "gray40")
+      return(invisible(NULL))
+    }
     req(rv$normalization_complete, rv$combined_expr)
     
     expr_data <- get_expr_comparison()
@@ -1083,6 +1542,7 @@ server_normalize <- function(input, output, session, rv) {
   )
 
   output$normalize_mixed_scale_ui <- renderUI({
+    if (isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")) return(NULL)
     if (!isTRUE(rv$normalization_complete)) return(NULL)
     mixed <- FALSE
     if (!is.null(rv$unified_metadata)) {
@@ -1151,11 +1611,33 @@ server_normalize <- function(input, output, session, rv) {
     if (is.null(rv$normalization_summary_table) || nrow(rv$normalization_summary_table) == 0) {
       return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Run normalization to see process summary."))
     }
+    sm <- rv$last_norm_platform_summary
+    if (isTRUE(rv$last_keep_platforms_separate) && !is.null(sm)) {
+      return(tags$div(
+        style = "font-size: 14px; line-height: 1.6; color: #333;",
+        tags$p(tags$strong("Step 2 complete — Parallel (two methods).")),
+        tags$p(
+          tags$strong("Microarray: "),
+          format(sm$micro_samples, big.mark = ","), " samples, ",
+          format(sm$micro_genes, big.mark = ","), " genes. Method: ", sm$micro_method, "."
+        ),
+        tags$p(
+          tags$strong("RNA-seq: "),
+          format(sm$rna_samples, big.mark = ","), " samples, ",
+          format(sm$rna_genes, big.mark = ","), " genes. Method: ", sm$rna_method,
+          " (plots / QC). Raw counts are kept for DESeq2 / edgeR / voom."
+        ),
+        tags$p(
+          "The ", format(sm$display_samples, big.mark = ","),
+          " sample count is both platforms listed together. They did not share one normalize method."
+        )
+      ))
+    }
     st <- rv$normalization_summary_table
     n_genes <- if ("Final_Common_Genes" %in% names(st)) max(st$Final_Common_Genes, na.rm = TRUE) else NA
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 3 complete."), " Normalization applied per dataset; see table and log below for gene counts (initial, after filtering, final common)."),
+      tags$p(tags$strong("Step 2 complete."), " Normalization applied per dataset; common genes are shown in Step 3 (QC). See table and log below."),
       tags$p("Final common genes: ", format(n_genes, big.mark = ","), "."))
   })
 
@@ -1175,7 +1657,7 @@ server_normalize <- function(input, output, session, rv) {
   
   output$next_to_groups_btn <- renderUI({
     req(rv$normalization_complete)
-    actionButton("go_to_groups", "Next: Select Groups", 
+    actionButton("go_to_groups", "Next: QC & Visualization", 
                  icon = icon("arrow-right"), class = "btn-success btn-lg")
   })
   

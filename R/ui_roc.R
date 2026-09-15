@@ -7,15 +7,13 @@
 
 ui_roc <- tabItem(
   tabName = "roc",
-  h2(icon("chart-line"), " Step 12: ROC Curve Analysis"),
+  h2(icon("chart-line"), " Step 13: ROC Curve Analysis"),
 
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " For genes common across all ML methods (the final ML product), compute ROC curves and AUC scores to evaluate diagnostic performance (Normal vs Disease).", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Training ROC (Primary):"), " AUC is first computed on the original training data used in ML (internal performance).", style = "margin-bottom: 4px;"),
-      tags$p(tags$strong("Validation ROC (External, when available):"), " When an external validation dataset is loaded (Step 11), per-gene AUC is then computed on the independent cohort and shown below the training results for unbiased biomarker performance.", style = "margin-bottom: 0;")
+      uiOutput("roc_about_ui")
     )
   ),
 

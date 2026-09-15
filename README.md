@@ -12,9 +12,21 @@
 
 ## Overview
 
-GExPipe provides a single workflow for:
+GExPipe is a **16-step** Shiny workflow for bulk RNA-seq and microarray
+data from GEO. Step 1 has **four analysis types**:
 
-- **Download** — GEO datasets (GEOquery)
+| Type | What it does |
+|------|----------------|
+| **RNA-seq only** | Count DE (DESeq2 / edgeR / voom) or limma on TMM. One or more GSE IDs in the RNA-seq box. |
+| **Microarray only** | Platform normalization + limma. One or more GSE IDs in the microarray box. |
+| **Merged (Both)** | Normalize each study, intersect common genes, one joint batch, **one limma DE**. Each box accepts several GSE IDs. |
+| **Parallel DE, then merge** | RNA-seq and microarray stay separate through DE (two engines). Step 7 keeps same-direction overlap. Each box accepts several GSE IDs. |
+
+Later steps (WGCNA, DEG ∩ modules, PPI, ML, validation, ROC, nomogram, GSEA, report) are shared.
+
+The pipeline covers:
+
+- **Download** — GEO datasets (GEOquery); several GSEs per platform box
 - **QC** — sample and gene filtering
 - **Normalization** — count/microarray normalization
 - **Batch correction** — ComBat, limma
@@ -34,8 +46,8 @@ Dependencies are from **CRAN** and **Bioconductor** only.
 | R version | Bioconductor | Supported |
 |-----------|-------------|-----------|
 | 4.4.x | 3.19 / 3.20 | ❌ (below minimum) |
-| 4.5.x | 3.21 | ✅ (recommended) |
-| 4.6.x stable | 3.22 | ✅ |
+| 4.5.x | 3.21 | ❌ (below DESCRIPTION minimum R ≥ 4.6.0) |
+| 4.6.x stable | 3.22 | ✅ (required) |
 | 4.6.x alpha/beta | — | ❌ (no binaries available) |
 
 > **Use a stable R release.** Download from
@@ -45,7 +57,7 @@ Dependencies are from **CRAN** and **Bioconductor** only.
 
 ## Installation & Run
 
-### Option 1 — Run directly from GitHub (`main`, includes 0.99.24 probe-ID fixes)
+### Option 1 — Run directly from GitHub (`main`, includes Parallel DE and multi-GSE)
 
 Paste into R or RStudio. Install `pkgload` once so the app loads the cloned source (not an older Bioconductor install).
 
@@ -102,7 +114,7 @@ remotes::install_github("safarafique/GExPipe", force = TRUE, upgrade = "always",
 # then Ctrl+Shift+F10 and runGExPipe() again
 ```
 
-Both options require **R >= 4.5.0** (stable). Bioconductor **3.21** (R 4.5) or **3.22** (R 4.6 stable) is selected automatically.
+Both options require **R >= 4.6.0** (stable). Bioconductor **3.22** is selected automatically.
 
 ### From Bioconductor (when accepted)
 
@@ -166,7 +178,7 @@ The vignette is R Markdown and requires **Pandoc**. If Pandoc is not installed, 
 R CMD build . --no-build-vignettes
 ```
 
-The resulting `GExPipe_0.99.14.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
+The resulting `GExPipe_0.99.105.tar.gz` is valid for submission; vignette source is in `vignettes/`. To build the vignette locally, install [Pandoc](https://pandoc.org/installing.html) and run `R CMD build .` without `--no-build-vignettes`.
 
 ### Package check
 
@@ -174,10 +186,10 @@ From the package root:
 
 ```bash
 R CMD build . --no-build-vignettes
-R CMD check GExPipe_0.99.14.tar.gz --no-build-vignettes --no-manual
+R CMD check GExPipe_0.99.105.tar.gz --no-build-vignettes --no-manual
 ```
 
-Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.14.tar.gz")` and address any reported issues.
+Before submission, fix any **ERROR**s and **WARNING**s from `R CMD check`, then run `BiocCheck("GExPipe_0.99.105.tar.gz")` and address any reported issues.
 
 ---
 

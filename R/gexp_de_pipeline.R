@@ -263,3 +263,300 @@ gexp_run_de <- function(
     formula_desc = de_design$formula_desc
   )
 }
+
+#' Label DE rows by logFC and adjusted p-value cutoffs
+#'
+#' @param de_results data.frame with `logFC` and `adj.P.Val`.
+#' @param logfc_cutoff Numeric log2 fold-change cutoff.
+#' @param padj_cutoff Numeric adjusted P-value cutoff.
+#' @return The same data.frame with a `Significance` column.
+#' @noRd
+gexpipe_classify_de_significance <- function(de_results, logfc_cutoff = 0.5, padj_cutoff = 0.05) {
+  if (is.null(de_results) || !is.data.frame(de_results) || nrow(de_results) < 1L) {
+    return(de_results)
+  }
+  de_results$Significance <- "Not Significant"
+  ok <- !is.na(de_results$adj.P.Val) & !is.na(de_results$logFC)
+  de_results$Significance[ok & de_results$adj.P.Val < padj_cutoff &
+    de_results$logFC > logfc_cutoff] <- "Up-regulated"
+  de_results$Significance[ok & de_results$adj.P.Val < padj_cutoff &
+    de_results$logFC < -logfc_cutoff] <- "Down-regulated"
+  de_results$Significance <- as.character(de_results$Significance)
+  de_results
+}
+
+#' Run limma DE on one platform (or one study) subset
+#'
+#' Uses per-platform normalized expression (not the cross-platform
+#' batch-corrected matrix). Single-dataset subsets use a Condition contrast;
+#' multiple datasets on the same platform use [gexpipe_build_de_design()].
+#'
+#' @param expr Numeric matrix (genes x samples).
+#' @param metadata Sample metadata with `Condition` and optional `Dataset`.
+#' @param logfc_cutoff Numeric log2 fold-change cutoff.
+#' @param padj_cutoff Numeric adjusted P-value cutoff.
+#' @param ref_lab Reference condition label (default `Normal`).
+#' @param alt_lab Alternate condition label (default `Disease`).
+#' @return list with `de_results`, `sig_genes`, `filter_note`, `sample_info`,
+#'   `formula_desc`.
+#' @examples
+#' expr <- matrix(rnorm(200), nrow = 20)
+#' rownames(expr) <- paste0("G", seq_len(nrow(expr)))
+#' colnames(expr) <- paste0("S", seq_len(ncol(expr)))
+#' meta <- data.frame(
+#'   Condition = rep(c("Normal", "Disease"), each = 5),
+#'   row.names = colnames(expr),
+#'   stringsAsFactors = FALSE
+#' )
+#' gexpipe_run_limma_on_subset(expr, meta)
+#' @export
+gexpipe_run_limma_on_subset <- function(
+  expr,
+  metadata,
+  logfc_cutoff = 0.5,
+  padj_cutoff = 0.05,
+  ref_lab = "Normal",
+  alt_lab = "Disease"
+) {
+  if (is.null(expr) || !is.matrix(expr)) {
+    stop("expr must be a non-null matrix (genes x samples).")
+  }
+  if (is.null(metadata) || !is.data.frame(metadata)) {
+    stop("metadata must be a data.frame with at least a 'Condition' column.")
+  }
+  if (!"Condition" %in% colnames(metadata)) {
+    stop("metadata must contain a 'Condition' column.")
+  }
+
+  metadata <- .gexpipe_align_metadata_to_expr(expr, metadata)
+  metadata$Condition <- factor(
+    as.character(metadata$Condition),
+    levels = c(ref_lab, alt_lab)
+  )
+  n_ref <- sum(metadata$Condition == ref_lab, na.rm = TRUE)
+  n_alt <- sum(metadata$Condition == alt_lab, na.rm = TRUE)
+  if (n_ref < 2L || n_alt < 2L) {
+    stop(
+      "Need at least 2 ", ref_lab, " and 2 ", alt_lab,
+      " samples on this platform (have ", n_ref, " / ", n_alt, ")."
+    )
+  }
+
+  n_ds <- if ("Dataset" %in% colnames(metadata)) {
+    length(unique(as.character(metadata$Dataset)))
+  } else {
+    1L
+  }
+
+  if (n_ds <= 1L) {
+    design <- stats::model.matrix(~ 0 + Condition, data = metadata)
+    colnames(design) <- levels(metadata$Condition)
+    filt <- gexpipe_independent_filter(expr, design = design)
+    expr_f <- filt$expr
+    contrast_expr <- paste0(alt_lab, " - ", ref_lab)
+    contrast <- limma::makeContrasts(contrasts = contrast_expr, levels = design)
+    fit <- limma::lmFit(expr_f, design)
+    fit2 <- limma::contrasts.fit(fit, contrast)
+    fit2 <- limma::eBayes(fit2)
+    tt <- limma::topTable(fit2, number = Inf, adjust.method = "BH")
+    formula_desc <- paste0("~ Condition (contrast: ", alt_lab, " vs ", ref_lab, ")")
+  } else {
+    de_design <- gexpipe_build_de_design(metadata)
+    filt <- gexpipe_independent_filter(expr, design = de_design$design)
+    expr_f <- filt$expr
+    fit <- limma::lmFit(expr_f, de_design$design)
+    fit2 <- limma::eBayes(fit)
+    tt <- limma::topTable(
+      fit2,
+      coef = de_design$coef_condition,
+      number = Inf,
+      adjust.method = "BH"
+    )
+    formula_desc <- de_design$formula_desc
+  }
+
+  tt$Gene <- rownames(tt)
+  de_results <- tt[, c("Gene", "logFC", "AveExpr", "P.Value", "adj.P.Val")]
+  de_results <- gexpipe_classify_de_significance(de_results, logfc_cutoff, padj_cutoff)
+  rownames(de_results) <- de_results$Gene
+  sig_genes <- de_results[de_results$Significance != "Not Significant", , drop = FALSE]
+
+  list(
+    de_results = de_results,
+    sig_genes = sig_genes,
+    filter_note = filt$note,
+    sample_info = gexpipe_de_sample_info(metadata, method = "limma"),
+    formula_desc = formula_desc
+  )
+}
+
+#' Default Parallel DE methods (scientifically matched per platform)
+#'
+#' Microarray: always limma on the array matrix. RNA-seq: the user's count
+#' engine (DESeq2 / edgeR / voom) on raw counts + Dataset when 2+ GSEs, or
+#' limma on TMM log-CPM when that is the chosen RNA method.
+#' @noRd
+gexpipe_parallel_de_defaults <- function(de_method_rna = "deseq2") {
+  rna <- if (!is.null(de_method_rna) && nzchar(de_method_rna) &&
+      de_method_rna %in% c("deseq2", "edger", "limma_voom", "limma")) {
+    de_method_rna
+  } else {
+    "deseq2"
+  }
+  list(rna = rna, micro = "limma")
+}
+
+#' Bind RNA-seq count matrices on shared RNA genes (no microarray intersection)
+#' @noRd
+gexpipe_bind_rna_counts <- function(rna_counts_list) {
+  if (is.null(rna_counts_list) || length(rna_counts_list) < 1L) {
+    return(NULL)
+  }
+  mats <- lapply(rna_counts_list, function(m) as.matrix(m))
+  gene_sets <- lapply(mats, rownames)
+  genes <- if (length(gene_sets) == 1L) {
+    gene_sets[[1]]
+  } else {
+    Reduce(intersect, gene_sets)
+  }
+  if (length(genes) < 1L) {
+    return(NULL)
+  }
+  raw_list <- list()
+  nms <- names(mats)
+  if (is.null(nms)) nms <- paste0("RNA", seq_along(mats))
+  for (i in seq_along(mats)) {
+    keep <- intersect(genes, rownames(mats[[i]]))
+    if (length(keep) > 0L) {
+      raw_list[[nms[[i]]]] <- mats[[i]][keep, , drop = FALSE]
+    }
+  }
+  if (length(raw_list) < 1L) {
+    return(NULL)
+  }
+  built <- do.call(cbind, raw_list)
+  built <- round(built)
+  storage.mode(built) <- "integer"
+  built
+}
+
+#' Count-based DE on one RNA-seq matrix (DESeq2 / edgeR / limma-voom)
+#'
+#' Uses raw integer counts and includes Dataset in the design when 2+ GSEs
+#' are present. Does not mix microarray samples or genes.
+#' @noRd
+gexpipe_run_count_de <- function(
+  counts,
+  metadata,
+  method = c("deseq2", "edger", "limma_voom"),
+  logfc_cutoff = 0.5,
+  padj_cutoff = 0.05,
+  ref_lab = "Normal",
+  alt_lab = "Disease"
+) {
+  method <- match.arg(method)
+  if (is.null(counts) || !is.matrix(counts) || ncol(counts) < 3L) {
+    stop("Count DE needs an integer count matrix with at least 3 samples.")
+  }
+  if (is.null(metadata) || !is.data.frame(metadata) ||
+      !"Condition" %in% colnames(metadata)) {
+    stop("metadata must contain a Condition column.")
+  }
+  metadata <- .gexpipe_align_metadata_to_expr(counts, metadata)
+  metadata$Condition <- factor(
+    as.character(metadata$Condition),
+    levels = c(ref_lab, alt_lab)
+  )
+  n_ref <- sum(metadata$Condition == ref_lab, na.rm = TRUE)
+  n_alt <- sum(metadata$Condition == alt_lab, na.rm = TRUE)
+  if (n_ref < 2L || n_alt < 2L) {
+    stop(
+      "Need at least 2 ", ref_lab, " and 2 ", alt_lab,
+      " RNA-seq samples (have ", n_ref, " / ", n_alt, ")."
+    )
+  }
+
+  format_out <- function(de_results, filter_note, formula_desc) {
+    de_results <- de_results[!is.na(de_results$adj.P.Val), , drop = FALSE]
+    de_results <- gexpipe_classify_de_significance(de_results, logfc_cutoff, padj_cutoff)
+    rownames(de_results) <- de_results$Gene
+    sig_genes <- de_results[de_results$Significance != "Not Significant", , drop = FALSE]
+    list(
+      de_results = de_results,
+      sig_genes = sig_genes,
+      filter_note = filter_note,
+      sample_info = gexpipe_de_sample_info(metadata, method = method),
+      formula_desc = formula_desc
+    )
+  }
+
+  if (identical(method, "deseq2")) {
+    if (!requireNamespace("DESeq2", quietly = TRUE)) {
+      stop("DESeq2 is not installed.")
+    }
+    ds_design <- gexpipe_deseq2_design(metadata)
+    design_mm <- stats::model.matrix(ds_design$formula, data = metadata)
+    filt <- gexpipe_independent_filter(counts, design = design_mm)
+    counts_f <- filt$expr
+    dds <- DESeq2::DESeqDataSetFromMatrix(
+      countData = counts_f,
+      colData = metadata,
+      design = ds_design$formula
+    )
+    dds <- DESeq2::DESeq(dds, quiet = TRUE)
+    res <- DESeq2::results(
+      dds,
+      contrast = c("Condition", alt_lab, ref_lab),
+      alpha = padj_cutoff
+    )
+    res_df <- as.data.frame(res)
+    de_results <- data.frame(
+      Gene = rownames(res_df),
+      logFC = res_df$log2FoldChange,
+      AveExpr = res_df$baseMean,
+      P.Value = res_df$pvalue,
+      adj.P.Val = res_df$padj,
+      stringsAsFactors = FALSE
+    )
+    return(format_out(de_results, filt$note, ds_design$formula_desc))
+  }
+
+  de_design <- gexpipe_build_de_design(metadata)
+  filt <- gexpipe_independent_filter(counts, design = de_design$design)
+  counts_f <- filt$expr
+
+  if (identical(method, "edger")) {
+    if (!requireNamespace("edgeR", quietly = TRUE)) {
+      stop("edgeR is not installed.")
+    }
+    dge <- edgeR::DGEList(counts = counts_f, group = metadata$Condition)
+    dge <- edgeR::calcNormFactors(dge, method = "TMM")
+    dge <- edgeR::estimateDisp(dge, de_design$design)
+    fit <- edgeR::glmQLFit(dge, de_design$design)
+    qlf <- edgeR::glmQLFTest(fit, coef = de_design$coef_condition)
+    res <- edgeR::topTags(qlf, n = Inf, sort.by = "PValue")$table
+    de_results <- data.frame(
+      Gene = rownames(res),
+      logFC = res$logFC,
+      AveExpr = res$logCPM,
+      P.Value = res$PValue,
+      adj.P.Val = res$FDR,
+      stringsAsFactors = FALSE
+    )
+    return(format_out(de_results, filt$note, de_design$formula_desc))
+  }
+
+  v <- limma::voom(counts_f, design = de_design$design, plot = FALSE)
+  fit <- limma::lmFit(v, de_design$design)
+  fit <- limma::eBayes(fit)
+  tt <- limma::topTable(
+    fit,
+    coef = de_design$coef_condition,
+    number = Inf,
+    adjust.method = "BH",
+    sort.by = "P"
+  )
+  tt$Gene <- rownames(tt)
+  de_results <- tt[, c("Gene", "logFC", "AveExpr", "P.Value", "adj.P.Val")]
+  format_out(de_results, filt$note, de_design$formula_desc)
+}

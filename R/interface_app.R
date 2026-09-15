@@ -1,4 +1,4 @@
-## Full analysis UI (15 tabs). Built only when user enters analysis mode so cold start
+## Full analysis UI (16 tabs). Built only when user enters analysis mode so cold start
 ## and shinytest2 do not source every tab file on first HTTP response.
 gexp_app_analysis_dashboard_ui <- function() {
   # Ensure full namespace attach before any tab UI sources (race: user clicks Go before onFlushed).
@@ -51,20 +51,21 @@ gexp_app_analysis_dashboard_ui <- function() {
       shinydashboard::sidebarMenu(
         id = "sidebar_menu",
         shinydashboard::menuItem("1. Download Data", tabName = "download", icon = shiny::icon("download", class = "fa-lg"), badgeLabel = "Start", badgeColor = "green"),
-        shinydashboard::menuItem("2. QC & Visualization", tabName = "qc", icon = shiny::icon("chart-bar", class = "fa-lg"), badgeLabel = "View", badgeColor = "blue"),
-        shinydashboard::menuItem("3. Normalize Data", tabName = "normalize", icon = shiny::icon("balance-scale", class = "fa-lg"), badgeLabel = "Process", badgeColor = "purple"),
+        shinydashboard::menuItem("2. Normalize Data", tabName = "normalize", icon = shiny::icon("balance-scale", class = "fa-lg"), badgeLabel = "Process", badgeColor = "purple"),
+        shinydashboard::menuItem("3. QC & Visualization", tabName = "qc", icon = shiny::icon("chart-bar", class = "fa-lg"), badgeLabel = "View", badgeColor = "blue"),
         shinydashboard::menuItem("4. Select Groups", tabName = "groups", icon = shiny::icon("users", class = "fa-lg"), badgeLabel = "Categorize", badgeColor = "orange"),
         shinydashboard::menuItem("5. Batch Correction", tabName = "batch", icon = shiny::icon("filter", class = "fa-lg"), badgeLabel = "Correct", badgeColor = "red"),
         shinydashboard::menuItem("6. Differential Expression Analysis", tabName = "results", icon = shiny::icon("dna", class = "fa-lg"), badgeLabel = "DE Analysis", badgeColor = "yellow"),
-        shinydashboard::menuItem("7. WGCNA Analysis", tabName = "wgcna", icon = shiny::icon("project-diagram", class = "fa-lg"), badgeLabel = "Network", badgeColor = "purple"),
-        shinydashboard::menuItem("8. Common Genes (DEG & WGCNA)", tabName = "common_genes", icon = shiny::icon("venus-double", class = "fa-lg"), badgeLabel = "GO/KEGG", badgeColor = "green"),
-        shinydashboard::menuItem("9. PPI Interaction", tabName = "ppi", icon = shiny::icon("project-diagram", class = "fa-lg"), badgeLabel = "Network", badgeColor = "teal"),
-        shinydashboard::menuItem("10. Machine Learning Process", tabName = "ml", icon = shiny::icon("brain", class = "fa-lg"), badgeLabel = "ML", badgeColor = "maroon"),
-        shinydashboard::menuItem("11. Validation Setup", tabName = "validation", icon = shiny::icon("shield-alt", class = "fa-lg"), badgeLabel = "Validate", badgeColor = "olive"),
-        shinydashboard::menuItem("12. ROC Curve Analysis", tabName = "roc", icon = shiny::icon("chart-line", class = "fa-lg"), badgeLabel = "AUC", badgeColor = "green"),
-        shinydashboard::menuItem("13. Diagnostic Nomogram", tabName = "nomogram", icon = shiny::icon("calculator", class = "fa-lg"), badgeLabel = "Nomogram", badgeColor = "maroon"),
-        shinydashboard::menuItem("14. GSEA Analysis", tabName = "gsea", icon = shiny::icon("project-diagram", class = "fa-lg"), badgeLabel = "GSEA", badgeColor = "teal"),
-        shinydashboard::menuItem("15. Results Summary", tabName = "results_summary", icon = shiny::icon("file-alt", class = "fa-lg"), badgeLabel = "PDF", badgeColor = "red")
+        shinydashboard::menuItem("7. RNA-seq \u2229 microarray", tabName = "consensus", icon = shiny::icon("object-ungroup", class = "fa-lg"), badgeLabel = "Overlap", badgeColor = "fuchsia"),
+        shinydashboard::menuItem("8. WGCNA Analysis", tabName = "wgcna", icon = shiny::icon("project-diagram", class = "fa-lg"), badgeLabel = "Network", badgeColor = "purple"),
+        shinydashboard::menuItem("9. Common Genes (DEG & WGCNA)", tabName = "common_genes", icon = shiny::icon("venus-double", class = "fa-lg"), badgeLabel = "GO/KEGG", badgeColor = "green"),
+        shinydashboard::menuItem("10. PPI Interaction", tabName = "ppi", icon = shiny::icon("project-diagram", class = "fa-lg"), badgeLabel = "Network", badgeColor = "teal"),
+        shinydashboard::menuItem("11. Machine Learning Process", tabName = "ml", icon = shiny::icon("brain", class = "fa-lg"), badgeLabel = "ML", badgeColor = "maroon"),
+        shinydashboard::menuItem("12. Validation Setup", tabName = "validation", icon = shiny::icon("shield-alt", class = "fa-lg"), badgeLabel = "Validate", badgeColor = "olive"),
+        shinydashboard::menuItem("13. ROC Curve Analysis", tabName = "roc", icon = shiny::icon("chart-line", class = "fa-lg"), badgeLabel = "AUC", badgeColor = "green"),
+        shinydashboard::menuItem("14. Diagnostic Nomogram", tabName = "nomogram", icon = shiny::icon("calculator", class = "fa-lg"), badgeLabel = "Nomogram", badgeColor = "maroon"),
+        shinydashboard::menuItem("15. GSEA Analysis", tabName = "gsea", icon = shiny::icon("project-diagram", class = "fa-lg"), badgeLabel = "GSEA", badgeColor = "teal"),
+        shinydashboard::menuItem("16. Results Summary", tabName = "results_summary", icon = shiny::icon("file-alt", class = "fa-lg"), badgeLabel = "PDF", badgeColor = "red")
       ),
       shiny::tags$div(
         class = "gexp-sidebar-workspace",
@@ -127,56 +128,89 @@ gexp_app_analysis_dashboard_ui <- function() {
             }
           });
         }
-        $(document).on('shiny:connected', gexpHideImmuneChip);
-        $(document).on('shiny:value', gexpHideImmuneChip);
-        setInterval(gexpHideImmuneChip, 1000);
+        function gexpToggleConsensusMenu() {
+          var at = (($('input[name=\"analysis_type\"]:checked').val() || '') + '').toLowerCase();
+          var item = $('a[data-value=\"consensus\"]').closest('li');
+          if (at === 'parallel') { item.show(); } else { item.hide(); }
+        }
+        $(document).on('shiny:connected', function() { gexpHideImmuneChip(); gexpToggleConsensusMenu(); });
+        $(document).on('shiny:value', function() { gexpHideImmuneChip(); gexpToggleConsensusMenu(); });
+        $(document).on('change', 'input[name=\"analysis_type\"]', gexpToggleConsensusMenu);
+        setInterval(function() { gexpHideImmuneChip(); gexpToggleConsensusMenu(); }, 1000);
         $(document).on('click', '.pipeline-step[data-tab]', function() {
           var tab = $(this).data('tab');
-          if (tab) {
-            var link = $('a[data-value=\"' + tab + '\"]');
-            if (link.length) link.click();
-          }
+          if (tab) gexpClickSidebarTab(tab);
         });
         function gexpClickSidebarTab(tab) {
           if (!tab) return;
-          var link = $('a[data-value=\"' + tab + '\"]');
-          if (link.length) link.click();
+          try {
+            if (window.Shiny && Shiny.setInputValue) {
+              Shiny.setInputValue('sidebar_menu', tab, {priority: 'event'});
+            }
+          } catch (err) {}
+          var link = $('ul.sidebar-menu a[data-value=\"' + tab + '\"]').first();
+          if (!link.length) link = $('a[data-value=\"' + tab + '\"]').first();
+          if (link.length) {
+            var li = link.closest('li');
+            $('ul.sidebar-menu > li').removeClass('active');
+            li.addClass('active');
+            if (link[0] && typeof link[0].click === 'function') link[0].click();
+            else link.trigger('click');
+          }
+          var pane = document.getElementById('shiny-tab-' + tab);
+          if (pane) {
+            $('.content-wrapper .tab-content > .tab-pane').removeClass('active');
+            $(pane).addClass('active');
+          }
+          try { window.scrollTo(0, 0); } catch (err2) {}
         }
         function gexpResolveNextTab(btnId) {
-          var deMethod = (($('input[name=\"de_method\"]:checked').val() || '') + '').toLowerCase();
+          if (!btnId) return null;
           var datasetMode = (($('input[name=\"dataset_mode\"]:checked').val() || '') + '').toLowerCase();
-          var isCountBased = (deMethod === 'deseq2' || deMethod === 'edger' || deMethod === 'limma_voom');
           var isSingle = (datasetMode === 'single');
-          if (btnId === 'next_to_normalize') return isCountBased ? 'groups' : 'normalize';
-          if (btnId === 'next_page_groups' || btnId === 'next_to_batch_btn') return isSingle ? 'results' : 'batch';
+          var analysisType = (($('input[name=\"analysis_type\"]:checked').val() || '') + '').toLowerCase();
+          var mergeAfter = (analysisType === 'parallel');
+          if (btnId === 'next_to_normalize') return 'groups';
+          if (btnId === 'next_page_normalize' || btnId === 'next_page_normalize_parallel' ||
+              btnId === 'go_to_groups' || btnId === 'go_to_groups_from_norm') return 'qc';
+          if (btnId === 'next_page_groups' || btnId === 'next_to_batch_btn') {
+            return isSingle ? 'results' : 'batch';
+          }
+          if (btnId === 'next_page_batch' || btnId === 'next_page_batch_end') return 'results';
+          if (btnId === 'next_page_results' || btnId === 'next_page_results_end') {
+            return mergeAfter ? 'consensus' : 'wgcna';
+          }
+          if (btnId === 'next_page_results_parallel' || btnId === 'next_page_results_parallel_end') {
+            return 'consensus';
+          }
+          if (btnId === 'next_page_consensus') return null;
           var staticMap = {
-            next_page_download: 'qc',
-            next_page_normalize: 'groups',
-            go_to_groups: 'groups',
-            go_to_groups_from_norm: 'groups',
+            next_page_download: 'normalize',
+            next_page_normalize: 'qc',
+            next_page_normalize_parallel: 'qc',
+            go_to_groups: 'qc',
+            go_to_groups_from_norm: 'qc',
             go_to_results: 'results',
-            next_page_batch: 'results',
-            next_page_results: 'wgcna',
             next_page_wgcna: 'common_genes',
             next_page_common_genes_end: 'ppi',
             next_page_common_genes_to_ml: 'ml',
             next_page_ppi: 'ml',
-            next_page_ml: 'download',
+            next_page_ml: 'validation',
             next_page_ml_to_roc: 'validation',
             next_page_ml_to_validation: 'validation',
             next_page_validation_to_roc: 'roc',
-            next_page_roc: 'download',
+            next_page_roc: 'nomogram',
             next_page_roc_to_nomogram: 'nomogram',
             next_page_roc_to_gsea: 'gsea',
             next_page_roc_to_results: 'results_summary',
             next_page_nomogram_to_gsea: 'gsea',
             next_page_nomogram_to_results: 'results_summary',
-            next_page_gsea: 'download',
+            next_page_gsea: 'results_summary',
             next_page_gsea_to_results: 'results_summary'
           };
           return staticMap[btnId] || null;
         }
-        $(document).on('click', 'button[id^=\"next_\"] , #go_to_groups, #go_to_groups_from_norm, #go_to_results, #next_to_batch_btn', function() {
+        $(document).on('click', 'button[id^=\"next_\"], button[id^=\"go_to_\"], #next_to_batch_btn, .next-btn button', function() {
           var btnId = (this && this.id) ? this.id : '';
           var targetTab = gexpResolveNextTab(btnId);
           if (targetTab) gexpClickSidebarTab(targetTab);
@@ -184,11 +218,12 @@ gexp_app_analysis_dashboard_ui <- function() {
       ")),
       shinydashboard::tabItems(
         gexp_ui_download(),
-        gexp_ui_qc(),
         gexp_ui_normalize(),
+        gexp_ui_qc(),
         gexp_ui_groups(),
         gexp_ui_batch(),
         gexp_ui_results(),
+        gexp_ui_consensus(),
         gexp_ui_wgcna(),
         gexp_ui_common_genes(),
         gexp_ui_ppi(),

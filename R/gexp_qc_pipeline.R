@@ -85,6 +85,52 @@ gexp_qc_detect_outliers <- function(expr, top_n = 5000L) {
   )
 }
 
+#' Flag outliers within each dataset (before merge)
+#'
+#' Combined-matrix PCA on mixed microarray + RNA-seq (or un-normalized
+#' multi-study counts) is not comparable. This helper runs
+#' [gexp_qc_detect_outliers()] on each GSE separately and unions the flags.
+#'
+#' @param micro_expr_list Named list of microarray matrices.
+#' @param rna_counts_list Named list of RNA-seq matrices.
+#' @param top_n Integer number of top variable genes per dataset.
+#' @return List with `pca_outliers`, `conn_outliers`, `all_outliers`,
+#'   `skipped` (datasets with fewer than 5 samples), and `log`.
+#' @export
+gexp_qc_detect_outliers_per_dataset <- function(
+  micro_expr_list = list(),
+  rna_counts_list = list(),
+  top_n = 5000L
+) {
+  mats <- c(micro_expr_list, rna_counts_list)
+  mats <- mats[vapply(mats, function(m) is.matrix(m) && ncol(m) > 0L, logical(1))]
+  pca_outliers <- character(0)
+  conn_outliers <- character(0)
+  all_outliers <- character(0)
+  skipped <- character(0)
+  log <- character(0)
+  for (nm in names(mats)) {
+    m <- mats[[nm]]
+    if (is.null(m) || ncol(m) < 5L) {
+      skipped <- c(skipped, nm)
+      log <- c(log, paste0(nm, ": skipped (< 5 samples)"))
+      next
+    }
+    qc <- gexp_qc_detect_outliers(m, top_n = top_n)
+    pca_outliers <- union(pca_outliers, qc$pca_outliers)
+    conn_outliers <- union(conn_outliers, qc$conn_outliers)
+    all_outliers <- union(all_outliers, qc$all_outliers)
+    log <- c(log, paste0(nm, ": ", length(qc$all_outliers), " flagged"))
+  }
+  list(
+    pca_outliers = pca_outliers,
+    conn_outliers = conn_outliers,
+    all_outliers = all_outliers,
+    skipped = skipped,
+    log = log
+  )
+}
+
 #' Exclude selected samples from download/QC state lists
 #'
 #' @param combined_expr_raw Matrix genes x samples.
@@ -143,6 +189,16 @@ gexp_qc_exclude_samples <- function(
   }
   rna_counts_list <- rna_counts_list[!vapply(rna_counts_list, is.null, logical(1))]
 
+  rebuilt_genes <- gexp_rebuild_all_genes_list(micro_expr_list, rna_counts_list)
+  common_keep <- if (length(rebuilt_genes) > 0L) Reduce(intersect, rebuilt_genes) else character(0)
+  rebuilt <- .gexpipe_cbind_common_genes(
+    c(micro_expr_list, rna_counts_list),
+    common_keep
+  )
+  if (!is.null(rebuilt)) {
+    combined_expr_raw <- rebuilt
+  }
+
   if (!is.null(unified_metadata) && "SampleID" %in% names(unified_metadata)) {
     unified_metadata <- unified_metadata[!unified_metadata$SampleID %in% samples_to_exclude, , drop = FALSE]
   }
@@ -152,7 +208,7 @@ gexp_qc_exclude_samples <- function(
     micro_expr_list = micro_expr_list,
     rna_counts_list = rna_counts_list,
     unified_metadata = unified_metadata,
-    remaining_samples = keep_cols
+    remaining_samples = colnames(combined_expr_raw)
   )
 }
 

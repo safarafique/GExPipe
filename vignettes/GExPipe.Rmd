@@ -36,14 +36,16 @@ knitr::opts_chunk$set(
 # Introduction
 
 `GExPipe` is a **Shiny application** for bulk RNA-seq and microarray
-analysis. This vignette walks through the guided 15-step interface end to
-end — download GEO data, run QC and normalization, correct batch effects,
-discover differentially expressed genes, build co-expression networks,
-refine candidates with PPI and machine learning, and export a clinical
-summary report — without manually wiring separate Bioconductor tools
-together. For mixed microarray studies (Arraystar, Affymetrix, Agilent,
+analysis. This vignette walks through the guided **16-step** interface end
+to end. Step 1 has four analysis types: **RNA-seq only**, **microarray
+only**, **Merged (Both)** (per-study normalize, common genes, one joint
+batch and limma DE), and **Parallel DE, then merge** (separate pipelines
+through DE, then RNA-seq intersect microarray at Step 7). Each RNA-seq and
+microarray box accepts one or more GSE IDs in the same run. Later steps
+cover WGCNA, DEG ∩ modules, PPI, machine learning, and a clinical summary
+report. For mixed microarray studies (Arraystar, Affymetrix, Agilent,
 custom probe IDs), the download step automatically runs **STEP 2b** to map
-probes to HGNC gene symbols before merging — see
+probes to HGNC gene symbols so overlap and later merge use symbols — see
 [Gene ID mapping](#gene-id-mapping-mixed-studies) below.
 
 ## Vignette outline
@@ -54,7 +56,7 @@ probes to HGNC gene symbols before merging — see
 | [Installation](#installation) | Bioconductor and GitHub install |
 | [Run latest code for analysis](#run-latest-code) | Avoid stale installs; use `main` / `pkgload` |
 | [Launch the Shiny application](#launch-the-shiny-application) | Start the app (`runGExPipe()` + `shiny::runApp()`) |
-| [Step-by-step Shiny walkthrough](#step-by-step-shiny-walkthrough) | Actions and screenshots for all 15 steps |
+| [Step-by-step Shiny walkthrough](#step-by-step-shiny-walkthrough) | Actions and screenshots for all 16 steps |
 | [Gene ID mapping](#gene-id-mapping-mixed-studies) | Probe / accession → symbol conversion (STEP 2b) |
 | [Programmatic example](#programmatic-example-bundled-data) | Optional scripting with bundled CSV data |
 | [Troubleshooting](#troubleshooting) | Common install and runtime issues |
@@ -68,30 +70,31 @@ for functional enrichment.
 
 ## How the Shiny app is organised {#how-the-shiny-app-is-organised}
 
-The sidebar lists **15 sequential steps** grouped into four phases. Each
+The sidebar lists **16 sequential steps** grouped into four phases. Each
 step unlocks only after the previous one succeeds. The welcome screen
-explains the workflow; click **Go to Analysis** to open Step 1.
+explains the four analysis types; click **Start Analyzing** to open Step 1.
+Step 7 (**RNA-seq ∩ microarray**) is used only for Parallel DE.
 
 | Phase | Steps | What you do |
 |------------------------|------------------------|------------------------|
-| **Data preparation** | 1 – 5 | Download GEO data → QC & visualization → Normalize → Select groups → Batch correction |
-| **Gene discovery** | 6 – 8 | Differential expression → WGCNA → DEG ∩ hub genes |
-| **Candidate refinement** | 9 – 12 | PPI network → ML feature selection → Validation → ROC |
-| **Clinical translation** | 13 – 15 | Nomogram → GSEA → Summary PDF report |
+| **Data preparation** | 1 – 5 | Download GEO data (per GSE) → Normalize each study → QC & visualization → Select groups → Batch correction |
+| **Gene discovery** | 6 – 9 | Differential expression → Parallel overlap (Step 7) → WGCNA → DEG ∩ modules |
+| **Candidate refinement** | 10 – 13 | PPI network → ML feature selection → Validation → ROC |
+| **Clinical translation** | 14 – 16 | Nomogram → GSEA → Summary PDF report |
 
-```{r pipeline-overview, echo=FALSE, fig.cap="GExPipe 15-step pipeline. Each box corresponds to one sidebar tab in the Shiny app."}
+```{r pipeline-overview, echo=FALSE, fig.height=8, fig.cap="GExPipe 16-step pipeline. Each box corresponds to one sidebar tab in the Shiny app. Step 7 is Parallel DE only."}
 pipeline <- data.frame(
-  step  = 1:15,
+  step  = 1:16,
   phase = rep(
     c("Data preparation", "Gene discovery",
       "Candidate refinement", "Clinical translation"),
-    c(5, 3, 4, 3)
+    c(5, 4, 4, 3)
   ),
   label = c(
-    "1 Download", "2 QC", "3 Normalize", "4 Groups", "5 Batch",
-    "6 DE", "7 WGCNA", "8 Common genes",
-    "9 PPI", "10 ML", "11 Validation", "12 ROC",
-    "13 Nomogram", "14 GSEA", "15 Report"
+    "1 Download", "2 Normalize", "3 QC", "4 Groups", "5 Batch",
+    "6 DE", "7 RNA ∩ array", "8 WGCNA", "9 DEG ∩ WGCNA",
+    "10 PPI", "11 ML", "12 Validation", "13 ROC",
+    "14 Nomogram", "15 GSEA", "16 Report"
   ),
   stringsAsFactors = FALSE
 )
@@ -155,7 +158,7 @@ time**; `runGExPipe()` does not download packages at launch.
 
 Until the package is on Bioconductor, install from
 [GitHub](https://github.com/safarafique/GExPipe). Requires **R ≥
-4.5.0**.
+4.6.0** (see DESCRIPTION).
 
 ```{r install-github, eval=FALSE}
 options(timeout = 3600)
@@ -189,8 +192,8 @@ BiocManager::install(c("org.Hs.eg.db", "biomaRt"), ask = FALSE, update = FALSE)
 # Run latest code for analysis {#run-latest-code}
 
 If you installed from GitHub some time ago, reinstall or launch from the
-latest `main` branch so probe-ID mapping (STEP 2b) and other fixes are
-included:
+latest `main` branch so Parallel DE, multi-GSE download, probe-ID mapping
+(STEP 2b), and other fixes are included:
 
 ```{r run-latest-github, eval=FALSE}
 if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
@@ -236,7 +239,7 @@ app <- GExPipe::runGExPipe()
 shiny::runApp(app, port = 3838L)
 ```
 
-The browser opens at the **welcome screen**. Click **Go to Analysis** to
+The browser opens at the **welcome screen**. Click **Start Analyzing** to
 begin **Step 1 - Download Data**.
 
 ```{r launch-github-auto, eval=FALSE}
@@ -261,111 +264,132 @@ button, and confirm the **success check** before continuing.
 
 ## Phase 1 — Data preparation
 
-The sidebar tabs for this phase are **1. Download Data**, **2. QC &
-Visualization**, **3. Normalize Data**, **4. Select Groups**, and **5. Batch
+The sidebar tabs for this phase are **1. Download Data**, **2. Normalize
+Data**, **3. QC & Visualization**, **4. Select Groups**, and **5. Batch
 Correction**. The walkthrough uses a two-study RNA-seq example
 (`GSE50760`, `GSE104836`); any valid GEO accessions work the same way.
+For Parallel DE, enter RNA-seq IDs in the left box and microarray IDs in
+the right box (several IDs per box are allowed).
 
 ### Step 1 — Download Data
 
 **Sidebar:** `1. Download Data`
 
-**Goal:** Download GEO series, map row IDs to gene symbols, and build a
-combined genes × samples matrix for downstream steps.
+**Goal:** Download GEO series, map row IDs to gene symbols, and keep
+**per-GSE** matrices. Merged (Both) intersects genes after Step 2
+normalization. Parallel DE keeps each platform's genes until Step 7.
 
 **What to do:**
 
 1. Optionally enter a **Disease / Condition** label (used in reports and
    saved workspace names).
-2. Under **Select Analysis Platform**, choose **RNA-seq**, **Microarray**, or
-   **Merged (Both)**.
-3. Choose **Datasets** mode:
-   - **Single dataset (1 GSE)** — Step 5 (batch correction) is skipped.
-   - **Multiple datasets (comma-separated)** — batch correction is
-     recommended in Step 5.
-4. Select the **DE method for Step 6** (this also controls Step 3 behaviour):
+2. Under **Select Analysis Platform**, choose one of four types:
+   - **RNA-seq** — counts; DESeq2 / edgeR / voom or limma on TMM.
+   - **Microarray** — platform normalization + limma.
+   - **Merged (Both)** — per-study normalize, common genes, one joint
+     batch, **one limma DE** (original merged workflow).
+   - **Parallel DE, then merge** — two separate pipelines through DE
+     (RNA-seq engine + microarray limma). Step 7 keeps same-direction
+     overlap. Step 8 is one WGCNA on one processed platform matrix.
+3. **Datasets:** RNA-seq-only and microarray-only can use **Single
+   dataset (1 GSE)** (skips Step 5) or **Multiple datasets**. **Merged**
+   and **Parallel** always keep every GSE typed in each box (several
+   RNA-seq studies **and** several microarray studies in one run).
+4. Select the **DE method for Step 6** (this also controls Step 2):
    - **limma** — microarray, merged, or normalized log-expression.
    - **limma-voom**, **DESeq2**, or **edgeR** — RNA-seq integer counts.
-5. Enter comma-separated **GSE IDs** (e.g. `GSE50760, GSE104836`).
+   - Parallel: RNA-seq method on the left; microarray is always limma.
+5. Enter comma-separated **GSE IDs**. RNA-seq and microarray each have
+   their own box (e.g. `GSE50760, GSE104836` in RNA-seq and `GSE89076`
+   in microarray).
 6. Click **Start Processing** and read the **Download log**.
-7. Click **Next: QC & Visualization**.
+7. Click **Next: Normalize Data**.
 
 For **multiple microarray platforms**, install `org.Hs.eg.db` and
 `biomaRt` (see [Installation](#installation)) so **STEP 2b** converts probe
-IDs to HGNC symbols before merging.
+IDs to HGNC symbols so overlap and later merge use gene symbols.
 
 **Success check:** Download log lists samples per GSE; **STEP 2b** runs when
-needed; row names are symbols (`TP53`, `BRCA1`, …); **Common genes** > 0.
+needed; row names are symbols (`TP53`, `BRCA1`, …). Merged reports common
+genes; Parallel keeps each platform's full gene list until Step 7.
 
-```{r step01-screenshot, echo=FALSE, fig.cap="Step 1: Select platform, dataset mode, DE method, and GSE IDs.", out.width="100%"}
+```{r step01-screenshot, echo=FALSE, fig.cap="Step 1: Select one of four analysis types, DE method, and GSE IDs (several per box).", out.width="100%"}
 knitr::include_graphics("images/step01_download.png")
 ```
 
-### Step 2 — QC & Visualization
+### Step 2 — Normalize Data
 
-**Sidebar:** `2. QC & Visualization`
+**Sidebar:** `2. Normalize Data`
 
-**Goal:** Check gene overlap, inspect raw expression, and detect outlier
-samples **before** normalization.
+**Goal:** Normalize **each GSE on its native scale**, then merge on common
+genes. Optional global quantile is off by default; use Step 5 to align
+studies.
+
+**What to do:**
+
+**Count-based DE (DESeq2 / edgeR / limma-voom from Step 1):** the panel shows
+**Normalization Auto-Handled** — continue to **Next: QC & Visualization**.
+Each RNA-seq GSE is TMM-normalized (Merged intersects common genes; Parallel
+does not). DESeq2/edgeR/voom still use **raw counts**.
+
+**limma path (microarray or merged):**
+
+1. Choose **Auto** or **Manual** under **Normalization Strategy**.
+2. Microarray: **Quantile** or **RMA** *per GSE*; RNA-seq: **TMM + log2-CPM** *per GSE*.
+3. Leave **Apply global quantile normalization** off unless you have
+   same-platform microarray studies and want extra alignment (mixed
+   microarray + RNA-seq never applies it). Cross-study alignment is Step 5.
+4. Click **Apply Normalization**. Merged intersects common genes here;
+   Parallel keeps two separate matrices (no global quantile).
+5. Scroll to **Normalization Quality Assessment** (panels a and b below):
+   - Overall density and **Q–Q** plot (panel a).
+   - Median/range alignment and distribution overlap (panel b).
+6. Click **Next: QC & Visualization**.
+
+**Success check:** Within each dataset, sample medians align. Mixed-platform
+blocks remaining after Step 2 are expected; Step 5 removes study/platform
+batch. Parallel shows two columns (RNA-seq left, microarray right).
+
+```{r step03a-screenshot, echo=FALSE, fig.cap="Step 2a: Overall density and Q-Q plots after normalization.", out.width="100%"}
+knitr::include_graphics("images/step03a_normalize.png")
+```
+
+```{r step03b-screenshot, echo=FALSE, fig.cap="Step 2b: Median/range alignment and distribution overlap.", out.width="100%"}
+knitr::include_graphics("images/step03b_normalize.png")
+```
+
+### Step 3 — QC & Visualization
+
+**Sidebar:** `3. QC & Visualization`
+
+**Goal:** Check gene overlap, inspect expression **per platform** after
+Step 2, and detect outlier samples **within each GSE**. Parallel DE does
+not require a gene intersection here.
 
 **What to do:**
 
 1. Review **Venn** and **UpSet** plots (figure below, panel a).
 2. Open **Quality Control Plots** — **Boxplot** and **Density** tabs on raw
    expression (panel b).
-3. In **Sample Outlier Detection**, click **Run Outlier Detection** (panel c):
-   - **PCA + Mahalanobis distance** (97.5% chi-squared threshold).
-   - **Sample connectivity** (signed network; mean − 2×SD cutoff).
+3. In **Sample Outlier Detection**, click **Run Outlier Detection** (panel c).
+   Flags are computed **per dataset** (PCA + connectivity on that GSE).
 4. Exclude flagged samples if needed; keep **≥ 3 samples per group** after
    Step 4.
 5. Review **Data Summary** (datasets, samples, genes).
-6. Proceed to Step 3.
+6. Proceed to Step 4 (Select Groups).
 
 **Success check:** Overlap and QC plots look reasonable; outliers reviewed.
 
-```{r step02a-screenshot, echo=FALSE, fig.cap="Step 2a: Venn and UpSet gene overlap.", out.width="100%"}
+```{r step02a-screenshot, echo=FALSE, fig.cap="Step 3a: Venn and UpSet gene overlap.", out.width="100%"}
 knitr::include_graphics("images/step02a_qc.png")
 ```
 
-```{r step02b-screenshot, echo=FALSE, fig.cap="Step 2b: Raw expression boxplot.", out.width="100%"}
+```{r step02b-screenshot, echo=FALSE, fig.cap="Step 3b: Expression boxplot.", out.width="100%"}
 knitr::include_graphics("images/step02b_qc.png")
 ```
 
-```{r step02c-screenshot, echo=FALSE, fig.cap="Step 2c: PCA and connectivity outlier detection.", out.width="100%"}
+```{r step02c-screenshot, echo=FALSE, fig.cap="Step 3c: PCA and connectivity outlier detection.", out.width="100%"}
 knitr::include_graphics("images/step02c_qc.png")
-```
-
-### Step 3 — Normalize Data
-
-**Sidebar:** `3. Normalize Data`
-
-**Goal:** Make expression values comparable across samples and datasets.
-
-**What to do:**
-
-**Count-based DE (DESeq2 / edgeR / limma-voom from Step 1):** the panel shows
-**Normalization Auto-Handled** — proceed with **Go to Step 4: Select Groups**.
-Background TMM + quantile still runs for WGCNA and heatmaps.
-
-**limma path (microarray or merged):**
-
-1. Choose **Auto** or **Manual** under **Normalization Strategy**.
-2. Microarray: **Quantile** or **RMA**; RNA-seq: **TMM + log2-CPM**.
-3. Toggle **Apply global quantile normalization** if appropriate.
-4. Click **Apply Normalization**.
-5. Scroll to **Normalization Quality Assessment** (panels a and b below):
-   - Overall density and **Q–Q** plot (panel a).
-   - Median/range alignment and distribution overlap (panel b).
-6. Click **Next: Select Groups**.
-
-**Success check:** Q–Q points follow the diagonal; sample medians align.
-
-```{r step03a-screenshot, echo=FALSE, fig.cap="Step 3a: Overall density and Q-Q plots after normalization.", out.width="100%"}
-knitr::include_graphics("images/step03a_normalize.png")
-```
-
-```{r step03b-screenshot, echo=FALSE, fig.cap="Step 3b: Median/range alignment and distribution overlap.", out.width="100%"}
-knitr::include_graphics("images/step03b_normalize.png")
 ```
 
 ### Step 4 — Select Groups
@@ -453,7 +477,12 @@ knitr::include_graphics("images/step05b_batch.png")
    - **Volcano plot** (up / down / not significant).
    - **Top DEGs** table and heatmap below.
 6. Optionally download **Analysis report (TXT)**.
-7. Click **Next: WGCNA Analysis**.
+7. Click **Next: WGCNA Analysis** (RNA-seq only, microarray only, or
+   Merged) or **Next: RNA-seq ∩ microarray** (Parallel DE).
+
+Parallel DE runs two engines with one click (RNA-seq on the left,
+microarray limma on the right). Merged (Both) still uses one joint limma
+on the combined matrix.
 
 **Success check:** Volcano shows expected direction; DEG count is plausible for
 your contrast; pipeline verification lists the correct method and samples.
@@ -466,9 +495,29 @@ knitr::include_graphics("images/step06a_de.png")
 knitr::include_graphics("images/step06b_de.png")
 ```
 
-### Step 7 — WGCNA Network Analysis
 
-**Sidebar:** `7. WGCNA Analysis`
+### Step 7 — RNA-seq ∩ microarray (Parallel DE only)
+
+**Sidebar:** `7. RNA-seq ∩ microarray`
+
+**Goal:** Keep genes that are significant on **both** platforms with the
+**same fold-change direction**. This is the first merge after Parallel DE.
+RNA-seq only, microarray only, and Merged (Both) skip this tab.
+
+**What to do:**
+
+1. Confirm both Step 6 DE tables exist (RNA-seq left, microarray right).
+2. Click **Apply** to store the same-direction overlap (Consensus DEGs).
+3. Review the Venn: **Common** is the two-circle overlap; **Consensus** is
+   the list stored for Step 9.
+4. Click **Next: WGCNA Analysis**.
+
+**Success check:** Consensus gene count is greater than 0 and matches the
+same-direction overlap, not the union of all DEGs.
+
+### Step 8 — WGCNA Network Analysis
+
+**Sidebar:** `8. WGCNA Analysis`
 
 **Goal:** Find co-expression modules associated with disease and extract hub
 genes from significant modules.
@@ -495,33 +544,34 @@ The WGCNA tab has internal sub-steps; complete them in order:
 5. **Identify significant modules** (panel d):
    - Click **Identify Significant Modules**; note hub genes (GS/MM filters).
    - Optionally run **GS vs MM** plots for all modules.
-6. Click **Next: Common Genes (DEG & WGCNA)**.
+6. Click **Next: Common Genes (DEG & WGCNA)** (Step 9).
 
 **Success check:** Soft-threshold R² ≥ 0.80; at least one module correlates
 with Disease; hub genes are listed for significant modules.
 
-```{r step07a-screenshot, echo=FALSE, fig.cap="Step 7a: WGCNA data preparation and gene selection.", out.width="100%"}
+```{r step07a-screenshot, echo=FALSE, fig.cap="Step 8a: WGCNA data preparation and gene selection.", out.width="100%"}
 knitr::include_graphics("images/step07a_wgcna.png")
 ```
 
-```{r step07b-screenshot, echo=FALSE, fig.cap="Step 7b: Soft-threshold power selection.", out.width="100%"}
+```{r step07b-screenshot, echo=FALSE, fig.cap="Step 8b: Soft-threshold power selection.", out.width="100%"}
 knitr::include_graphics("images/step07b_wgcna.png")
 ```
 
-```{r step07c-screenshot, echo=FALSE, fig.cap="Step 7c: Module dendrogram and module-trait heatmap.", out.width="100%"}
+```{r step07c-screenshot, echo=FALSE, fig.cap="Step 8c: Module dendrogram and module-trait heatmap.", out.width="100%"}
 knitr::include_graphics("images/step07c_wgcna.png")
 ```
 
-```{r step07d-screenshot, echo=FALSE, fig.cap="Step 7d: Significant modules and hub gene summary.", out.width="100%"}
+```{r step07d-screenshot, echo=FALSE, fig.cap="Step 8d: Significant modules and hub gene summary.", out.width="100%"}
 knitr::include_graphics("images/step07d_wgcna.png")
 ```
 
-### Step 8 — Common Genes (DEG & WGCNA) & Enrichment
+### Step 9 — Common Genes (DEG & WGCNA) & Enrichment
 
-**Sidebar:** `8. Common Genes (DEG & WGCNA)`
+**Sidebar:** `9. Common Genes (DEG & WGCNA)`
 
-**Goal:** Intersect DEGs (Step 6) with genes in significant WGCNA modules
-(Step 7), then run GO/KEGG enrichment on the overlap.
+**Goal:** Intersect DEGs (Step 6, or Step 7 consensus in Parallel) with
+genes in significant WGCNA modules (Step 8), then run GO/KEGG enrichment
+on the overlap.
 
 **What to do:**
 
@@ -535,28 +585,28 @@ knitr::include_graphics("images/step07d_wgcna.png")
    - **Path 1: PPI Interaction → then ML**, or
    - **Path 2: Direct to Machine Learning**.
 
-**Requirements:** Steps 6 and 7 (including **Identify Significant Modules**)
-must be complete.
+**Requirements:** Step 6 DE (and Step 7 if Parallel) plus WGCNA **Identify
+Significant Modules** must be complete.
 
 **Success check:** Venn overlap > 0; GO/KEGG plots show interpretable terms.
 
-```{r step08a-screenshot, echo=FALSE, fig.cap="Step 8a: Common genes Venn diagram (DEG intersect WGCNA).", out.width="100%"}
+```{r step08a-screenshot, echo=FALSE, fig.cap="Step 9a: Common genes Venn diagram (DEG intersect WGCNA).", out.width="100%"}
 knitr::include_graphics("images/step08a_common_genes.png")
 ```
 
-```{r step08b-screenshot, echo=FALSE, fig.cap="Step 8b: GO enrichment of common genes.", out.width="100%"}
+```{r step08b-screenshot, echo=FALSE, fig.cap="Step 9b: GO enrichment of common genes.", out.width="100%"}
 knitr::include_graphics("images/step08b_go.png")
 ```
 
-```{r step08c-screenshot, echo=FALSE, fig.cap="Step 8c: KEGG enrichment of common genes.", out.width="100%"}
+```{r step08c-screenshot, echo=FALSE, fig.cap="Step 9c: KEGG enrichment of common genes.", out.width="100%"}
 knitr::include_graphics("images/step08c_kegg.png")
 ```
 
 ## Phase 3 — Candidate refinement
 
-### Step 9 — PPI Interaction
+### Step 10 — PPI Interaction
 
-**Sidebar:** `9. PPI Interaction`
+**Sidebar:** `10. PPI Interaction`
 
 **Goal:** Map common genes onto a STRING protein–protein interaction network
 and identify hub proteins.
@@ -569,32 +619,32 @@ and identify hub proteins.
 4. Choose genes for network view: **Hub genes only**, **Top N by degree**, or
    **Select genes manually**; click **Run**.
 5. Inspect PPI network layouts (panel b) and **consensus hub** table.
-6. Click **Extract Data for ML** (required before Step 10).
+6. Click **Extract Data for ML** (required before Step 11).
 7. Click **Next: Machine Learning Process**.
 
-**Requirements:** Step 8 common genes computed.
+**Requirements:** Step 9 common genes computed.
 
 **Success check:** Network builds with mapped edges; hub genes listed;
 ML extract succeeds.
 
-```{r step09a-screenshot, echo=FALSE, fig.cap="Step 9a: Run PPI and interactive vs non-interactive gene table.", out.width="100%"}
+```{r step09a-screenshot, echo=FALSE, fig.cap="Step 10a: Run PPI and interactive vs non-interactive gene table.", out.width="100%"}
 knitr::include_graphics("images/step09a_ppi.png")
 ```
 
-```{r step09b-screenshot, echo=FALSE, fig.cap="Step 9b: PPI network graph and hub gene metrics.", out.width="100%"}
+```{r step09b-screenshot, echo=FALSE, fig.cap="Step 10b: PPI network graph and hub gene metrics.", out.width="100%"}
 knitr::include_graphics("images/step09b_ppi.png")
 ```
 
-### Step 10 — Machine Learning Process
+### Step 11 — Machine Learning Process
 
-**Sidebar:** `10. Machine Learning Process`
+**Sidebar:** `11. Machine Learning Process`
 
 **Goal:** Rank genes by predictive importance using multiple ML algorithms and
 find genes selected by ≥ 2 methods.
 
 **What to do:**
 
-1. Confirm **Extract Data for ML** was run on the PPI tab (Step 9).
+1. Confirm **Extract Data for ML** was run on the PPI tab (Step 10).
 2. Under **Run ML Analysis** (panel a), select one or more methods:
    LASSO, Elastic Net, Ridge, Random Forest, SVM-RFE, Boruta, sPLS-DA,
    XGBoost+SHAP.
@@ -610,17 +660,17 @@ find genes selected by ≥ 2 methods.
 **Success check:** At least one common ML gene; Venn overlap across methods
 is non-empty.
 
-```{r step10a-screenshot, echo=FALSE, fig.cap="Step 10a: Select ML methods and run analysis.", out.width="100%"}
+```{r step10a-screenshot, echo=FALSE, fig.cap="Step 11a: Select ML methods and run analysis.", out.width="100%"}
 knitr::include_graphics("images/step10a_ml.png")
 ```
 
-```{r step10b-screenshot, echo=FALSE, fig.cap="Step 10b: Method overlap Venn diagram and common ML genes.", out.width="100%"}
+```{r step10b-screenshot, echo=FALSE, fig.cap="Step 11b: Method overlap Venn diagram and common ML genes.", out.width="100%"}
 knitr::include_graphics("images/step10b_ml.png")
 ```
 
-### Step 11 — Validation
+### Step 12 — Validation
 
-**Sidebar:** `11. Validation Setup`
+**Sidebar:** `12. Validation Setup`
 
 **Goal:** Test generalization on an external GEO cohort or an internal
 70/30 train–test split. Target accuracy ≥ 70%.
@@ -639,22 +689,22 @@ knitr::include_graphics("images/step10b_ml.png")
 3. Review validation status and DE results (panel b).
 4. Click **Continue to ROC Curve Analysis**.
 
-**Requirements:** Step 10 ML analysis complete with at least one common ML gene.
+**Requirements:** Step 11 ML analysis complete with at least one common ML gene.
 
 **Success check:** External mode shows downloaded samples and validation DE
 results; internal mode confirms the 70/30 split is ready for ROC and nomogram.
 
-```{r step11a-screenshot, echo=FALSE, fig.cap="Step 11a: Validation mode and external validation settings.", out.width="100%"}
+```{r step11a-screenshot, echo=FALSE, fig.cap="Step 12a: Validation mode and external validation settings.", out.width="100%"}
 knitr::include_graphics("images/step11a_validation.png")
 ```
 
-```{r step11b-screenshot, echo=FALSE, fig.cap="Step 11b: External validation DE results.", out.width="100%"}
+```{r step11b-screenshot, echo=FALSE, fig.cap="Step 12b: External validation DE results.", out.width="100%"}
 knitr::include_graphics("images/step11b_validation_external.png")
 ```
 
-### Step 12 — ROC Analysis
+### Step 13 — ROC Analysis
 
-**Sidebar:** `12. ROC Curve Analysis`
+**Sidebar:** `13. ROC Curve Analysis`
 
 **Goal:** Per-gene AUC with 95% CI (`r BiocStyle::CRANpkg("pROC")`).
 Retain genes with AUC ≥ 0.80 in training and validation.
@@ -664,7 +714,7 @@ Retain genes with AUC ≥ 0.80 in training and validation.
 1. Review **AUC Summary — Training Data** (panel a): table and bar plot for
    common ML genes with AUC ≥ 0.80.
 2. Inspect **ROC Curves — Training Data** and per-gene expression boxplots.
-3. If external validation was run in Step 11, compare training vs validation
+3. If external validation was run in Step 12, compare training vs validation
    AUC in the summary and external ROC panels (panel b).
 4. Review **Multi-variable ROC** (combined biomarker panel vs best single gene).
 5. Under **Select Final Biomarker Genes**, choose genes to carry forward to
@@ -672,27 +722,27 @@ Retain genes with AUC ≥ 0.80 in training and validation.
 6. Click **Continue to Diagnostic Nomogram**, **Continue to GSEA Analysis**, or
    **View Results Summary**.
 
-**Requirements:** Step 10 common ML genes; Step 11 validation mode selected.
+**Requirements:** Step 11 common ML genes; Step 12 validation mode selected.
 
 **Success check:** At least one gene with training AUC ≥ 0.80; validation AUC
 reported when external data are loaded.
 
-```{r step12a-screenshot, echo=FALSE, fig.cap="Step 12a: Training ROC curves and AUC summary.", out.width="100%"}
+```{r step12a-screenshot, echo=FALSE, fig.cap="Step 13a: Training ROC curves and AUC summary.", out.width="100%"}
 knitr::include_graphics("images/step12a_roc.png")
 ```
 
-```{r step12b-screenshot, echo=FALSE, fig.cap="Step 12b: Training vs validation AUC comparison.", out.width="100%"}
+```{r step12b-screenshot, echo=FALSE, fig.cap="Step 13b: Training vs validation AUC comparison.", out.width="100%"}
 knitr::include_graphics("images/step12b_roc.png")
 ```
 
 ## Phase 4 — Clinical translation
 
-The sidebar tabs for this phase are **13. Diagnostic Nomogram Model**,
-**14. GSEA Analysis**, and **Results Summary**.
+The sidebar tabs for this phase are **14. Diagnostic Nomogram Model**,
+**15. GSEA Analysis**, and **16. Results Summary**.
 
-### Step 13 — Nomogram
+### Step 14 — Nomogram
 
-**Sidebar:** `13. Diagnostic Nomogram Model`
+**Sidebar:** `14. Diagnostic Nomogram Model`
 
 **Goal:** Build a points-based clinical score (`rms::lrm()`),
 calibration curve, and decision curve analysis.
@@ -712,18 +762,18 @@ calibration curve, and decision curve analysis.
 5. Click **Continue to GSEA Analysis** or **View Results Summary**.
 
 **Requirements:** Batch correction (Step 5), group metadata, and common ML
-genes from Step 10 (or common DEG ∩ WGCNA genes from Step 8).
+genes from Step 11 (or common DEG ∩ WGCNA genes from Step 9).
 
 **Success check:** Nomogram renders; training AUC is reasonable; validation
 metrics match your chosen validation strategy.
 
-```{r step13-screenshot, echo=FALSE, fig.cap="Step 13: Nomogram, calibration, and decision curves.", out.width="100%"}
+```{r step13-screenshot, echo=FALSE, fig.cap="Step 14: Nomogram, calibration, and decision curves.", out.width="100%"}
 knitr::include_graphics("images/step13_nomogram.png")
 ```
 
-### Step 14 — GSEA
+### Step 15 — GSEA
 
-**Sidebar:** `14. GSEA Analysis (Signature Genes)`
+**Sidebar:** `15. GSEA Analysis (Signature Genes)`
 
 **Goal:** Pathway-level enrichment (GO, KEGG, MSigDB Hallmark/C2/C5)
 stratified by final gene expression.
@@ -733,25 +783,25 @@ stratified by final gene expression.
 1. Select one or more **Gene Set Collection(s)** (Hallmark, GO BP/MF, KEGG,
    Reactome, etc.).
 2. Optionally enter **Custom target genes**; leave blank to use common ML genes
-   (or genes selected in Step 12).
+   (or genes selected in Step 13).
 3. Click **Run GSEA**.
 4. For each target gene, review the enrichment plot and pathway list in the
    per-gene panels below.
 5. Click **Continue to Results Summary**.
 
-**Requirements:** Batch-corrected expression and common ML genes from Step 10
-(or Step 8 overlap).
+**Requirements:** Batch-corrected expression and common ML genes from Step 11
+(or Step 9 overlap).
 
 **Success check:** GSEA completes for each target gene; enrichment plots and
 pathway tables are interpretable.
 
-```{r step14-screenshot, echo=FALSE, fig.cap="Step 14: GSEA enrichment plots per signature gene.", out.width="100%"}
+```{r step14-screenshot, echo=FALSE, fig.cap="Step 15: GSEA enrichment plots per signature gene.", out.width="100%"}
 knitr::include_graphics("images/step14_gsea.png")
 ```
 
-### Step 15 — Summary Report
+### Step 16 — Summary Report
 
-**Sidebar:** `Results Summary`
+**Sidebar:** `16. Results Summary`
 
 **Goal:** Review the full pipeline narrative and key figures, then download
 exports where available.
@@ -769,7 +819,7 @@ exports where available.
 **Success check:** Summary reflects your completed steps; key plots from
 earlier tabs appear in the ordered overview.
 
-```{r step15-screenshot, echo=FALSE, fig.cap="Step 15: Results summary overview.", out.width="100%"}
+```{r step15-screenshot, echo=FALSE, fig.cap="Step 16: Results summary overview.", out.width="100%"}
 knitr::include_graphics("images/step15_summary.png")
 ```
 

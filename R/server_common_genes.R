@@ -5,20 +5,95 @@
 NULL
 
 server_common_genes <- function(input, output, session, rv) {
+
+  .step9_parallel <- function() {
+    isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")
+  }
+
+  .step9_labels <- function() {
+    if (.step9_parallel()) {
+      list(
+        deg = "Consensus DE",
+        wgcna = "WGCNA modules",
+        overlap = "Consensus DE \u2229 WGCNA",
+        venn_main = "Consensus DE \u2229 WGCNA modules"
+      )
+    } else {
+      list(
+        deg = "DEGs",
+        wgcna = "WGCNA modules",
+        overlap = "DEG \u2229 WGCNA",
+        venn_main = "Common Genes (DEG \u2229 WGCNA)"
+      )
+    }
+  }
+
+  .draw_step9_venn <- function() {
+    labs <- .step9_labels()
+    deg_set <- rv$common_genes_deg_list
+    wgcna_set <- rv$common_genes_wgcna_list
+    VennDiagram::venn.diagram(
+      x = list(A = deg_set, B = wgcna_set),
+      category.names = c(labs$deg, labs$wgcna),
+      filename = NULL,
+      output = TRUE,
+      disable.logging = TRUE,
+      imagetype = "png",
+      height = 2200,
+      width = 2200,
+      resolution = 200,
+      compression = "lzw",
+      lwd = 2.5,
+      lty = "blank",
+      fill = c("#E64B35", "#3C5488"),
+      alpha = 0.55,
+      cex = 1.4,
+      fontface = "bold",
+      cat.cex = 1.15,
+      cat.fontface = "bold",
+      cat.col = c("#E64B35", "#3C5488"),
+      margin = 0.1,
+      main = labs$venn_main,
+      main.cex = 1.3,
+      main.fontface = "bold"
+    )
+  }
+
+  output$common_genes_page_title_ui <- renderUI({
+    labs <- .step9_labels()
+    h2(icon("venus-double"), " Step 9: ", labs$overlap, " & Enrichment")
+  })
+
+  output$common_genes_find_title_ui <- renderUI({
+    labs <- .step9_labels()
+    tags$span(icon("search"), " 1. Find Common Genes (", labs$overlap, ")")
+  })
+
+  output$common_genes_venn_heading_ui <- renderUI({
+    labs <- .step9_labels()
+    tags$h5(
+      icon("circle-notch"), " Venn: ", labs$deg, " vs ", labs$wgcna,
+      style = "margin-top: 10px; margin-bottom: 8px; font-weight: 600;"
+    )
+  })
   
   # ---------- COMMON GENES ----------
   observeEvent(input$compute_common_genes, {
     # Check prerequisites with clear messages (instead of silent req)
+    if (isTRUE(rv$merge_after_de) && !isTRUE(rv$consensus_complete)) {
+      showNotification("Apply Step 7 (RNA-seq \u2229 microarray) first so common genes use those DEGs.", type = "warning", duration = 8)
+      return()
+    }
     if (is.null(rv$sig_genes) || !is.data.frame(rv$sig_genes) || nrow(rv$sig_genes) == 0) {
-      showNotification("Complete Step 6 (Differential Expression) first and run DE analysis to get significant genes.", type = "warning", duration = 8)
+      showNotification("Complete Step 6 (DE) and, for merged RNA-seq + microarray, Step 7 (consensus) first.", type = "warning", duration = 8)
       return()
     }
     if (is.null(rv$gene_metrics) || !is.data.frame(rv$gene_metrics) || nrow(rv$gene_metrics) == 0) {
-      showNotification("Complete Step 7 (WGCNA): run Module-Trait correlation and 'Calculate Correlations & GS/MM' to get gene metrics.", type = "warning", duration = 8)
+      showNotification("Complete Step 8 (WGCNA): run Module-Trait correlation and 'Calculate Correlations & GS/MM' to get gene metrics.", type = "warning", duration = 8)
       return()
     }
     if (is.null(rv$significant_modules) || !is.data.frame(rv$significant_modules) || nrow(rv$significant_modules) == 0) {
-      showNotification("Complete Step 7 (WGCNA): click 'Identify Significant Modules' to get trait-associated modules.", type = "warning", duration = 8)
+      showNotification("Complete Step 8 (WGCNA): click 'Identify Significant Modules' to get trait-associated modules.", type = "warning", duration = 8)
       return()
     }
 
@@ -36,7 +111,7 @@ server_common_genes <- function(input, output, session, rv) {
     module_colors <- unique(sub("^ME", "", sig_mod_names))
     wgcna_genes <- unique(trimws(rv$gene_metrics$Gene[rv$gene_metrics$Module %in% module_colors]))
     if (length(wgcna_genes) == 0) {
-      showNotification("No genes in significant WGCNA modules. Check module-trait thresholds in Step 7.", type = "warning", duration = 6)
+      showNotification("No genes in significant WGCNA modules. Check module-trait thresholds in Step 8.", type = "warning", duration = 6)
       return()
     }
 
@@ -51,7 +126,7 @@ server_common_genes <- function(input, output, session, rv) {
     if (length(common) == 0) {
       showNotification("Computation done: no overlap between DEGs and WGCNA significant module genes. Try relaxing DE or module-trait cutoffs.", type = "warning", duration = 8)
     } else {
-      showNotification(paste("Found", length(common), "common genes (DEG n WGCNA)."), type = "message", duration = 5)
+      showNotification(paste("Found", length(common), "genes (", .step9_labels()$overlap, ")."), type = "message", duration = 5)
     }
   })
   
@@ -60,41 +135,75 @@ server_common_genes <- function(input, output, session, rv) {
     tags$div(
       class = "alert alert-warning",
       icon("hand-point-right"),
-      " Click 'Compute Common Genes' to find overlap between DEGs and WGCNA significant module genes. Requires Step 6 (DE) and Step 7 (Identify Significant Modules) completed."
+      " Click Compute Common Genes. Needs DE (and Step 7 consensus if Parallel), plus Step 8 Identify Significant Modules."
     )
   })
   
   output$common_genes_summary_ui <- renderUI({
     req(rv$common_genes_de_wgcna)
+    labs <- .step9_labels()
     n_common <- length(rv$common_genes_de_wgcna)
     n_deg <- rv$common_genes_deg_n
     n_wgcna <- rv$common_genes_wgcna_n
     pct_deg <- if (n_deg > 0) round(100 * n_common / n_deg, 1) else 0
     pct_wgcna <- if (n_wgcna > 0) round(100 * n_common / n_wgcna, 1) else 0
-    tags$div(
-      class = "alert alert-success",
-      icon("check-circle"),
-      tags$strong("Common genes: ", n_common),
-      tags$br(),
-      "DEGs: ", n_deg, " | WGCNA (sig. modules): ", n_wgcna,
-      tags$br(),
-      "Overlap: ", pct_deg, "% of DEGs, ", pct_wgcna, "% of WGCNA genes."
+    card <- function(ic, title, n, meaning, bg) {
+      tags$div(
+        style = paste0("background:", bg, "; color:#fff; border-radius:10px; padding:12px 14px; min-height:110px;"),
+        tags$div(style = "display:flex; align-items:center; gap:8px; margin-bottom:6px;",
+                 icon(ic, class = "fa-lg"), tags$strong(title, style = "font-size:14px;")),
+        tags$div(style = "font-size:26px; font-weight:700;", format(n, big.mark = ",")),
+        tags$div(style = "font-size:12px; margin-top:6px; line-height:1.35;", meaning)
+      )
+    }
+    tagList(
+      if (.step9_parallel()) {
+        tags$div(
+          class = "alert alert-secondary",
+          style = "margin-bottom: 12px; padding: 10px 14px; background: #f8fafc; border: 1px solid #cbd5e1;",
+          icon("key"), " ",
+          tags$strong("Not the same as Step 7 Common. "),
+          icon("check-double"), " Consensus DE = Step 7 same-direction list. ",
+          icon("project-diagram"), " WGCNA = genes in significant modules. ",
+          icon("venus-double"), " This overlap is Consensus DE ∩ WGCNA."
+        )
+      } else {
+        NULL
+      },
+      fluidRow(
+        column(4, card("check-double", labs$deg, n_deg,
+                       if (.step9_parallel()) "Step 7 same-direction RNA-seq ∩ microarray." else "Significant DEGs from Step 6.",
+                       "#ca8a04")),
+        column(4, card("project-diagram", labs$wgcna, n_wgcna,
+                       "Genes in significant WGCNA modules (Step 8).",
+                       "#2563eb")),
+        column(4, card("venus-double", labs$overlap, n_common,
+                       paste0(pct_deg, "% of ", labs$deg, "; ", pct_wgcna, "% of ", labs$wgcna, "."),
+                       "#16a34a"))
+      )
     )
   })
 
   output$common_genes_process_summary_ui <- renderUI({
     if (is.null(rv$common_genes_de_wgcna) || length(rv$common_genes_de_wgcna) == 0) {
-      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"), " Compute common genes (DEG \u2229 WGCNA) to see process summary."))
+      labs <- .step9_labels()
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"),
+                    " Compute common genes (", labs$overlap, ") to see process summary."))
     }
+    labs <- .step9_labels()
     n_common <- length(rv$common_genes_de_wgcna)
     n_deg <- rv$common_genes_deg_n
     n_wgcna <- rv$common_genes_wgcna_n
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 8 complete."), " Common genes: ", n_common, " (DEG: ", n_deg, ", WGCNA sig. modules: ", n_wgcna, "). Venn above; GO/KEGG and PPI use this set."))
+      tags$p(
+        tags$strong("Step 9 complete."), " ", labs$overlap, ": ", n_common,
+        " (", labs$deg, ": ", n_deg, "; ", labs$wgcna, ": ", n_wgcna, "). Venn above; GO/KEGG and PPI use this set."
+      )
+    )
   })
 
-  # Venn diagram: DEG vs WGCNA (common genes overlap)
+  # Venn diagram: Consensus DE / DEGs vs WGCNA
   output$common_genes_venn_plot <- renderPlot({
     req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
     deg_set <- rv$common_genes_deg_list
@@ -105,146 +214,47 @@ server_common_genes <- function(input, output, session, rv) {
       return(invisible(NULL))
     }
     grid::grid.newpage()
-    vp <- VennDiagram::venn.diagram(
-      x = list(DEG = deg_set, WGCNA = wgcna_set),
-      category.names = c("DEG", "WGCNA"),
-      filename = NULL,
-      output = TRUE,
-      disable.logging = TRUE,
-      imagetype = "png",
-      height = 2200,
-      width = 2200,
-      resolution = 200,
-      compression = "lzw",
-      lwd = 2.5,
-      lty = "blank",
-      fill = c("#E41A1C", "#377EB8"),
-      alpha = 0.65,
-      cex = 1.4,
-      fontface = "bold",
-      cat.cex = 1.3,
-      cat.fontface = "bold",
-      cat.col = c("#E41A1C", "#377EB8"),
-      margin = 0.08,
-      main = "Common Genes (DEG \u2229 WGCNA)",
-      main.cex = 1.4,
-      main.fontface = "bold"
-    )
-    grid::grid.draw(vp)
+    grid::grid.draw(.draw_step9_venn())
   }, height = 420)
 
   output$download_common_genes_venn_png <- downloadHandler(
-    filename = function() "common_genes_venn_DEG_WGCNA.png",
+    filename = function() {
+      if (.step9_parallel()) "common_genes_venn_ConsensusDE_WGCNA.png" else "common_genes_venn_DEG_WGCNA.png"
+    },
     content = function(file) {
       req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
-      deg_set <- rv$common_genes_deg_list
-      wgcna_set <- rv$common_genes_wgcna_list
-      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
-      png(file, width = 8 * 150, height = 8 * 150, res = 150, bg = "white")
+      if (length(rv$common_genes_deg_list) == 0 && length(rv$common_genes_wgcna_list) == 0) return()
+      png(file, width = 8 * 300, height = 8 * 300, res = 300, bg = "white")
       grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(
-        x = list(DEG = deg_set, WGCNA = wgcna_set),
-        category.names = c("DEG", "WGCNA"),
-        filename = NULL,
-        output = TRUE,
-        disable.logging = TRUE,
-        imagetype = "png",
-        height = 8 * 150,
-        width = 8 * 150,
-        resolution = 150,
-        compression = "lzw",
-        lwd = 2.5,
-        lty = "blank",
-        fill = c("#E41A1C", "#377EB8"),
-        alpha = 0.65,
-        cex = 1.4,
-        fontface = "bold",
-        cat.cex = 1.3,
-        cat.fontface = "bold",
-        cat.col = c("#E41A1C", "#377EB8"),
-        margin = 0.08,
-        main = "Common Genes (DEG \u2229 WGCNA)",
-        main.cex = 1.4,
-        main.fontface = "bold"
-      )
-      grid::grid.draw(vp)
+      grid::grid.draw(.draw_step9_venn())
       dev.off()
     }
   )
 
   output$download_common_genes_venn_jpg <- downloadHandler(
-    filename = function() "common_genes_venn_DEG_WGCNA.jpg",
+    filename = function() {
+      if (.step9_parallel()) "common_genes_venn_ConsensusDE_WGCNA.jpg" else "common_genes_venn_DEG_WGCNA.jpg"
+    },
     content = function(file) {
       req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
-      deg_set <- rv$common_genes_deg_list
-      wgcna_set <- rv$common_genes_wgcna_list
-      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
-      jpeg(file, width = 8 * 150, height = 8 * 150, res = 150, bg = "white", quality = 95)
+      if (length(rv$common_genes_deg_list) == 0 && length(rv$common_genes_wgcna_list) == 0) return()
+      jpeg(file, width = 8 * 300, height = 8 * 300, res = 300, bg = "white", quality = 95)
       grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(
-        x = list(DEG = deg_set, WGCNA = wgcna_set),
-        category.names = c("DEG", "WGCNA"),
-        filename = NULL,
-        output = TRUE,
-        disable.logging = TRUE,
-        imagetype = "png",
-        height = 8 * 150,
-        width = 8 * 150,
-        resolution = 150,
-        compression = "lzw",
-        lwd = 2.5,
-        lty = "blank",
-        fill = c("#E41A1C", "#377EB8"),
-        alpha = 0.65,
-        cex = 1.4,
-        fontface = "bold",
-        cat.cex = 1.3,
-        cat.fontface = "bold",
-        cat.col = c("#E41A1C", "#377EB8"),
-        margin = 0.08,
-        main = "Common Genes (DEG \u2229 WGCNA)",
-        main.cex = 1.4,
-        main.fontface = "bold"
-      )
-      grid::grid.draw(vp)
+      grid::grid.draw(.draw_step9_venn())
       dev.off()
     }
   )
 
   output$download_common_genes_venn_pdf <- downloadHandler(
-    filename = function() "common_genes_venn_DEG_WGCNA.pdf",
+    filename = function() {
+      if (.step9_parallel()) "common_genes_venn_ConsensusDE_WGCNA.pdf" else "common_genes_venn_DEG_WGCNA.pdf"
+    },
     content = function(file) {
       req(rv$common_genes_deg_list, rv$common_genes_wgcna_list)
-      deg_set <- rv$common_genes_deg_list
-      wgcna_set <- rv$common_genes_wgcna_list
-      if (length(deg_set) == 0 && length(wgcna_set) == 0) return()
+      if (length(rv$common_genes_deg_list) == 0 && length(rv$common_genes_wgcna_list) == 0) return()
       pdf(file, width = 8, height = 8, bg = "white")
       grid::grid.newpage()
-      vp <- VennDiagram::venn.diagram(
-        x = list(DEG = deg_set, WGCNA = wgcna_set),
-        category.names = c("DEG", "WGCNA"),
-        filename = NULL,
-        output = TRUE,
-        disable.logging = TRUE,
-        imagetype = "png",
-        height = 2200,
-        width = 2200,
-        resolution = 200,
-        lwd = 2.5,
-        lty = "blank",
-        fill = c("#E41A1C", "#377EB8"),
-        alpha = 0.65,
-        cex = 1.4,
-        fontface = "bold",
-        cat.cex = 1.3,
-        cat.fontface = "bold",
-        cat.col = c("#E41A1C", "#377EB8"),
-        margin = 0.08,
-        main = "Common Genes (DEG \u2229 WGCNA)",
-        main.cex = 1.4,
-        main.fontface = "bold"
-      )
-      grid::grid.draw(vp)
+      grid::grid.draw(.draw_step9_venn())
       dev.off()
     }
   )
@@ -255,11 +265,14 @@ server_common_genes <- function(input, output, session, rv) {
   })
   
   output$download_common_genes <- downloadHandler(
-    filename = function() "common_genes_DEG_WGCNA.csv",
+    filename = function() {
+      if (.step9_parallel()) "common_genes_ConsensusDE_WGCNA.csv" else "common_genes_DEG_WGCNA.csv"
+    },
     content = function(file) {
       req(rv$common_genes_df)
+      csv_name <- if (.step9_parallel()) "common_genes_ConsensusDE_WGCNA.csv" else "common_genes_DEG_WGCNA.csv"
       write.csv(rv$common_genes_df, file, row.names = FALSE)
-      write.csv(rv$common_genes_df, file.path(CSV_EXPORT_DIR(), "common_genes_DEG_WGCNA.csv"), row.names = FALSE)
+      write.csv(rv$common_genes_df, file.path(CSV_EXPORT_DIR(), csv_name), row.names = FALSE)
     }
   )
   
@@ -318,13 +331,9 @@ server_common_genes <- function(input, output, session, rv) {
     if (nrow(df) == 0) return(NULL)
     n_show <- min(20, nrow(df))
     enrichplot::dotplot(go_obj, showCategory = n_show, x = "GeneRatio", color = "p.adjust", size = "Count") +
-      ggplot2::scale_color_continuous(low = "#E64B35", high = "#4DBBD5", name = "p.adjust") +
-      ggplot2::theme_minimal(base_size = 12) +
-      ggplot2::theme(
-        axis.text.y = ggplot2::element_text(size = 10),
-        plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5),
-        legend.position = "right"
-      ) +
+      gexpipe_pub_padj_scale("colour") +
+      gexpipe_pub_theme(base_size = 13) +
+      ggplot2::theme(axis.text.y = ggplot2::element_text(size = 11)) +
       ggplot2::ggtitle(title)
   }
 
@@ -512,14 +521,10 @@ server_common_genes <- function(input, output, session, rv) {
     ggplot2::ggplot(df, ggplot2::aes(x = Description, y = Count, fill = p.adjust)) +
       ggplot2::geom_col() +
       ggplot2::coord_flip() +
-      ggplot2::scale_fill_continuous(low = "#E64B35", high = "#4DBBD5", name = "p.adjust") +
-      ggplot2::theme_minimal(base_size = 12) +
-      ggplot2::theme(
-        axis.text.y = ggplot2::element_text(size = 10),
-        plot.title = ggplot2::element_text(face = "bold", size = 14, hjust = 0.5),
-        legend.position = "right"
-      ) +
-      ggplot2::labs(title = "KEGG Pathway Enrichment (Bar)", x = NULL, y = "Gene count")
+      gexpipe_pub_padj_scale("fill") +
+      gexpipe_pub_theme(base_size = 13) +
+      ggplot2::theme(axis.text.y = ggplot2::element_text(size = 11)) +
+      ggplot2::labs(title = "KEGG pathway enrichment", x = NULL, y = "Gene count")
   }
 
   output$kegg_barplot <- renderPlot(

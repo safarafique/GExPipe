@@ -100,6 +100,36 @@ test_that("gexpipe_batch_confounding_summary detects empty cells", {
   expect_true(bad$confounded)
 })
 
+test_that("gexp_normalize_and_intersect keep_platforms_separate does not mix gene sets", {
+  set.seed(2)
+  micro_genes <- paste0("M", seq_len(15), c(rep("", 10), paste0("_only", 1:5)))
+  rna_genes <- c(paste0("M", seq_len(10)), paste0("Ronly", seq_len(8)))
+  m1 <- matrix(abs(rnorm(15 * 6)), nrow = 15, ncol = 6, dimnames = list(micro_genes, paste0("M1_S", 1:6)))
+  r1 <- matrix(round(abs(rnorm(18 * 4, 50, 10))), nrow = 18, ncol = 4, dimnames = list(rna_genes, paste0("R1_S", 1:4)))
+  storage.mode(r1) <- "integer"
+  out <- gexp_normalize_and_intersect(
+    micro_expr_list = list(GSEmicro = m1),
+    rna_counts_list = list(GSErna = r1),
+    de_method = "deseq2",
+    apply_global_quantile = TRUE,
+    keep_platforms_separate = TRUE
+  )
+  expect_equal(ncol(out$combined_expr), 10L)
+  expect_equal(colnames(out$combined_expr), out$unified_metadata$SampleID)
+  expect_true(nrow(out$expr_micro) >= 12L)
+  expect_true(nrow(out$expr_rna) >= 15L)
+  expect_false(identical(sort(rownames(out$expr_micro)), sort(rownames(out$expr_rna))))
+  expect_true(all(grepl("^Ronly", setdiff(rownames(out$expr_rna), rownames(out$expr_micro)))))
+  expect_true(!is.null(out$raw_counts_for_deseq2))
+  expect_true(any(grepl("^Ronly", rownames(out$raw_counts_for_deseq2))))
+  expect_true(grepl("RUN 1", out$log_text, fixed = TRUE))
+  expect_true(grepl("RUN 2", out$log_text, fixed = TRUE))
+  expect_true(grepl("OK Microarray run complete", out$log_text, fixed = TRUE))
+  expect_true(grepl("OK RNA-seq run complete", out$log_text, fixed = TRUE))
+  expect_true(!is.null(out$log_text_micro))
+  expect_true(!is.null(out$log_text_rna))
+})
+
 test_that("gexp_normalize_and_intersect builds aligned unified metadata", {
   set.seed(1)
   genes <- paste0("Gene", seq_len(20))
@@ -116,6 +146,24 @@ test_that("gexp_normalize_and_intersect builds aligned unified metadata", {
   expect_equal(colnames(out$combined_expr), out$unified_metadata$SampleID)
   expect_equal(sum(out$unified_metadata$Platform == "Microarray"), 6L)
   expect_equal(sum(out$unified_metadata$Platform == "RNAseq"), 4L)
+})
+
+test_that("platform table helpers pick microarray and RNA-seq methods", {
+  set.seed(3)
+  log_mat <- matrix(rnorm(80, mean = 8, sd = 0.2), nrow = 10, ncol = 8)
+  raw_mat <- matrix(2^rnorm(80, mean = 8, sd = 1), nrow = 10, ncol = 8)
+  counts <- matrix(rpois(80, 40), nrow = 10, ncol = 8)
+  storage.mode(counts) <- "integer"
+  fpkm <- matrix(runif(80, 0.2, 40), nrow = 10, ncol = 8)
+  expect_true(GExPipe:::gexp_expr_looks_log2(log_mat))
+  expect_false(GExPipe:::gexp_expr_looks_log2(raw_mat))
+  expect_equal(GExPipe:::gexp_choose_micro_norm_method(log_mat, "GPL16699"), "as_is")
+  expect_equal(GExPipe:::gexp_choose_micro_norm_method(raw_mat, "GPL16699"), "normexp")
+  expect_equal(GExPipe:::gexp_choose_micro_norm_method(raw_mat, "GPL570"), "log2_quantile")
+  expect_equal(GExPipe:::gexp_choose_rnaseq_norm_method(counts), "TMM")
+  expect_equal(GExPipe:::gexp_choose_rnaseq_norm_method(fpkm), "log2fpkm")
+  out <- GExPipe:::gexp_normalize_microarray_matrix(log_mat, method = "as_is")
+  expect_equal(dim(out), dim(log_mat))
 })
 
 test_that("gexpipe_pvca_df returns aligned variance components", {
