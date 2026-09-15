@@ -4,15 +4,13 @@
 
 ui_ppi <- tabItem(
   tabName = "ppi",
-  h2(icon("project-diagram"), " Step 9: PPI Interaction (Common Genes)"),
+  h2(icon("project-diagram"), " Step 10: PPI Interaction (Common Genes)"),
   
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " Build a protein-protein interaction (PPI) network from common genes using STRINGdb and identify hub genes by centrality (degree, betweenness, PageRank). Network views support interpretation and feature selection for ML.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Methods:"), " STRINGdb mapping and interaction retrieval; consensus hubs (genes appearing in top lists of multiple centrality measures); four layout options (Fruchterman-Reingold, circular, ggraph, Kamada-Kawai). Optional: centrality-weighted features for ML.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Requirements:"), " Step 8 (Common Genes) completed; click 'Compute Common Genes' before running PPI.", style = "margin-bottom: 0;")
+      uiOutput("ppi_about_ui")
     )
   ),
   

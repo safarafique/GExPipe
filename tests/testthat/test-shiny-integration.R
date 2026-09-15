@@ -5,7 +5,7 @@ test_that("shinytest2: AppDriver connects to runGExPipe app", {
   expect_true(nzchar(app$get_html(selector = "body")))
 })
 
-test_that("shinytest2: welcome -> dashboard -> QC navigation", {
+test_that("shinytest2: welcome -> dashboard -> Normalize navigation", {
   app <- .gexpipe_shinytest2_driver("workflow")
   on.exit(app$stop(), add = TRUE)
 
@@ -13,13 +13,13 @@ test_that("shinytest2: welcome -> dashboard -> QC navigation", {
   expect_true(grepl("go_to_analysis|Start Analyzing|GExPipe", html, ignore.case = TRUE))
 
   .gexpipe_shinytest2_enter_analysis(app)
-  expect_equal(app$get_value(input = "analysis_type"), "rnaseq")
+  expect_equal(app$get_value(input = "analysis_type"), "merged")
   expect_true(app$exists(selector = "#start_processing"))
   expect_true(app$exists(selector = "#skip_load_btn"))
 
   app$click("next_page_download")
-  app$wait_for_value(input = "sidebar_menu", value = "qc", timeout = 90000L)
-  expect_equal(app$get_value(input = "sidebar_menu"), "qc")
+  app$wait_for_value(input = "sidebar_menu", value = "normalize", timeout = 90000L)
+  expect_equal(app$get_value(input = "sidebar_menu"), "normalize")
 })
 
 test_that("shinytest2: start processing warns when no GSE IDs", {

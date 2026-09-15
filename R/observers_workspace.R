@@ -14,6 +14,21 @@ gexp_get_saved_workspaces_dir <- function() {
   file.path(getwd(), "saved_workspaces")
 }
 
+#' Skip values that cannot be saved (do not serialize() a copy of huge matrices)
+#' @noRd
+.gexp_workspace_value_ok <- function(x) {
+  if (missing(x) || is.null(x)) {
+    return(TRUE)
+  }
+  if (is.function(x) || is.environment(x) || inherits(x, "externalptr")) {
+    return(FALSE)
+  }
+  if (inherits(x, "reactivevalues") || inherits(x, "ShinySession")) {
+    return(FALSE)
+  }
+  TRUE
+}
+
 gexp_make_workspace_state <- function(input, rv) {
   current_step <- input$sidebar_menu
   if (is.null(current_step) || !nzchar(current_step)) current_step <- "download"
@@ -25,13 +40,11 @@ gexp_make_workspace_state <- function(input, rv) {
       for (d in drop_names) raw_list[[d]] <- NULL
       state <- list()
       for (nm in names(raw_list)) {
-        tryCatch(
-          {
-            serialize(raw_list[[nm]], NULL)
-            state[[nm]] <- raw_list[[nm]]
-          },
-          error = function(e) NULL
-        )
+        val <- raw_list[[nm]]
+        if (!isTRUE(.gexp_workspace_value_ok(val))) {
+          next
+        }
+        state[[nm]] <- val
       }
       if (!"saved_step" %in% names(state)) state$saved_step <- current_step
       state
@@ -108,7 +121,7 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
     rv$nomogram_complete <- TRUE
   }
   valid_tabs <- c(
-    "download", "qc", "normalize", "groups", "batch", "results", "wgcna",
+    "download", "qc", "normalize", "groups", "batch", "results", "consensus", "wgcna",
     "common_genes", "ppi", "ml", "validation", "roc", "nomogram", "gsea",
     "results_summary"
   )
@@ -224,6 +237,12 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
       return()
     }
     rv$auto_save_after_download_done <- TRUE
+    shiny::showNotification(
+      "Auto-saving workspace after download. The app may pause while the file is written.",
+      type = "message",
+      duration = NULL,
+      id = "auto_save_download"
+    )
     tryCatch(
       {
         state <- gexp_make_workspace_state(input, rv)
@@ -255,6 +274,7 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
         )
       }
     )
+    shiny::removeNotification("auto_save_download")
   })
 
   shiny::observeEvent(input$save_workspace_to_folder, {

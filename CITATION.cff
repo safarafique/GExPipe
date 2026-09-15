@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use GExPipe in your research, please cite it using the metadata below."
+type: software
+title: "GExPipe: Gene Expression Pipeline Shiny Application"
+version: 0.99.51
+date-released: "2026-08-27"
+url: "https://github.com/safarafique/GExPipe"
+repository-code: "https://github.com/safarafique/GExPipe"
+license: MIT
+authors:
+  - family-names: "Rafique"
+    given-names: "Safa"
+    orcid: "https://orcid.org/0000-0003-2646-8106"
+  - family-names: "Ashraf"
+    given-names: "Naeem Mahmood"
+    orcid: "https://orcid.org/0000-0003-3614-0702"
+  - family-names: "Sabar"
+    given-names: "Muhammad Farooq"
+    orcid: "https://orcid.org/0000-0003-0135-2991"

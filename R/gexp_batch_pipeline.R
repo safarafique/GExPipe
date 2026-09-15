@@ -71,11 +71,15 @@ gexp_batch_correct <- function(
   if (any(all_na_rows)) {
     expr <- expr[!all_na_rows, , drop = FALSE]
   }
-  gene_vars <- apply(expr, 1, var, na.rm = TRUE)
-  percentile <- variance_percentile / 100
-  cutoff <- stats::quantile(gene_vars, percentile, na.rm = TRUE)
-  high_var <- !is.na(gene_vars) & gene_vars > cutoff
-  expr_filtered <- expr[high_var, , drop = FALSE]
+  if (variance_percentile <= 0) {
+    expr_filtered <- expr
+  } else {
+    gene_vars <- apply(expr, 1, var, na.rm = TRUE)
+    percentile <- variance_percentile / 100
+    cutoff <- stats::quantile(gene_vars, percentile, na.rm = TRUE)
+    high_var <- !is.na(gene_vars) & gene_vars > cutoff
+    expr_filtered <- expr[high_var, , drop = FALSE]
+  }
 
   genes_before <- nrow(expr)
   genes_after <- nrow(expr_filtered)
@@ -210,6 +214,179 @@ gexp_batch_correct <- function(
     genes_before = genes_before,
     genes_after = genes_after,
     filter_percent = filter_percent,
+    log_text = log_text
+  )
+}
+
+#' Variance-filter one platform block (no cross-platform merge)
+#' @noRd
+.gexpipe_filter_var_block <- function(expr, variance_percentile = 25) {
+  if (is.null(expr) || !is.matrix(expr) || ncol(expr) < 1L) {
+    return(expr)
+  }
+  all_na_rows <- apply(expr, 1, function(x) all(is.na(x)))
+  if (any(all_na_rows)) {
+    expr <- expr[!all_na_rows, , drop = FALSE]
+  }
+  gene_vars <- apply(expr, 1, stats::var, na.rm = TRUE)
+  percentile <- max(0, min(50, as.numeric(variance_percentile))) / 100
+  cutoff <- stats::quantile(gene_vars, percentile, na.rm = TRUE)
+  keep <- !is.na(gene_vars) & gene_vars > cutoff
+  expr[keep, , drop = FALSE]
+}
+
+#' Default Parallel batch methods (scientifically matched per platform)
+#'
+#' Microarray: ComBat-ref (log intensities, largest GSE as reference).
+#' RNA-seq count DE (DESeq2/edgeR/voom): limma on the continuous matrix;
+#' those engines use raw counts + batch at DE. RNA-seq limma DE: ComBat-ref
+#' on TMM log-CPM. Confounded Dataset×Condition: limma on both.
+#' @noRd
+gexpipe_parallel_batch_defaults <- function(de_method_rna = "deseq2", confounded = FALSE) {
+  if (isTRUE(confounded)) {
+    return(list(rna = "limma", micro = "limma"))
+  }
+  rna <- if (!is.null(de_method_rna) && de_method_rna %in% c("deseq2", "edger", "limma_voom")) {
+    "limma"
+  } else {
+    "combat_ref"
+  }
+  list(rna = rna, micro = "combat_ref")
+}
+
+#' Batch-correct RNA-seq and microarray separately (no joint ComBat)
+#'
+#' Used by Parallel DE. Each platform is filtered and corrected on its own
+#' samples and gene set. Single-GSE platforms are only variance-filtered.
+#' Platforms are not gene-intersected or jointly ComBat-corrected.
+#'
+#' @param expr Numeric matrix (genes x samples); used when platform matrices
+#'   are not supplied.
+#' @param metadata Sample metadata with `Dataset`, `Condition`, `Platform`.
+#' @param variance_percentile Bottom variance percentile to drop (per platform).
+#' @param rna_method Batch method for RNA-seq when it has 2+ datasets.
+#' @param micro_method Batch method for microarray when it has 2+ datasets.
+#' @param expr_rna Optional RNA-seq-only matrix (genes x RNA samples).
+#' @param expr_micro Optional microarray-only matrix (genes x array samples).
+#' @return Same list shape as [gexp_batch_correct()], plus platform matrices.
+#' @noRd
+gexp_batch_correct_by_platform <- function(
+  expr,
+  metadata,
+  variance_percentile = 25,
+  rna_method = "combat_ref",
+  micro_method = "combat_ref",
+  expr_rna = NULL,
+  expr_micro = NULL
+) {
+  if ((is.null(expr) || !is.matrix(expr)) && is.null(expr_rna) && is.null(expr_micro)) {
+    stop("expr must be a non-null matrix (genes x samples).")
+  }
+  if (is.null(expr) || !is.matrix(expr)) {
+    expr <- .gexpipe_cbind_union_na(expr_micro, expr_rna)
+  }
+  metadata <- .gexpipe_align_metadata_to_expr(expr, metadata)
+  rna_ids <- intersect(gexpipe_platform_sample_ids(metadata, "RNAseq"), colnames(expr))
+  micro_ids <- intersect(gexpipe_platform_sample_ids(metadata, "Microarray"), colnames(expr))
+
+  block_input <- function(ids, plat_expr) {
+    if (!is.null(plat_expr) && is.matrix(plat_expr) && ncol(plat_expr) > 0L) {
+      keep <- intersect(ids, colnames(plat_expr))
+      if (length(keep) >= 2L) {
+        return(plat_expr[, keep, drop = FALSE])
+      }
+    }
+    if (length(ids) < 2L) {
+      return(NULL)
+    }
+    expr[, ids, drop = FALSE]
+  }
+
+  correct_block <- function(sub, method, label) {
+    if (is.null(sub) || !is.matrix(sub) || ncol(sub) < 2L) {
+      return(list(
+        expr = NULL,
+        genes_before = 0L,
+        genes_after = 0L,
+        n_samples = 0L,
+        n_datasets = 0L,
+        log = paste0(label, ": no samples; skipped.\n")
+      ))
+    }
+    ids <- colnames(sub)
+    meta <- metadata[intersect(ids, rownames(metadata)), , drop = FALSE]
+    meta <- meta[ids, , drop = FALSE]
+    n_ds <- length(unique(as.character(meta$Dataset)))
+    n_before <- nrow(sub)
+    filtered <- .gexpipe_filter_var_block(sub, variance_percentile)
+    if (n_ds < 2L) {
+      return(list(
+        expr = filtered,
+        genes_before = n_before,
+        genes_after = nrow(filtered),
+        n_samples = ncol(filtered),
+        n_datasets = n_ds,
+        log = paste0(
+          label, ": 1 dataset (", unique(as.character(meta$Dataset)), "). ",
+          "Standard: no between-study batch. Variance filter only (",
+          format(n_before, big.mark = ","), " \u2192 ",
+          format(nrow(filtered), big.mark = ","), " genes).\n"
+        )
+      ))
+    }
+    out <- gexp_batch_correct(
+      filtered,
+      meta,
+      variance_percentile = 0,
+      method = method
+    )
+    list(
+      expr = out$batch_corrected,
+      genes_before = n_before,
+      genes_after = nrow(out$batch_corrected),
+      n_samples = ncol(out$batch_corrected),
+      n_datasets = n_ds,
+      log = paste0(label, " (", method, ", ", n_ds, " datasets):\n", out$log_text)
+    )
+  }
+
+  rna_out <- correct_block(block_input(rna_ids, expr_rna), rna_method, "RNA-seq")
+  micro_out <- correct_block(block_input(micro_ids, expr_micro), micro_method, "Microarray")
+
+  if (is.null(rna_out$expr) && is.null(micro_out$expr)) {
+    stop("Per-platform batch correction produced no expression blocks.")
+  }
+
+  batch_corrected <- .gexpipe_cbind_union_na(rna_out$expr, micro_out$expr)
+  expr_filtered <- batch_corrected
+  n_rna <- if (is.null(rna_out$expr)) 0L else nrow(rna_out$expr)
+  n_micro <- if (is.null(micro_out$expr)) 0L else nrow(micro_out$expr)
+
+  log_text <- paste0(
+    "Parallel batch: each platform corrected separately (not one joint ComBat).\n",
+    "Gene sets stay platform-specific (not intersected).\n",
+    rna_out$log,
+    micro_out$log,
+    "RNA-seq genes after platform batch: ", format(n_rna, big.mark = ","), "\n",
+    "Microarray genes after platform batch: ", format(n_micro, big.mark = ","), "\n"
+  )
+
+  list(
+    expr_filtered = expr_filtered,
+    batch_corrected = batch_corrected,
+    batch_corrected_rna = rna_out$expr,
+    batch_corrected_micro = micro_out$expr,
+    genes_before = n_rna + n_micro,
+    genes_after = n_rna + n_micro,
+    genes_before_rna = rna_out$genes_before,
+    genes_after_rna = rna_out$genes_after,
+    n_samples_rna = rna_out$n_samples,
+    genes_before_micro = micro_out$genes_before,
+    genes_after_micro = micro_out$genes_after,
+    n_samples_micro = micro_out$n_samples,
+    n_datasets_rna = rna_out$n_datasets,
+    n_datasets_micro = micro_out$n_datasets,
+    filter_percent = NA_real_,
     log_text = log_text
   )
 }

@@ -1,10 +1,10 @@
 # ==============================================================================
-# UI_WGCNA.R - Step 7: WGCNA Analysis Tab
+# UI_WGCNA.R - Step 8: WGCNA Analysis Tab
 # ==============================================================================
 
 ui_wgcna <- tabItem(
     tabName = "wgcna",
-    h2(icon("project-diagram"), " Step 7: WGCNA Network Analysis"),
+    h2(icon("project-diagram"), " Step 8: WGCNA Network Analysis"),
     
     fluidRow(
       box(
@@ -14,10 +14,14 @@ ui_wgcna <- tabItem(
           class = "alert alert-info",
           style = "padding: 15px; margin: 0; border-left: 4px solid #17a2b8;",
           icon("info-circle"),
-          " WGCNA requires batch-corrected data and defined groups.",
+          " WGCNA requires a processed expression matrix and defined groups. It does ",
+          tags$strong("not"),
+          " use the DEG or consensus list.",
           tags$br(),
           tags$strong("Recommended workflow:"),
-          " Complete Differential Expression Analysis (Step 6) before running WGCNA for best results.",
+          " Complete DE (Step 6). For Parallel, apply Step 7 so Step 9 can overlap modules with those DEGs. WGCNA uses top-variable genes on ",
+          tags$strong("one"),
+          " processed platform matrix (RNA-seq VST or microarray after batch).",
           tags$br(),
           "Traits are derived from your group mapping (Normal vs Disease).",
           tags$br(),
@@ -38,30 +42,68 @@ ui_wgcna <- tabItem(
           style = "padding: 15px 0;",
           tags$p(
             style = "color: #495057; margin-bottom: 18px;",
-            "Choose how many genes to use, prepare the expression matrix, check the sample dendrogram for outliers, and optionally exclude bad samples. The gene set and sample list below are what WGCNA will use in Steps 2-3."
+            "Choose how many genes to use, prepare the expression matrix, check the sample dendrogram for outliers, and optionally exclude bad samples. The gene set and sample list below are what WGCNA will use in Steps 2-3. This is ",
+            tags$strong("not"),
+            " the Step 6 / Step 7 DEG list."
           ),
           fluidRow(
             column(12,
+              radioButtons(
+                "wgcna_mode",
+                label = tags$strong("WGCNA setup:"),
+                choices = c(
+                  "Auto (recommended) - top 5,000 variable genes" = "auto",
+                  "Manual - choose gene count" = "manual"
+                ),
+                selected = "auto",
+                inline = TRUE
+              ),
+              uiOutput("wgcna_setup_guide_ui"),
+              conditionalPanel(
+                condition = "input.analysis_type == 'parallel'",
+                tags$div(
+                  style = "margin: 8px 0 14px 0; padding: 12px 14px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;",
+                  radioButtons(
+                    "wgcna_parallel_platform",
+                    label = tags$span(tags$strong("Parallel: which platform for this one WGCNA?")),
+                    choices = list(
+                      "Auto (platform with more samples)" = "auto",
+                      "RNA-seq (VST of counts)" = "rnaseq",
+                      "Microarray (normalized / batch-corrected)" = "microarray"
+                    ),
+                    selected = "auto"
+                  ),
+                  tags$small(
+                    "Pick RNA-seq or microarray yourself, or leave Auto. One network only — not a mixed matrix, and not the Step 7 DEG list.",
+                    style = "color: #6c757d; display: block;"
+                  )
+                )
+              ),
+              conditionalPanel(
+                condition = "input.wgcna_mode == 'manual'",
+                tagList(
               radioButtons("wgcna_gene_mode",
                            label = tags$span(tags$strong("Gene selection:"),
                              tags$i(class = "fa fa-question-circle param-help",
                                     `data-toggle` = "tooltip", `data-placement` = "right",
-                                    title = "Use all common genes (from normalization + batch effect) or select top variable genes by variance.")),
+                                    title = "Use all expressed genes that passed QC, or the most variable subset (recommended: 5000-8000). Do not restrict WGCNA to DEGs.")),
                            choices = list(
-                             "All genes" = "all_common",
-                             "Top variable genes" = "top_variable"
+                             "Top variable genes (recommended)" = "top_variable",
+                             "All genes" = "all_common"
                            ),
                            selected = "top_variable",
                            inline = TRUE,
                            width = "100%"),
-              tags$small("Use all genes common across samples after normalization & batch effect, or filter by variance.",
+              tags$small("Recommended: top 5,000-8,000 variable genes on VST (RNA-seq) or normalized microarray values. Overlap those modules with DEGs in Step 9.",
                         style = "color: #6c757d; display: block; margin-bottom: 15px;")
+                )
+              )
             )
           ),
           fluidRow(
             column(4,
               conditionalPanel(
-                condition = "input.wgcna_gene_mode == 'top_variable'",
+                condition = "input.wgcna_mode == 'manual' && input.wgcna_gene_mode == 'top_variable'",
                 numericInput("wgcna_top_genes",
                             label = tags$span(tags$strong("Top Variable Genes:"),
                               tags$i(class = "fa fa-question-circle param-help",

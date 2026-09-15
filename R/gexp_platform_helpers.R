@@ -39,6 +39,36 @@ gexpipe_has_mixed_platforms <- function(metadata) {
   "Microarray" %in% plats && "RNAseq" %in% plats
 }
 
+#' Sample IDs for one platform in unified metadata
+#'
+#' @param metadata data.frame with a `Platform` column and sample IDs as
+#'   row names (or a `SampleID` column).
+#' @param platform `"Microarray"` or `"RNAseq"`.
+#' @return Character vector of sample IDs (may be empty).
+#' @examples
+#' meta <- data.frame(
+#'   Platform = c("Microarray", "RNAseq"),
+#'   row.names = c("S1", "S2")
+#' )
+#' gexpipe_platform_sample_ids(meta, "RNAseq")
+#' @export
+gexpipe_platform_sample_ids <- function(metadata, platform = c("Microarray", "RNAseq")) {
+  platform <- match.arg(platform)
+  if (is.null(metadata) || nrow(metadata) < 1L || !"Platform" %in% colnames(metadata)) {
+    return(character(0))
+  }
+  keep <- as.character(metadata$Platform) == platform
+  ids <- rownames(metadata)
+  if (is.null(ids) || any(!nzchar(ids))) {
+    if ("SampleID" %in% colnames(metadata)) {
+      ids <- as.character(metadata$SampleID)
+    } else {
+      return(character(0))
+    }
+  }
+  as.character(ids[keep & !is.na(keep)])
+}
+
 #' Test whether Platform is not estimable alongside Dataset
 #'
 #' Returns TRUE when Platform is nested within Dataset (each GSE has one technology)
@@ -239,6 +269,10 @@ gexpipe_deseq2_design <- function(metadata) {
 #' @export
 gexpipe_pca_polar_df <- function(expr, metadata, color_by = "Dataset") {
   metadata <- .gexpipe_align_metadata_to_expr(expr, metadata)
+  ok <- rowSums(is.finite(expr)) == ncol(expr)
+  if (sum(ok) >= 10L) {
+    expr <- expr[ok, , drop = FALSE]
+  }
   pca <- stats::prcomp(t(expr), scale. = TRUE)
   pc1 <- pca$x[, 1]
   pc2 <- pca$x[, 2]
@@ -290,7 +324,8 @@ gexpipe_pvca_df <- function(expr, metadata, max_samples = 100L, max_pcs = 10L) {
   }
   metadata <- .gexpipe_align_metadata_to_expr(expr, metadata)
 
-  gene_ok <- rowSums(is.finite(expr)) >= 2L
+  complete <- rowSums(is.finite(expr)) == ncol(expr)
+  gene_ok <- if (sum(complete) >= 20L) complete else rowSums(is.finite(expr)) >= 2L
   expr <- expr[gene_ok, , drop = FALSE]
   if (nrow(expr) < 2L) {
     return(list(

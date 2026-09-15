@@ -75,17 +75,17 @@ ui_welcome <- fluidPage(
       tags$p(
         class = "hero-animate",
         style = "color: rgba(255,255,255,0.85); font-size: 16px; font-weight: 500; letter-spacing: 0.4px; margin-bottom: 28px;",
-        "One workflow: GEO -> QC -> DE -> WGCNA -> PPI -> ML -> reports. No coding required."
+        "Four analysis types. One guided path. Publication-ready figures. No coding."
       ),
       # Stats badges
       tags$div(
         class = "hero-animate",
         style = "display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-bottom: 36px;",
         lapply(list(
-          list("16", "Analysis Steps", "#a78bfa"),
-          list("GEO", "Integrated", "#22d3ee"),
-          list("RNA-seq", "+ Microarray", "#34d399"),
-          list("DESeq2", "limma WGCNA", "#fbbf24")
+          list("4", "Analysis types", "#a78bfa"),
+          list("16", "Guided steps", "#22d3ee"),
+          list("RNA + array", "or Parallel", "#34d399"),
+          list("300 dpi", "Figures", "#fbbf24")
         ), function(x) {
           tags$div(
             class = "badge-pop",
@@ -102,13 +102,13 @@ ui_welcome <- fluidPage(
         class = "hero-animate pipeline-3d",
         style = "display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; margin-top: 24px; padding: 28px;",
         lapply(list(
-          list("1", "Download", "#6366f1"),
-          list("2", "QC", "#7c3aed"),
-          list("3-5", "Preprocess", "#a855f7"),
+          list("1-5", "Prep", "#6366f1"),
           list("6", "DE", "#ec4899"),
-          list("7-8", "WGCNA", "#0ea5e9"),
-          list("9-10", "PPI & ML", "#10b981"),
-          list("11-16", "Report", "#f59e0b")
+          list("7", "RNA ∩ array", "#a855f7"),
+          list("8", "WGCNA", "#0ea5e9"),
+          list("9", "Overlap", "#22d3ee"),
+          list("10-11", "PPI / ML", "#10b981"),
+          list("12-16", "Validate", "#f59e0b")
         ), function(x) {
           tags$div(
             class = "step",
@@ -143,17 +143,36 @@ ui_welcome <- fluidPage(
         style = "color: #1e293b; font-size: 20px; font-weight: 700; margin: 26px 0 14px 0; text-align: left;
                  border-bottom: 3px solid #8b5cf6; padding-bottom: 8px; display: inline-block; letter-spacing: -0.2px;",
         icon("sitemap", style = "margin-right: 10px; color: #8b5cf6;"),
-        "What you can do"
+        "Choose one analysis type"
+      ),
+      tags$div(
+        style = "display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 22px 0; text-align: left;",
+        tags$div(style = "padding: 12px 14px; border-radius: 12px; background: #eff6ff; border: 1px solid #bfdbfe;",
+          tags$strong(style = "color: #1e3a8a;", "RNA-seq only"),
+          tags$p(style = "margin: 4px 0 0 0; font-size: 13px; color: #334155;", "DESeq2 / edgeR / voom on counts. WGCNA on VST. Skip Step 7.")),
+        tags$div(style = "padding: 12px 14px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa;",
+          tags$strong(style = "color: #9a3412;", "Microarray only"),
+          tags$p(style = "margin: 4px 0 0 0; font-size: 13px; color: #334155;", "Platform norm + limma. WGCNA on the array matrix. Skip Step 7.")),
+        tags$div(style = "padding: 12px 14px; border-radius: 12px; background: #f5f3ff; border: 1px solid #ddd6fe;",
+          tags$strong(style = "color: #5b21b6;", "Merged (Both)"),
+          tags$p(style = "margin: 4px 0 0 0; font-size: 13px; color: #334155;", "Per-study norm, common genes, global quantile, one batch, one limma. Skip Step 7.")),
+        tags$div(style = "padding: 12px 14px; border-radius: 12px; background: #ecfdf5; border: 1px solid #a7f3d0;",
+          tags$strong(style = "color: #065f46;", "Parallel, then merge"),
+          tags$p(style = "margin: 4px 0 0 0; font-size: 13px; color: #334155;", "Two DEs (RNA engine + array limma). Step 7 = same-direction overlap. One WGCNA."))
+      ),
+      tags$h3(
+        style = "color: #1e293b; font-size: 20px; font-weight: 700; margin: 8px 0 14px 0; text-align: left;
+                 border-bottom: 3px solid #8b5cf6; padding-bottom: 8px; display: inline-block; letter-spacing: -0.2px;",
+        icon("list-ol", style = "margin-right: 10px; color: #8b5cf6;"),
+        "Then the same later steps"
       ),
       tags$div(
         style = "text-align: left; margin: 0 0 28px 0; font-size: 14px; line-height: 1.95; color: #475569;",
-        tags$div(class = "pipeline-item", tags$strong("1. Download"), " - GEO data (RNA-seq / Microarray / Merged) with gene symbol mapping"),
-        tags$div(class = "pipeline-item", tags$strong("2. QC & Visualization"), " - Gene overlap, PCA, sample connectivity"),
-        tags$div(class = "pipeline-item", tags$strong("3-5. Normalize, Groups, Batch"), " - Preprocessing and batch correction"),
-        tags$div(class = "pipeline-item", tags$strong("6. Differential Expression"), " - limma / DESeq2 / edgeR"),
-        tags$div(class = "pipeline-item", tags$strong("7-8. WGCNA & Common Genes"), " - Co-expression modules and enrichment"),
-        tags$div(class = "pipeline-item", tags$strong("9-10. PPI & ML"), " - Protein interaction networks and predictive modeling"),
-        tags$div(class = "pipeline-item", tags$strong("11-15. Validation, ROC, Nomogram, GSEA, Summary"), " - Validation and report")
+        tags$div(class = "pipeline-item", tags$strong("1-5. Prep"), " - Download, normalize, QC, groups, batch (type-specific Auto/Manual)"),
+        tags$div(class = "pipeline-item", tags$strong("6. DE"), " - One engine, or two in Parallel"),
+        tags$div(class = "pipeline-item", tags$strong("7. RNA-seq \u2229 microarray"), " - Parallel only; other types skip to WGCNA"),
+        tags$div(class = "pipeline-item", tags$strong("8-9. WGCNA & overlap"), " - One network on processed genes; then DEG \u2229 modules + GO/KEGG"),
+        tags$div(class = "pipeline-item", tags$strong("10-16. PPI, ML, validate, report"), " - Same path for all four types; 300 dpi figures")
       ),
       tags$h3(
         style = "color: #1e293b; font-size: 20px; font-weight: 700; margin: 26px 0 14px 0; text-align: left;
@@ -166,10 +185,10 @@ ui_welcome <- fluidPage(
                  list-style: none;",
         tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
                 icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
-                "Supports both RNA-seq and microarray in one workflow"),
+                "Four analysis types: RNA-seq, microarray, Merged, or Parallel then merge"),
         tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
                 icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
-                "Multi-dataset merge with common gene mapping across platforms"),
+                "Each RNA-seq and microarray box accepts one or more GSE IDs (Merged and Parallel keep all of them)"),
         tags$li(style = "position: relative; padding-left: 8px; margin: 6px 0;",
                 icon("check-circle", style = "position: absolute; left: -22px; top: 4px; color: #10b981; font-size: 14px;"),
                 "Step-by-step pipeline with guided options and validation"),

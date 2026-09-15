@@ -3,8 +3,28 @@
 ## Internal app wiring helpers extracted from inst/shinyapp/server.R so Shiny
 ## logic is implemented in package R/ code and can be tested/refactored.
 
+#' Pipeline-tracker label for the current DE method
+#'
+#' `if (rv$de_method == "deseq2")` crashes with "argument is of length zero"
+#' when the radio is NULL or character(0) after download, which greys out the UI.
+#' @noRd
+.gexp_de_progress_label <- function(de_method) {
+  m <- tryCatch(as.character(de_method)[[1L]], error = function(e) "")
+  if (length(m) != 1L || is.na(m) || !nzchar(m)) {
+    m <- "limma"
+  }
+  switch(
+    m,
+    deseq2 = "DE (DESeq2)",
+    edger = "DE (edgeR)",
+    limma_voom = "DE (limma-voom)",
+    "DE (limma)"
+  )
+}
+
 gexp_register_pipeline_observers <- function(input, output, session, rv) {
   # nocov start
+  gexpipe_register_later_step_abouts(input, output)
   output$pipeline_progress <- shiny::renderUI({
     is_count_based <- isTRUE(rv$de_method %in% c("deseq2", "edger", "limma_voom"))
 
@@ -16,38 +36,28 @@ gexp_register_pipeline_observers <- function(input, output, session, rv) {
     )
     steps <- c(steps, list(
       list(
+        id = "normalize",
+        label = if (is_count_based) "Norm (Auto)" else "Normalize",
+        icon = if (is_count_based) "magic" else "balance-scale",
+        tab = "normalize",
+        done = isTRUE(rv$normalization_complete),
+        running = isTRUE(rv$normalize_running)
+      ),
+      list(
         id = "qc", label = "QC", icon = "chart-bar", tab = "qc",
-        done = isTRUE(rv$download_complete), running = FALSE
+        done = isTRUE(rv$normalization_complete), running = FALSE
       )
     ))
-    if (!is_count_based) {
-      steps <- c(steps, list(
-        list(
-          id = "normalize", label = "Normalize", icon = "balance-scale", tab = "normalize",
-          done = isTRUE(rv$normalization_complete), running = isTRUE(rv$normalize_running)
-        )
-      ))
-    } else {
-      steps <- c(steps, list(
-        list(
-          id = "normalize", label = "Norm (Auto)", icon = "magic", tab = "normalize",
-          done = isTRUE(rv$normalization_complete), running = isTRUE(rv$normalize_running)
-        )
-      ))
-    }
-    de_label <- if (rv$de_method == "deseq2") {
-      "DE (DESeq2)"
-    } else if (rv$de_method == "edger") {
-      "DE (edgeR)"
-    } else if (rv$de_method == "limma_voom") {
-      "DE (limma-voom)"
-    } else {
-      "DE (limma)"
-    }
+    de_label <- .gexp_de_progress_label(rv$de_method)
     steps <- c(steps, list(
       list(id = "groups", label = "Groups", icon = "users", tab = "groups", done = isTRUE(rv$groups_applied), running = FALSE),
       list(id = "batch", label = "Batch", icon = "filter", tab = "batch", done = isTRUE(rv$batch_complete), running = isTRUE(rv$batch_running)),
       list(id = "de", label = de_label, icon = "dna", tab = "results", done = !is.null(rv$de_results), running = isTRUE(rv$de_running)),
+      list(
+        id = "consensus", label = "Consensus", icon = "object-ungroup", tab = "consensus",
+        done = isTRUE(rv$consensus_complete) || (!isTRUE(rv$merge_after_de) && !is.null(rv$de_results)),
+        running = FALSE
+      ),
       list(id = "wgcna", label = "WGCNA", icon = "project-diagram", tab = "wgcna", done = isTRUE(rv$wgcna_complete), running = isTRUE(rv$wgcna_running)),
       list(id = "common", label = "Common Genes", icon = "venus-double", tab = "common_genes", done = length(rv$common_genes_de_wgcna) > 0, running = FALSE),
       list(id = "ppi", label = "PPI", icon = "project-diagram", tab = "ppi", done = isTRUE(rv$ppi_complete), running = FALSE),
@@ -66,6 +76,10 @@ gexp_register_pipeline_observers <- function(input, output, session, rv) {
     steps <- Filter(function(s) {
       sid <- tolower(if (is.null(s$id)) "" else as.character(s$id))
       lab <- tolower(if (is.null(s$label)) "" else as.character(s$label))
+      if (sid == "consensus" && !isTRUE(rv$merge_after_de) &&
+          !identical(input$analysis_type, "parallel")) {
+        return(FALSE)
+      }
       !(sid == "immune" || grepl("immune", lab, fixed = TRUE))
     }, steps)
 
@@ -117,10 +131,20 @@ gexp_register_pipeline_observers <- function(input, output, session, rv) {
 
   shiny::observe({
     shinyjs::toggleState("apply_normalization", condition = isTRUE(rv$download_complete))
+    shinyjs::toggleState("apply_normalization_parallel", condition = isTRUE(rv$download_complete))
     shinyjs::toggleState("extract_groups_btn", condition = isTRUE(rv$download_complete))
     shinyjs::toggleState("apply_groups_btn", condition = isTRUE(rv$download_complete))
     shinyjs::toggleState("apply_batch", condition = isTRUE(rv$groups_applied))
-    shinyjs::toggleState("run_de", condition = isTRUE(rv$batch_complete))
+    de_ready <- isTRUE(rv$groups_applied) && (
+      isTRUE(rv$batch_complete) ||
+        !is.null(rv$expr_rna) ||
+        !is.null(rv$expr_micro) ||
+        !is.null(rv$combined_expr) ||
+        !is.null(rv$batch_corrected) ||
+        !is.null(rv$raw_counts_for_deseq2)
+    )
+    shinyjs::toggleState("run_de", condition = de_ready)
+    shinyjs::toggleState("run_de_parallel", condition = de_ready)
     shinyjs::toggleState("prepare_wgcna", condition = isTRUE(rv$batch_complete))
     shinyjs::toggleState("pick_soft_threshold", condition = isTRUE(rv$wgcna_prepared))
     shinyjs::toggleState("run_wgcna", condition = isTRUE(rv$wgcna_prepared))

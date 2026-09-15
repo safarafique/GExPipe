@@ -4,22 +4,20 @@
 
 ui_common_genes <- tabItem(
   tabName = "common_genes",
-  h2(icon("venus-double"), " Common Genes (DEG vs WGCNA) & Enrichment"),
+  uiOutput("common_genes_page_title_ui"),
   
   fluidRow(
     box(
       title = tags$span(icon("info-circle"), " About this step"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      tags$p(tags$strong("Purpose:"), " Intersect differentially expressed genes (DEG) with genes in significant WGCNA modules to obtain a high-confidence gene set, then perform GO and KEGG pathway enrichment for biological interpretation.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Workflow:"), " 1) Compute Common Genes (DEG n WGCNA) -> 2) Run GO and optionally KEGG enrichment -> 3) Choose next step: Path 1 = PPI then ML, or Path 2 = direct to ML.", style = "margin-bottom: 8px;"),
-      tags$p(tags$strong("Requirements:"), " Step 6 (DE Analysis) and Step 7 (WGCNA, including Identify Significant Modules) must be completed.", style = "margin-bottom: 0;")
+      uiOutput("common_genes_about_ui")
     )
   ),
 
   # ========== COMMON GENES ==========
   fluidRow(
     box(
-      title = tags$span(icon("search"), " 1. Find Common Genes (DEG n WGCNA)"),
+      title = uiOutput("common_genes_find_title_ui"),
       width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE,
       tags$div(
         style = "padding: 15px 0;",
@@ -32,7 +30,7 @@ ui_common_genes <- tabItem(
         uiOutput("common_genes_placeholder_ui"),
         uiOutput("common_genes_summary_ui"),
         tags$hr(),
-        tags$h5(icon("circle-notch"), " Venn diagram: DEG \u2229 WGCNA", style = "margin-top: 10px; margin-bottom: 8px; font-weight: 600;"),
+        uiOutput("common_genes_venn_heading_ui"),
         plotOutput("common_genes_venn_plot", height = "420px"),
         tags$div(style = "margin-top: 8px; margin-bottom: 15px;",
           downloadButton("download_common_genes_venn_png", tagList(icon("download"), " Venn diagram (PNG)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),

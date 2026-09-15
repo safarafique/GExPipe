@@ -1,5 +1,5 @@
 # ==============================================================================
-# SERVER_WGCNA.R - Step 7: WGCNA Analysis Module
+# SERVER_WGCNA.R - Step 8: WGCNA Analysis Module
 # ==============================================================================
 #
 # WGCNA best practices (signed network):
@@ -19,6 +19,56 @@
 # Implemented in R/gexp_wgcna_pipeline.R as gexpipe_wgcna_heatmap_cor().
 
 server_wgcna <- function(input, output, session, rv) {
+
+  output$wgcna_setup_guide_ui <- renderUI({
+    mode <- if (is.null(input$wgcna_mode)) "auto" else input$wgcna_mode
+    defs <- gexpipe_parallel_wgcna_defaults(rv$unified_metadata)
+    plat_lab <- if (identical(defs$platform, "rnaseq")) {
+      paste0("RNA-seq VST (", defs$n_rna, " samples)")
+    } else {
+      paste0("microarray after batch (", defs$n_micro, " samples)")
+    }
+    if (identical(mode, "manual")) {
+      tags$div(
+        class = "alert alert-warning",
+        style = "margin: 8px 0 12px 0; font-size: 13px; line-height: 1.55;",
+        tags$strong("Manual — pick the matrix and gene count."),
+        tags$ul(
+          style = "margin: 6px 0 0 0; padding-left: 18px;",
+          tags$li(tags$strong("RNA-seq:"), " VST of raw counts (never raw counts or the DEG list)."),
+          tags$li(tags$strong("Microarray:"), " batch-corrected (or normalized) intensities."),
+          tags$li(tags$strong("Genes:"), " top 5,000–8,000 variable genes. Avoid “all genes” unless the matrix is already small."),
+          tags$li("One network only. Step 9 overlaps modules with DEGs / consensus.")
+        )
+      )
+    } else if (identical(input$analysis_type, "parallel") || isTRUE(rv$merge_after_de)) {
+      tags$div(
+        class = "alert alert-info",
+        style = "margin: 8px 0 12px 0; font-size: 13px; line-height: 1.55;",
+        icon("magic"),
+        tags$strong(" Auto (recommended). "),
+        "Top ", tags$strong("5,000"), " variable genes. Choose RNA-seq or microarray below (or Auto = more samples, currently ",
+        tags$strong(plat_lab),
+        "). Not the Step 7 DEG list."
+      )
+    } else {
+      at <- if (!is.null(input$analysis_type)) input$analysis_type else "microarray"
+      mat_lab <- switch(
+        at,
+        rnaseq = "RNA-seq VST of counts",
+        microarray = "microarray after batch (or normalized if 1 GSE)",
+        merged = "the merged batch-corrected log matrix",
+        "the processed expression matrix"
+      )
+      tags$div(
+        class = "alert alert-info",
+        style = "margin: 8px 0 12px 0; font-size: 13px; line-height: 1.55;",
+        icon("magic"),
+        tags$strong(" Auto (recommended). "),
+        "Top ", tags$strong("5,000"), " variable genes on ", mat_lab, ". Not the DEG list."
+      )
+    }
+  })
   
   output$wgcna_timer <- renderText({
     wgcna_running <- isTRUE(rv$wgcna_running)
@@ -44,6 +94,18 @@ server_wgcna <- function(input, output, session, rv) {
         tags$div(icon("exclamation-triangle"), tags$strong(" Step 5 required:"),
                  " Complete batch correction (Step 5) and ensure group labels are applied before running WGCNA."),
         type = "error", duration = 6)
+      return()
+    }
+    if (isTRUE(rv$merge_after_de) && !isTRUE(rv$consensus_complete)) {
+      showNotification(
+        tags$div(
+          icon("exclamation-triangle"),
+          tags$strong(" Step 7 required:"),
+          " Apply Step 7 (RNA-seq \u2229 microarray) first so Step 9 can overlap modules with those DEGs. WGCNA still uses top-variable genes on one processed platform matrix, not that DEG list."
+        ),
+        type = "error",
+        duration = 8
+      )
       return()
     }
     batch_complete <- TRUE
@@ -89,18 +151,30 @@ server_wgcna <- function(input, output, session, rv) {
     
     withProgress(message = "Preparing WGCNA data", value = 0.5, {
       tryCatch({
-        # Use batch corrected data if available
-        expr_mat <- rv$batch_corrected
-        
-        if (is.null(expr_mat)) {
-          expr_mat <- rv$combined_expr
+        wgcna_mode <- if (is.null(input$wgcna_mode) || !nzchar(input$wgcna_mode)) {
+          "auto"
+        } else {
+          input$wgcna_mode
         }
-        
-        if (is.null(expr_mat)) {
-          stop("No expression data available. Please complete batch correction first.")
+        defs <- gexpipe_parallel_wgcna_defaults(rv$unified_metadata)
+        plat_choice <- if (isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")) {
+          if (!is.null(input$wgcna_parallel_platform) && nzchar(input$wgcna_parallel_platform)) {
+            input$wgcna_parallel_platform
+          } else {
+            "auto"
+          }
+        } else {
+          "auto"
         }
-        
-        add_wgcna_log("Starting WGCNA data preparation...")
+        wgcna_in <- gexpipe_wgcna_input_expr(rv, parallel_platform = plat_choice)
+        expr_mat <- wgcna_in$expr
+        if (is.null(expr_mat)) {
+          stop("No expression data available for WGCNA. Complete Steps 2-5 first.")
+        }
+        rv$last_wgcna_platform <- wgcna_in$platform
+        rv$last_wgcna_source <- wgcna_in$source
+        add_wgcna_log(paste0("Starting WGCNA data preparation (", wgcna_in$source, ")..."))
+        add_wgcna_log("Using top-variable genes (not the DEG / consensus list). Overlap with DEGs is Step 9.")
         
         # Remove samples with too many NAs
         good_samples <- colSums(is.na(expr_mat)) < nrow(expr_mat) * 0.5
@@ -142,18 +216,28 @@ server_wgcna <- function(input, output, session, rv) {
                             sum(!gsg$goodGenes), "genes removed"))
         }
         
-        gene_mode <- if (!is.null(input$wgcna_gene_mode)) input$wgcna_gene_mode else "top_variable"
+        gene_mode <- if (identical(wgcna_mode, "auto")) {
+          "top_variable"
+        } else if (!is.null(input$wgcna_gene_mode)) {
+          input$wgcna_gene_mode
+        } else {
+          "top_variable"
+        }
         # Variance is needed later for wgcna_gene_variance_table in both modes
         vars <- apply(expr_mat, 1, var, na.rm = TRUE)
         if (gene_mode == "all_common") {
           expr_top <- expr_mat
-          add_wgcna_log(paste("Using all common genes:", nrow(expr_top), "genes"))
+          add_wgcna_log(paste("Using all genes on this matrix:", nrow(expr_top), "genes"))
         } else {
-          # Select top variable genes (wgcna_top_genes only exists when top_variable is selected)
-          top_n <- min(
-            if (!is.null(input$wgcna_top_genes)) as.integer(input$wgcna_top_genes) else 5000L,
-            length(vars)
-          )
+          top_req <- if (identical(wgcna_mode, "auto")) {
+            defs$top_genes
+          } else if (!is.null(input$wgcna_top_genes)) {
+            as.integer(input$wgcna_top_genes)
+          } else {
+            5000L
+          }
+          if (is.na(top_req) || top_req < 1000L) top_req <- 5000L
+          top_n <- min(top_req, length(vars))
           keep_genes <- names(sort(vars, decreasing = TRUE))[seq_len(top_n)]
           expr_top <- expr_mat[keep_genes, , drop = FALSE]
           add_wgcna_log(paste("Selected top", top_n, "most variable genes"))
@@ -253,7 +337,9 @@ server_wgcna <- function(input, output, session, rv) {
         icon("check-circle"),
         "WGCNA datExpr ready: ",
         nrow(rv$datExpr), " samples x ",
-        ncol(rv$datExpr), " genes."
+        ncol(rv$datExpr), " genes",
+        if (!is.null(rv$last_wgcna_source)) paste0(" (", rv$last_wgcna_source, ")") else "",
+        "."
       )
     }
   })
@@ -1561,7 +1647,7 @@ server_wgcna <- function(input, output, session, rv) {
     n_genes <- if (!is.null(rv$gene_metrics)) nrow(rv$gene_metrics) else 0
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 7 complete."), " Significant modules: ", n_mods, ". Gene metrics: ", format(n_genes, big.mark = ","), " genes. Use these for Common Genes (Step 8)."))
+      tags$p(tags$strong("Step 8 complete."), " Significant modules: ", n_mods, ". Gene metrics: ", format(n_genes, big.mark = ","), " genes. Use these for Common Genes (Step 9)."))
   })
 
   output$significant_modules_summary_ui <- renderUI({

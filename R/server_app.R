@@ -1,58 +1,70 @@
 gexp_app_server <- function(input, output, session) {
 
-  # -- In-app restart notification ---------------------------------------------
-  # Shown when the pre-launch subprocess updated packages that were DLL-locked
-  # and could not be reloaded in the running session.
-  # The user sees a full-screen modal instead of just a console message.
+  # -- In-app restart notice ----------------------------------------------------
+  # Set when the pre-launch subprocess updated packages that were DLL-locked
+  # and could not be reloaded in the running session. Previously shown as a
+  # blocking full-screen modal on every app start; now just a console message
+  # so it doesn't interrupt the UI. Opt back into the modal with
+  # options(gexpipe.show_restart_modal = TRUE).
   if (isTRUE(getOption("gexpipe.restart_required", FALSE))) {
     conflict_pkgs <- getOption("gexpipe.still_conflicted", character(0))
-    tryCatch({
-      shiny::showModal(shiny::modalDialog(
-        title = shiny::tags$span(
-          shiny::icon("exclamation-triangle", style = "color:#e67e22;"),
-          " Restart R to apply package updates"
-        ),
-        shiny::tags$div(
-          shiny::tags$p(
-            "GExPipe just updated ", length(conflict_pkgs),
-            " package(s) in the background, but they are still loaded at an",
-            " older version in this R session because their DLLs are in use."
+    message(
+      "GExPipe: ", length(conflict_pkgs),
+      " package(s) updated in the background are still loaded at an older ",
+      "version in this session (DLL in use)",
+      if (length(conflict_pkgs) > 0L) paste0(": ", paste(conflict_pkgs, collapse = ", ")) else "",
+      ". Restart R and run GExPipe::runGExPipe() again to pick them up; ",
+      "the app remains usable in the meantime."
+    )
+    if (isTRUE(getOption("gexpipe.show_restart_modal", FALSE))) {
+      tryCatch({
+        shiny::showModal(shiny::modalDialog(
+          title = shiny::tags$span(
+            shiny::icon("exclamation-triangle", style = "color:#e67e22;"),
+            " Restart R to apply package updates"
           ),
-          if (length(conflict_pkgs) > 0L)
-            shiny::tags$ul(
-              lapply(conflict_pkgs, function(pkg) {
-                cur <- tryCatch(as.character(utils::packageVersion(pkg)),
-                                error = function(e) "?")
-                shiny::tags$li(shiny::tags$code(pkg),
-                               paste0(" (loaded: ", cur, ")"))
-              })
+          shiny::tags$div(
+            shiny::tags$p(
+              "GExPipe just updated ", length(conflict_pkgs),
+              " package(s) in the background, but they are still loaded at an",
+              " older version in this R session because their DLLs are in use."
             ),
-          shiny::tags$hr(),
-          shiny::tags$p(shiny::tags$strong("To fix:")),
-          shiny::tags$ol(
-            shiny::tags$li("Stop the app  -  press the ", shiny::tags$strong("Stop"),
-                           " button in RStudio, or press ", shiny::tags$kbd("Ctrl+C"),
-                           " in the console."),
-            shiny::tags$li("Restart R  -  ", shiny::tags$strong("RStudio: Ctrl+Shift+F10"),
-                           "  (or Session -> Restart R)."),
-            shiny::tags$li("Run again  -  ",
-                           shiny::tags$code("GExPipe::runGExPipe()"),
-                           ". The app will open immediately; no reinstall needed.")
-          ),
-          shiny::tags$p(
-            shiny::tags$em(
-              "The analysis pipeline is fully available while the app is running.",
-              " This message only means some dependency versions are mismatched.",
-              " You may continue, but restarting R is recommended before starting",
-              " a new analysis."
+            if (length(conflict_pkgs) > 0L)
+              shiny::tags$ul(
+                lapply(conflict_pkgs, function(pkg) {
+                  cur <- tryCatch(as.character(utils::packageVersion(pkg)),
+                                  error = function(e) "?")
+                  shiny::tags$li(shiny::tags$code(pkg),
+                                 paste0(" (loaded: ", cur, ")"))
+                })
+              ),
+            shiny::tags$hr(),
+            shiny::tags$p(shiny::tags$strong("To fix:")),
+            shiny::tags$ol(
+              shiny::tags$li("Stop the app  -  press the ", shiny::tags$strong("Stop"),
+                             " button in RStudio, or press ", shiny::tags$kbd("Ctrl+C"),
+                             " in the console."),
+              shiny::tags$li("Restart R  -  ", shiny::tags$strong("RStudio: Ctrl+Shift+F10"),
+                             "  (or Session -> Restart R)."),
+              shiny::tags$li("Run again  -  ",
+                             shiny::tags$code("GExPipe::runGExPipe()"),
+                             ". The app will open immediately; no reinstall needed.")
+            ),
+            shiny::tags$p(
+              shiny::tags$em(
+                "The analysis pipeline is fully available while the app is running.",
+                " This message only means some dependency versions are mismatched.",
+                " You may continue, but restarting R is recommended before starting",
+                " a new analysis."
+              )
             )
-          )
-        ),
-        footer = shiny::modalButton("Continue anyway"),
-        size = "m",
-        easyClose = FALSE
-      ))
-    }, error = function(e) NULL)
+          ),
+          footer = shiny::modalButton("Continue anyway"),
+          size = "m",
+          easyClose = FALSE
+        ))
+      }, error = function(e) NULL)
+    }
   }
 
   # -- Soft notification for packages that failed to load (non-blocking) -------
@@ -86,8 +98,8 @@ gexp_app_server <- function(input, output, session) {
       if (requireNamespace("cicerone", quietly = TRUE)) {
         cicerone::Cicerone$
           new()$
-          step(el = "sidebar_menu", title = "Navigation", description = "Use this sidebar to navigate through the 15-step pipeline.")$
-          step(el = "analysis_type", title = "Platform", description = "Choose your data type: RNA-seq, Microarray, or Merged.")$
+          step(el = "sidebar_menu", title = "Navigation", description = "Use this sidebar to navigate through the 16-step pipeline.")$
+          step(el = "analysis_type", title = "Platform", description = "Choose RNA-seq, Microarray, Merged (Both), or Parallel DE then merge. Each box accepts one or more GSE IDs.")$
           step(el = "start_processing", title = "Start", description = "Click here to begin downloading and processing your datasets.")
       } else {
         NULL
@@ -109,12 +121,25 @@ gexp_app_server <- function(input, output, session) {
     common_genes = NULL,
     combined_expr_raw = NULL,
     combined_expr = NULL,
+    expr_micro = NULL,
+    expr_rna = NULL,
     unified_metadata = NULL,
     expr_filtered = NULL,
     batch_corrected = NULL,
+    batch_corrected_rna = NULL,
+    batch_corrected_micro = NULL,
     de_results = NULL,
+    de_results_rna = NULL,
+    de_results_micro = NULL,
     sig_genes = NULL,
+    sig_genes_rna = NULL,
+    sig_genes_micro = NULL,
+    consensus_complete = FALSE,
+    consensus_result = NULL,
+    consensus_same_direction = TRUE,
+    merge_after_de = FALSE,
     de_method = "limma",
+    de_method_micro = "limma",
     raw_counts_for_deseq2 = NULL,
     raw_counts_metadata = NULL,
     download_complete = FALSE,
@@ -262,10 +287,37 @@ gexp_app_server <- function(input, output, session) {
 
   # Step 4: keep DE method and disease name available across modules
   shiny::observe({
-    rv$de_method <- input$de_method
+    if (identical(input$analysis_type, "parallel")) {
+      rna <- if (!is.null(input$de_method_rna) && nzchar(input$de_method_rna)) {
+        input$de_method_rna
+      } else {
+        "deseq2"
+      }
+      rv$de_method <- rna
+      rv$de_method_micro <- "limma"
+      if (!identical(input$de_method, rna)) {
+        shiny::updateRadioButtons(session, "de_method", selected = rna)
+      }
+    } else {
+      rv$de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
+      rv$de_method_micro <- "limma"
+    }
   })
   shiny::observe({
     rv$disease_name <- trimws(if (is.null(input$disease_name)) "" else input$disease_name)
+  })
+
+  shiny::observe({
+    rv$merge_after_de <- identical(input$analysis_type, "parallel")
+    rna_txt <- if (is.null(input$rnaseq_gses)) "" else as.character(input$rnaseq_gses)
+    mic_txt <- if (is.null(input$microarray_gses)) "" else as.character(input$microarray_gses)
+    has_rna <- any(nzchar(trimws(unlist(strsplit(gsub("\\s+", ",", rna_txt), ",")))))
+    has_mic <- any(nzchar(trimws(unlist(strsplit(gsub("\\s+", ",", mic_txt), ",")))))
+    if (isTRUE(has_rna) && isTRUE(has_mic) &&
+        !identical(input$analysis_type, "merged") &&
+        !identical(input$analysis_type, "parallel")) {
+      shiny::updateRadioButtons(session, "analysis_type", selected = "merged")
+    }
   })
 
   shiny::observeEvent(input$analysis_type, {
@@ -290,12 +342,20 @@ gexp_app_server <- function(input, output, session) {
       shiny::showNotification(
         shiny::tags$div(
           shiny::icon("info-circle"),
-          shiny::tags$strong(" DE method switched to limma."),
-          " Mixed-platform merged runs use log-expression on the common gene intersection; count-based DE (DESeq2/edgeR/voom) is not applied across platforms."
+          shiny::tags$strong(" Merged (Both) uses limma after batch correction."),
+          " That is the original merged workflow. For DESeq2/edgeR/voom on RNA-seq plus limma on microarray, choose Parallel DE, then merge."
         ),
-        type = "warning",
+        type = "message",
         duration = 8
       )
+    }
+    if (identical(input$analysis_type, "parallel") ||
+        identical(input$analysis_type, "merged")) {
+      shiny::updateRadioButtons(session, "dataset_mode", selected = "multi")
+    }
+    if (identical(input$analysis_type, "parallel")) {
+      shiny::updateRadioButtons(session, "de_method_rna", selected = "deseq2")
+      shiny::updateRadioButtons(session, "de_method_micro", selected = "limma")
     }
   })
 
@@ -319,6 +379,7 @@ gexp_app_server <- function(input, output, session) {
     server_groups(input, output, session, rv)
     server_batch(input, output, session, rv)
     server_results(input, output, session, rv)
+    server_consensus(input, output, session, rv)
     server_wgcna(input, output, session, rv)
     server_common_genes(input, output, session, rv)
     server_ppi(input, output, session, rv)
