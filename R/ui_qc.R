@@ -70,7 +70,6 @@ ui_qc <- tabItem(
           )
         )
       ),
-      gexp_ui_parallel_run_logs("qc_log_micro", "qc_log_rna"),
       gexp_ui_parallel_two_col(
         tagList(
           box(
@@ -187,6 +186,7 @@ ui_qc <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("qc_process_summary_ui"))
     ),
+    gexp_ui_parallel_run_logs("qc_log_micro", "qc_log_rna"),
     fluidRow(
       box(width = 12, status = "info", solidHeader = FALSE,
           tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",

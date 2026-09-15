@@ -28,7 +28,6 @@ ui_batch <- tabItem(
         )
       )
     ),
-    gexp_ui_parallel_run_logs("batch_log_micro", "batch_log_rna"),
 
     fluidRow(
       box(
@@ -515,5 +514,6 @@ ui_batch <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("batch_process_summary_ui"))
     ),
+    gexp_ui_parallel_run_logs("batch_log_micro", "batch_log_rna"),
     gexp_ui_next_tab_button("next_page_batch_end", "Next: Differential Expression")
   )

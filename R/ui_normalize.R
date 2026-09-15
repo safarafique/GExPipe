@@ -375,7 +375,6 @@ ui_normalize <- tabItem(
           )
         )
       ),
-      gexp_ui_parallel_run_logs("normalization_log_micro", "normalization_log_rna"),
       gexp_ui_parallel_two_col(
         tagList(
           box(
@@ -422,6 +421,7 @@ ui_normalize <- tabItem(
           )
         )
       ),
+      gexp_ui_parallel_run_logs("normalization_log_micro", "normalization_log_rna"),
       fluidRow(
         box(width = 12, status = "info", solidHeader = FALSE,
             tags$div(class = "next-btn", style = "text-align: center; padding: 20px 0;",
