@@ -1,11 +1,26 @@
 .claude/
 .cursoragent
+.cursorignore
 .Rproj.user
 .Rhistory
 .Rapp.history
 .RData
 .RDataTmp
 .Ruserdata
+
+# Session scratch/debug files (not part of the package)
+.tmp_*.out
+tmp_*.md
+tmp_*.py
+tmp_*.R
+tmp_*.txt
+tmp_*.log
+tmp_*.html
+restart_gexpipe_fixed.R
+GPIPE/
+devel
+enrich_fix_wip/
+tmp_*/
 
 # Local installed-version snapshot (machine-specific; not for GitHub)
 inst/pkg_versions_installed.local.txt
