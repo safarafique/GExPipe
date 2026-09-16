@@ -360,9 +360,8 @@ gexp_ui_download <- function() {
           title = tags$span(icon("terminal"), " Download log"),
           width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
           tags$div(
-            style = "display:flex; align-items:center; justify-content: space-between; margin-bottom: 10px;",
-            tags$div(tags$span(class = "step-timer", tags$span(class = "label", "Elapsed:"), textOutput("download_timer", inline = TRUE))),
-            actionButton("toggle_download_summary", tagList(icon("plus"), " Toggle summary"), class = "btn btn-sm btn-default")
+            style = "margin-bottom: 10px;",
+            tags$span(class = "step-timer", tags$span(class = "label", "Elapsed:"), textOutput("download_timer", inline = TRUE))
           ),
           tags$pre(style = "white-space: pre-wrap;", textOutput("download_log"))
         )

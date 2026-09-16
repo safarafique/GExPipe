@@ -1060,17 +1060,6 @@ gexp_app_head <- function() {
           box-shadow: 0 0 10px rgba(102, 126, 234, 0.3);
         }
         
-        /* ===== PROCESSING SUMMARY TOGGLE BUTTON ===== */
-        #toggle_download_summary {
-          transition: all 0.3s ease;
-          border-radius: 20px;
-        }
-        
-        #toggle_download_summary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        
         /* Collapsible box styling */
         .box[data-collapsed='true'] .box-body {
           display: none;
