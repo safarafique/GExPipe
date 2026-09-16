@@ -1,5 +1,14 @@
 gexp_app_server <- function(input, output, session) {
 
+  # -- Keep-alive heartbeat -----------------------------------------------------
+  # Client-side JS (see gexp_app_head()) pings this input every 15s while the
+  # user has been active within the last 30 minutes, so the round-trip itself
+  # keeps the websocket connection alive against idle timeouts from a browser,
+  # proxy, or VPN. No action needed server-side beyond registering the input.
+  shiny::observeEvent(input$gexp_keepalive, {
+    invisible(NULL)
+  }, ignoreInit = TRUE)
+
   # -- In-app restart notice ----------------------------------------------------
   # Set when the pre-launch subprocess updated packages that were DLL-locked
   # and could not be reloaded in the running session. Previously shown as a

@@ -54,10 +54,10 @@ gexp_ui_de_threshold_inputs <- function(id_logfc, id_padj, id_top) {
         shiny::tags$i(
           class = "fa fa-question-circle param-help",
           `data-toggle` = "tooltip", `data-placement` = "top",
-          title = "Log2 fold-change threshold. Genes with |log2FC| above this value are considered differentially expressed.<br><b>0.5</b> = mild (1.4-fold), <b>1.0</b> = strong (2-fold)."
+          title = "Log2 fold-change threshold. Genes with |log2FC| above this value are considered differentially expressed.<br><b>0.5</b> = mild (1.4-fold), <b>1.0</b> = strong (2-fold). Range 0-2."
         )
       ),
-      0.5, step = 0.1
+      0.5, min = 0, max = 2, step = 0.1
     ),
     shiny::numericInput(
       id_padj,
