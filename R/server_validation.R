@@ -705,6 +705,22 @@ server_validation <- function(input, output, session, rv) {
       tags$hr(),
       tags$h4(icon("play-circle"), " Step C: Categorize Groups & Run DE", style = "color: #27ae60; margin-bottom: 10px;"),
       fluidRow(
+        column(3, numericInput("ext_val_logfc_cutoff", tags$span("LogFC cutoff:",
+          tags$i(class = "fa fa-question-circle param-help",
+                 `data-toggle` = "tooltip", `data-placement` = "top",
+                 title = "Log2 fold-change threshold for the validation-set DE. Genes with |log2FC| above this value are considered differentially expressed.<br><b>0.5</b> = mild (1.4-fold), <b>1.0</b> = strong (2-fold). Range 0-2.")),
+          0.5, min = 0, max = 2, step = 0.1)),
+        column(3, numericInput("ext_val_padj_cutoff", tags$span("Adj. P-value:",
+          tags$i(class = "fa fa-question-circle param-help",
+                 `data-toggle` = "tooltip", `data-placement` = "top",
+                 title = "Benjamini-Hochberg adjusted p-value cutoff for the validation-set DE.<br><b>0.05</b> = standard (5% FDR), <b>0.01</b> = stringent.")),
+          0.05, step = 0.01)),
+        column(6,
+          tags$p("Thresholds applied to the validation dataset's own DE run (independent of Step 6's thresholds).",
+                 style = "font-size: 12px; color: #6c757d; margin-top: 28px;")
+        )
+      ),
+      fluidRow(
         column(6,
           actionButton("ext_val_run_btn",
             tagList(icon("dna"), " Apply Groups & Run DE Analysis"),
@@ -811,8 +827,16 @@ server_validation <- function(input, output, session, rv) {
         de_res$Gene <- rownames(de_res)
         de_res <- de_res[, c("Gene", "logFC", "AveExpr", "P.Value", "adj.P.Val")]
 
-        padj_cut <- 0.05
-        logfc_cut <- 0.5
+        padj_cut <- if (!is.null(input$ext_val_padj_cutoff) && !is.na(input$ext_val_padj_cutoff)) {
+          input$ext_val_padj_cutoff
+        } else {
+          0.05
+        }
+        logfc_cut <- if (!is.null(input$ext_val_logfc_cutoff) && !is.na(input$ext_val_logfc_cutoff)) {
+          input$ext_val_logfc_cutoff
+        } else {
+          0.5
+        }
         de_res$Significance <- "Not Significant"
         de_res$Significance[de_res$adj.P.Val < padj_cut & de_res$logFC > logfc_cut] <- "Up-regulated"
         de_res$Significance[de_res$adj.P.Val < padj_cut & de_res$logFC < -logfc_cut] <- "Down-regulated"
@@ -933,6 +957,16 @@ server_validation <- function(input, output, session, rv) {
     n_sig <- if (!is.null(sig)) nrow(sig) else 0
     n_up <- sum(de$Significance == "Up-regulated", na.rm = TRUE)
     n_down <- sum(de$Significance == "Down-regulated", na.rm = TRUE)
+    used_logfc <- if (!is.null(input$ext_val_logfc_cutoff) && !is.na(input$ext_val_logfc_cutoff)) {
+      input$ext_val_logfc_cutoff
+    } else {
+      0.5
+    }
+    used_padj <- if (!is.null(input$ext_val_padj_cutoff) && !is.na(input$ext_val_padj_cutoff)) {
+      input$ext_val_padj_cutoff
+    } else {
+      0.05
+    }
 
     tagList(
       fluidRow(
@@ -956,7 +990,7 @@ server_validation <- function(input, output, session, rv) {
                 style = "text-align: center; padding: 15px; background: linear-gradient(135deg, #e74c3c, #c0392b); border-radius: 10px; color: white; margin-bottom: 10px;",
                 tags$h4(icon("arrow-up"), tags$strong("Up-regulated"), style = "margin: 0;"),
                 tags$h2(n_up, style = "margin: 5px 0;"),
-                tags$small("adj.P < 0.05, logFC > 0.5")
+                tags$small(paste0("adj.P < ", used_padj, ", logFC > ", used_logfc))
               )
             ),
             column(4,
@@ -964,7 +998,7 @@ server_validation <- function(input, output, session, rv) {
                 style = "text-align: center; padding: 15px; background: linear-gradient(135deg, #3498db, #2980b9); border-radius: 10px; color: white; margin-bottom: 10px;",
                 tags$h4(icon("arrow-down"), tags$strong("Down-regulated"), style = "margin: 0;"),
                 tags$h2(n_down, style = "margin: 5px 0;"),
-                tags$small("adj.P < 0.05, logFC < -0.5")
+                tags$small(paste0("adj.P < ", used_padj, ", logFC < -", used_logfc))
               )
             )
           ),

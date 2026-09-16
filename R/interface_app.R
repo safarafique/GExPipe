@@ -269,6 +269,28 @@ gexp_app_head <- function() {
           });
         });
       ")),
+      # Keep-alive heartbeat: without this, a browser/proxy/VPN idle timeout can
+      # drop the websocket ('Disconnected from server') even though the R session
+      # is still fine, just because no traffic crossed the connection for a while.
+      # As long as the user interacted within the last 30 minutes, ping the server
+      # every 15s so real bytes keep flowing and nothing decides the connection is
+      # dead. Once idle exceeds 30 minutes, stop pinging and let it disconnect.
+      shiny::tags$script(shiny::HTML("
+        (function() {
+          var GEXP_IDLE_LIMIT_MS = 30 * 60 * 1000;
+          var gexpLastActivity = Date.now();
+          $(document).on('mousemove keydown click scroll touchstart', function() {
+            gexpLastActivity = Date.now();
+          });
+          setInterval(function() {
+            if (Date.now() - gexpLastActivity < GEXP_IDLE_LIMIT_MS) {
+              if (window.Shiny && Shiny.setInputValue) {
+                Shiny.setInputValue('gexp_keepalive', Date.now(), {priority: 'event'});
+              }
+            }
+          }, 15000);
+        })();
+      ")),
       shiny::tags$style(shiny::HTML("
         /* ===== HELP ICON / TOOLTIP STYLING ===== */
         .param-help {
