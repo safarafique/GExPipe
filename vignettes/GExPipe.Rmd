@@ -266,10 +266,11 @@ button, and confirm the **success check** before continuing.
 
 The sidebar tabs for this phase are **1. Download Data**, **2. Normalize
 Data**, **3. QC & Visualization**, **4. Select Groups**, and **5. Batch
-Correction**. The walkthrough uses a two-study RNA-seq example
-(`GSE50760`, `GSE104836`); any valid GEO accessions work the same way.
-For Parallel DE, enter RNA-seq IDs in the left box and microarray IDs in
-the right box (several IDs per box are allowed).
+Correction**. The walkthrough uses an RNA-seq example (`GSE144119`) and a
+microarray example (`GSE268456`); any valid GEO accessions work the same
+way, and either box accepts more than one GSE ID (comma-separated) if you
+want a multi-dataset run. For Parallel DE, enter RNA-seq IDs in the left
+box and microarray IDs in the right box (several IDs per box are allowed).
 
 ### Step 1 — Download Data
 
@@ -300,8 +301,8 @@ normalization. Parallel DE keeps each platform's genes until Step 7.
    - **limma-voom**, **DESeq2**, or **edgeR** — RNA-seq integer counts.
    - Parallel: RNA-seq method on the left; microarray is always limma.
 5. Enter comma-separated **GSE IDs**. RNA-seq and microarray each have
-   their own box (e.g. `GSE50760, GSE104836` in RNA-seq and `GSE89076`
-   in microarray).
+   their own box (e.g. `GSE144119` in RNA-seq and `GSE268456` in
+   microarray).
 6. Click **Start Processing** and read the **Download log**.
 7. Click **Next: Normalize Data**.
 
@@ -442,7 +443,15 @@ Normal vs Disease signal.
    condition, hierarchical clustering, and **PVCA** on the same panel.
 7. Click **Next: Differential Expression**.
 
-**Note:** Step 5 is skipped when only **one GSE** was loaded in Step 1.
+**Note:** With only **one GSE** loaded in Step 1, there is no between-study
+batch to remove, so cross-study correction is skipped by default - but a
+single dataset can still carry a technical batch effect from sample
+processing (extraction date, sequencing lane, processing day). Step 5
+shows a diagnostic panel for this case: pick a candidate technical
+covariate from that GSE's own phenodata, compare PCA colored by the
+covariate versus by Condition, and either confirm there is no batch
+effect or apply `limma::removeBatchEffect()` using that covariate before
+continuing.
 
 **Success check:** After-correction PCA (panel b) shows datasets intermingled.
 
@@ -683,12 +692,25 @@ knitr::include_graphics("images/step10b_ml.png")
    - **Internal Validation** — use a 70/30 stratified split of your current
      data (no extra download).
 2. **External path only:**
-   - Enter validation **GSE IDs**, select **Platform Type** and **DE Method**
-     (limma, or DESeq2/edgeR when the platform is RNA-seq with raw counts).
-   - Click **Download**, then browse phenodata and select the group column.
+   - Enter validation **GSE IDs** (e.g. `GSE100026`), select **Platform
+     Type** and **DE Method** (limma, or DESeq2/edgeR when the platform is
+     RNA-seq with raw counts).
+   - Click **Download** - this normalizes the validation data with the
+     same per-dataset method used in Step 2 (quantile for microarray,
+     TMM for RNA-seq) and applies the same gene ID -> symbol conversion as
+     Step 1, so validation gene identifiers and counts match the training
+     pipeline for the same GSE.
+   - Browse phenodata and select the group column.
+   - A **Batch Correction** panel appears next: with 2+ validation
+     datasets it runs the same auto-selected ComBat-ref/limma correction
+     as Step 5; with a single dataset it offers the same optional
+     technical-covariate correction described in Step 5.
    - Categorize labels as Normal / Disease, set **LogFC cutoff** and
      **Adj. P-value** for this validation-set DE (defaults 0.5 / 0.05,
-     independent of Step 6's thresholds), and click **Run Validation DE**.
+     independent of Step 6's thresholds), and click **Run Validation DE**
+     - this uses the same DE engines (`gexpipe_run_count_de` /
+     `gexpipe_run_limma_on_subset`) as Step 6, including a Dataset
+     covariate when 2+ validation datasets are combined.
 3. Review validation status and DE results (panel b).
 4. Click **Continue to ROC Curve Analysis**.
 
@@ -806,21 +828,26 @@ knitr::include_graphics("images/step14_gsea.png")
 
 **Sidebar:** `16. Results Summary`
 
-**Goal:** Review the full pipeline narrative and key figures, then download
-exports where available.
+**Goal:** Review a plain-text overview of the whole pipeline and its key
+result counts, in order.
 
 **What to do:**
 
-1. Read the **Pipeline summary** narrative at the top.
-2. Scroll through step cards for normalization, batch correction, DE, WGCNA,
-   common genes, GO/KEGG, PPI, ML, ROC, nomogram, and GSEA — each with a
-   short description and figure.
-3. Use download buttons on individual plots (JPG/PDF) where you need figures
-   for a manuscript or report.
-4. Expand **Cite this analysis** for package and method references.
+1. Read the **Pipeline summary** narrative at the top - one paragraph
+   covering genes/samples processed, normalization, batch correction, DE
+   (significant/up/down genes), WGCNA modules, common genes, GO/KEGG/PPI
+   counts, ML overlap, nomogram AUCs, and GSEA.
+2. Scroll through the step cards below it for the same information broken
+   out per step (normalization, batch correction, DE, WGCNA, common genes,
+   GO/KEGG, PPI, ML, nomogram, GSEA, and input/pipeline size).
 
-**Success check:** Summary reflects your completed steps; key plots from
-earlier tabs appear in the ordered overview.
+This tab is text and tables only - it does not duplicate plots or offer
+JPG/PDF downloads. For figures, use the download buttons on each step's own
+tab (e.g. Step 6 for the volcano plot, Step 9 for the PPI network).
+
+**Success check:** The narrative and step cards reflect your completed
+steps' actual numbers (e.g. DEG count matches Step 6, module count matches
+Step 7).
 
 ```{r step15-screenshot, echo=FALSE, fig.cap="Step 16: Results summary overview.", out.width="100%"}
 knitr::include_graphics("images/step15_summary.png")
