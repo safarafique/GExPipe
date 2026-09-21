@@ -1,0 +1,11 @@
+Option_id,Platform,Description,Typical_use
+quantile,Microarray,Quantile (processed / log2),"Merged, microarray, Parallel micro"
+log2_quantile,Microarray,log2 then quantile,"Merged, microarray, Parallel micro"
+rma,Microarray,RMA from Affymetrix CEL (affy/oligo),When CEL supplementary files available
+normexp,Microarray,Agilent normexp + quantile,"Merged, microarray, Parallel micro"
+TMM,RNA-seq,TMM + log2-CPM,Merged limma path; RNA limma DE
+log2fpkm,RNA-seq,log2(x+1) FPKM/TPM,Manual RNA options
+log2cpm_only,RNA-seq,log2(CPM+1) exploration,Manual RNA options
+skip_counts,RNA-seq,Raw counts retained,"DESeq2, edgeR, limma-voom (Auto skips TMM)"
+global_quantile,Merged,Global quantile after common-gene intersection,Merged (Both) only; not Parallel
+per_gse_auto,All,Auto mode follows Step 1 DE method and data type,Steps 2 Auto default

@@ -74,7 +74,7 @@ ui_wgcna <- tabItem(
                     selected = "auto"
                   ),
                   tags$small(
-                    "Pick RNA-seq or microarray yourself, or leave Auto. One network only — not a mixed matrix, and not the Step 7 DEG list.",
+                    "Pick RNA-seq or microarray yourself, or leave Auto. One network only - not a mixed matrix, and not the Step 7 DEG list.",
                     style = "color: #6c757d; display: block;"
                   )
                 )

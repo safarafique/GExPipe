@@ -141,7 +141,7 @@ gexp_ui_parallel_run_logs <- function(micro_id, rna_id) {
 #' @noRd
 gexpipe_ui_norm_auto_guide <- function(analysis_type, de_method) {
   de_method <- if (is.null(de_method) || !nzchar(de_method)) "limma" else de_method
-  # Merged DE is one limma on a shared log matrix — always normalize RNA-seq.
+  # Merged DE is one limma on a shared log matrix - always normalize RNA-seq.
   if (identical(analysis_type, "merged")) de_method <- "limma"
   count_de <- .gexpipe_is_count_de(de_method)
   de_lab <- .gexpipe_de_method_label(de_method)
@@ -154,7 +154,7 @@ gexpipe_ui_norm_auto_guide <- function(analysis_type, de_method) {
         shiny::tags$strong("RNA-seq DE (", de_lab, "): "),
         "raw counts are kept. Step 2 will ",
         shiny::tags$strong("not"),
-        " apply TMM or log2 for DE — ", de_lab, " normalizes internally. Sample plots may still use a light log scale."
+        " apply TMM or log2 for DE - ", de_lab, " normalizes internally. Sample plots may still use a light log scale."
       )
     } else {
       shiny::tags$li(
@@ -246,7 +246,7 @@ gexpipe_ui_norm_manual_guide <- function(analysis_type, de_method) {
   shiny::tags$div(
     class = "alert alert-warning",
     style = "margin: 10px 0 12px 0; font-size: 13px; line-height: 1.55;",
-    shiny::tags$strong("Manual — details so DE stays on the right scale."),
+    shiny::tags$strong("Manual - details so DE stays on the right scale."),
     head_msg,
     do.call(shiny::tags$ul, c(list(style = "margin: 0; padding-left: 18px;"), bullets)),
     if (identical(analysis_type, "parallel")) {
@@ -271,7 +271,7 @@ gexpipe_format_separate_run_log <- function(run_n, platform, body) {
   hr <- paste(rep("\u2501", 56L), collapse = "")
   paste0(
     hr, "\n",
-    "RUN ", run_n, " \u2014 ", platform, " (separate pipeline)\n",
+    "RUN ", run_n, " 2014 ", platform, " (separate pipeline)\n",
     hr, "\n",
     body
   )

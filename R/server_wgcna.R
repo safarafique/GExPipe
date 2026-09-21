@@ -32,12 +32,12 @@ server_wgcna <- function(input, output, session, rv) {
       tags$div(
         class = "alert alert-warning",
         style = "margin: 8px 0 12px 0; font-size: 13px; line-height: 1.55;",
-        tags$strong("Manual — pick the matrix and gene count."),
+        tags$strong("Manual - pick the matrix and gene count."),
         tags$ul(
           style = "margin: 6px 0 0 0; padding-left: 18px;",
           tags$li(tags$strong("RNA-seq:"), " VST of raw counts (never raw counts or the DEG list)."),
           tags$li(tags$strong("Microarray:"), " batch-corrected (or normalized) intensities."),
-          tags$li(tags$strong("Genes:"), " top 5,000–8,000 variable genes. Avoid “all genes” unless the matrix is already small."),
+          tags$li(tags$strong("Genes:"), " top 5,000-8,000 variable genes. Avoid \"all genes\" unless the matrix is already small."),
           tags$li("One network only. Step 9 overlaps modules with DEGs / consensus.")
         )
       )
@@ -1394,7 +1394,7 @@ server_wgcna <- function(input, output, session, rv) {
     d <- dendrapply(d, set_edge_par)
     op <- par(mar = c(4, 4, 4, 2), bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
-    plot(d, main = "Module Eigengene Dendrogram", xlab = "", ylab = "Height", leaflab = "perpendicular", cex = 0.8, col.main = "#1a252f")
+    plot(d, main = "Module Eigengene Dendrogram", xlab = "", ylab = "Height", leaflab = "perpendicular", cex = 0.8, col.main = "#1a252f", yaxt = "n")
     axis(2, col = "#5d6d7e", col.axis = "#2c3e50", cex.axis = 0.9, las = 1)
     box(col = "gray85", lwd = 1)
   })
@@ -1464,7 +1464,7 @@ server_wgcna <- function(input, output, session, rv) {
     d <- dendrapply(d, set_edge_par)
     op <- par(mar = c(4, 4, 4, 2), bg = "white", fg = "#2c3e50")
     on.exit(par(op), add = TRUE)
-    plot(d, main = "Module Eigengene Dendrogram", xlab = "", ylab = "Height", leaflab = "perpendicular", cex = 0.8, col.main = "#1a252f")
+    plot(d, main = "Module Eigengene Dendrogram", xlab = "", ylab = "Height", leaflab = "perpendicular", cex = 0.8, col.main = "#1a252f", yaxt = "n")
     axis(2, col = "#5d6d7e", col.axis = "#2c3e50", cex.axis = 0.9, las = 1)
     box(col = "gray85", lwd = 1)
   }

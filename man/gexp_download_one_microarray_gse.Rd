@@ -4,12 +4,19 @@
 \alias{gexp_download_one_microarray_gse}
 \title{Download and parse one microarray GSE}
 \usage{
-gexp_download_one_microarray_gse(gse_id, micro_dir)
+gexp_download_one_microarray_gse(gse_id, micro_dir, download_cel = NULL, fast = NULL)
 }
 \arguments{
 \item{gse_id}{GEO series ID.}
 
 \item{micro_dir}{Directory for supplementary files.}
+
+\item{download_cel}{Logical; if \code{TRUE}, also download raw CEL files for
+RMA normalization (Affymetrix). Default \code{NULL} follows
+\code{options(gexpipe.download_cel)} (FALSE).}
+
+\item{fast}{Logical; if \code{TRUE} (default from
+\code{options(gexpipe.fast_download)}), skip slower optional lookups.}
 }
 \value{
 List with status, log text, reason, expression, metadata, eset, platform_id, and cel_paths.

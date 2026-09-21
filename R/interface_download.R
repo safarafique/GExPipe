@@ -273,7 +273,7 @@ gexp_ui_download <- function() {
               tags$p(
                 icon("lightbulb"),
                 tags$strong(" Tip:"),
-                " Microarray only (e.g. GSE44076) \u2192 select ",
+                " Microarray only (e.g. GSE268456) \u2192 select ",
                 tags$strong("limma"),
                 ". RNA-seq counts \u2192 select DESeq2, edgeR, or limma-voom.",
                 style = "margin: 8px 0 0 0; font-size: 12.5px; color: #374151;"
@@ -301,12 +301,12 @@ gexp_ui_download <- function() {
           title = tags$span(icon("dna"), " RNA-seq Datasets"),
           width = 6, status = "info", solidHeader = TRUE,
           textAreaInput("rnaseq_gses", "GSE IDs (comma separated; one or more):",
-            value = "", placeholder = "e.g. GSE50760, GSE104836",
+            value = "", placeholder = "e.g. GSE144119",
             rows = 3
           ),
           tags$p(
             style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-            icon("lightbulb"), " One or more RNA-seq GEO Series IDs, comma-separated (e.g. GSE50760, GSE104836)."
+            icon("lightbulb"), " One or more RNA-seq GEO Series IDs, comma-separated (e.g. GSE144119)."
           )
         )
       ),
@@ -316,12 +316,12 @@ gexp_ui_download <- function() {
           title = tags$span(icon("microchip"), " Microarray Datasets"),
           width = 6, status = "warning", solidHeader = TRUE,
           textAreaInput("microarray_gses", "GSE IDs (comma separated; one or more):",
-            value = "", placeholder = "e.g. GSE89076, GSE44076",
+            value = "", placeholder = "e.g. GSE268456",
             rows = 3
           ),
           tags$p(
             style = "margin-top: 4px; margin-bottom: 0; color: #868e96; font-size: 12px;",
-            icon("lightbulb"), " One or more microarray GEO Series IDs, comma-separated (e.g. GSE89076, GSE44076)."
+            icon("lightbulb"), " One or more microarray GEO Series IDs, comma-separated (e.g. GSE268456)."
           )
         )
       )

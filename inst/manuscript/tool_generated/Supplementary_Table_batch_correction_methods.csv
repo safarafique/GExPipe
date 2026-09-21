@@ -1,0 +1,7 @@
+Method_id,UI_label,Implementation,Condition_protection,Availability
+combat_ref,ComBat-ref,sva::ComBat with ref.batch = largest Dataset,Condition (+ Platform in mod when identifiable),Merged / single-track default
+sva,SVA + ComBat,"Estimate SVs (be method), then ComBat with mod + SVs",Condition protected in mod,Merged / single-track
+limma,limma removeBatchEffect,"limma::removeBatchEffect(batch = Dataset, design = mod)",Condition (+ Platform when in mod),Merged; Parallel RNA when count DE
+combat,ComBat,sva::ComBat with phenotype mod,Condition in mod,Merged; Parallel manual option
+quantile_limma,Quantile + limma,normalizeBetweenArrays quantile then removeBatchEffect,Condition in mod,Merged; Parallel micro manual
+hybrid,Hybrid,Quantile then ComBat,Condition in mod,Merged; Parallel micro manual

@@ -219,6 +219,7 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
   }
   output$download_workspace <- workspace_download_handler()
   output$download_workspace_results <- workspace_download_handler()
+  output$download_workspace_results_parallel <- workspace_download_handler()
 
   shiny::observe({
     if (isTRUE(getOption("shiny.testmode"))) {

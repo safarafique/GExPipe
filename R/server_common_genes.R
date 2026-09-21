@@ -165,14 +165,14 @@ server_common_genes <- function(input, output, session, rv) {
           tags$strong("Not the same as Step 7 Common. "),
           icon("check-double"), " Consensus DE = Step 7 same-direction list. ",
           icon("project-diagram"), " WGCNA = genes in significant modules. ",
-          icon("venus-double"), " This overlap is Consensus DE ∩ WGCNA."
+          icon("venus-double"), " This overlap is Consensus DE \u2229 WGCNA."
         )
       } else {
         NULL
       },
       fluidRow(
         column(4, card("check-double", labs$deg, n_deg,
-                       if (.step9_parallel()) "Step 7 same-direction RNA-seq ∩ microarray." else "Significant DEGs from Step 6.",
+                       if (.step9_parallel()) "Step 7 same-direction RNA-seq \u2229 microarray." else "Significant DEGs from Step 6.",
                        "#ca8a04")),
         column(4, card("project-diagram", labs$wgcna, n_wgcna,
                        "Genes in significant WGCNA modules (Step 8).",

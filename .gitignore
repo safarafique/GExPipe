@@ -46,7 +46,12 @@ app/
 inst/shinyapp/rna_data/
 rna_data/
 inst/shinyapp/ext_val_rna/
+inst/shinyapp/ext_val_micro/
 inst/shinyapp/csv_exports/
+
+# Local validation/benchmark scratch (large raw downloads, not part of the
+# package or the GitHub source - some files here exceed GitHub's 100MB limit)
+validation_manual/
 
 # GEO platform annotation caches (can be >1 GB)
 inst/shinyapp/*.soft.gz

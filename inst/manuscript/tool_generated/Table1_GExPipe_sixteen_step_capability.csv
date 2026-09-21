@@ -1,0 +1,20 @@
+Step,Feature,GExPipe,Notes
+1,Download Data,Yes,GEOquery; RNA-seq + microarray GSE boxes; empty Series Matrix count ingest; probe→HGNC (Step 2b); four analysis types
+2,Normalize Data,Yes,"Per-GSE platform normalization; Auto/Manual; Merged: common genes + optional global quantile; Parallel: separate, no intersection"
+3,QC & Visualization,Yes,Sample/gene QC; density/boxplot; outlier exclusion; Venn/UpSet gene overlap (Parallel: per-platform plots)
+4,Select Groups,Yes,Normal vs Disease (and related); Parallel: separate success banners per platform
+5,Batch Correction,Yes,Variance filter; 6 joint methods (Merged/single); Parallel: per-platform batch (no joint ComBat)
+6,Differential Expression,Yes,"limma, limma-voom, DESeq2, edgeR; Parallel: dual engines one click; independent cutoffs per platform"
+7,RNA-seq ∩ microarray,Yes,Parallel DE only: same-direction dual-platform significant genes (consensus for downstream)
+8,WGCNA Analysis,Yes,Top variable genes (default 5000); one network; Parallel: RNA VST or array matrix on chosen platform
+9,Common Genes (DEG & WGCNA),Yes,DEG ∩ trait-associated modules; GO/KEGG; DEG source depends on analysis type
+10,PPI Interaction,Yes,STRINGdb network; hub ranking (internet on first use)
+11,Machine Learning,Yes,8 algorithms; ≥2-method consensus final list; feature-importance plots
+12,Validation Setup,Yes,External GEO cohort or internal split; feeds ROC
+13,ROC Curve Analysis,Yes,Training/validation AUC; optional immune deconvolution correlation
+14,Diagnostic Nomogram,Yes,Exploratory nomogram (rms); reporting aid
+15,GSEA Analysis,Yes,GSEA / MSigDB-related pathways (msigdbr)
+16,Results Summary,Yes,Automated PDF-oriented summary; workspace save/load in sidebar
+—,Four analysis types at Step 1,Yes,RNA-seq only; Microarray only; Merged (Both); Parallel DE then merge
+—,Multi-GSE per platform (Merged / Parallel),Yes,Several comma-separated GSE IDs in each box
+—,Empty GEO Series Matrix RNA-seq ingest,Yes,Supplementary count files / NCBI counts (download pipeline)

@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use GExPipe in your research, please cite it using the metadata below."
 type: software
 title: "GExPipe: Gene Expression Pipeline Shiny Application"
-version: 0.99.51
-date-released: "2026-08-27"
+version: 0.99.105
+date-released: "2026-09-16"
 url: "https://github.com/safarafique/GExPipe"
 repository-code: "https://github.com/safarafique/GExPipe"
 license: MIT

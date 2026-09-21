@@ -1,0 +1,18 @@
+bibentry(
+  bibtype  = "Manual",
+  title    = "GExPipe: Gene Expression Pipeline Shiny Application",
+  author   = c(
+    person("Safa", "Rafique"),
+    person("Naeem Mahmood", "Ashraf"),
+    person("Muhammad Farooq", "Sabar")
+  ),
+  year     = "2026",
+  note     = paste("R package version", meta$Version),
+  url      = "https://github.com/safarafique/GExPipe",
+  textVersion = paste(
+    "Rafique S, Ashraf NM, Sabar MF (2026).",
+    "GExPipe: Gene Expression Pipeline Shiny Application.",
+    paste0("R package version ", meta$Version, "."),
+    "https://github.com/safarafique/GExPipe"
+  )
+)

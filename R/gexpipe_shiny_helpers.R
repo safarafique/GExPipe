@@ -423,6 +423,74 @@ gexp_enrich_thin_metadata_list <- function(meta_list) {
 }
 
 
+#' Merge full per-GSE GEO phenodata columns into unified_metadata
+#'
+#' \code{unified_metadata} is built by \code{gexp_normalize_and_intersect()} as a
+#' minimal SampleID/Platform/Dataset/Condition schema (needed so datasets with
+#' incompatible phenotype columns can still be merged for DE). That means the full
+#' clinical/GEO phenotype columns already fetched into \code{rna_metadata_list} /
+#' \code{micro_metadata_list} during download never reach the analysis metadata
+#' shown to the user. This adds those columns back in (by sample ID, per GSE),
+#' without touching the existing required columns, so single- or multi-dataset
+#' step-by-step runs carry the same phenodata richness as the validation pipeline.
+#'
+#' @param unified_metadata data.frame with rownames = sample IDs and a Dataset column.
+#' @param rna_metadata_list Named list of per-GSE RNA-seq phenodata data.frames.
+#' @param micro_metadata_list Named list of per-GSE microarray phenodata data.frames.
+#' @return \code{unified_metadata} with additional GEO phenotype columns merged in.
+#' @keywords internal
+gexp_enrich_unified_metadata_with_full_pdata <- function(unified_metadata, rna_metadata_list = NULL,
+                                                          micro_metadata_list = NULL) {
+  if (is.null(unified_metadata) || !is.data.frame(unified_metadata) ||
+      nrow(unified_metadata) == 0L || !"Dataset" %in% colnames(unified_metadata)) {
+    return(unified_metadata)
+  }
+  gses <- unique(as.character(unified_metadata$Dataset))
+  full_pd_parts <- lapply(gses, function(gse) {
+    ids <- rownames(unified_metadata)[as.character(unified_metadata$Dataset) == gse]
+    md <- if (!is.null(rna_metadata_list) && gse %in% names(rna_metadata_list)) {
+      rna_metadata_list[[gse]]
+    } else if (!is.null(micro_metadata_list) && gse %in% names(micro_metadata_list)) {
+      micro_metadata_list[[gse]]
+    } else {
+      NULL
+    }
+    if (is.null(md) || !is.data.frame(md) || ncol(md) == 0L || nrow(md) == 0L) {
+      return(NULL)
+    }
+    md <- as.data.frame(md, stringsAsFactors = FALSE, check.names = FALSE)
+    md[] <- lapply(md, function(x) {
+      if (is.factor(x)) {
+        as.character(x)
+      } else if (is.list(x)) {
+        vapply(x, function(v) paste(as.character(unlist(v)), collapse = "; "), character(1))
+      } else {
+        x
+      }
+    })
+    md <- tryCatch(gexp_expand_geo_characteristics(md), error = function(e) md)
+    stub <- data.frame(title = ids, row.names = ids, stringsAsFactors = FALSE)
+    md <- .gexpipe_align_pdata_to_primary(stub, md)
+    keep <- intersect(ids, rownames(md))
+    if (length(keep) == 0L) return(NULL)
+    md[keep, , drop = FALSE]
+  })
+  full_pd_parts <- Filter(Negate(is.null), full_pd_parts)
+  if (length(full_pd_parts) == 0L) {
+    return(unified_metadata)
+  }
+  all_cols <- unique(unlist(lapply(full_pd_parts, colnames)))
+  full_pd_parts <- lapply(full_pd_parts, function(md) {
+    for (cc in setdiff(all_cols, colnames(md))) md[[cc]] <- NA_character_
+    md[, all_cols, drop = FALSE]
+  })
+  full_pd <- do.call(rbind, full_pd_parts)
+  tryCatch(
+    .gexpipe_merge_pdata_columns(unified_metadata, full_pd),
+    error = function(e) unified_metadata
+  )
+}
+
 #' Normalize phenotype labels for group extraction (e.g. parse GEO title text)
 #'
 #' For GEO series like GSE108413, treatment is only in \code{title}, e.g.
@@ -1160,6 +1228,7 @@ GPL_to_biomart_probe_attr <- c(
     return(tab)
   }
   .fetch_gpl <- function(destdir_val) {
+    try(.gexpipe_clean_corrupt_gpl_cache(destdir_val, gpl_id), silent = TRUE)
     tryCatch(
       .gexpipe_geo_quiet(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
       error = function(e) NULL
@@ -1681,6 +1750,7 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
     }
 
     .fetch_gpl <- function(destdir_val) {
+      try(.gexpipe_clean_corrupt_gpl_cache(destdir_val, gpl_id), silent = TRUE)
       tryCatch(
                 .gexpipe_geo_quiet(GEOquery::getGEO(gpl_id, destdir = destdir_val)),
         error = function(e) NULL

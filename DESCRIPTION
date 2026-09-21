@@ -46,6 +46,7 @@ Imports:
     affy (>= 1.84.0),
     AnnotationDbi (>= 1.64.0),
     Biobase (>= 2.62.0),
+    BiocGenerics,
     biomaRt (>= 2.58.0),
     caret (>= 6.0.94),
     circlize (>= 0.4.16),
@@ -126,6 +127,7 @@ Suggests:
     remotes,
     SHAPforxgboost (>= 0.1.0),
     curl,
+    httpuv,
     shinytest2,
     stringi,
     testthat

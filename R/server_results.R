@@ -157,7 +157,7 @@ server_results <- function(input, output, session, rv) {
       rna_lab <- .gexpipe_de_method_label(if (is.null(rv$de_method)) "deseq2" else rv$de_method)
       return(tags$div(
         style = "font-size: 14px; line-height: 1.6; color: #333;",
-        tags$p(tags$strong("Step 6 complete — two separate DEs."), " Consensus is Step 7."),
+        tags$p(tags$strong("Step 6 complete - two separate DEs."), " Consensus is Step 7."),
         tags$p("RNA-seq (", rna_lab, "): ", format(n_r, big.mark = ","), " DEGs",
                if (!is.null(rv$de_logfc_rna)) paste0(" (|log2FC| >= ", rv$de_logfc_rna, ", adj.P <= ", rv$de_padj_rna, ")") else "",
                "."),
@@ -195,7 +195,7 @@ server_results <- function(input, output, session, rv) {
       tags$div(
         class = "alert alert-warning",
         style = "margin: 8px 0 0 0; font-size: 13px; line-height: 1.55;",
-        tags$strong("Manual — pick the RNA-seq engine. Microarray stays limma."),
+        tags$strong("Manual - pick the RNA-seq engine. Microarray stays limma."),
         tags$ul(
           style = "margin: 6px 0 0 0; padding-left: 18px;",
           tags$li(tags$strong("DESeq2 / edgeR / voom:"), " raw RNA-seq counts only; Dataset is a covariate when that side has 2+ GSEs. Not applied to microarray."),
@@ -336,17 +336,30 @@ server_results <- function(input, output, session, rv) {
       }
     }
 
-    # DE requires both Normal and Disease; otherwise there is no contrast (e.g. same sample source = one condition only)
+    # DE requires both groups; otherwise there is no contrast (e.g. same sample source = one condition only).
+    # Use the current (possibly renamed) reference/comparison labels, not the
+    # literal "Normal"/"Disease" strings - group names may have been
+    # customized in Step 4.
+    precheck_ref_lab <- if (!is.null(rv$condition_ref_label) && nzchar(rv$condition_ref_label)) {
+      rv$condition_ref_label
+    } else {
+      "Normal"
+    }
+    precheck_alt_lab <- if (!is.null(rv$condition_alt_label) && nzchar(rv$condition_alt_label)) {
+      rv$condition_alt_label
+    } else {
+      "Disease"
+    }
     cond_counts <- table(rv$unified_metadata$Condition)
-    n_normal <- if ("Normal" %in% names(cond_counts)) cond_counts[["Normal"]] else 0L
-    n_disease <- if ("Disease" %in% names(cond_counts)) cond_counts[["Disease"]] else 0L
+    n_normal <- if (precheck_ref_lab %in% names(cond_counts)) cond_counts[[precheck_ref_lab]] else 0L
+    n_disease <- if (precheck_alt_lab %in% names(cond_counts)) cond_counts[[precheck_alt_lab]] else 0L
     if (n_normal == 0L || n_disease == 0L) {
       showNotification(
         tags$div(
-          icon("exclamation-triangle"), tags$strong(" Need both Normal and Disease samples for DE."),
+          icon("exclamation-triangle"), tags$strong(paste0(" Need both ", precheck_ref_lab, " and ", precheck_alt_lab, " samples for DE.")),
           tags$br(),
-          "You have ", n_normal, " Normal and ", n_disease, " Disease. Differential expression compares these two groups.",
-          " If you entered GSEs from the same sample source (e.g. same study or only one condition), add a dataset that contains the other group, or in Step 3 assign some samples to Normal and some to Disease."
+          "You have ", n_normal, " ", precheck_ref_lab, " and ", n_disease, " ", precheck_alt_lab, ". Differential expression compares these two groups.",
+          " If you entered GSEs from the same sample source (e.g. same study or only one condition), add a dataset that contains the other group, or in Step 3 assign some samples to ", precheck_ref_lab, " and some to ", precheck_alt_lab, "."
         ),
         type = "error", duration = 12)
       rv$de_running <- FALSE
@@ -386,16 +399,8 @@ server_results <- function(input, output, session, rv) {
         duration = 8
       )
     }
-    ref_lab <- if (!is.null(rv$condition_ref_label) && nzchar(rv$condition_ref_label)) {
-      rv$condition_ref_label
-    } else {
-      "Normal"
-    }
-    alt_lab <- if (!is.null(rv$condition_alt_label) && nzchar(rv$condition_alt_label)) {
-      rv$condition_alt_label
-    } else {
-      "Disease"
-    }
+    ref_lab <- precheck_ref_lab
+    alt_lab <- precheck_alt_lab
     de_contrast_label <- paste0(alt_lab, " vs ", ref_lab)
     
     rv$de_start <- Sys.time()
@@ -408,8 +413,24 @@ server_results <- function(input, output, session, rv) {
       # cached during that particular normalization run).
       # ------------------------------------------------------------------
       .try_rebuild_raw_counts <- function() {
-        if (!is.null(rv$raw_counts_for_deseq2)) return(TRUE)   # already available
+        # rv$raw_counts_for_deseq2 is never cleared when the user changes
+        # which GSEs are loaded (e.g. an earlier RNA-seq attempt, or a GSE
+        # that was later moved from the RNA-seq box to the Microarray box).
+        # A stale matrix from a completely different sample set would
+        # otherwise look "available" here despite matching nothing in the
+        # current run, silently corrupting the design matrix downstream.
+        # Require real overlap with the samples actually in play now.
+        current_ids <- if (!is.null(rv$unified_metadata)) rownames(rv$unified_metadata) else character(0)
+        if (!is.null(rv$raw_counts_for_deseq2)) {
+          overlap <- length(intersect(colnames(rv$raw_counts_for_deseq2), current_ids))
+          if (overlap >= 3L) return(TRUE)
+          rv$raw_counts_for_deseq2 <- NULL # stale - stop treating it as available
+        }
         if (length(rv$rna_counts_list) == 0)   return(FALSE)   # pure microarray - can't rebuild
+        rna_counts_overlap <- sum(vapply(rv$rna_counts_list, function(m) {
+          length(intersect(colnames(m), current_ids)) > 0L
+        }, logical(1)))
+        if (rna_counts_overlap == 0L) return(FALSE) # rna_counts_list is stale too - none of it matches this run
 
         if (isTRUE(parallel_de)) {
           built <- gexpipe_bind_rna_counts(rv$rna_counts_list)
@@ -443,30 +464,58 @@ server_results <- function(input, output, session, rv) {
       # fails inside DESeq2 with "some values in assay are negative".
       # ------------------------------------------------------------------
       .counts_usable_for <- function(engine) {
-        bad <- .gexpipe_call(
+        bad_neg <- .gexpipe_call(
           ".gexpipe_negative_count_datasets",
           rv$rna_counts_list,
           combined = rv$raw_counts_for_deseq2
         )
-        if (length(bad) == 0L) return(TRUE)
-        showNotification(
-          tags$div(
-            icon("exclamation-triangle"),
-            tags$strong(paste0(" ", engine, " needs raw counts.")),
-            tags$p(
-              paste0("Negative values were found in: ", paste(bad, collapse = ", "),
-                     ". GEO published normalized (log-scale) values for these series, ",
-                     "not raw integer counts."),
-              style = "margin-top: 8px; font-size: 12px;"
+        if (length(bad_neg) > 0L) {
+          showNotification(
+            tags$div(
+              icon("exclamation-triangle"),
+              tags$strong(paste0(" ", engine, " needs raw counts.")),
+              tags$p(
+                paste0("Negative values were found in: ", paste(bad_neg, collapse = ", "),
+                       ". GEO published normalized (log-scale) values for these series, ",
+                       "not raw integer counts."),
+                style = "margin-top: 8px; font-size: 12px;"
+              ),
+              tags$p(
+                "Falling back to limma, which is the correct model for continuous log-scale data.",
+                style = "margin-top: 4px; font-size: 12px;"
+              )
             ),
-            tags$p(
-              "Falling back to limma, which is the correct model for continuous log-scale data.",
-              style = "margin-top: 4px; font-size: 12px;"
-            )
-          ),
-          type = "warning", duration = 12
+            type = "warning", duration = 12
+          )
+          return(FALSE)
+        }
+        bad_noncount <- .gexpipe_call(
+          ".gexpipe_noncount_datasets",
+          rv$rna_counts_list,
+          combined = rv$raw_counts_for_deseq2
         )
-        FALSE
+        if (length(bad_noncount) > 0L) {
+          showNotification(
+            tags$div(
+              icon("exclamation-triangle"),
+              tags$strong(paste0(" ", engine, " needs raw integer counts.")),
+              tags$p(
+                paste0("Non-integer values were found in: ", paste(bad_noncount, collapse = ", "),
+                       ". GEO likely published normalized (FPKM/TPM/CPM) values for these series ",
+                       "under a counts-like filename, not raw integer counts. Using these with ",
+                       engine, " would silently filter out every gene instead of failing cleanly."),
+                style = "margin-top: 8px; font-size: 12px;"
+              ),
+              tags$p(
+                "Falling back to limma, which is the correct model for continuous normalized data.",
+                style = "margin-top: 4px; font-size: 12px;"
+              )
+            ),
+            type = "warning", duration = 12
+          )
+          return(FALSE)
+        }
+        TRUE
       }
 
       # Pre-checks for count-based methods (DESeq2 / edgeR / limma-voom).
@@ -581,11 +630,11 @@ server_results <- function(input, output, session, rv) {
         showNotification(
           tags$div(
             icon("check-circle"),
-            tags$strong(" Parallel DE complete — two separate engines."),
+            tags$strong(" Parallel DE complete - two separate engines."),
             paste0(
               " RNA-seq (", method, "): ", nrow(rv$sig_genes_rna),
               " DEGs. Microarray (limma): ", nrow(rv$sig_genes_micro),
-              " DEGs. Apply RNA-seq ∩ microarray in Step 7."
+              " DEGs. Apply RNA-seq \u2229 microarray in Step 7."
             )
           ),
           type = "message",
@@ -1069,7 +1118,7 @@ server_results <- function(input, output, session, rv) {
         tags$p(
           style = "margin: 0 0 10px 0; font-weight: 700; font-size: 15px; color: #1e293b;",
           icon("check-circle", style = "color: #10b981; margin-right: 8px;"),
-          "Pipeline verification — two separate DE engines"
+          "Pipeline verification - two separate DE engines"
         ),
         tags$p(
           style = "margin: 0 0 6px 0; font-size: 13px; color: #334155; line-height: 1.6;",
@@ -1153,8 +1202,8 @@ server_results <- function(input, output, session, rv) {
       gexpipe_pub_theme(base_size = 13) +
       ggplot2::labs(
         title = title,
-        subtitle = paste0(method_label, " — DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down,
-                          ") | LogFC ±", logfc, ", Adj.P ≤ ", padj),
+        subtitle = paste0(method_label, " - DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down,
+                          ") | LogFC +/-", logfc, ", Adj.P <= ", padj),
         x = "log2 fold change",
         y = "-log10(adjusted p-value)"
       ) +
@@ -1668,6 +1717,46 @@ server_results <- function(input, output, session, rv) {
       fn <- paste0("Significant_Genes_", Sys.Date(), ".csv")
       write.csv(rv$sig_genes, file, row.names = FALSE)
       write.csv(rv$sig_genes, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+
+  # Parallel DE: RNA-seq and microarray results are separate tables, so give
+  # each platform its own download instead of only the platform currently
+  # toggled into rv$de_results/rv$sig_genes.
+  output$download_de_results_rna <- downloadHandler(
+    filename = function() paste0("DE_Results_RNAseq_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$de_results_rna)
+      fn <- paste0("DE_Results_RNAseq_", Sys.Date(), ".csv")
+      write.csv(rv$de_results_rna, file, row.names = FALSE)
+      write.csv(rv$de_results_rna, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+  output$download_de_results_micro <- downloadHandler(
+    filename = function() paste0("DE_Results_Microarray_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$de_results_micro)
+      fn <- paste0("DE_Results_Microarray_", Sys.Date(), ".csv")
+      write.csv(rv$de_results_micro, file, row.names = FALSE)
+      write.csv(rv$de_results_micro, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+  output$download_sig_genes_rna <- downloadHandler(
+    filename = function() paste0("Significant_Genes_RNAseq_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$sig_genes_rna)
+      fn <- paste0("Significant_Genes_RNAseq_", Sys.Date(), ".csv")
+      write.csv(rv$sig_genes_rna, file, row.names = FALSE)
+      write.csv(rv$sig_genes_rna, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
+    }
+  )
+  output$download_sig_genes_micro <- downloadHandler(
+    filename = function() paste0("Significant_Genes_Microarray_", Sys.Date(), ".csv"),
+    content = function(file) {
+      req(rv$sig_genes_micro)
+      fn <- paste0("Significant_Genes_Microarray_", Sys.Date(), ".csv")
+      write.csv(rv$sig_genes_micro, file, row.names = FALSE)
+      write.csv(rv$sig_genes_micro, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
     }
   )
 

@@ -104,7 +104,7 @@ ui_welcome <- fluidPage(
         lapply(list(
           list("1-5", "Prep", "#6366f1"),
           list("6", "DE", "#ec4899"),
-          list("7", "RNA ∩ array", "#a855f7"),
+          list("7", "RNA \u2229 array", "#a855f7"),
           list("8", "WGCNA", "#0ea5e9"),
           list("9", "Overlap", "#22d3ee"),
           list("10-11", "PPI / ML", "#10b981"),

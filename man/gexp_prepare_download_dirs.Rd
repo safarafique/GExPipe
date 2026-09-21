@@ -7,7 +7,8 @@
 gexp_prepare_download_dirs(
   base_dir = getwd(),
   has_micro = FALSE,
-  has_rna = FALSE
+  has_rna = FALSE,
+  clear_cache = NULL
 )
 }
 \arguments{
@@ -16,6 +17,10 @@ gexp_prepare_download_dirs(
 \item{has_micro}{Logical; whether microarray IDs exist.}
 
 \item{has_rna}{Logical; whether RNA-seq IDs exist.}
+
+\item{clear_cache}{If \code{TRUE}, delete existing \code{micro_data} / \code{rna_data}
+before download. Default follows \code{options(gexpipe.clear_download_cache)}
+(FALSE) so GEOquery can reuse cached matrix files between runs.}
 }
 \value{
 Character vector log lines describing cleanup.

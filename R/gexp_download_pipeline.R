@@ -580,22 +580,47 @@ gexp_download_finalize_common_genes <- function(
  as.data.frame(fd, stringsAsFactors = FALSE, check.names = FALSE)
 }
 
+#' First non-empty scalar from a possibly zero-/multi-length annotation() result
+#' @keywords internal
+.gexpipe_first_nonempty_scalar <- function(x) {
+ if (is.null(x) || length(x) == 0L) return(NULL)
+ x <- as.character(x)
+ x <- x[!is.na(x) & nzchar(x)]
+ if (length(x) == 0L) return(NULL)
+ x[[1L]]
+}
+
 #' Platform annotation from ExpressionSet or SummarizedExperiment
+#'
+#' Tries \code{annotation()} first, then falls back to a \code{platform_id}
+#' column in phenodata/colData (always present for GEO series-matrix objects,
+#' since GEOquery derives \code{annotation()} from the same \code{!Sample_platform_id}
+#' header field) - this keeps GPL lookup working even when \code{annotation()}
+#' comes back empty/zero-length for a given object.
 #' @keywords internal
 .gexpipe_geo_annotation <- function(obj) {
  if (is.null(obj)) {
  return("")
  }
- ann <- tryCatch(Biobase::annotation(obj), error = function(e) "")
- if (!is.null(ann) && !is.na(ann) && nzchar(as.character(ann))) {
- return(as.character(ann))
+ ann <- tryCatch(Biobase::annotation(obj), error = function(e) NULL)
+ got <- .gexpipe_first_nonempty_scalar(ann)
+ if (!is.null(got)) return(got)
+
+ if (.gexpipe_is_summarized_experiment(obj) && requireNamespace("BiocGenerics", quietly = TRUE)) {
+ ann <- tryCatch(BiocGenerics::annotation(obj), error = function(e) NULL)
+ got <- .gexpipe_first_nonempty_scalar(ann)
+ if (!is.null(got)) return(got)
  }
- if (.gexpipe_is_summarized_experiment(obj) && requireNamespace("SummarizedExperiment", quietly = TRUE)) {
- ann <- tryCatch(SummarizedExperiment::annotation(obj), error = function(e) "")
- if (!is.null(ann) && !is.na(ann)) {
- return(as.character(ann))
+
+ pd <- tryCatch(.gexpipe_geo_pdata(obj), error = function(e) NULL)
+ if (!is.null(pd) && nrow(pd) > 0L) {
+ plat_col <- grep("^platform_id$", colnames(pd), ignore.case = TRUE, value = TRUE)
+ if (length(plat_col) > 0L) {
+ got <- .gexpipe_first_nonempty_scalar(pd[[plat_col[[1L]]]])
+ if (!is.null(got)) return(got)
  }
  }
+
  ""
 }
 
@@ -647,6 +672,81 @@ gexp_download_finalize_common_genes <- function(
  out[!dup, , drop = FALSE]
 }
 
+#' Cached series-matrix .gz files GEOquery would reuse for this GSE
+#' @keywords internal
+.gexpipe_geo_cache_files_for <- function(destdir, gse_id) {
+ if (is.null(destdir) || !dir.exists(destdir)) {
+ return(character(0))
+ }
+ pat <- paste0("^", gse_id, "(-GPL[0-9]+)?_series_matrix\\.txt\\.gz$")
+ list.files(destdir, pattern = pat, full.names = TRUE, ignore.case = TRUE)
+}
+
+#' Test whether a file is actually gzip-compressed, by checking its magic
+#' bytes on a plain (non-decompressing) file handle.
+#'
+#' GEO occasionally serves a plain-text file (e.g. an HTML error page, or an
+#' uncompressed SOFT file) that still gets cached with a ".gz" name. Opening
+#' such a file with \code{gzfile()}/\code{readBin} to *decompress* it can
+#' segfault the R process outright (a crash, not a catchable R condition) -
+#' this check never invokes the decompressor, so it is safe to call before
+#' any code path that would.
+#' @keywords internal
+.gexpipe_is_valid_gzip <- function(path) {
+ if (is.null(path) || !nzchar(path) || !file.exists(path)) {
+ return(FALSE)
+ }
+ if (file.info(path)$size < 2L) {
+ return(FALSE)
+ }
+ magic <- tryCatch({
+ con <- file(path, open = "rb", raw = TRUE)
+ on.exit(close(con), add = TRUE)
+ readBin(con, "raw", n = 2L)
+ }, error = function(e) raw(0))
+ length(magic) == 2L && magic[[1L]] == as.raw(0x1f) && magic[[2L]] == as.raw(0x8b)
+}
+
+#' Remove any cached series-matrix files for this GSE that fail to
+#' decompress, so GEOquery is forced to re-download a fresh copy instead of
+#' silently reusing a corrupt/truncated cache (e.g. from an interrupted
+#' download) on every subsequent run.
+#' @keywords internal
+.gexpipe_clean_corrupt_geo_cache <- function(destdir, gse_id) {
+ files <- .gexpipe_geo_cache_files_for(destdir, gse_id)
+ for (f in files) {
+ if (!.gexpipe_is_valid_gzip(f)) {
+ try(unlink(f), silent = TRUE)
+ }
+ }
+ invisible(NULL)
+}
+
+#' Cached GPL platform-annotation .soft(.gz) files GEOquery would reuse
+#' @keywords internal
+.gexpipe_gpl_cache_files_for <- function(destdir, gpl_id) {
+ if (is.null(destdir) || !dir.exists(destdir) || is.null(gpl_id) || !nzchar(gpl_id)) {
+ return(character(0))
+ }
+ pat <- paste0("^", gpl_id, "\\.soft(\\.gz)?$")
+ list.files(destdir, pattern = pat, full.names = TRUE, ignore.case = TRUE)
+}
+
+#' Remove cached GPL annotation files that are not actually valid gzip
+#' (e.g. an HTML error page or plain-text SOFT file saved with a ".gz" name
+#' after a failed download) - reading one with the decompressor can segfault
+#' R outright, so this must run before any code path that would do that.
+#' @keywords internal
+.gexpipe_clean_corrupt_gpl_cache <- function(destdir, gpl_id) {
+ files <- .gexpipe_gpl_cache_files_for(destdir, gpl_id)
+ for (f in files) {
+ if (endsWith(tolower(f), ".gz") && !.gexpipe_is_valid_gzip(f)) {
+ try(unlink(f), silent = TRUE)
+ }
+ }
+ invisible(NULL)
+}
+
 #' Fetch GEO series matrix via getGEO (ExpressionSet or SummarizedExperiment)
 #' @keywords internal
 .gexpipe_getgeo_series <- function(gse_id, ...) {
@@ -655,6 +755,18 @@ gexp_download_finalize_common_genes <- function(
  args <- list(GEO = gse_id, GSEMatrix = TRUE, getGPL = FALSE)
  if (length(dots) > 0L) {
  args[names(dots)] <- dots
+ }
+ if (!is.null(args$destdir)) {
+ try(.gexpipe_clean_corrupt_geo_cache(args$destdir, gse_id), silent = TRUE)
+ }
+ # Some series (e.g. GSE13159, ~2000+ samples) have multi-hundred-MB series
+ # matrix files; R's default 60s download timeout is easily exceeded on a
+ # perfectly fine connection, which then gets misreported as a connectivity
+ # problem. Bump it defensively here regardless of how the app was launched.
+ old_timeout <- getOption("timeout", 60L)
+ if (old_timeout < 600L) {
+ options(timeout = 600L)
+ on.exit(options(timeout = old_timeout), add = TRUE)
  }
  .gexpipe_geo_quiet(do.call(GEOquery::getGEO, args))
 }
@@ -1390,6 +1502,11 @@ gexp_download_normalize_ids_for_overlap <- function(
 #'
 #' @param gse_id GEO series ID.
 #' @param micro_dir Directory for supplementary files.
+#' @param download_cel Logical; if `TRUE`, also download raw CEL files for
+#'   RMA normalization (Affymetrix). Default `NULL` follows
+#'   `options(gexpipe.download_cel)` (FALSE).
+#' @param fast Logical; if `TRUE` (default from
+#'   `options(gexpipe.fast_download)`), skip slower optional lookups.
 #' @return List with status, log text, reason, expression, metadata, eset, platform_id, and cel_paths.
 #'
 #' @examples
@@ -1421,7 +1538,9 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
 
  if (inherits(micro_data, "geo_error")) {
  err_msg <- micro_data$error
- out$reason <- if (grepl("connection|timeout|hostname|resolve|HTTP|ssl|could not resolve|Unable to", err_msg, ignore.case = TRUE)) {
+ out$reason <- if (grepl("timeout|timed out", err_msg, ignore.case = TRUE)) {
+ "download timed out - this GSE may be very large (e.g. GSE13159); your internet connection may be fine, just retry, or it will usually succeed on a second attempt once partial data is cached"
+ } else if (grepl("connection|hostname|resolve|HTTP|ssl|could not resolve|Unable to", err_msg, ignore.case = TRUE)) {
  "network/HTTP - check internet connection"
  } else if (grepl("destfile", err_msg, ignore.case = TRUE)) {
  "GEOquery download failed (destfile not found) - retry later or download this GSE manually from GEO"
@@ -2450,6 +2569,8 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
 #'
 #' @param gse_id GEO series ID.
 #' @param rna_dir Directory containing `rna_data`.
+#' @param fast Logical; if `TRUE` (default from
+#'   `options(gexpipe.fast_download)`), skip slower optional lookups.
 #' @return List with status, reason, log text, count matrix, and metadata.
 #'
 #' @examples
@@ -2682,7 +2803,9 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  "per-sample merge, and NCBI rnaseq_counts."
  )
  if (!is.null(supp_state$err) && nzchar(supp_state$err)) {
- out$reason <- if (grepl("connection|timeout|hostname|resolve|HTTP|ssl", supp_state$err, ignore.case = TRUE)) {
+ out$reason <- if (grepl("timeout|timed out", supp_state$err, ignore.case = TRUE)) {
+ "download timed out - this GSE's supplementary files may be large; your internet connection may be fine, just retry"
+ } else if (grepl("connection|hostname|resolve|HTTP|ssl", supp_state$err, ignore.case = TRUE)) {
  "network/HTTP - check internet connection"
  } else if (grepl("truncated|corrupt|tar archive", supp_state$err, ignore.case = TRUE)) {
  "truncated/corrupted supplementary tar - try re-download or remove this GSE"

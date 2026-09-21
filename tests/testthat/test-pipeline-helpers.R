@@ -18,7 +18,8 @@ test_that("workspace skip helper rejects functions and keeps matrices", {
 })
 
 test_that("Parallel Apply Normalization is not a click on the hidden legacy button", {
-  r_dir <- if (dir.exists("R")) "R" else file.path("..", "..", "R")
+  r_dir <- normalizePath(file.path(testthat::test_path(), "..", "..", "R"), mustWork = FALSE)
+  skip_if_not(dir.exists(r_dir), "R/ source tree not available in installed package")
   norm <- paste(readLines(file.path(r_dir, "server_normalize.R"), warn = FALSE), collapse = "\n")
   expect_false(grepl('shinyjs::click("apply_normalization")', norm, fixed = TRUE))
   expect_true(grepl("apply_normalization_parallel", norm, fixed = TRUE))
@@ -29,7 +30,8 @@ test_that("Parallel Apply Normalization is not a click on the hidden legacy butt
 })
 
 test_that("Parallel UI keeps RNA-seq left and a separate legacy track", {
-  r_dir <- if (dir.exists("R")) "R" else file.path("..", "..", "R")
+  r_dir <- normalizePath(file.path(testthat::test_path(), "..", "..", "R"), mustWork = FALSE)
+  skip_if_not(dir.exists(r_dir), "R/ source tree not available in installed package")
   wrap <- paste(readLines(file.path(r_dir, "interface_tabs_wrappers.R"), warn = FALSE), collapse = "\n")
   rna_pos <- regexpr("RNA-seq run log", wrap, fixed = TRUE)[1]
   micro_pos <- regexpr("Microarray run log", wrap, fixed = TRUE)[1]
@@ -292,7 +294,9 @@ test_that("gexp_prepare_download_dirs creates expected folders", {
   on.exit(unlink(td, recursive = TRUE), add = TRUE)
   dir.create(file.path(td, "micro_data"), showWarnings = FALSE)
   dir.create(file.path(td, "rna_data"), showWarnings = FALSE)
-  logs <- gexp_prepare_download_dirs(td, has_micro = TRUE, has_rna = TRUE)
+  # Pre-existing dirs only produce log lines when clearing is requested;
+  # clear_cache defaults to FALSE, so ask for it explicitly to exercise that path.
+  logs <- gexp_prepare_download_dirs(td, has_micro = TRUE, has_rna = TRUE, clear_cache = TRUE)
   expect_true(dir.exists(file.path(td, "micro_data")))
   expect_true(dir.exists(file.path(td, "rna_data")))
   expect_gt(length(logs), 0L)
@@ -320,6 +324,9 @@ test_that("count-file scoring prefers multi-sample matrix over single-sample HTS
 test_that(".gexpipe_pick_best_count_file selects combined matrix over per-sample files", {
   skip_if_not_installed("GExPipe")
   skip_if_not_installed("data.table")
+  # .gexpipe_preview_count_file() rejects candidates under the real-world
+  # minimum gene count (default 500); lower it so this 50-gene fixture qualifies.
+  withr::local_options(gexpipe.rnaseq_min_genes = 10L)
   pick_fn <- getFromNamespace(".gexpipe_pick_best_count_file", "GExPipe")
   td <- tempfile("gexp_counts_")
   dir.create(td, showWarnings = FALSE)

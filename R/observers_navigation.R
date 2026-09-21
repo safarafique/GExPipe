@@ -52,10 +52,13 @@ gexp_register_navigation_observers <- function(input, output, session, rv) {
     .gexp_goto_tab("qc")
   })
   shiny::observeEvent(input$next_page_groups, {
-    .gexp_goto_tab(if (isTRUE(rv$single_dataset)) "results" else "batch")
+    # Always land on Step 5 - even with a single dataset, there can be a
+    # technical batch effect (extraction date, sequencing lane, processing
+    # day) worth checking via the diagnostic panel shown there.
+    .gexp_goto_tab("batch")
   })
   shiny::observeEvent(input$next_to_batch_btn, {
-    .gexp_goto_tab(if (isTRUE(rv$single_dataset)) "results" else "batch")
+    .gexp_goto_tab("batch")
   })
   shiny::observeEvent(input$go_to_results, {
     .gexp_goto_tab("results")
@@ -78,7 +81,7 @@ gexp_register_navigation_observers <- function(input, output, session, rv) {
   shiny::observeEvent(input$next_page_consensus, {
     if (isTRUE(rv$merge_after_de) && !isTRUE(rv$consensus_complete)) {
       shiny::showNotification(
-        "Apply Step 7 (RNA-seq ∩ microarray) first. WGCNA does not use that DEG list; Step 9 does.",
+        "Apply Step 7 (RNA-seq \u2229 microarray) first. WGCNA does not use that DEG list; Step 9 does.",
         type = "warning",
         duration = 6
       )
