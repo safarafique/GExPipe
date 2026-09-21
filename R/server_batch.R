@@ -27,7 +27,7 @@ server_batch <- function(input, output, session, rv) {
       icon("dna"),
       tags$strong(" Mixed microarray + RNA-seq integration"),
       tags$p(
-        "Merged (Both): one batch correction on the combined matrix, then one limma DE — same as the previous app.",
+        "Merged (Both): one batch correction on the combined matrix, then one limma DE - same as the previous app.",
         style = "margin: 8px 0;"
       ),
       tags$ul(
@@ -49,19 +49,173 @@ server_batch <- function(input, output, session, rv) {
     )
   })
 
-  output$batch_single_dataset_ui <- renderUI({
-    if (isTRUE(rv$single_dataset)) {
-      return(
-        tags$div(
-          class = "alert alert-info",
-          style = "margin-top: 10px;",
-          icon("info-circle"),
-          tags$strong(" Single dataset detected: "),
-          "Batch correction will be skipped automatically. You can proceed to Results."
-        )
-      )
+  # ---- Single-dataset technical-batch diagnostic ----
+  # With only one GSE, "Dataset" carries no signal for between-study batch
+  # correction - but a technical batch effect (extraction date, sequencing
+  # lane, processing day, etc.) can still exist within that one dataset's own
+  # phenodata. Let the user check PCA colored by any such covariate vs. by
+  # Condition before accepting the automatic skip.
+  single_ds_full_pdata <- reactive({
+    if (!isTRUE(rv$single_dataset) || is.null(rv$unified_metadata)) return(NULL)
+    gse <- unique(as.character(rv$unified_metadata$Dataset))
+    if (length(gse) != 1L) return(NULL)
+    gse <- gse[[1L]]
+    pd <- NULL
+    rna_key <- .gexpipe_resolve_metadata_key(names(rv$rna_metadata_list), gse)
+    if (!is.na(rna_key)) pd <- rv$rna_metadata_list[[rna_key]]
+    if (is.null(pd)) {
+      micro_key <- .gexpipe_resolve_metadata_key(names(rv$micro_metadata_list), gse)
+      if (!is.na(micro_key)) pd <- rv$micro_metadata_list[[micro_key]]
     }
-    NULL
+    pd
+  })
+
+  single_ds_covariate_choices <- reactive({
+    pd <- single_ds_full_pdata()
+    if (is.null(pd) || nrow(pd) < 3L) return(character(0))
+    reserved <- c("sampleid", "dataset", "condition", "platform", "batch", "title", "geo_accession")
+    cn <- colnames(pd)
+    cn <- cn[!tolower(cn) %in% reserved]
+    keep <- vapply(cn, function(col) {
+      v <- as.character(pd[[col]])
+      v <- v[!is.na(v) & nzchar(trimws(v))]
+      n_levels <- length(unique(v))
+      length(v) >= 2L && n_levels >= 2L && n_levels <= (nrow(pd) - 1L)
+    }, logical(1))
+    cn[keep]
+  })
+
+  output$batch_single_dataset_ui <- renderUI({
+    if (!isTRUE(rv$single_dataset)) return(NULL)
+    choices <- single_ds_covariate_choices()
+    tagList(
+      tags$div(
+        class = "alert alert-info",
+        style = "margin-top: 10px;",
+        icon("info-circle"),
+        tags$strong(" Single dataset detected: "),
+        "No between-study batch correction is needed (only one GSE), so it is skipped by default. ",
+        "But a single dataset can still have a technical batch effect from sample processing (extraction date, sequencing lane, processing day) - check below before proceeding."
+      ),
+      if (length(choices) == 0L) {
+        tags$div(
+          class = "alert alert-secondary",
+          style = "margin-top: 10px; font-size: 13px; background: #f1f1f1;",
+          icon("circle-info"),
+          " No usable technical covariate columns were found in this GSE's phenodata (need a column with 2 or more repeated values across samples). Proceeding with the automatic skip is fine."
+        )
+      } else {
+        box(
+          title = tags$span(icon("magnifying-glass-chart"), " Technical batch effect check (single dataset)"),
+          width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+          tags$p(
+            "Run PCA (or hierarchical clustering) colored by a candidate technical covariate versus by biological condition. ",
+            "If samples cluster primarily by ", tags$strong("extraction date, sequencing lane, or processing day"),
+            " rather than by biological condition (e.g. Normal vs Disease), a batch effect is present and correction is worth applying even for this single dataset.",
+            style = "font-size: 13px; color: #495057; margin-bottom: 12px;"
+          ),
+          selectInput("single_ds_covariate", "Candidate technical covariate (from GEO phenodata):",
+                      choices = choices, width = "100%"),
+          fluidRow(
+            column(6,
+              tags$h5("By candidate covariate", style = "text-align: center;"),
+              plotOutput("single_ds_pca_covariate", height = "350px")
+            ),
+            column(6,
+              tags$h5("By Condition", style = "text-align: center;"),
+              plotOutput("single_ds_pca_condition", height = "350px")
+            )
+          ),
+          tags$div(
+            style = "margin-top: 15px; display: flex; gap: 10px;",
+            actionButton("single_ds_apply_batch_covariate",
+                         tagList(icon("magic"), " Apply batch correction using this covariate"),
+                         class = "btn-warning"),
+            actionButton("single_ds_confirm_skip",
+                         tagList(icon("check"), " No batch effect - keep skipping"),
+                         class = "btn-success")
+          )
+        )
+      }
+    )
+  })
+
+  output$single_ds_pca_covariate <- renderPlot({
+    pd <- single_ds_full_pdata()
+    expr <- if (!is.null(rv$expr_filtered)) rv$expr_filtered else rv$combined_expr
+    req(pd, input$single_ds_covariate, expr)
+    common <- intersect(colnames(expr), rownames(pd))
+    req(length(common) >= 3L)
+    meta <- pd[common, , drop = FALSE]
+    meta[[input$single_ds_covariate]] <- as.character(meta[[input$single_ds_covariate]])
+    .batch_pca_polar_plot(
+      expr[, common, drop = FALSE], meta, input$single_ds_covariate,
+      paste0("By ", input$single_ds_covariate),
+      "Clustering here suggests a technical batch effect"
+    )
+  })
+
+  output$single_ds_pca_condition <- renderPlot({
+    expr <- if (!is.null(rv$expr_filtered)) rv$expr_filtered else rv$combined_expr
+    req(rv$unified_metadata, expr)
+    .batch_pca_polar_plot(
+      expr, rv$unified_metadata, "Condition",
+      "By Condition",
+      "Clean separation here (not by the covariate) means no correction needed"
+    )
+  })
+
+  observeEvent(input$single_ds_confirm_skip, {
+    showNotification("Keeping batch correction skipped for this single dataset.", type = "message", duration = 4)
+  })
+
+  observeEvent(input$single_ds_apply_batch_covariate, {
+    req(input$single_ds_covariate)
+    pd <- single_ds_full_pdata()
+    expr <- if (!is.null(rv$expr_filtered)) rv$expr_filtered else rv$combined_expr
+    req(pd, rv$unified_metadata, expr)
+    common <- intersect(colnames(expr), rownames(pd))
+    if (length(common) < 4L) {
+      showNotification("Not enough samples with this covariate to run batch correction.", type = "error", duration = 6)
+      return()
+    }
+    meta <- rv$unified_metadata[common, , drop = FALSE]
+    meta$TechBatch <- factor(as.character(pd[common, input$single_ds_covariate]))
+    if (length(levels(meta$TechBatch)) < 2L) {
+      showNotification("This covariate has only one level across these samples - nothing to correct.", type = "warning", duration = 6)
+      return()
+    }
+    mod <- gexpipe_build_batch_mod(meta)
+    corrected <- tryCatch(
+      limma::removeBatchEffect(expr[, common, drop = FALSE], batch = meta$TechBatch, design = mod),
+      error = function(e) {
+        showNotification(paste("Batch correction failed:", conditionMessage(e)), type = "error", duration = 8)
+        NULL
+      }
+    )
+    req(corrected)
+    rv$expr_filtered <- expr[, common, drop = FALSE]
+    rv$batch_corrected <- corrected
+    rv$batch_corrected_rna <- if (!is.null(rv$expr_rna)) {
+      keep_r <- intersect(common, colnames(rv$expr_rna))
+      if (length(keep_r) > 0L) rv$expr_rna[, keep_r, drop = FALSE] else NULL
+    } else NULL
+    rv$batch_corrected_micro <- if (!is.null(rv$expr_micro)) {
+      keep_m <- intersect(common, colnames(rv$expr_micro))
+      if (length(keep_m) > 0L) rv$expr_micro[, keep_m, drop = FALSE] else NULL
+    } else NULL
+    rv$batch_complete <- TRUE
+    rv$batch_running <- FALSE
+    output$batch_log <- renderText({
+      paste0(
+        "OK Batch correction applied (single dataset, technical covariate override)\n",
+        "Covariate used as batch: ", input$single_ds_covariate, "\n",
+        "Levels: ", paste(levels(meta$TechBatch), collapse = ", "), "\n",
+        "Method: limma removeBatchEffect (Condition protected)\n",
+        "Samples: ", length(common), "\n"
+      )
+    })
+    showNotification("Batch correction applied using the selected technical covariate.", type = "message", duration = 6)
   })
 
   output$batch_confounding_ui <- renderUI({
@@ -130,7 +284,7 @@ server_batch <- function(input, output, session, rv) {
       tags$div(
         class = "alert alert-warning",
         style = "margin: 8px 0 10px 0; font-size: 13px; line-height: 1.55;",
-        tags$strong("Manual — pick each platform so DE stays valid."),
+        tags$strong("Manual - pick each platform so DE stays valid."),
         tags$ul(
           style = "margin: 6px 0 0 0; padding-left: 18px;",
           tags$li(tags$strong("Microarray:"), " ComBat-ref if 2+ GSEs and groups are crossed. Use limma/SVA if Dataset is confounded with Condition. Quantile+limma or Hybrid if study medians are far apart."),
@@ -605,16 +759,16 @@ server_batch <- function(input, output, session, rv) {
     if (!is.null(p)) p
   })
 
-  .batch_variance_gg <- function(expr, title) {
+  .batch_variance_gg <- function(expr, title, pct) {
     if (is.null(expr) || !is.matrix(expr) || nrow(expr) < 2L) {
       plot.new()
       text(0.5, 0.5, "Complete Step 2 to see this plot.", cex = 1.1, col = "gray40")
       return(invisible(NULL))
     }
-    req(input$variance_percentile)
+    req(pct)
     gene_vars <- apply(expr, 1, stats::var, na.rm = TRUE)
     gene_vars[is.na(gene_vars)] <- 0
-    cutoff <- as.numeric(stats::quantile(gene_vars, input$variance_percentile / 100, na.rm = TRUE))
+    cutoff <- as.numeric(stats::quantile(gene_vars, pct / 100, na.rm = TRUE))
     df <- data.frame(
       Variance = gene_vars,
       Kept = ifelse(gene_vars > cutoff, "Retained", "Filtered"),
@@ -627,17 +781,38 @@ server_batch <- function(input, output, session, rv) {
       ggplot2::theme_bw(base_size = 12) +
       ggplot2::labs(
         title = title,
-        subtitle = paste0("Cutoff (", input$variance_percentile, "th percentile)"),
+        subtitle = paste0("Cutoff (", pct, "th percentile): ", round(cutoff, 4)),
         x = "Log10(Variance)", y = "Count", fill = "Status"
       ) +
       ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 13), legend.position = "top")
   }
 
   output$gene_variance_plot_rna <- renderPlot({
-    .batch_variance_gg(rv$expr_rna, "RNA-seq gene variance")
+    .batch_variance_gg(rv$expr_rna, "RNA-seq gene variance", input$variance_percentile_rna)
   })
   output$gene_variance_plot_micro <- renderPlot({
-    .batch_variance_gg(rv$expr_micro, "Microarray gene variance")
+    .batch_variance_gg(rv$expr_micro, "Microarray gene variance", input$variance_percentile_micro)
+  })
+
+  output$genes_to_keep_rna <- renderText({
+    req(input$variance_percentile_rna)
+    rna <- .batch_var_keep_n(rv$expr_rna, input$variance_percentile_rna)
+    format(as.integer(rna[["keep"]]), big.mark = ",")
+  })
+  output$genes_to_remove_rna <- renderText({
+    req(input$variance_percentile_rna)
+    rna <- .batch_var_keep_n(rv$expr_rna, input$variance_percentile_rna)
+    format(as.integer(rna[["remove"]]), big.mark = ",")
+  })
+  output$genes_to_keep_micro <- renderText({
+    req(input$variance_percentile_micro)
+    micro <- .batch_var_keep_n(rv$expr_micro, input$variance_percentile_micro)
+    format(as.integer(micro[["keep"]]), big.mark = ",")
+  })
+  output$genes_to_remove_micro <- renderText({
+    req(input$variance_percentile_micro)
+    micro <- .batch_var_keep_n(rv$expr_micro, input$variance_percentile_micro)
+    format(as.integer(micro[["remove"]]), big.mark = ",")
   })
 
   output$pca_before_dataset_rna <- renderPlot({
@@ -788,6 +963,8 @@ server_batch <- function(input, output, session, rv) {
       parallel_batch <- isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")
 
       res <- if (isTRUE(parallel_batch)) {
+        rna_pct <- if (!is.null(input$variance_percentile_rna)) input$variance_percentile_rna else input$variance_percentile
+        micro_pct <- if (!is.null(input$variance_percentile_micro)) input$variance_percentile_micro else input$variance_percentile
         gexp_batch_correct_by_platform(
           expr = if (!is.null(rv$combined_expr_before_global_norm)) {
             rv$combined_expr_before_global_norm
@@ -796,6 +973,8 @@ server_batch <- function(input, output, session, rv) {
           },
           metadata = rv$unified_metadata,
           variance_percentile = input$variance_percentile,
+          rna_variance_percentile = rna_pct,
+          micro_variance_percentile = micro_pct,
           rna_method = rna_method_use,
           micro_method = micro_method_use,
           expr_rna = rv$expr_rna,
@@ -912,7 +1091,7 @@ server_batch <- function(input, output, session, rv) {
           n_m0 <- if (!is.null(res$genes_before_micro)) res$genes_before_micro else n_m
           n_r0 <- if (!is.null(res$genes_before_rna)) res$genes_before_rna else n_r
           tags$div(
-            tags$strong("OK Batch correction complete — two separate runs."),
+            tags$strong("OK Batch correction complete - two separate runs."),
             tags$br(),
             tags$span(
               "Microarray: ", format(n_m0, big.mark = ","), " \u2192 ",

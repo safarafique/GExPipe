@@ -47,7 +47,7 @@ server_results_summary <- function(input, output, session, rv) {
     s7 <- if (length(methods_run) > 0) sprintf("Machine learning (%s) was run; the Venn/UpSet plot shows overlap across methods, with %s genes common to all selected methods. ", paste(methods_run, collapse = ", "), format(n_ml, big.mark = ",")) else "Machine learning was not run. "
     s8 <- if (nomo_ok && !is.na(train_auc) && !is.na(val_auc)) sprintf("The diagnostic nomogram (70/30 split-sample validation) achieved training AUC %s and validation AUC %s (optimal threshold %s). ", train_auc, val_auc, thresh) else if (n_ml > 0) "ROC analysis (Step 11) and the diagnostic nomogram (Step 12) are available when run. "
     s9 <- sprintf("GSEA was performed for %s target gene(s). ", format(n_gsea, big.mark = ","))
-    s10 <- if (n_immune_samp > 0) sprintf("Immune cell deconvolution (%s) estimated proportions for %s cell types across %s samples. ", immune_meth, n_cells, format(n_immune_samp, big.mark = ",")) else "Immune deconvolution was not run. "
+    s10 <- if (n_immune_samp > 0) sprintf("Immune cell deconvolution (%s) estimated proportions for %s cell types across %s samples. ", immune_meth, n_cells, format(n_immune_samp, big.mark = ",")) else ""
 
     paste0(s1, s2, s3, s4, s5, s6, s7, s8, s9, s10)
   }

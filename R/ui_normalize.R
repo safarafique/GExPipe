@@ -116,7 +116,7 @@ ui_normalize <- tabItem(
             tagList(
               tags$div(
                 style = "padding: 12px 14px; background: #e8f5e9; border-left: 4px solid #4caf50; border-radius: 5px; margin: 15px 0;",
-                tags$p(tags$strong("Merged only — common genes"), style = "margin: 0 0 6px 0;"),
+                tags$p(tags$strong("Merged only - common genes"), style = "margin: 0 0 6px 0;"),
                 tags$p(
                   "After per-dataset methods, GExPipe keeps genes present on both platforms, then one matrix for limma.",
                   style = "margin: 0; font-size: 13px; color: #495057;"

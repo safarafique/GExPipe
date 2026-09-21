@@ -1,5 +1,5 @@
 # ==============================================================================
-# SERVER_CONSENSUS.R - Step 7: RNA-seq ∩ microarray DEG consensus
+# SERVER_CONSENSUS.R - Step 7: RNA-seq/microarray DEG consensus (intersect)
 # ==============================================================================
 
 server_consensus <- function(input, output, session, rv) {
@@ -50,11 +50,11 @@ server_consensus <- function(input, output, session, rv) {
       tags$div(
         class = "alert alert-warning",
         style = "margin: 8px 0 10px 0; font-size: 13px; line-height: 1.55;",
-        tags$strong("Manual — optional same-direction filter."),
+        tags$strong("Manual - optional same-direction filter."),
         tags$ul(
           style = "margin: 6px 0 0 0; padding-left: 18px;",
           tags$li("Keep the box checked unless you have a reason to keep opposite-direction overlap."),
-          tags$li("This list is for Step 9 (DEG ∩ WGCNA modules). WGCNA does not use it.")
+          tags$li("This list is for Step 9 (DEG \u2229 WGCNA modules). WGCNA does not use it.")
         )
       )
     } else {
@@ -101,7 +101,7 @@ server_consensus <- function(input, output, session, rv) {
       class = "alert alert-primary",
       icon("object-ungroup"),
       tags$strong(" Ready."),
-      " Review the overlap, then Apply consensus. Step 9 uses this list ∩ WGCNA modules. WGCNA itself does not use DEGs."
+      " Review the overlap, then Apply consensus. Step 9 uses this list \u2229 WGCNA modules. WGCNA itself does not use DEGs."
     )
   })
 
@@ -132,15 +132,15 @@ server_consensus <- function(input, output, session, rv) {
       ),
       tags$ul(
         style = "margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.7; color: #334155;",
-        tags$li(icon("dna"), " ", tags$strong("RNA-seq DEGs"), " — significant on RNA-seq only (Step 6)."),
-        tags$li(icon("th"), " ", tags$strong("Microarray DEGs"), " — significant on microarray only (Step 6)."),
+        tags$li(icon("dna"), " ", tags$strong("RNA-seq DEGs"), " - significant on RNA-seq only (Step 6)."),
+        tags$li(icon("th"), " ", tags$strong("Microarray DEGs"), " - significant on microarray only (Step 6)."),
         tags$li(
           icon("circle"), " ", tags$strong("Common"),
-          " — in ", tags$em("both"), " lists (Venn center). Opposite direction is still counted here."
+          " - in ", tags$em("both"), " lists (Venn center). Opposite direction is still counted here."
         ),
         tags$li(
           icon("check-double"), " ", tags$strong("Consensus"),
-          " — Common genes with the ", tags$em("same"), " direction. This is what Apply keeps for Step 9.",
+          " - Common genes with the ", tags$em("same"), " direction. This is what Apply keeps for Step 9.",
           if (is.finite(n_disc) && n_disc > 0L) {
             tagList(" ", tags$span(style = "color: #b45309;", paste0("(", n_disc, " common genes dropped as opposite direction).")))
           } else {
@@ -265,7 +265,7 @@ server_consensus <- function(input, output, session, rv) {
         tags$strong(" Consensus applied."),
         paste0(
           " ", format(out$n_consensus, big.mark = ","),
-          " same-platform-pair DEGs stored for Step 9 (DEG ∩ modules). Next: WGCNA on one processed matrix (not this list)."
+          " same-platform-pair DEGs stored for Step 9 (DEG \u2229 modules). Next: WGCNA on one processed matrix (not this list)."
         )
       ),
       type = "message",

@@ -2,7 +2,47 @@
 # SERVER_PPI.R - PPI Network (Common Genes) + Hub Gene Identification
 # ==============================================================================
 
+#' GExPipe-managed STRINGdb cache directory
+#'
+#' STRINGdb's own default caching (input_directory = "") is not validated -
+#' a corrupted/partial file from an earlier interrupted download (e.g. the
+#' protein.aliases file used by string_db$map()) gets reused on every
+#' subsequent attempt and every STRING version tried, producing a
+#' persistent "alias file unavailable" failure that a retry alone never
+#' fixes. Using our own managed directory lets us validate and clear
+#' corrupted files before each attempt, the same way GEO/GPL caches are
+#' handled.
+#' @keywords internal
+.gexpipe_stringdb_cache_dir <- function() {
+  d <- file.path(getwd(), "STRINGdb_cache")
+  dir.create(d, showWarnings = FALSE, recursive = TRUE)
+  d
+}
+
+#' Remove any cached STRINGdb file (interactions, aliases, proteins, ...)
+#' that is not actually valid gzip - same corrupted-cache class of bug as
+#' the GEO/GPL cache fix (see .gexpipe_is_valid_gzip in
+#' gexp_download_pipeline.R). Forces a fresh download instead of repeatedly
+#' reusing a broken file.
+#' @keywords internal
+.gexpipe_clean_corrupt_stringdb_cache <- function(dir) {
+  if (is.null(dir) || !dir.exists(dir)) {
+    return(invisible(NULL))
+  }
+  files <- list.files(dir, pattern = "\\.gz$", full.names = TRUE, ignore.case = TRUE)
+  for (f in files) {
+    if (!.gexpipe_is_valid_gzip(f)) {
+      try(unlink(f), silent = TRUE)
+    }
+  }
+  invisible(NULL)
+}
+
 gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
+  if (!nzchar(input_directory)) {
+    input_directory <- .gexpipe_stringdb_cache_dir()
+  }
+  try(.gexpipe_clean_corrupt_stringdb_cache(input_directory), silent = TRUE)
   versions <- getOption("gexpipe.stringdb_try_versions", NULL)
   if (!is.character(versions) || length(versions) < 1L) {
     versions <- c("12.0", "11.5", "11")   # latest first - most likely to succeed
@@ -35,6 +75,11 @@ gexp_stringdb_new_safe <- function(score_threshold, input_directory = "") {
 }
 
 gexp_stringdb_get_ppi_data_safe <- function(score_threshold, valid_genes, input_directory = "") {
+  if (!nzchar(input_directory)) {
+    input_directory <- .gexpipe_stringdb_cache_dir()
+  }
+  try(.gexpipe_clean_corrupt_stringdb_cache(input_directory), silent = TRUE)
+
   versions <- getOption("gexpipe.stringdb_try_versions", NULL)
   if (!is.character(versions) || length(versions) < 1L) {
     versions <- c("12.0", "11.5", "11")   # latest first
@@ -797,9 +842,9 @@ server_ppi <- function(input, output, session, rv) {
   # Single plot: Hub-only or Other-only network depending on applied gene set
   output$ppi_hub_or_other_title_ui <- renderUI({
     mode <- app_ppi$applied_mode
-    if (mode == "hub") {
+    if (identical(mode, "hub")) {
       tags$h5(icon("circle-nodes"), " Hub genes only (consensus hubs)", style = "margin-top: 4px; margin-bottom: 8px; color: #B71C1C; font-size: 13px;")
-    } else if (mode == "topn") {
+    } else if (identical(mode, "topn")) {
       tags$h5(icon("circle"), " Other genes only (top N connected, non-hub)", style = "margin-top: 4px; margin-bottom: 8px; color: #1565C0; font-size: 13px;")
     } else {
       tags$p(icon("info-circle"), " Choose 'Hub genes only' or 'Top N by degree' above and click Run to see this network.", style = "margin-bottom: 8px; font-size: 12px; color: #666;")
@@ -810,12 +855,12 @@ server_ppi <- function(input, output, session, rv) {
     {
       mode <- app_ppi$applied_mode
       tryCatch({
-        if (mode == "hub") {
+        if (identical(mode, "hub")) {
           g <- ppi_subgraph_hub_only()
           main <- "Hub genes only (consensus hubs)"
           empty_msg <- "No hub genes in selected set.\nSelect more genes (Top N) or run PPI to get consensus hubs."
           node_col <- ppi_col_hub
-        } else if (mode == "topn") {
+        } else if (identical(mode, "topn")) {
           g <- ppi_subgraph_other_only()
           main <- "Other genes only (top N connected, non-hub)"
           empty_msg <- "No non-hub genes in selected set.\nAll selected genes are consensus hubs."
@@ -1010,8 +1055,8 @@ server_ppi <- function(input, output, session, rv) {
     filename = function() "PPI_Network_HubOrOther.png",
     content = function(file) {
       mode <- app_ppi$applied_mode
-      if (mode == "hub") { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
-      } else if (mode == "topn") { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
+      if (identical(mode, "hub")) { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
+      } else if (identical(mode, "topn")) { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
       } else return()
       if (is.null(g) || igraph::vcount(g) == 0) return()
       png(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA")
@@ -1023,8 +1068,8 @@ server_ppi <- function(input, output, session, rv) {
     filename = function() "PPI_Network_HubOrOther.jpg",
     content = function(file) {
       mode <- app_ppi$applied_mode
-      if (mode == "hub") { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
-      } else if (mode == "topn") { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
+      if (identical(mode, "hub")) { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
+      } else if (identical(mode, "topn")) { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
       } else return()
       if (is.null(g) || igraph::vcount(g) == 0) return()
       jpeg(file, width = 7, height = 6.5, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
@@ -1036,8 +1081,8 @@ server_ppi <- function(input, output, session, rv) {
     filename = function() "PPI_Network_HubOrOther.pdf",
     content = function(file) {
       mode <- app_ppi$applied_mode
-      if (mode == "hub") { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
-      } else if (mode == "topn") { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
+      if (identical(mode, "hub")) { g <- ppi_subgraph_hub_only(); main <- "Hub genes only (consensus hubs)"; node_col <- ppi_col_hub
+      } else if (identical(mode, "topn")) { g <- ppi_subgraph_other_only(); main <- "Other genes only (top N connected, non-hub)"; node_col <- ppi_col_other
       } else return()
       if (is.null(g) || igraph::vcount(g) == 0) return()
       pdf(file, width = 7, height = 6.5, bg = "#FAFAFA")
@@ -1149,7 +1194,7 @@ server_ppi <- function(input, output, session, rv) {
     sel <- ppi_selected_genes()
     n <- length(sel)
     mode <- app_ppi$applied_mode
-    mode_txt <- if (mode == "hub") "Hub genes" else if (mode == "topn") "Top N by degree" else if (mode == "manual") "Manual selection" else "-"
+    mode_txt <- if (identical(mode, "hub")) "Hub genes" else if (identical(mode, "topn")) "Top N by degree" else if (identical(mode, "manual")) "Manual selection" else "-"
     tags$div(
       class = "alert alert-success",
       icon("link"),

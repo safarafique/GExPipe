@@ -1,0 +1,17 @@
+Step,Sidebar_label,Phase,Tool_capabilities
+1,Download Data,Data preparation,GEOquery; RNA-seq + microarray GSE boxes; empty Series Matrix count ingest; probe→HGNC (Step 2b); four analysis types
+2,Normalize Data,Data preparation,"Per-GSE platform normalization; Auto/Manual; Merged: common genes + optional global quantile; Parallel: separate, no intersection"
+3,QC & Visualization,Data preparation,Sample/gene QC; density/boxplot; outlier exclusion; Venn/UpSet gene overlap (Parallel: per-platform plots)
+4,Select Groups,Data preparation,Normal vs Disease (and related); Parallel: separate success banners per platform
+5,Batch Correction,Data preparation,Variance filter; 6 joint methods (Merged/single); Parallel: per-platform batch (no joint ComBat)
+6,Differential Expression,Gene discovery,"limma, limma-voom, DESeq2, edgeR; Parallel: dual engines one click; independent cutoffs per platform"
+7,RNA-seq ∩ microarray,Gene discovery,Parallel DE only: same-direction dual-platform significant genes (consensus for downstream)
+8,WGCNA Analysis,Gene discovery,Top variable genes (default 5000); one network; Parallel: RNA VST or array matrix on chosen platform
+9,Common Genes (DEG & WGCNA),Gene discovery,DEG ∩ trait-associated modules; GO/KEGG; DEG source depends on analysis type
+10,PPI Interaction,Candidate refinement,STRINGdb network; hub ranking (internet on first use)
+11,Machine Learning,Candidate refinement,8 algorithms; ≥2-method consensus final list; feature-importance plots
+12,Validation Setup,Candidate refinement,External GEO cohort or internal split; feeds ROC
+13,ROC Curve Analysis,Candidate refinement,Training/validation AUC; optional immune deconvolution correlation
+14,Diagnostic Nomogram,Clinical translation,Exploratory nomogram (rms); reporting aid
+15,GSEA Analysis,Clinical translation,GSEA / MSigDB-related pathways (msigdbr)
+16,Results Summary,Clinical translation,Automated PDF-oriented summary; workspace save/load in sidebar

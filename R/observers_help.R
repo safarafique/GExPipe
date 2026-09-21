@@ -57,7 +57,7 @@ gexp_user_guideline_modal_ui <- function() {
     shiny::tags$p("Example: analyze a public RNA-seq study from GEO.", style = "margin-bottom: 8px; color: #475569;"),
     shiny::tags$ul(
       style = "padding-left: 22px; line-height: 1.8; color: #334155;",
-      shiny::tags$li("Step 1: Enter a GSE ID (e.g. GSE50760), select \"RNA-seq\", click \"Download\". Wait for processing."),
+      shiny::tags$li("Step 1: Enter a GSE ID (e.g. GSE144119), select \"RNA-seq\", click \"Download\". Wait for processing."),
       shiny::tags$li("Step 2: Apply normalization (Auto uses the platform table)."),
       shiny::tags$li("Step 3: Check QC plots (PCA, sample clustering) and common genes."),
       shiny::tags$li("Step 4: In \"Select Groups\", assign each sample to \"Normal\" or \"Disease\" using the metadata column that contains group labels."),

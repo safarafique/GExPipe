@@ -1,5 +1,5 @@
 # ==============================================================================
-# UI_CONSENSUS.R - Step 7: RNA-seq ∩ microarray
+# UI_CONSENSUS.R - Step 7: RNA-seq/microarray intersect
 # ==============================================================================
 
 ui_consensus <- tabItem(
@@ -18,10 +18,10 @@ ui_consensus <- tabItem(
         style = "margin-bottom: 8px;"
       ),
       tags$p(
-        tags$strong("Next — WGCNA (Step 8):"),
+        tags$strong("Next - WGCNA (Step 8):"),
         " Do ",
         tags$strong("not"),
-        " feed this DEG list into WGCNA. Step 8 builds one network on a processed matrix (RNA-seq VST or microarray after batch; Auto = more samples) using the top 5,000–8,000 variable genes. Step 9 overlaps these consensus DEGs with those module genes.",
+        " feed this DEG list into WGCNA. Step 8 builds one network on a processed matrix (RNA-seq VST or microarray after batch; Auto = more samples) using the top 5,000-8,000 variable genes. Step 9 overlaps these consensus DEGs with those module genes.",
         style = "margin-bottom: 0;"
       )
     )
@@ -90,7 +90,7 @@ ui_consensus <- tabItem(
       )
     ),
     box(
-      title = tags$span(icon("check-double"), " Consensus genes (same direction — Apply this list)"),
+      title = tags$span(icon("check-double"), " Consensus genes (same direction - Apply this list)"),
       width = 6, status = "success", solidHeader = TRUE,
       DTOutput("consensus_table"),
       tags$div(

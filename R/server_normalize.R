@@ -132,7 +132,11 @@ server_normalize <- function(input, output, session, rv) {
     rv$combined_expr_before_global_norm <- norm_out$combined_expr_before_global
     rv$combined_expr <- norm_out$combined_expr
     rv$raw_counts_for_deseq2 <- norm_out$raw_counts_for_deseq2
-    rv$unified_metadata <- norm_out$unified_metadata
+    rv$unified_metadata <- gexp_enrich_unified_metadata_with_full_pdata(
+      norm_out$unified_metadata,
+      rna_metadata_list = rv$rna_metadata_list,
+      micro_metadata_list = rv$micro_metadata_list
+    )
     rv$normalization_stats <- norm_out$normalization_stats
     rv$normalization_summary_table <- norm_out$normalization_summary_table
 
@@ -155,7 +159,7 @@ server_normalize <- function(input, output, session, rv) {
         " genes. RNA-seq: ",
         format(if (is.null(rv$expr_rna)) 0L else nrow(rv$expr_rna), big.mark = ","),
         " genes. Symbol overlap (", format(final_count, big.mark = ","),
-        ") is information only — batch and DE do not mix the matrices."
+        ") is information only - batch and DE do not mix the matrices."
       )
     } else {
       paste0(
@@ -425,7 +429,7 @@ server_normalize <- function(input, output, session, rv) {
       showNotification(
         if (isTRUE(norm_res$keep_separate) && !is.null(sm)) {
           tags$div(
-            tags$strong("OK Normalization complete — two methods (not one joint method)."),
+            tags$strong("OK Normalization complete - two methods (not one joint method)."),
             tags$br(),
             tags$span(
               "Microarray: ", format(sm$micro_samples, big.mark = ","), " samples, ",
@@ -621,7 +625,7 @@ server_normalize <- function(input, output, session, rv) {
       ggplot2::theme_bw(base_size = 11) +
       ggplot2::labs(
         title = title,
-        subtitle = "This platform only — datasets from the other platform are not included",
+        subtitle = "This platform only - datasets from the other platform are not included",
         x = "Sample",
         y = "Expression Value",
         fill = "Dataset"
@@ -685,7 +689,7 @@ server_normalize <- function(input, output, session, rv) {
       ggplot2::theme_bw(base_size = 12) +
       ggplot2::labs(
         title = title,
-        subtitle = "This platform only — the other platform is not on this plot",
+        subtitle = "This platform only - the other platform is not on this plot",
         x = "Expression Value",
         y = "Density",
         color = "Stage"
@@ -1615,7 +1619,7 @@ server_normalize <- function(input, output, session, rv) {
     if (isTRUE(rv$last_keep_platforms_separate) && !is.null(sm)) {
       return(tags$div(
         style = "font-size: 14px; line-height: 1.6; color: #333;",
-        tags$p(tags$strong("Step 2 complete — Parallel (two methods).")),
+        tags$p(tags$strong("Step 2 complete - Parallel (two methods).")),
         tags$p(
           tags$strong("Microarray: "),
           format(sm$micro_samples, big.mark = ","), " samples, ",

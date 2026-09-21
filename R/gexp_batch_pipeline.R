@@ -263,11 +263,17 @@ gexpipe_parallel_batch_defaults <- function(de_method_rna = "deseq2", confounded
 #' @param expr Numeric matrix (genes x samples); used when platform matrices
 #'   are not supplied.
 #' @param metadata Sample metadata with `Dataset`, `Condition`, `Platform`.
-#' @param variance_percentile Bottom variance percentile to drop (per platform).
+#' @param variance_percentile Bottom variance percentile to drop, used for
+#'   both platforms when `rna_variance_percentile`/`micro_variance_percentile`
+#'   are not given.
 #' @param rna_method Batch method for RNA-seq when it has 2+ datasets.
 #' @param micro_method Batch method for microarray when it has 2+ datasets.
 #' @param expr_rna Optional RNA-seq-only matrix (genes x RNA samples).
 #' @param expr_micro Optional microarray-only matrix (genes x array samples).
+#' @param rna_variance_percentile Optional RNA-seq-specific percentile
+#'   (overrides `variance_percentile` for the RNA-seq block only).
+#' @param micro_variance_percentile Optional microarray-specific percentile
+#'   (overrides `variance_percentile` for the microarray block only).
 #' @return Same list shape as [gexp_batch_correct()], plus platform matrices.
 #' @noRd
 gexp_batch_correct_by_platform <- function(
@@ -277,8 +283,12 @@ gexp_batch_correct_by_platform <- function(
   rna_method = "combat_ref",
   micro_method = "combat_ref",
   expr_rna = NULL,
-  expr_micro = NULL
+  expr_micro = NULL,
+  rna_variance_percentile = NULL,
+  micro_variance_percentile = NULL
 ) {
+  rna_variance_percentile <- if (!is.null(rna_variance_percentile)) rna_variance_percentile else variance_percentile
+  micro_variance_percentile <- if (!is.null(micro_variance_percentile)) micro_variance_percentile else variance_percentile
   if ((is.null(expr) || !is.matrix(expr)) && is.null(expr_rna) && is.null(expr_micro)) {
     stop("expr must be a non-null matrix (genes x samples).")
   }
@@ -302,7 +312,7 @@ gexp_batch_correct_by_platform <- function(
     expr[, ids, drop = FALSE]
   }
 
-  correct_block <- function(sub, method, label) {
+  correct_block <- function(sub, method, label, block_variance_percentile) {
     if (is.null(sub) || !is.matrix(sub) || ncol(sub) < 2L) {
       return(list(
         expr = NULL,
@@ -318,7 +328,7 @@ gexp_batch_correct_by_platform <- function(
     meta <- meta[ids, , drop = FALSE]
     n_ds <- length(unique(as.character(meta$Dataset)))
     n_before <- nrow(sub)
-    filtered <- .gexpipe_filter_var_block(sub, variance_percentile)
+    filtered <- .gexpipe_filter_var_block(sub, block_variance_percentile)
     if (n_ds < 2L) {
       return(list(
         expr = filtered,
@@ -350,8 +360,8 @@ gexp_batch_correct_by_platform <- function(
     )
   }
 
-  rna_out <- correct_block(block_input(rna_ids, expr_rna), rna_method, "RNA-seq")
-  micro_out <- correct_block(block_input(micro_ids, expr_micro), micro_method, "Microarray")
+  rna_out <- correct_block(block_input(rna_ids, expr_rna), rna_method, "RNA-seq", rna_variance_percentile)
+  micro_out <- correct_block(block_input(micro_ids, expr_micro), micro_method, "Microarray", micro_variance_percentile)
 
   if (is.null(rna_out$expr) && is.null(micro_out$expr)) {
     stop("Per-platform batch correction produced no expression blocks.")

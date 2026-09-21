@@ -1,0 +1,5 @@
+Method_id,Display_name,Input_data,RNA_seq_only,Microarray_only,Parallel_micro,Parallel_RNA
+limma,limma,Normalized log-scale expression or TMM log-CPM,Yes,Yes,Yes (micro fixed),Yes (RNA if selected)
+limma_voom,limma-voom,Raw RNA-seq counts → voom,Yes,No,No,Yes (RNA if selected)
+deseq2,DESeq2,Raw RNA-seq counts,Yes,No,No,Yes (RNA if selected)
+edger,edgeR,Raw RNA-seq counts,Yes,No,No,Yes (RNA if selected)

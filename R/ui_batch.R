@@ -81,49 +81,93 @@ ui_batch <- tabItem(
           style = "padding: 15px 0;",
           fluidRow(
             column(6,
-                   tags$div(
-                     style = "padding-right: 15px;",
-                     tags$label(
-                       tags$strong(icon("sliders-h"), " Variance Percentile Cutoff:"),
-                       tags$i(class = "fa fa-question-circle param-help",
-                              `data-toggle` = "tooltip", `data-placement` = "right",
-                              title = "Remove genes with the lowest expression variance across samples. These low-variance genes add noise without contributing to differential analysis.<br><b>25%</b> = moderate (removes bottom quarter), <b>10%</b> = conservative, <b>40%</b> = aggressive filtering."),
-                       style = "font-size: 16px; color: #2c3e50; margin-bottom: 10px; display: block;"
-                     ),
-                     tags$p(
-                       "Select the percentile below which genes will be filtered out.",
-                       style = "color: #6c757d; font-size: 13px; margin-bottom: 15px;"
-                     ),
-                     sliderInput("variance_percentile",
-                                 label = NULL,
-                                 min = 0,
-                                 max = 50,
-                                 value = 25,
-                                 step = 1,
-                                 post = "%",
-                                 width = "100%"),
+                   conditionalPanel(
+                     condition = "input.analysis_type != 'parallel'",
                      tags$div(
-                       style = "margin-top: 10px; padding: 12px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 5px;",
-                       tags$div(
-                         style = "display: flex; justify-content: space-between; align-items: center;",
-                         tags$span(
-                           tags$strong("Genes to keep: "),
-                           tags$span(textOutput("genes_to_keep", inline = TRUE), 
-                                    style = "color: #3498db; font-weight: bold; font-size: 16px;")
-                         ),
-                         tags$span(
-                           tags$strong("Genes to remove: "),
-                           tags$span(textOutput("genes_to_remove", inline = TRUE), 
-                                    style = "color: #e74c3c; font-weight: bold; font-size: 16px;")
-                         )
+                       style = "padding-right: 15px;",
+                       tags$label(
+                         tags$strong(icon("sliders-h"), " Variance Percentile Cutoff:"),
+                         tags$i(class = "fa fa-question-circle param-help",
+                                `data-toggle` = "tooltip", `data-placement` = "right",
+                                title = "Remove genes with the lowest expression variance across samples. These low-variance genes add noise without contributing to differential analysis.<br><b>25%</b> = moderate (removes bottom quarter), <b>10%</b> = conservative, <b>40%</b> = aggressive filtering."),
+                         style = "font-size: 16px; color: #2c3e50; margin-bottom: 10px; display: block;"
                        ),
+                       tags$p(
+                         "Select the percentile below which genes will be filtered out.",
+                         style = "color: #6c757d; font-size: 13px; margin-bottom: 15px;"
+                       ),
+                       sliderInput("variance_percentile",
+                                   label = NULL,
+                                   min = 0,
+                                   max = 50,
+                                   value = 25,
+                                   step = 1,
+                                   post = "%",
+                                   width = "100%"),
                        tags$div(
-                         style = "margin-top: 8px; padding-top: 8px; border-top: 1px solid #b8daff;",
-                         tags$small(
-                           icon("info-circle", style = "margin-right: 5px;"),
-                           textOutput("filter_info", inline = TRUE),
-                           style = "color: #495057;"
+                         style = "margin-top: 10px; padding: 12px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 5px;",
+                         tags$div(
+                           style = "display: flex; justify-content: space-between; align-items: center;",
+                           tags$span(
+                             tags$strong("Genes to keep: "),
+                             tags$span(textOutput("genes_to_keep", inline = TRUE),
+                                      style = "color: #3498db; font-weight: bold; font-size: 16px;")
+                           ),
+                           tags$span(
+                             tags$strong("Genes to remove: "),
+                             tags$span(textOutput("genes_to_remove", inline = TRUE),
+                                      style = "color: #e74c3c; font-weight: bold; font-size: 16px;")
+                           )
+                         ),
+                         tags$div(
+                           style = "margin-top: 8px; padding-top: 8px; border-top: 1px solid #b8daff;",
+                           tags$small(
+                             icon("info-circle", style = "margin-right: 5px;"),
+                             textOutput("filter_info", inline = TRUE),
+                             style = "color: #495057;"
+                           )
                          )
+                       )
+                     )
+                   ),
+                   conditionalPanel(
+                     condition = "input.analysis_type == 'parallel'",
+                     tags$div(
+                       style = "padding-right: 15px;",
+                       tags$label(
+                         tags$strong(icon("sliders-h"), " Variance Percentile Cutoff (per platform):"),
+                         tags$i(class = "fa fa-question-circle param-help",
+                                `data-toggle` = "tooltip", `data-placement` = "right",
+                                title = "Remove genes with the lowest expression variance across samples. Each platform is filtered on its own gene set, so RNA-seq and microarray can use different cutoffs."),
+                         style = "font-size: 16px; color: #2c3e50; margin-bottom: 10px; display: block;"
+                       ),
+                       tags$p("RNA-seq:", style = "color: #6c757d; font-size: 13px; margin-bottom: 4px; font-weight: bold;"),
+                       sliderInput("variance_percentile_rna",
+                                   label = NULL,
+                                   min = 0,
+                                   max = 50,
+                                   value = 25,
+                                   step = 1,
+                                   post = "%",
+                                   width = "100%"),
+                       tags$div(
+                         style = "margin-bottom: 15px; padding: 10px 12px; background: #e8f4f8; border-left: 4px solid #3498db; border-radius: 5px;",
+                         tags$span(tags$strong("Keep: "), tags$span(textOutput("genes_to_keep_rna", inline = TRUE), style = "color: #3498db; font-weight: bold;")),
+                         tags$span(" | ", tags$strong("Remove: "), tags$span(textOutput("genes_to_remove_rna", inline = TRUE), style = "color: #e74c3c; font-weight: bold;"))
+                       ),
+                       tags$p("Microarray:", style = "color: #6c757d; font-size: 13px; margin-bottom: 4px; font-weight: bold;"),
+                       sliderInput("variance_percentile_micro",
+                                   label = NULL,
+                                   min = 0,
+                                   max = 50,
+                                   value = 25,
+                                   step = 1,
+                                   post = "%",
+                                   width = "100%"),
+                       tags$div(
+                         style = "padding: 10px 12px; background: #fdf1e3; border-left: 4px solid #e67e22; border-radius: 5px;",
+                         tags$span(tags$strong("Keep: "), tags$span(textOutput("genes_to_keep_micro", inline = TRUE), style = "color: #e67e22; font-weight: bold;")),
+                         tags$span(" | ", tags$strong("Remove: "), tags$span(textOutput("genes_to_remove_micro", inline = TRUE), style = "color: #e74c3c; font-weight: bold;"))
                        )
                      )
                    )

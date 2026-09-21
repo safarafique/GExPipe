@@ -1,0 +1,9 @@
+Item,Value,Notes
+Package,GExPipe,0.99.105
+Minimum_R,4.6.0,DESCRIPTION Depends
+Bioconductor,3.22 (target),DESCRIPTION / README
+Organism,Homo sapiens only,"HGNC, org.Hs.eg.db, human KEGG/STRING"
+Data_source,NCBI GEO,GEOquery download
+Assay_types,Bulk microarray and bulk RNA-seq,Not single-cell or spatial
+Multi_GSE,Comma-separated IDs per platform box,Merged and Parallel keep all GSEs; single-platform can truncate to first GSE
+License,MIT,DESCRIPTION

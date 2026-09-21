@@ -42,6 +42,50 @@ utils::globalVariables(c("."))
   bad
 }
 
+#' Does a matrix look like raw integer counts (vs normalized/continuous values)?
+#'
+#' Real RNA-seq raw counts are non-negative integers. Some GEO series publish
+#' FPKM/TPM/CPM-normalized tables under a "counts" filename; those are
+#' non-negative but non-integer, and feeding them into DESeq2/edgeR's count
+#' model does not raise a clean error - instead, \code{edgeR::filterByExpr()}
+#' quietly removes every gene ("Independent filtering removed all genes"),
+#' because CPM computed from already-normalized values is meaningless.
+#'
+#' @param m Matrix or data frame.
+#' @param tol Numeric tolerance for "close enough to an integer".
+#' @return TRUE when finite values look like raw counts.
+#' @keywords internal
+.gexpipe_matrix_looks_like_counts <- function(m, tol = 1e-6) {
+  if (is.null(m) || length(m) == 0L) {
+    return(TRUE) # nothing to judge; don't block on missing data here
+  }
+  v <- suppressWarnings(as.numeric(as.matrix(m)))
+  v <- v[is.finite(v)]
+  if (length(v) == 0L) {
+    return(TRUE)
+  }
+  frac_noninteger <- mean(abs(v - round(v)) > tol)
+  frac_noninteger < 0.01
+}
+
+#' Datasets whose stored "counts" do not look like raw integer counts
+#'
+#' @param counts_list Named list of count matrices.
+#' @param combined Optional combined count matrix used as a fallback check.
+#' @return Character vector of offending dataset names (empty when all valid).
+#' @keywords internal
+.gexpipe_noncount_datasets <- function(counts_list, combined = NULL) {
+  bad <- character(0)
+  if (length(counts_list) > 0) {
+    flags <- vapply(counts_list, function(x) !.gexpipe_matrix_looks_like_counts(x), logical(1))
+    bad <- names(counts_list)[flags]
+  }
+  if (length(bad) == 0L && !is.null(combined) && !.gexpipe_matrix_looks_like_counts(combined)) {
+    bad <- "combined count matrix"
+  }
+  bad
+}
+
 #' Independent filtering for DE (limma filterByExpr)
 #'
 #' Removes lowly expressed genes using a design-aware filter so filtering is
@@ -62,26 +106,42 @@ gexpipe_independent_filter <- function(expr, design = NULL, group = NULL) {
     stop("expr must be a non-empty matrix for independent filtering.")
   }
   n_before <- nrow(expr)
+  # edgeR::filterByExpr() assumes raw integer counts (it computes CPM from
+  # library sizes); applying it to already-normalized continuous data
+  # (microarray log-intensities, or batch-corrected/log expression used with
+  # limma) produces meaningless thresholds and can filter out every gene.
+  # Only use it when expr genuinely looks like counts; otherwise fall back to
+  # a simple detectable-expression filter appropriate for continuous data.
+  looks_like_counts <- .gexpipe_matrix_looks_like_counts(expr)
+  used_filter_by_expr <- FALSE
   keep <- tryCatch({
-    if (!is.null(design)) {
+    if (looks_like_counts && !is.null(design)) {
+      used_filter_by_expr <- TRUE
       edgeR::filterByExpr(expr, design = design)
-    } else if (!is.null(group)) {
+    } else if (looks_like_counts && !is.null(group)) {
+      used_filter_by_expr <- TRUE
       edgeR::filterByExpr(expr, group = group)
     } else {
-      rowSums(expr > 0, na.rm = TRUE) >= max(2L, ceiling(ncol(expr) * 0.1))
+      threshold <- if (looks_like_counts) 0 else stats::median(expr, na.rm = TRUE)
+      rowSums(expr > threshold, na.rm = TRUE) >= max(2L, ceiling(ncol(expr) * 0.1))
     }
   }, error = function(e) {
-    rowSums(expr > 0, na.rm = TRUE) >= max(2L, ceiling(ncol(expr) * 0.1))
+    threshold <- if (looks_like_counts) 0 else stats::median(expr, na.rm = TRUE)
+    rowSums(expr > threshold, na.rm = TRUE) >= max(2L, ceiling(ncol(expr) * 0.1))
   })
   if (length(keep) != n_before) {
     keep <- rep(TRUE, n_before)
   }
   n_after <- sum(keep)
   if (n_after < 1L) {
-    stop("Independent filtering removed all genes; check expression/count data.")
+    # Filter was too strict for this data (e.g. very low expression overall) -
+    # keep everything rather than crash; the earlier variance-percentile
+    # filter (Step 5) already did the primary gene-level filtering.
+    keep <- rep(TRUE, n_before)
+    n_after <- n_before
   }
   note <- paste0(
-    "Independent filtering (filterByExpr): ",
+    "Independent filtering (", if (used_filter_by_expr) "filterByExpr" else "detectable-expression", "): ",
     format(n_before, big.mark = ","), " -> ",
     format(n_after, big.mark = ","), " genes"
   )
@@ -220,7 +280,12 @@ gexp_run_de <- function(
   }
 
   metadata <- .gexpipe_align_metadata_to_expr(expr, metadata)
-  metadata$Condition <- factor(metadata$Condition, levels = c("Normal", "Disease"))
+  cond_chr <- as.character(metadata$Condition)
+  cond_lvls <- unique(cond_chr[!is.na(cond_chr) & nzchar(cond_chr)])
+  if (setequal(cond_lvls, c("Normal", "Disease"))) {
+    cond_lvls <- c("Normal", "Disease")
+  }
+  metadata$Condition <- factor(cond_chr, levels = cond_lvls)
 
   de_design <- gexpipe_build_de_design(metadata)
   design <- de_design$design

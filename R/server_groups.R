@@ -389,7 +389,7 @@ server_groups <- function(input, output, session, rv) {
     do.call(tabsetPanel, c(list(id = "phenodata_tabs", type = "pills"), tabs))
   })
 
-  # Render DT tables for each dataset (display only — no network enrich here)
+  # Render DT tables for each dataset (display only - no network enrich here)
   observe({
     all_gses <- .gexpipe_available_gses()
     for (gse in all_gses) {
@@ -588,7 +588,7 @@ server_groups <- function(input, output, session, rv) {
           tags$p(
             style = "margin: 0 0 8px 0; color: #6c757d; font-size: 12px;",
             icon("columns", style = "margin-right: 4px;"),
-            paste0(length(col_names), " phenotype columns available — pick the column that defines Normal vs Disease.")
+            paste0(length(col_names), " phenotype columns available - pick the column that defines Normal vs Disease.")
           ),
           selectInput(
             inputId = paste0("group_col_", gse),
@@ -1157,6 +1157,12 @@ server_groups <- function(input, output, session, rv) {
       keep_r <- intersect(matched, colnames(rv$expr_rna))
       if (length(keep_r) > 0L) {
         rv$expr_rna <- rv$expr_rna[, keep_r, drop = FALSE]
+      }
+    }
+    if (!is.null(rv$combined_expr_before_global_norm) && is.matrix(rv$combined_expr_before_global_norm)) {
+      keep_b <- intersect(matched, colnames(rv$combined_expr_before_global_norm))
+      if (length(keep_b) > 0L) {
+        rv$combined_expr_before_global_norm <- rv$combined_expr_before_global_norm[, keep_b, drop = FALSE]
       }
     }
     rv$unified_metadata <- rv$unified_metadata[matched, , drop = FALSE]

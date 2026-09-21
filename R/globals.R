@@ -16,7 +16,7 @@ utils::globalVariables(c(
   "renderImage", "renderInfoBox", "renderDataTable", "downloadHandler",
   "observe", "observeEvent", "req", "invalidateLater", "showNotification",
   "removeNotification", "withProgress", "incProgress", "reactive", "eventReactive",
-  "reactiveVal", "reactiveValues", "validate", "need",
+  "reactiveVal", "reactiveValues", "validate", "need", "isolate",
   "updateRadioButtons", "updateSelectInput", "updateTextInput",
   "updateCheckboxInput", "updateCheckboxGroupInput", "updateSliderInput",
   "updateNumericInput", "updateActionButton", "updateTabItems",

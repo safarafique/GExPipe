@@ -4,12 +4,15 @@
 \alias{gexp_download_one_rnaseq_gse}
 \title{Download and parse one RNA-seq GSE}
 \usage{
-gexp_download_one_rnaseq_gse(gse_id, rna_dir)
+gexp_download_one_rnaseq_gse(gse_id, rna_dir, fast = NULL)
 }
 \arguments{
 \item{gse_id}{GEO series ID.}
 
 \item{rna_dir}{Directory containing \code{rna_data}.}
+
+\item{fast}{Logical; if \code{TRUE} (default from
+\code{options(gexpipe.fast_download)}), skip slower optional lookups.}
 }
 \value{
 List with status, reason, log text, count matrix, and metadata.

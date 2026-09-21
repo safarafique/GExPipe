@@ -228,24 +228,51 @@ box(
       )
     ),
     
-    fluidRow(
-      box(
-        title = tags$span(icon("file-csv"), " Download DE results"),
-        width = 12, status = "info", solidHeader = TRUE,
-        tags$p("Export the differential expression (volcano) table to check results in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
-        downloadButton("download_de_results", tagList(icon("download"), " DE results / volcano table (CSV)"), class = "btn-primary btn-lg")
+    conditionalPanel(
+      condition = "input.analysis_type != 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("file-csv"), " Download DE results"),
+          width = 12, status = "info", solidHeader = TRUE,
+          tags$p("Export the differential expression (volcano) table to check results in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
+          downloadButton("download_de_results", tagList(icon("download"), " DE results / volcano table (CSV)"), class = "btn-primary btn-lg")
+        )
+      ),
+      fluidRow(
+        box(
+          title = tags$span(icon("download"), " Download Results"),
+          width = 12, status = "warning", solidHeader = TRUE,
+          column(4, downloadButton("download_de_results_alt", tagList(icon("download"), " DE Results"), class = "btn-success btn-block")),
+          column(4, downloadButton("download_sig_genes", tagList(icon("download"), " Significant Genes"), class = "btn-success btn-block")),
+          column(4, downloadButton("download_workspace_results", tagList(icon("download"), " Workspace"), class = "btn-success btn-block"))
+        )
       )
     ),
-    fluidRow(
-      box(
-        title = tags$span(icon("download"), " Download Results"), 
-        width = 12, status = "warning", solidHeader = TRUE,
-        column(4, downloadButton("download_de_results_alt", tagList(icon("download"), " DE Results"), class = "btn-success btn-block")),
-        column(4, downloadButton("download_sig_genes", tagList(icon("download"), " Significant Genes"), class = "btn-success btn-block")),
-        column(4, downloadButton("download_workspace_results", tagList(icon("download"), " Workspace"), class = "btn-success btn-block"))
+    conditionalPanel(
+      condition = "input.analysis_type == 'parallel'",
+      fluidRow(
+        box(
+          title = tags$span(icon("file-csv"), " Download DE Results (separate by platform)"),
+          width = 12, status = "info", solidHeader = TRUE,
+          tags$p("RNA-seq and microarray were analyzed separately (their own DE engines and gene sets) - download each platform's results on its own.", style = "margin-bottom: 12px; color: #555;"),
+          gexp_ui_parallel_two_col(
+            tagList(
+              tags$h5(icon("dna"), " RNA-seq", style = "color: #1e3a8a;"),
+              downloadButton("download_de_results_rna", tagList(icon("download"), " DE Results (CSV)"), class = "btn-info btn-block", style = "margin-bottom: 6px;"),
+              downloadButton("download_sig_genes_rna", tagList(icon("download"), " Significant Genes (CSV)"), class = "btn-success btn-block")
+            ),
+            tagList(
+              tags$h5(icon("th"), " Microarray", style = "color: #9a3412;"),
+              downloadButton("download_de_results_micro", tagList(icon("download"), " DE Results (CSV)"), class = "btn-info btn-block", style = "margin-bottom: 6px;"),
+              downloadButton("download_sig_genes_micro", tagList(icon("download"), " Significant Genes (CSV)"), class = "btn-success btn-block")
+            )
+          ),
+          tags$div(style = "margin-top: 14px; text-align: center;",
+            downloadButton("download_workspace_results_parallel", tagList(icon("download"), " Workspace"), class = "btn-success btn-lg"))
+        )
       )
     ),
-    
+
     conditionalPanel(
       condition = "input.analysis_type != 'parallel'",
       fluidRow(

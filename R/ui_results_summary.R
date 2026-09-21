@@ -1,8 +1,6 @@
 # ==============================================================================
-# UI_RESULTS_SUMMARY.R - Step 15: Results Summary (aesthetic flow: summary -> steps with arrow, description, figure)
+# UI_RESULTS_SUMMARY.R - Step 15: Results Summary (text-only overview, no plots)
 # ==============================================================================
-
-RESULTS_PLOT_HEIGHT <- "280px"
 
 # Reusable step connector (arrow down)
 step_arrow <- function() {
@@ -46,7 +44,7 @@ ui_results_summary <- tabItem(
     ),
     uiOutput("results_summary_about_ui"),
     tags$p(
-      "Pipeline overview and key results in order. Download 300 dpi figures from each step for the paper.",
+      "Pipeline overview and key results in order (text and tables only - see each step's own tab for its plots).",
       style = "margin-top: 8px; margin-bottom: 0; color: #7f8c8d; font-size: 14px;"
     )
   ),
@@ -78,70 +76,29 @@ ui_results_summary <- tabItem(
       box(
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         title = tags$span(icon("layer-group"), " Step 5: Batch correction"),
-        tags$p("Batch effect removed (e.g. ComBat, limma). Before/after comparison below.", style = "margin-bottom: 12px; font-size: 13px; color: #5a6c7d;"),
+        tags$p("Batch effect removed (e.g. ComBat, limma).", style = "margin-bottom: 12px; font-size: 13px; color: #5a6c7d;"),
         uiOutput("results_summary_batch_only")
       )
     )
   ),
 
-  # ----- 3. Batch before vs after PCA -----
-  step_card(
-    "3-5", "chart-area", "Batch effect: Before vs After",
-    "PCA of expression before and after batch correction. Samples should mix better after correction.",
-    "primary",
-    gexp_ui_plot_download_jpg_pdf("dl_rs_batch_before_after_jpg", "dl_rs_batch_before_after_pdf", "btn-primary btn-sm"),
-    plotOutput("results_summary_batch_before_after", height = RESULTS_PLOT_HEIGHT)
-  ),
-
-  # ----- 4. Differential expression -----
+  # ----- 3. Differential expression -----
   step_card(
     "6", "chart-line", "Differential expression",
-    "DEGs identified (e.g. limma). Volcano: log2 FC vs adjusted P-value. Heatmap: top genes across samples.",
+    "DEGs identified (e.g. limma).",
     "success",
-    uiOutput("results_summary_de"),
-    tags$div(style = "margin-top: 12px;",
-      fluidRow(
-        column(6,
-          gexp_ui_plot_download_jpg_pdf("dl_rs_volcano_jpg", "dl_rs_volcano_pdf", "btn-success btn-sm"),
-          plotOutput("results_summary_volcano", height = RESULTS_PLOT_HEIGHT)
-        ),
-        column(6,
-          gexp_ui_plot_download_jpg_pdf("dl_rs_de_heatmap_jpg", "dl_rs_de_heatmap_pdf", "btn-success btn-sm"),
-          plotOutput("results_summary_de_heatmap", height = RESULTS_PLOT_HEIGHT)
-        )
-      )
-    )
+    uiOutput("results_summary_de")
   ),
 
-  # ----- 5. WGCNA -----
+  # ----- 4. WGCNA -----
   step_card(
     "7", "project-diagram", "WGCNA co-expression",
-    "Soft-threshold choice, sample tree, gene dendrogram with module colors, and module-trait correlation.",
+    "Soft-threshold choice, modules, and module-trait correlation.",
     "primary",
-    uiOutput("results_summary_wgcna"),
-    fluidRow(
-      column(6,
-        gexp_ui_plot_download_jpg_pdf("dl_rs_soft_threshold_jpg", "dl_rs_soft_threshold_pdf", "btn-primary btn-sm"),
-        plotOutput("results_summary_soft_threshold", height = RESULTS_PLOT_HEIGHT)
-      ),
-      column(6,
-        gexp_ui_plot_download_jpg_pdf("dl_rs_sample_tree_jpg", "dl_rs_sample_tree_pdf", "btn-primary btn-sm"),
-        plotOutput("results_summary_sample_tree", height = RESULTS_PLOT_HEIGHT)
-      )
-    ),
-    fluidRow(
-      column(6,
-        gexp_ui_plot_download_jpg_pdf("dl_rs_wgcna_dendro_jpg", "dl_rs_wgcna_dendro_pdf", "btn-primary btn-sm"),
-        plotOutput("results_summary_wgcna_dendro", height = RESULTS_PLOT_HEIGHT)
-      ),
-      column(6,
-        gexp_ui_plot_download_jpg_pdf("dl_rs_module_trait_jpg", "dl_rs_module_trait_pdf", "btn-primary btn-sm"),
-        plotOutput("results_summary_module_trait", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
+    uiOutput("results_summary_wgcna")
   ),
 
-  # ----- 6. Common genes & GO/KEGG -----
+  # ----- 5. Common genes & GO/KEGG -----
   step_card(
     "8", "venus-double", "Common genes (DEG n WGCNA)",
     "Intersection of DEGs and WGCNA module genes. This set is used for GO/KEGG enrichment and PPI.",
@@ -151,85 +108,48 @@ ui_results_summary <- tabItem(
 
   step_card(
     "8", "sitemap", "GO & KEGG enrichment",
-    "Pathway enrichment of common genes. GO dotplot and KEGG bar plot.",
+    "Pathway enrichment of common genes.",
     "info",
-    uiOutput("results_summary_go_kegg"),
-    fluidRow(
-      column(6,
-        gexp_ui_plot_download_jpg_pdf("dl_rs_go_plot_jpg", "dl_rs_go_plot_pdf", "btn-info btn-sm"),
-        plotOutput("results_summary_go_plot", height = RESULTS_PLOT_HEIGHT)
-      ),
-      column(6,
-        gexp_ui_plot_download_jpg_pdf("dl_rs_kegg_plot_jpg", "dl_rs_kegg_plot_pdf", "btn-info btn-sm"),
-        plotOutput("results_summary_kegg_plot", height = RESULTS_PLOT_HEIGHT)
-      )
-    )
+    uiOutput("results_summary_go_kegg")
   ),
 
-  # ----- 7. PPI -----
+  # ----- 6. PPI -----
   step_card(
     "9", "project-diagram", "PPI network",
     "Protein-protein interaction network from common genes (STRINGdb). Hub genes by degree.",
     "info",
-    uiOutput("results_summary_ppi"),
-    gexp_ui_plot_download_jpg_pdf("dl_rs_ppi_plot_jpg", "dl_rs_ppi_plot_pdf", "btn-info btn-sm"),
-    plotOutput("results_summary_ppi_plot", height = RESULTS_PLOT_HEIGHT)
+    uiOutput("results_summary_ppi")
   ),
 
-  # ----- 8. Machine learning & ROC -----
+  # ----- 7. Machine learning -----
   step_card(
-    "10", "circle", "Machine learning - Venn/UpSet",
+    "10", "circle", "Machine learning",
     "Overlap of gene lists across selected ML methods. Common genes used for ROC and validation.",
     "warning",
-    uiOutput("results_summary_ml"),
-    gexp_ui_plot_download_jpg_pdf("dl_rs_ml_venn_jpg", "dl_rs_ml_venn_pdf", "btn-warning btn-sm"),
-    plotOutput("results_summary_ml_venn", height = RESULTS_PLOT_HEIGHT)
+    uiOutput("results_summary_ml")
   ),
 
-  step_card(
-    "12", "chart-line", "ROC curve",
-    "ROC/AUC for mean signature of ML common genes (training data).",
-    "success",
-    gexp_ui_plot_download_jpg_pdf("dl_rs_roc_plot_jpg", "dl_rs_roc_plot_pdf", "btn-success btn-sm"),
-    plotOutput("results_summary_roc_plot", height = RESULTS_PLOT_HEIGHT)
-  ),
-
-  # ----- 9. Nomogram -----
+  # ----- 8. Nomogram -----
   step_card(
     "13", "calculator", "Diagnostic nomogram",
     "Nomogram model and 70/30 validation. Training and validation AUC.",
     "danger",
-    uiOutput("results_summary_nomogram_ui"),
-    gexp_ui_plot_download_jpg_pdf("dl_rs_nomogram_plot_jpg", "dl_rs_nomogram_plot_pdf", "btn-danger btn-sm"),
-    plotOutput("results_summary_nomogram_plot", height = RESULTS_PLOT_HEIGHT)
+    uiOutput("results_summary_nomogram_ui")
   ),
 
-  # ----- 10. GSEA -----
+  # ----- 9. GSEA -----
   step_card(
     "14", "chart-area", "GSEA",
-    "Gene Set Enrichment Analysis for target genes. Enrichment plot and pathways.",
+    "Gene Set Enrichment Analysis for target genes.",
     "info",
-    uiOutput("results_summary_gsea"),
-    gexp_ui_plot_download_jpg_pdf("dl_rs_gsea_plot_jpg", "dl_rs_gsea_plot_pdf", "btn-info btn-sm"),
-    plotOutput("results_summary_gsea_plot", height = RESULTS_PLOT_HEIGHT)
+    uiOutput("results_summary_gsea")
   ),
 
-  # ----- 11. Input & pipeline info -----
+  # ----- 10. Input & pipeline info -----
   step_card(
     "-", "dna", "Input & pipeline",
     "Common genes and expression matrix size after preprocessing.",
     "primary",
     uiOutput("results_summary_input_genes")
-  ),
-
-  # ----- Cite (collapsible at bottom) -----
-  fluidRow(
-    column(12,
-      box(
-        title = tags$span(icon("quote-right"), " Cite this analysis"),
-        width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
-        uiOutput("citation_text")
-      )
-    )
   )
 )

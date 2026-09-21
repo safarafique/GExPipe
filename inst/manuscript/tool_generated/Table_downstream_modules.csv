@@ -1,0 +1,11 @@
+Module,Step,Description,Source_reference
+QC diagnostics,3,"PCA-style views, sample filtering, PVCA helper in batch/QC pipeline","gexp_qc_pipeline.R, gexp_platform_helpers.R"
+Consensus Step 7,7,require_same_direction default TRUE; mean logFC; conservative adj.P,gexp_consensus_pipeline.R
+WGCNA,8,dynamicTreeCut; top 5000 variable genes default; module-trait correlation,gexp_wgcna_pipeline.R
+GO/KEGG,9,clusterProfiler enrichment on common genes,Step 9 UI
+STRING PPI,10,STRINGdb download on first use; human taxonomy 9606,"ui_ppi.R, STRINGdb"
+Validation,12,External GSE or hold-out split,server_validation.R
+ROC / immune,13,pROC; optional immune deconvolution matrix,ui_roc.R
+Nomogram,14,rms nomogram,ui_nomogram.R
+GSEA,15,msigdbr gene sets,ui_gsea.R
+Workspace,sidebar,Save/load RData workspace,observers_workspace.R

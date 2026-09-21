@@ -1,0 +1,9 @@
+Method_id,UI_name,R_package,Notes
+lasso,LASSO,glmnet,L1; coefficient path plots
+elastic,Elastic Net,glmnet,alpha=0.5
+ridge,Ridge,glmnet,L2 shrinkage
+rf,Random Forest,randomForest,Variable importance
+svm,SVM-RFE,kernlab (Suggests),Recursive feature elimination
+boruta,Boruta,Boruta (Suggests),All-relevant features vs shadows
+splsda,sPLS-DA,mixOmics (Suggests),Sparse multivariate selection
+xgboost,XGBoost+SHAP,xgboost + SHAPforxgboost (Suggests),SHAP-ranked importance
