@@ -1,3 +1,62 @@
+# GExPipe 0.99.106
+
+- Fixed a metadata desync bug: applying group labels in Step 4 trimmed
+  `combined_expr`/`expr_micro`/`expr_rna`/`unified_metadata` to the kept
+  samples but left `combined_expr_before_global_norm` untouched, so any
+  time Step 4 excluded a sample, Parallel-mode Step 5 batch correction
+  crashed the app with a metadata-alignment error.
+- Fixed `edgeR::filterByExpr()` (built for raw integer counts) being
+  applied to already-normalized continuous log-intensity data in the
+  limma DE path, which could silently filter out every gene
+  ("Independent filtering removed all genes"). Independent filtering now
+  detects whether the input looks like counts and uses an appropriate
+  filter either way.
+- Fixed `.gexpipe_factor_meta()` hardcoding `levels = c("Normal",
+  "Disease")` when re-leveling `Condition`: after renaming groups in
+  Step 4 (e.g. to custom labels), every sample's Condition silently
+  became `NA`, destroying the DE design matrix. Group labels are now
+  preserved regardless of what they're named.
+- Fixed empty/zero-length platform IDs (`Biobase::annotation()`
+  returning `character(0)`) silently breaking probe-to-symbol GPL
+  lookups; added a `platform_id` phenodata fallback.
+- Fixed corrupted/partial GEO series-matrix and GPL annotation cache
+  files (from earlier interrupted downloads) being reused indefinitely
+  instead of triggering a fresh download, including one path that could
+  segfault R outright when a mislabeled `.gz` file was opened.
+- Fixed the same class of corrupted-cache bug for STRINGdb's PPI step
+  (alias/interaction files); GExPipe now manages its own validated
+  STRINGdb cache directory instead of relying on STRINGdb's unmanaged
+  default.
+- Fixed stale `raw_counts_for_deseq2`/`rna_counts_list` from an earlier,
+  unrelated download being treated as "available" for a later run with
+  different samples; now requires real sample overlap with the current
+  dataset before being trusted.
+- Fixed a duplicate y-axis rendering bug in the WGCNA Module Eigengene
+  Dendrogram (overlapping/garbled axis labels).
+- External Validation now runs the same pipeline as the main analysis
+  for the same GSE: probe/gene ID-to-symbol conversion uses the same
+  GPL/fData information, per-dataset normalization uses the same
+  function, gene filtering uses the same variance-percentile step, batch
+  correction (real ComBat-ref/limma for 2+ datasets, or an optional
+  technical-covariate diagnostic for a single dataset) mirrors Step 5,
+  and DE uses the same shared engines with Dataset-aware covariates.
+- Increased the browser idle-disconnect keep-alive window from 30 to
+  60 minutes.
+- GEO series-matrix downloads get a longer timeout (600s) so very large
+  series (e.g. GSE13159, ~2000+ samples) don't time out on a normal
+  connection and get misreported as a network/connectivity failure.
+- Parallel-mode Step 5 now has separate variance-percentile sliders for
+  RNA-seq and microarray (previously shared one value for both).
+- Results Summary (Step 16) is now a text/table-only overview - all
+  plots, JPG/PDF download buttons, and the "Cite this analysis" box
+  were removed from this tab; figures remain available on each step's
+  own tab.
+- Added standalone, non-Shiny example scripts under `inst/scripts/`
+  (`manual_pipeline_microarray.R`, `manual_pipeline_rnaseq.R`, and
+  `_multi` variants for 2+ datasets) that run the full pipeline -
+  download through PPI - step by step using the same package functions
+  as the app.
+
 # GExPipe 0.99.105
 
 - Fixed RNA-seq download failing with "no usable RNA-seq count matrix"
