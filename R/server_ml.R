@@ -398,6 +398,11 @@ server_ml <- function(input, output, session, rv) {
         venn_sets <- gexp_ml_venn_sets_for_selected(gene_lists, methods_sel)
         common_all <- if (length(venn_sets) == 0) character(0) else Reduce(intersect, venn_sets)
         rv$ml_common_genes <- common_all
+        # A fresh ML run means any previously CONFIRMED ROC gene selection
+        # (Step 12) is stale by definition - it was chosen from the OLD
+        # candidate pool and, left in place, would silently leak into
+        # Nomogram/GSEA even when it no longer overlaps this run's genes.
+        rv$roc_selected_genes <- NULL
         rv$ml_venn_sets <- venn_sets
         rv$ml_methods_selected <- methods_sel
         rv$ml_methods_run <- method_names

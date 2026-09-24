@@ -530,7 +530,7 @@ ui_batch <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$div(
           id = "batch_summary_panel",
-          verbatimTextOutput("batch_log"),
+          gexp_ui_log_box("batch_log"),
           tags$div(
             class = "step-timer",
             tags$span(class = "label", "Elapsed:"),

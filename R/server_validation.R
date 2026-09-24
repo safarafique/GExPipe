@@ -415,13 +415,25 @@ server_validation <- function(input, output, session, rv) {
         # GSE, then intersected on common genes and globally quantile-aligned.
         # This replaces a naive raw-value cbind, which skipped normalization
         # entirely and could feed unnormalized values into DE.
+        # de_method must reflect the user's actual Step A choice (DE Method
+        # radio button) - gexp_normalize_and_intersect() only computes and
+        # keeps raw_counts_for_deseq2 when de_method is deseq2/edger/
+        # limma_voom (see its save_raw condition). Hardcoding "limma" here
+        # meant DESeq2/edgeR were NEVER available for validation DE, no
+        # matter what the user selected - it silently fell back to limma
+        # every time.
+        ext_val_de_method_chosen <- if (!is.null(input$ext_val_de_method) && nzchar(input$ext_val_de_method)) {
+          input$ext_val_de_method
+        } else {
+          "limma"
+        }
         norm_out_val <- tryCatch(
           gexp_normalize_and_intersect(
             micro_expr_list = micro_expr_list_val,
             rna_counts_list = rna_counts_list_val,
             micro_norm_method = "quantile",
             rnaseq_norm_method = "TMM",
-            de_method = "limma",
+            de_method = ext_val_de_method_chosen,
             apply_global_quantile = TRUE,
             keep_platforms_separate = FALSE
           ),

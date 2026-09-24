@@ -101,6 +101,43 @@ gexp_ui_plot_download_bar <- function(png_id, jpg_id, pdf_id, btn_class = "btn-s
   )
 }
 
+#' Standard dark-terminal log box, used for every step's processing log.
+#' One shared component so every step's log looks the same (background,
+#' font, timestamp handling) instead of each step styling its own.
+#' @param output_id Shiny output id for the log text (a renderText/
+#'   renderPrint producing already-formatted, newline-joined text).
+#' @param height CSS max-height for the scrollable area.
+#' @noRd
+gexp_ui_log_box <- function(output_id, height = "500px") {
+  shiny::tags$div(
+    class = "scrollable-log-area gexp-log-box",
+    style = paste0(
+      "max-height: ", height, "; overflow-y: auto; font-family: 'Courier New', monospace; ",
+      "font-size: 12px; background: #263238; color: #66BB6A; padding: 15px; ",
+      "border-radius: 8px; white-space: pre-wrap;"
+    ),
+    shiny::verbatimTextOutput(output_id, placeholder = TRUE)
+  )
+}
+
+#' Build a consistently-formatted closing summary block, appended to the end
+#' of every step's log text so every step ends the same way. `lines` is a
+#' named character/numeric vector (or list) of label -> value pairs.
+#' @noRd
+gexpipe_log_summary_block <- function(title, lines) {
+  rule <- paste(rep("━", 48), collapse = "")
+  body <- vapply(names(lines), function(nm) {
+    sprintf("  %s: %s", nm, format(lines[[nm]]))
+  }, character(1))
+  paste0(
+    "\n", rule, "\n",
+    "SUMMARY: ", title, "\n",
+    rule, "\n",
+    paste(body, collapse = "\n"), "\n",
+    rule, "\n"
+  )
+}
+
 # Open a graphics device for plot export (png/jpg/pdf inferred from file extension).
 gexp_plot_device_open <- function(file, width, height, bg = "white", type = NULL) {
   if (is.null(type)) {

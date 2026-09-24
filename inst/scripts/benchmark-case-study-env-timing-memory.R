@@ -78,20 +78,23 @@ step_timer <- function(step_label, expr) {
 # 3) One-time environment info (CPU, cores, RAM, OS, R/Bioc/GExPipe version)
 # ------------------------------------------------------------------------
 gexpipe_env_info <- function() {
+  # Windows: use PowerShell CIM (wmic was removed from recent Windows 11 builds)
+  .ps <- function(cmd) {
+    out <- tryCatch(system2("powershell", c("-NoProfile", "-Command", cmd),
+                            stdout = TRUE, stderr = FALSE),
+                    error = function(e) character(0))
+    out <- trimws(out[nzchar(trimws(out))])
+    if (length(out)) out[1] else NA_character_
+  }
+
   os <- if (.Platform$OS.type == "windows") {
-    tryCatch({
-      v <- system2("wmic", c("os", "get", "Caption"), stdout = TRUE)
-      trimws(v[nzchar(trimws(v))][2])
-    }, error = function(e) paste(Sys.info()[["sysname"]], Sys.info()[["release"]]))
+    .ps("(Get-CimInstance Win32_OperatingSystem | ForEach-Object { $_.Caption + ' ' + $_.Version })")
   } else {
     paste(Sys.info()[["sysname"]], Sys.info()[["release"]])
   }
 
   cpu <- if (.Platform$OS.type == "windows") {
-    tryCatch({
-      v <- system2("wmic", c("cpu", "get", "Name"), stdout = TRUE)
-      trimws(v[nzchar(trimws(v))][2])
-    }, error = function(e) NA_character_)
+    .ps("(Get-CimInstance Win32_Processor | Select-Object -First 1).Name")
   } else if (file.exists("/proc/cpuinfo")) {
     ln <- grep("model name", readLines("/proc/cpuinfo"), value = TRUE)
     if (length(ln)) trimws(sub(".*:", "", ln[1])) else NA_character_
@@ -101,11 +104,9 @@ gexpipe_env_info <- function() {
   } else NA_character_
 
   ram_gb <- if (.Platform$OS.type == "windows") {
-    tryCatch({
-      v <- system2("wmic", c("computersystem", "get", "TotalPhysicalMemory"), stdout = TRUE)
-      b <- as.numeric(trimws(v[nzchar(trimws(v))][2]))
-      round(b / 1024^3, 1)
-    }, error = function(e) NA_real_)
+    b <- suppressWarnings(as.numeric(
+      .ps("(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory")))
+    round(b / 1024^3, 1)
   } else if (file.exists("/proc/meminfo")) {
     ln <- grep("MemTotal:", readLines("/proc/meminfo"), value = TRUE)
     round(as.numeric(regmatches(ln, regexpr("[0-9]+", ln))) / 1024^2, 1)
@@ -203,3 +204,4 @@ gexpipe_build_report_row <- function(mode_label) {
 #   print(final_table)
 #   write.csv(final_table, "case_study_runtime_memory_table.csv", row.names = FALSE)
 # ==============================================================================
+

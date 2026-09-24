@@ -1071,9 +1071,14 @@ server_batch <- function(input, output, session, rv) {
             "OK Batch correction complete\n",
             "Method: ", input$batch_method, "\n\n",
             res$log_text,
-            "\nFinal Dataset:\n",
-            "  Genes: ", format(genes_after, big.mark = ","), "\n",
-            "  Samples: ", format(ncol(rv$batch_corrected), big.mark = ",")
+            gexpipe_log_summary_block("Step 5 - Batch Correction", list(
+              "Method" = input$batch_method,
+              "Genes before filter" = format(genes_before, big.mark = ","),
+              "Genes after filter" = format(genes_after, big.mark = ","),
+              "Filtered out" = paste0(filter_percent, "%"),
+              "Samples" = format(ncol(rv$batch_corrected), big.mark = ","),
+              "Status" = "Complete - proceed to Differential Expression (Step 6)"
+            ))
           )
         }
       })

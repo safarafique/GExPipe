@@ -762,10 +762,13 @@ gexp_download_finalize_common_genes <- function(
  # Some series (e.g. GSE13159, ~2000+ samples) have multi-hundred-MB series
  # matrix files; R's default 60s download timeout is easily exceeded on a
  # perfectly fine connection, which then gets misreported as a connectivity
- # problem. Bump it defensively here regardless of how the app was launched.
+ # problem. 600s, then 1800s, were both tried here first and still weren't
+ # enough on a real run for the very largest series - bumped to 1 hour,
+ # which gives even multi-GB series matrix files room to complete on a
+ # slow connection instead of failing partway through.
  old_timeout <- getOption("timeout", 60L)
- if (old_timeout < 600L) {
- options(timeout = 600L)
+ if (old_timeout < 3600L) {
+ options(timeout = 3600L)
  on.exit(options(timeout = old_timeout), add = TRUE)
  }
  .gexpipe_geo_quiet(do.call(GEOquery::getGEO, args))
@@ -1295,7 +1298,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  if (accept) {
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  all_genes_list[[gse]] <- rownames(cnt)
  log_text <- paste0(log_text, " ", gse, ": converted to ", nrow(cnt), " gene symbols\n")
@@ -1311,7 +1322,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  if (sum(valid) > 0) {
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  all_genes_list[[gse]] <- rownames(cnt)
  }
@@ -1344,7 +1363,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  cnt <- rna_counts_list[[gse]]
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  all_genes_list[[gse]] <- rownames(cnt)
  log_text <- paste0(log_text, " ", gse, ": biomaRt converted to ", nrow(cnt), " gene symbols\n")
@@ -1389,7 +1416,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  if (nrow(cnt) == length(sym)) {
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  }
  }
@@ -1444,7 +1479,10 @@ gexp_download_normalize_ids_for_overlap <- function(
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
  if (any(duplicated(rownames(cnt)))) {
- cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ # See the rounding note above: avereps() on integer counts can
+ # produce non-integer values, which would silently fail the
+ # downstream integer-count check and force a limma fallback.
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
  }
  rna_counts_list[[gse]] <- cnt
  }
@@ -2305,8 +2343,11 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  }
  dir.create(dirname(dest_file), showWarnings = FALSE, recursive = TRUE)
  old_to <- getOption("timeout", 60L)
- if (old_to < 180L) {
- options(timeout = 180L)
+ # Raw supplementary files (e.g. CEL tarballs for large microarray series)
+ # can also run to hundreds of MB - same 1-hour headroom as the series
+ # matrix downloader above, so a big file isn't cut off partway through.
+ if (old_to < 3600L) {
+ options(timeout = 3600L)
  }
  on.exit(options(timeout = old_to), add = TRUE)
  methods <- unique(c("libcurl", getOption("download.file.method"), "auto", "wininet"))
@@ -2556,7 +2597,12 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  return(out)
  }
  if (any(duplicated(rownames(count_matrix)))) {
- count_matrix <- limma::avereps(count_matrix, ID = rownames(count_matrix))
+ # Round back to whole counts - avereps() averages duplicate rows,
+ # which can produce non-integer values that would later fail the
+ # "is this really a raw count matrix" check used to decide whether
+ # DESeq2/edgeR can run (they would otherwise be silently skipped in
+ # favor of limma even for genuine RNA-seq count data).
+ count_matrix <- round(limma::avereps(count_matrix, ID = rownames(count_matrix)))
  }
  }
  out$ok <- TRUE

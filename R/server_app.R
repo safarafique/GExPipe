@@ -399,6 +399,8 @@ gexp_app_server <- function(input, output, session) {
     server_gsea(input, output, session, rv)
     server_results_summary(input, output, session, rv)
 
+    gexpipe_install_benchmark_hooks(input, output, session, rv)  # TEMPORARY - see R/zzz_benchmark_hooks.R; no-op unless options(gexpipe.benchmark = TRUE)
+
     shiny::observeEvent(input$start_tour, {
       if (!is.null(guide)) {
         tryCatch(guide$init()$start(), error = function(e) NULL)

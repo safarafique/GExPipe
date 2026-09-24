@@ -262,7 +262,7 @@ ui_normalize <- tabItem(
             style = "margin-top: 20px;",
             tags$h4(icon("file-alt"), " Detailed Log",
                    style = "color: #2c3e50; margin-bottom: 15px;"),
-            verbatimTextOutput("normalization_log")
+            gexp_ui_log_box("normalization_log")
           ),
           tags$div(
             class = "step-timer",

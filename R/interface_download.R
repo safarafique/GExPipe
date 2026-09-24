@@ -363,7 +363,7 @@ gexp_ui_download <- function() {
             style = "margin-bottom: 10px;",
             tags$span(class = "step-timer", tags$span(class = "label", "Elapsed:"), textOutput("download_timer", inline = TRUE))
           ),
-          tags$pre(style = "white-space: pre-wrap;", textOutput("download_log"))
+          gexp_ui_log_box("download_log")
         )
       )
     ),

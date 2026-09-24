@@ -70,6 +70,7 @@ Imports:
     igraph (>= 2.0.0),
     lifecycle (>= 1.0.0),
     limma (>= 3.58.0),
+    logistf (>= 1.26.0),
     Matrix (>= 1.6.0),
     msigdbr (>= 7.5.1),
     oligo (>= 1.66.0),

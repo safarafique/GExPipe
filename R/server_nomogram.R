@@ -125,8 +125,19 @@ server_nomogram <- function(input, output, session, rv) {
       showNotification("Batch-corrected data too small (need >= 10 genes, >= 3 samples).", type = "error", duration = 6)
       return()
     }
-    # Priority: user-selected genes from ROC > ML common genes > DEG+WGCNA common genes
+    # Priority: user-selected genes from ROC > ML common genes > DEG+WGCNA common genes.
+    # Guard against a STALE confirmed ROC selection left over from an earlier,
+    # unrelated analysis in the same session - rv$roc_selected_genes is never
+    # cleared when a new analysis starts, and ordinary gene symbols from a
+    # previous run will often still be "present" in a new expression matrix
+    # even though they were never chosen as candidates for THIS run. Only
+    # trust it if it overlaps the current run's own candidate pool.
+    current_gene_pool <- unique(c(rv$ml_common_genes, rv$common_genes_de_wgcna))
     common_genes <- rv$roc_selected_genes
+    if (!is.null(common_genes) && length(common_genes) > 0 && length(current_gene_pool) > 0 &&
+        length(intersect(common_genes, current_gene_pool)) == 0) {
+      common_genes <- NULL  # stale selection from a different analysis run - discard
+    }
     if (is.null(common_genes) || length(common_genes) == 0) common_genes <- rv$ml_common_genes
     if (is.null(common_genes) || length(common_genes) == 0) common_genes <- rv$common_genes_de_wgcna
     if (is.null(common_genes) || length(common_genes) == 0) {
@@ -205,16 +216,83 @@ server_nomogram <- function(input, output, session, rv) {
     outcome       <- outcome[valid]
     min_events <- min(sum(outcome == 1), sum(outcome == 0))
     epv <- min_events / length(available_genes)
+    # If sample size or panel size forces a reduction, rank by each gene's
+    # actual association with the disease outcome (point-biserial
+    # correlation) - NOT raw expression variance, which is blind to
+    # relevance and could silently drop a gene the user specifically
+    # validated in Step 12 (ROC) in favor of an unvalidated, merely
+    # high-variance one. Any trim is also reported to the user, never silent.
+    .gexpipe_nomogram_trim <- function(genes, keep_n) {
+      if (length(genes) <= keep_n) return(genes)
+      assoc <- vapply(genes, function(g) {
+        # Use expr_nomogram (samples x genes), already filtered to `valid`
+        # and aligned with `outcome` - NOT expr_mat, which is still the
+        # full, unfiltered batch-corrected matrix and would mismatch
+        # outcome's length whenever samples were dropped above.
+        r <- suppressWarnings(stats::cor(expr_nomogram[[g]], outcome, use = "pairwise.complete.obs"))
+        if (is.na(r)) 0 else abs(r)
+      }, numeric(1))
+      kept <- names(sort(assoc, decreasing = TRUE))[seq_len(keep_n)]
+      dropped <- setdiff(genes, kept)
+      showNotification(
+        tags$div(
+          icon("exclamation-triangle"),
+          tags$strong(paste0(" Sample size limits the nomogram to ", keep_n, " gene(s).")),
+          tags$br(), "Kept (highest association with outcome): ", tags$strong(paste(kept, collapse = ", ")),
+          tags$br(), "Dropped: ", paste(dropped, collapse = ", ")
+        ),
+        type = "warning", duration = 12
+      )
+      kept
+    }
     if (epv < 10) {
       max_predictors <- max(3, floor(min_events / 10))
-      gene_var <- apply(expr_mat[available_genes, ], 1, var, na.rm = TRUE)
-      available_genes <- names(sort(gene_var, decreasing = TRUE))[seq_len(min(max_predictors, length(available_genes)))]
+      available_genes <- .gexpipe_nomogram_trim(available_genes, min(max_predictors, length(available_genes)))
       epv <- min_events / length(available_genes)
     } else if (length(available_genes) > 15) {
-      gene_var <- apply(expr_mat[available_genes, ], 1, var, na.rm = TRUE)
-      available_genes <- names(sort(gene_var, decreasing = TRUE))[seq_len(min(15L, length(available_genes)))]
+      available_genes <- .gexpipe_nomogram_trim(available_genes, 15L)
       epv <- min_events / length(available_genes)
     }
+    # Drop redundant, highly-correlated genes (e.g. co-expressed cell-cycle
+    # markers like CHEK1/CCNB2) BEFORE fitting - two near-collinear
+    # predictors in a multivariable logistic model inflate coefficient
+    # variance and drive the kind of unstable, exploding ORs seen under
+    # separation. Keep the more outcome-associated gene of each
+    # highly-correlated pair; never silent.
+    .gexpipe_nomogram_corr_prune <- function(genes, corr_cutoff = 0.8) {
+      if (length(genes) < 2) return(genes)
+      assoc <- vapply(genes, function(g) {
+        r <- suppressWarnings(stats::cor(expr_nomogram[[g]], outcome, use = "pairwise.complete.obs"))
+        if (is.na(r)) 0 else abs(r)
+      }, numeric(1))
+      ordered_genes <- names(sort(assoc, decreasing = TRUE))
+      kept <- character(0)
+      dropped_info <- character(0)
+      for (g in ordered_genes) {
+        redundant_with <- NA_character_
+        for (k in kept) {
+          r <- suppressWarnings(stats::cor(expr_nomogram[[g]], expr_nomogram[[k]], use = "pairwise.complete.obs"))
+          if (!is.na(r) && abs(r) > corr_cutoff) { redundant_with <- k; break }
+        }
+        if (is.na(redundant_with)) kept <- c(kept, g)
+        else dropped_info[g] <- redundant_with
+      }
+      if (length(dropped_info) > 0) {
+        msg_lines <- paste0(names(dropped_info), " (redundant with ", dropped_info, ")")
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong(paste0(" Removed ", length(dropped_info), " highly correlated gene(s) (|r| > ", corr_cutoff, "):")),
+            tags$br(), paste(msg_lines, collapse = "; "),
+            tags$br(), tags$small("Keeping the more outcome-associated gene from each correlated pair avoids collinear, unstable coefficients.")
+          ),
+          type = "warning", duration = 12
+        )
+      }
+      kept
+    }
+    available_genes <- .gexpipe_nomogram_corr_prune(available_genes)
+
     if (sum(outcome == 1) < 10 || sum(outcome == 0) < 10) {
       showNotification("Need at least 10 samples per group.", type = "error", duration = 6)
       return()
@@ -259,6 +337,32 @@ server_nomogram <- function(input, output, session, rv) {
       ext_df$Outcome <- ext_outcome
       ext_df$SampleID <- paste0("ExtS", seq_len(nrow(ext_df)))
       validation_data <- ext_df
+
+      # Validation cohort eligibility check - an N=7 external set (or one
+      # with only 1-2 events in the smaller class) can produce a perfect-
+      # looking but statistically meaningless AUC/ROC curve. Warn instead
+      # of silently presenting it as if it were reliable.
+      n_val_total <- nrow(validation_data)
+      n_val_events <- sum(validation_data$Outcome == 1, na.rm = TRUE)
+      n_val_nonevents <- sum(validation_data$Outcome == 0, na.rm = TRUE)
+      min_val_class <- min(n_val_events, n_val_nonevents)
+      if (n_val_total < 20 || min_val_class < 5) {
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong(" Small validation cohort: "),
+            paste0(n_val_total, " total samples (", n_val_events, " disease, ", n_val_nonevents, " normal)."),
+            tags$br(),
+            tags$small(
+              "Below ~20 total samples or 5 events per class, validation AUC/ROC estimates are unstable ",
+              "and can look artificially perfect or artificially poor by chance. Treat this run as ",
+              "exploratory, not confirmatory. Consider Internal Validation (70/30 split) instead if you ",
+              "don't have a larger external cohort."
+            )
+          ),
+          type = "warning", duration = 15
+        )
+      }
 
     } else {
       # INTERNAL MODE: 70/30 stratified split
@@ -323,6 +427,59 @@ server_nomogram <- function(input, output, session, rv) {
     model_diagnostics$VIF_Status <- ifelse(is.na(model_diagnostics$VIF), "Unknown",
       ifelse(model_diagnostics$VIF > 10, "High (>10)", ifelse(model_diagnostics$VIF > 5, "Moderate (5-10)", "Low (<5)")))
 
+    # Firth's penalized-likelihood logistic regression: when a gene (or
+    # combination) near-perfectly separates the two groups, ordinary MLE
+    # (rms::lrm/glm) diverges to huge coefficients and SEs (OR in the
+    # 1e50 range is a real failure mode, not just a display quirk). Firth
+    # adds a small bias-correcting penalty and always returns finite,
+    # realistic coefficients/CIs, so it is shown as a second, trustworthy
+    # set of estimates alongside the standard ones rather than replacing
+    # the plotting/prediction engine (rms::lrm) that the nomogram/
+    # calibration/DCA plots below still depend on.
+    firth_fit <- if (requireNamespace("logistf", quietly = TRUE)) {
+      tryCatch(logistf::logistf(formula_obj, data = train_data), error = function(e) NULL)
+    } else {
+      NULL
+    }
+    if (!is.null(firth_fit)) {
+      firth_coefs_all <- coef(firth_fit)
+      firth_se_all <- setNames(sqrt(diag(vcov(firth_fit))), names(firth_coefs_all))
+      model_diagnostics$Coefficient_Firth <- as.numeric(firth_coefs_all[available_genes])
+      model_diagnostics$Std_Error_Firth <- as.numeric(firth_se_all[available_genes])
+      model_diagnostics$OR_Firth <- exp(model_diagnostics$Coefficient_Firth)
+    }
+    rv$nomogram_firth_available <- !is.null(firth_fit)
+
+    separation_flagged <- se > 5 | abs(coefs) > 15
+    if (any(separation_flagged, na.rm = TRUE)) {
+      bad_genes <- available_genes[which(separation_flagged)]
+      showNotification(
+        tags$div(
+          icon("exclamation-triangle"),
+          tags$strong(" Quasi-complete separation detected"),
+          tags$span(" for: ", paste(bad_genes, collapse = ", ")),
+          tags$br(),
+          tags$small(
+            if (!is.null(firth_fit)) {
+              paste0(
+                "These gene(s) near-perfectly separate the two groups in this sample, so the standard ",
+                "model's coefficient/OR for them is unstable (huge SE, extreme OR - not a real effect size). ",
+                "Firth-corrected (bias-reduced) coefficients are shown alongside the standard ones in the ",
+                "Model Diagnostics table below - trust those instead."
+              )
+            } else {
+              paste0(
+                "These gene(s) near-perfectly separate the two groups in this sample, so the standard ",
+                "model's coefficient/OR for them is unstable (huge SE, extreme OR). Install the 'logistf' ",
+                "package for bias-reduced (Firth) estimates."
+              )
+            }
+          )
+        ),
+        type = "warning", duration = 18
+      )
+    }
+
     calc_metrics <- function(actual, pred_prob, pred_class, thresh) {
       cm <- caret::confusionMatrix(factor(pred_class, levels = c(0, 1)), factor(actual, levels = c(0, 1)))
       roc_obj <- pROC::roc(actual, pred_prob, quiet = TRUE, ci = TRUE)
@@ -347,6 +504,50 @@ server_nomogram <- function(input, output, session, rv) {
     performance_comparison <- rbind(train_metrics, val_metrics)
 
     cal_train <- tryCatch(rms::calibrate(nomogram_model, method = "boot", B = 200), error = function(e) NULL)
+
+    # Bootstrap-corrected (optimism-corrected) C-index: the apparent
+    # training AUC (e.g. 0.98) is measured on the same data the model was
+    # fit on and is always optimistic. rms::validate() refits the whole
+    # model on B=200 bootstrap resamples of the training data, measures
+    # each refit's performance both on its own resample and on the
+    # original training data, and averages the gap (optimism) between
+    # them. Subtracting that average optimism from the apparent C-index
+    # gives an honest estimate of how the model would perform on new
+    # data drawn from the same population - generalized to whatever
+    # gene panel/N ended up in `nomogram_model`, no per-case tuning needed.
+    boot_validate <- tryCatch(rms::validate(nomogram_model, method = "boot", B = 200), error = function(e) NULL)
+    optimism_summary <- NULL
+    if (!is.null(boot_validate) && "Dxy" %in% rownames(boot_validate)) {
+      dxy_row <- boot_validate["Dxy", ]
+      c_apparent <- 0.5 + as.numeric(dxy_row["index.orig"]) / 2
+      c_corrected <- 0.5 + as.numeric(dxy_row["index.corrected"]) / 2
+      optimism_summary <- data.frame(
+        Metric = "C-index (training)",
+        Apparent = round(c_apparent, 4),
+        Optimism = round(c_apparent - c_corrected, 4),
+        Bootstrap_Corrected = round(c_corrected, 4),
+        B = 200L,
+        stringsAsFactors = FALSE
+      )
+      if ((c_apparent - c_corrected) > 0.05) {
+        showNotification(
+          tags$div(
+            icon("exclamation-triangle"),
+            tags$strong(" Meaningful overfitting detected: "),
+            paste0(
+              "apparent training C-index ", round(c_apparent, 3), " drops to ",
+              round(c_corrected, 3), " after bootstrap optimism correction (B=200)."
+            ),
+            tags$br(),
+            tags$small(
+              "The apparent value alone overstates how well this panel will generalize to new samples ",
+              "- use the bootstrap-corrected value as the more honest training performance estimate."
+            )
+          ),
+          type = "warning", duration = 15
+        )
+      }
+    }
     validation_data$Pred_Decile <- dplyr::ntile(validation_data$Predicted_Prob, min(10, nrow(validation_data) %/% 2))
     cal_validation <- validation_data %>%
       dplyr::group_by(.data$Pred_Decile) %>%
@@ -402,6 +603,7 @@ server_nomogram <- function(input, output, session, rv) {
     rv$nomogram_performance_comparison <- performance_comparison
     rv$nomogram_cal_train <- cal_train
     rv$nomogram_cal_validation <- cal_validation
+    rv$nomogram_optimism_summary <- optimism_summary
     rv$nomogram_dca_train <- dca_train
     rv$nomogram_dca_val <- dca_val
     rv$nomogram_dca_engine <- dca_engine
@@ -424,7 +626,7 @@ server_nomogram <- function(input, output, session, rv) {
     dd <- rms::datadist(rv$nomogram_train_data[, rv$nomogram_available_genes, drop = FALSE])
     options(datadist = dd)
     on.exit(options(datadist = NULL), add = TRUE)
-    np <- rms::nomogram(rv$nomogram_model, fun = plogis, fun.at = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), funlabel = "Risk of Disease", lp = FALSE)
+    np <- rms::nomogram(rv$nomogram_model, fun = plogis, fun.at = c(0.001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 0.999), funlabel = "Risk of Disease", lp = FALSE)
     plot(np)
     title(main = "Diagnostic Nomogram", cex.main = 1.3, font.main = 2)
   }, height = 500)
@@ -514,6 +716,9 @@ server_nomogram <- function(input, output, session, rv) {
     df$Std_Error <- round(df$Std_Error, 4)
     df$OR <- round(df$OR, 4)
     df$VIF <- round(df$VIF, 2)
+    for (j in c("Coefficient_Firth", "Std_Error_Firth", "OR_Firth")) {
+      if (j %in% names(df)) df[[j]] <- round(df[[j]], 4)
+    }
     DT::datatable(df, options = list(pageLength = 15, scrollX = TRUE), rownames = FALSE)
   })
 
@@ -525,6 +730,13 @@ server_nomogram <- function(input, output, session, rv) {
     DT::datatable(df, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
+  output$nomogram_optimism_table <- DT::renderDataTable({
+    req(rv$nomogram_optimism_summary)
+    DT::datatable(rv$nomogram_optimism_summary, options = list(dom = "t"), rownames = FALSE)
+  })
+  output$nomogram_optimism_available <- reactive({ !is.null(rv$nomogram_optimism_summary) })
+  outputOptions(output, "nomogram_optimism_available", suspendWhenHidden = FALSE)
+
   # ============================================================================
   # DOWNLOAD HANDLERS
   # ============================================================================
@@ -534,7 +746,7 @@ server_nomogram <- function(input, output, session, rv) {
     options(datadist = dd)
     on.exit(options(datadist = NULL), add = TRUE)
     dev_open()
-    np <- rms::nomogram(rv$nomogram_model, fun = plogis, fun.at = c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9), funlabel = "Risk of Disease", lp = FALSE)
+    np <- rms::nomogram(rv$nomogram_model, fun = plogis, fun.at = c(0.001, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 0.999), funlabel = "Risk of Disease", lp = FALSE)
     plot(np)
     title(main = "Diagnostic Nomogram", cex.main = 1.5, font.main = 2)
     dev_close()
@@ -577,6 +789,15 @@ server_nomogram <- function(input, output, session, rv) {
       req(rv$nomogram_performance_comparison)
       write.csv(rv$nomogram_performance_comparison, file, row.names = FALSE)
       write.csv(rv$nomogram_performance_comparison, file.path(CSV_EXPORT_DIR(), "Nomogram_Performance_Comparison.csv"), row.names = FALSE)
+    }
+  )
+
+  output$download_nomogram_optimism <- downloadHandler(
+    filename = function() "Nomogram_Bootstrap_Optimism_Correction.csv",
+    content = function(file) {
+      req(rv$nomogram_optimism_summary)
+      write.csv(rv$nomogram_optimism_summary, file, row.names = FALSE)
+      write.csv(rv$nomogram_optimism_summary, file.path(CSV_EXPORT_DIR(), "Nomogram_Bootstrap_Optimism_Correction.csv"), row.names = FALSE)
     }
   )
 

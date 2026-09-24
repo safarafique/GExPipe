@@ -181,31 +181,19 @@ server_normalize <- function(input, output, session, rv) {
     if (isTRUE(keep_platforms_separate)) {
       log_text <- norm_out$log_text
     } else {
+      summary_lines <- list("Initial total genes" = format(initial_total, big.mark = ","))
+      if (rnaseq_removed > 0) {
+        summary_lines[["Removed (low expression)"]] <- format(rnaseq_removed, big.mark = ",")
+        summary_lines[["After filtering"]] <- format(after_filter_total, big.mark = ",")
+      }
+      summary_lines[["Gene filtering"]] <- "Filtered to common genes (intersection)"
+      summary_lines[["Common genes retained"]] <- format(final_count, big.mark = ",")
+      summary_lines[["Final samples"]] <- format(ncol(rv$combined_expr), big.mark = ",")
+      summary_lines[["Note"]] <- "DE (Step 6) and batch correction (Step 5) may apply their own additional gene filtering."
+      summary_lines[["Status"]] <- "Complete - proceed to QC & Visualization (Step 3)"
       log_text <- paste0(
         norm_out$log_text,
-        "\n\u2713 Normalization Complete!\n",
-        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-        "Gene Statistics Summary:\n",
-        "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n"
-      )
-      if (rnaseq_removed > 0) {
-        log_text <- paste0(
-          log_text,
-          "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
-          "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n"
-        )
-      }
-      log_text <- paste0(
-        log_text,
-        "  Gene Filtering:           Filtered to common genes (intersection)\n",
-        "  Common genes retained: ", format(final_count, big.mark = ","), "\n",
-        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-        "Final Dataset:\n",
-        "  Genes:   ", format(nrow(rv$combined_expr), big.mark = ","), "\n",
-        "  Samples: ", format(ncol(rv$combined_expr), big.mark = ","), "\n",
-        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-        "\nNote: DE analysis applies independent gene filtering (filterByExpr) at Step 6.\n",
-        "      Batch correction may apply an optional variance filter in Step 5.\n"
+        gexpipe_log_summary_block("Step 2 - Normalization", summary_lines)
       )
     }
 

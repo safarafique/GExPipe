@@ -128,8 +128,35 @@ ui_nomogram <- tabItem(
     box(
       title = tags$span(icon("table"), " Model Diagnostics (VIF, Coefficients)"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+      tags$p(
+        style = "font-size: 12px; color: #666;",
+        "Coefficient/Std_Error/OR come from the standard model. When a gene near-perfectly separates ",
+        "the two groups, those can blow up to unrealistic values (huge SE, extreme OR) - the ",
+        "_Firth columns are Firth's bias-reduced estimates, which stay finite and realistic under ",
+        "separation; trust those when the two disagree."
+      ),
       DT::dataTableOutput("nomogram_diagnostics_table"),
       tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_diagnostics", tagList(icon("download"), " Diagnostics (CSV)"), class = "btn-info btn-sm"))
+    )
+  ),
+
+  conditionalPanel(
+    condition = "output.nomogram_optimism_available",
+    fluidRow(
+      box(
+        title = tags$span(icon("chart-line"), " Bootstrap Optimism Correction (Overfitting-Corrected C-index)"),
+        width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+        tags$p(
+          style = "font-size: 12px; color: #666;",
+          "The apparent training C-index is measured on the same data the model was fit on and is ",
+          "always optimistic. This refits the model on 200 bootstrap resamples of the training data ",
+          "and averages how much each resample's performance drops when applied back to the original ",
+          "data (the 'optimism'). The Bootstrap_Corrected value is the more honest estimate of how ",
+          "this panel will perform on new samples."
+        ),
+        DT::dataTableOutput("nomogram_optimism_table"),
+        tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_optimism", tagList(icon("download"), " Optimism Correction (CSV)"), class = "btn-warning btn-sm"))
+      )
     )
   ),
 

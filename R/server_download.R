@@ -571,6 +571,22 @@ server_download <- function(input, output, session, rv) {
         )
       }
 
+      elapsed_secs <- if (!is.null(rv$download_start)) round(as.numeric(difftime(Sys.time(), rv$download_start, units = "secs")), 1) else NA
+      n_micro_ds <- length(rv$micro_expr_list)
+      n_rna_ds <- length(rv$rna_counts_list)
+      total_samples <- sum(vapply(rv$micro_expr_list, ncol, integer(1)), vapply(rv$rna_counts_list, ncol, integer(1)))
+      log_text <- paste0(
+        log_text,
+        gexpipe_log_summary_block("Step 1 - Download", list(
+          "Microarray datasets loaded" = n_micro_ds,
+          "RNA-seq datasets loaded" = n_rna_ds,
+          "Total samples" = format(total_samples, big.mark = ","),
+          "Datasets skipped/failed" = length(skip_fail_reasons),
+          "Elapsed" = if (is.na(elapsed_secs)) "n/a" else paste0(elapsed_secs, " sec"),
+          "Status" = if (isTRUE(rv$download_complete)) "Complete - proceed to Step 2 (Normalize)" else "Incomplete - see log above"
+        ))
+      )
+
       rv$download_running <- FALSE
       output$download_log <- renderText({ log_text })
     })

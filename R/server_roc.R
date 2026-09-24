@@ -608,8 +608,15 @@ server_roc <- function(input, output, session, rv) {
     curves <- curves[names(curves) %in% df$Gene]
 
     roc_int <- roc_results()
-    if (!is.null(roc_int) && nrow(roc_int$df) > 0) {
-      df <- merge(df, roc_int$df[, c("Gene", "AUC"), drop = FALSE], by = "Gene", all.x = TRUE)
+    # Use df_all (every gene's training AUC), not df (pre-filtered to
+    # AUC >= AUC_MIN for the main biomarker table) - this comparison is
+    # meant to show Training vs Validation for every gene that has BOTH,
+    # so a gene whose training AUC merely fell below the curation bar
+    # must not show a blank Training cell while still appearing on the
+    # Validation side. That asymmetry made it look like the gene was
+    # never tested in training at all, when it actually was.
+    if (!is.null(roc_int) && nrow(roc_int$df_all) > 0) {
+      df <- merge(df, roc_int$df_all[, c("Gene", "AUC"), drop = FALSE], by = "Gene", all.x = TRUE)
       names(df)[names(df) == "AUC"] <- "AUC_Internal"
       df$Delta <- round(df$AUC_External - df$AUC_Internal, 4)
       df <- df[order(-df$AUC_External), , drop = FALSE]
@@ -1031,8 +1038,24 @@ server_roc <- function(input, output, session, rv) {
       }
     }, logical(1))
     preselected_genes <- vapply(gene_info[preselected], function(x) x$gene, character(1))
+    if (length(preselected_genes) == 0 && has_validation) {
+      # Nothing cleared BOTH bars - fall back to validation AUC alone (the
+      # stronger evidence when external validation exists) instead of
+      # silently selecting every gene, which would include genes that
+      # clearly failed validation (e.g. AUC well below 0.5).
+      val_ok <- vapply(gene_info, function(x) !is.na(x$auc_val) && x$auc_val >= 0.7, logical(1))
+      preselected_genes <- vapply(gene_info[val_ok], function(x) x$gene, character(1))
+    }
     if (length(preselected_genes) == 0) {
       preselected_genes <- vapply(gene_info, function(x) x$gene, character(1))
+    }
+    # If the user already confirmed a selection earlier this session, show
+    # THAT as the checked state instead of recomputing from scratch - a
+    # re-render of this panel (e.g. revisiting this tab) must not silently
+    # discard a choice the user already confirmed.
+    if (!is.null(rv$roc_selected_genes) && length(rv$roc_selected_genes) > 0) {
+      prior <- intersect(rv$roc_selected_genes, common_genes)
+      if (length(prior) > 0) preselected_genes <- prior
     }
 
     tagList(

@@ -109,13 +109,13 @@ gexp_ui_parallel_run_logs <- function(micro_id, rna_id) {
         title = shiny::tags$span(shiny::icon("dna"), " RNA-seq run log"),
         width = 12, status = "info", solidHeader = TRUE,
         collapsible = TRUE, collapsed = TRUE,
-        shiny::verbatimTextOutput(rna_id)
+        gexp_ui_log_box(rna_id)
       ),
       shinydashboard::box(
         title = shiny::tags$span(shiny::icon("th"), " Microarray run log"),
         width = 12, status = "warning", solidHeader = TRUE,
         collapsible = TRUE, collapsed = TRUE,
-        shiny::verbatimTextOutput(micro_id)
+        gexp_ui_log_box(micro_id)
       )
     )
   )
