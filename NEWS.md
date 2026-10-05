@@ -1,3 +1,8 @@
+# GExPipe 0.99.108
+
+- Version bump for Bioconductor: devel branch synced with the GitHub repository (all changes
+  from 0.99.52 to 0.99.107 are now on git.bioconductor.org).
+
 # GExPipe 0.99.107
 
 - Example GSE IDs: training examples are RNA-seq GSE144119, GSE100026 and microarray GSE47927, GSE26856; validation examples are RNA-seq GSE162462 and microarray GSE13159.
