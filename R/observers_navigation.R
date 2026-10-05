@@ -63,17 +63,11 @@ gexp_register_navigation_observers <- function(input, output, session, rv) {
   shiny::observeEvent(input$go_to_results, {
     .gexp_goto_tab("results")
   })
-  shiny::observeEvent(input$next_page_batch, {
-    .gexp_goto_tab("results")
-  })
   shiny::observeEvent(input$next_page_batch_end, {
     .gexp_goto_tab("results")
   })
   shiny::observeEvent(input$next_page_results, {
     .gexp_goto_tab(if (isTRUE(rv$merge_after_de)) "consensus" else "wgcna")
-  })
-  shiny::observeEvent(input$next_page_results_parallel, {
-    .gexp_goto_tab("consensus")
   })
   shiny::observeEvent(input$next_page_results_parallel_end, {
     .gexp_goto_tab("consensus")

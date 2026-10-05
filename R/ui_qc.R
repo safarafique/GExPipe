@@ -65,7 +65,7 @@ ui_qc <- tabItem(
           ),
           tags$p(
             tags$strong("Overlap plots:"),
-            " Venn / UpSet below are symbol overlap for information only. They are not used as common genes for DE.",
+            " Venn / UpSet below show the common genes of the RNA-seq datasets and of the microarray datasets separately. The two platforms are never merged here.",
             style = "margin-bottom: 0;"
           )
         )
@@ -75,12 +75,22 @@ ui_qc <- tabItem(
           box(
             title = tags$span(icon("chart-bar"), " RNA-seq boxplot"),
             width = 12, status = "info", solidHeader = TRUE,
-            plotOutput("qc_boxplot_rna", height = "320px")
+            plotOutput("qc_boxplot_rna", height = "320px"),
+            gexp_ui_plot_download_bar("download_qc_boxplot_rna_png", "download_qc_boxplot_rna_jpg", "download_qc_boxplot_rna_pdf", "btn-info btn-xs")
           ),
           box(
             title = tags$span(icon("wave-square"), " RNA-seq density"),
             width = 12, status = "info", solidHeader = TRUE,
-            plotOutput("qc_density_rna", height = "280px")
+            plotOutput("qc_density_rna", height = "280px"),
+            gexp_ui_plot_download_bar("download_qc_density_rna_png", "download_qc_density_rna_jpg", "download_qc_density_rna_pdf", "btn-info btn-xs")
+          ),
+          box(
+            title = tags$span(icon("chart-area"), " RNA-seq outlier plots (PCA and connectivity)"),
+            width = 12, status = "danger", solidHeader = TRUE,
+            plotOutput("qc_pca_outlier_plot_rna", height = "380px"),
+            gexp_ui_plot_download_bar("dl_qc_pca_plot_rna_png", "dl_qc_pca_plot_rna_jpg", "dl_qc_pca_plot_rna_pdf", "btn-danger btn-xs"),
+            plotOutput("qc_connectivity_plot_rna", height = "380px"),
+            gexp_ui_plot_download_bar("dl_qc_conn_plot_rna_png", "dl_qc_conn_plot_rna_jpg", "dl_qc_conn_plot_rna_pdf", "btn-danger btn-xs")
           ),
           box(
             title = tags$span(icon("table"), " RNA-seq outliers"),
@@ -92,12 +102,22 @@ ui_qc <- tabItem(
           box(
             title = tags$span(icon("chart-bar"), " Microarray boxplot"),
             width = 12, status = "warning", solidHeader = TRUE,
-            plotOutput("qc_boxplot_micro", height = "320px")
+            plotOutput("qc_boxplot_micro", height = "320px"),
+            gexp_ui_plot_download_bar("download_qc_boxplot_micro_png", "download_qc_boxplot_micro_jpg", "download_qc_boxplot_micro_pdf", "btn-warning btn-xs")
           ),
           box(
             title = tags$span(icon("wave-square"), " Microarray density"),
             width = 12, status = "warning", solidHeader = TRUE,
-            plotOutput("qc_density_micro", height = "280px")
+            plotOutput("qc_density_micro", height = "280px"),
+            gexp_ui_plot_download_bar("download_qc_density_micro_png", "download_qc_density_micro_jpg", "download_qc_density_micro_pdf", "btn-warning btn-xs")
+          ),
+          box(
+            title = tags$span(icon("chart-area"), " Microarray outlier plots (PCA and connectivity)"),
+            width = 12, status = "danger", solidHeader = TRUE,
+            plotOutput("qc_pca_outlier_plot_micro", height = "380px"),
+            gexp_ui_plot_download_bar("dl_qc_pca_plot_micro_png", "dl_qc_pca_plot_micro_jpg", "dl_qc_pca_plot_micro_pdf", "btn-danger btn-xs"),
+            plotOutput("qc_connectivity_plot_micro", height = "380px"),
+            gexp_ui_plot_download_bar("dl_qc_conn_plot_micro_png", "dl_qc_conn_plot_micro_jpg", "dl_qc_conn_plot_micro_pdf", "btn-danger btn-xs")
           ),
           box(
             title = tags$span(icon("table"), " Microarray outliers"),
@@ -108,15 +128,31 @@ ui_qc <- tabItem(
       ),
       fluidRow(
         box(
-          title = tags$span(icon("info-circle"), " Symbol overlap (information only)"),
-          width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
+          title = tags$span(icon("info-circle"), " Common genes per platform (RNA-seq and microarray separately)"),
+          width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
           tags$p(
-            "These plots show gene-symbol overlap between datasets. Parallel DE does not intersect genes here.",
+            "Gene-symbol overlap is shown separately for the RNA-seq datasets (left) and the microarray datasets (right). RNA-seq and microarray are never merged in Parallel mode.",
             style = "font-size: 13px; color: #555; margin-bottom: 10px;"
           ),
           fluidRow(
-            column(6, plotOutput("venn_plot_parallel", height = "420px")),
-            column(6, plotOutput("upset_plot_parallel", height = "420px"))
+        column(6,
+          tags$h4(icon("dna"), " RNA-seq: common genes across RNA-seq datasets", style = "margin-top: 0;"),
+          uiOutput("common_genes_summary_rna"),
+          plotOutput("venn_plot_rna", height = "380px"),
+          gexp_ui_plot_download_bar("download_venn_plot_rna_png", "download_venn_plot_rna_jpg", "download_venn_plot_rna_pdf", "btn-default btn-xs"),
+          tags$hr(),
+          plotOutput("upset_plot_rna", height = "380px"),
+          gexp_ui_plot_download_bar("download_upset_plot_rna_png", "download_upset_plot_rna_jpg", "download_upset_plot_rna_pdf", "btn-default btn-xs")
+        ),
+        column(6,
+          tags$h4(icon("th"), " Microarray: common genes across Microarray datasets", style = "margin-top: 0;"),
+          uiOutput("common_genes_summary_micro"),
+          plotOutput("venn_plot_micro", height = "380px"),
+          gexp_ui_plot_download_bar("download_venn_plot_micro_png", "download_venn_plot_micro_jpg", "download_venn_plot_micro_pdf", "btn-default btn-xs"),
+          tags$hr(),
+          plotOutput("upset_plot_micro", height = "380px"),
+          gexp_ui_plot_download_bar("download_upset_plot_micro_png", "download_upset_plot_micro_jpg", "download_upset_plot_micro_pdf", "btn-default btn-xs")
+        )
           )
         )
       )
@@ -152,10 +188,7 @@ ui_qc <- tabItem(
           ),
           column(9, uiOutput("qc_outlier_summary_ui"))
         ),
-        conditionalPanel(
-          condition = "input.analysis_type != 'parallel'",
-          uiOutput("qc_outlier_results_ui")
-        )
+        uiOutput("qc_outlier_results_ui")
       )
     ),
 

@@ -47,12 +47,14 @@ ui_batch <- tabItem(
         box(
           title = tags$span(icon("chart-bar"), " RNA-seq gene variance"),
           width = 12, status = "warning", solidHeader = TRUE,
-          plotOutput("gene_variance_plot_rna", height = "300px")
+          plotOutput("gene_variance_plot_rna", height = "300px"),
+          gexp_ui_plot_download_bar("download_gene_variance_plot_rna_png", "download_gene_variance_plot_rna_jpg", "download_gene_variance_plot_rna_pdf", "btn-warning btn-xs")
         ),
         box(
           title = tags$span(icon("chart-bar"), " Microarray gene variance"),
           width = 12, status = "warning", solidHeader = TRUE,
-          plotOutput("gene_variance_plot_micro", height = "300px")
+          plotOutput("gene_variance_plot_micro", height = "300px"),
+          gexp_ui_plot_download_bar("download_gene_variance_plot_micro_png", "download_gene_variance_plot_micro_jpg", "download_gene_variance_plot_micro_pdf", "btn-warning btn-xs")
         )
       )
     ),
@@ -214,13 +216,29 @@ ui_batch <- tabItem(
                            "batch_mode_parallel",
                            label = NULL,
                            choices = c(
-                             "Auto (recommended) - platform-specific methods" = "auto",
-                             "Manual - choose each platform" = "manual"
+                             "Auto (recommended) - best method chosen for each platform" = "auto",
+                             "Manual - choose each platform separately" = "manual",
+                             "Same method for both platforms" = "same"
                            ),
                            selected = "auto",
                            inline = TRUE
                          ),
                          uiOutput("batch_parallel_guide_ui"),
+                         conditionalPanel(
+                           condition = "input.batch_mode_parallel == 'same'",
+                           selectInput(
+                             "batch_method_same",
+                             "Method applied to RNA-seq and microarray (each corrected on its own samples):",
+                             choices = c(
+                               "ComBat-ref" = "combat_ref",
+                               "limma removeBatchEffect" = "limma",
+                               "ComBat" = "combat",
+                               "SVA (surrogate variables)" = "sva"
+                             ),
+                             selected = "combat_ref",
+                             width = "100%"
+                           )
+                         ),
                          conditionalPanel(
                            condition = "input.batch_mode_parallel == 'manual'",
                            gexp_ui_parallel_two_col(
@@ -363,8 +381,6 @@ ui_batch <- tabItem(
       )
     ),
 
-    gexp_ui_next_tab_button("next_page_batch", "Next: Differential Expression"),
-    
     conditionalPanel(
       condition = "input.analysis_type == 'parallel'",
       gexp_ui_parallel_two_col(
@@ -373,7 +389,9 @@ ui_batch <- tabItem(
             title = tags$span(icon("chart-line"), " RNA-seq PCA (before / after)"),
             width = 12, status = "info", solidHeader = TRUE,
             plotOutput("pca_before_dataset_rna", height = "280px"),
-            plotOutput("pca_after_dataset_rna", height = "280px")
+            gexp_ui_plot_download_bar("download_pca_before_dataset_rna_png", "download_pca_before_dataset_rna_jpg", "download_pca_before_dataset_rna_pdf", "btn-info btn-xs"),
+            plotOutput("pca_after_dataset_rna", height = "280px"),
+            gexp_ui_plot_download_bar("download_pca_after_dataset_rna_png", "download_pca_after_dataset_rna_jpg", "download_pca_after_dataset_rna_pdf", "btn-info btn-xs")
           )
         ),
         tagList(
@@ -381,7 +399,9 @@ ui_batch <- tabItem(
             title = tags$span(icon("chart-line"), " Microarray PCA (before / after)"),
             width = 12, status = "warning", solidHeader = TRUE,
             plotOutput("pca_before_dataset_micro", height = "280px"),
-            plotOutput("pca_after_dataset_micro", height = "280px")
+            gexp_ui_plot_download_bar("download_pca_before_dataset_micro_png", "download_pca_before_dataset_micro_jpg", "download_pca_before_dataset_micro_pdf", "btn-warning btn-xs"),
+            plotOutput("pca_after_dataset_micro", height = "280px"),
+            gexp_ui_plot_download_bar("download_pca_after_dataset_micro_png", "download_pca_after_dataset_micro_jpg", "download_pca_after_dataset_micro_pdf", "btn-warning btn-xs")
           )
         )
       )
@@ -530,7 +550,7 @@ ui_batch <- tabItem(
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         tags$div(
           id = "batch_summary_panel",
-          verbatimTextOutput("batch_log"),
+          gexp_ui_log_box("batch_log"),
           tags$div(
             class = "step-timer",
             tags$span(class = "label", "Elapsed:"),
@@ -544,11 +564,31 @@ ui_batch <- tabItem(
         title = tags$span(icon("file-csv"), " Download expression data (batch step)"),
         width = 12, status = "warning", solidHeader = TRUE,
         tags$p("Export expression before and after batch correction to verify the pipeline in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
-        fluidRow(
-          column(6,
-            downloadButton("download_expr_before_batch", tagList(icon("download"), " Before batch (expression CSV)"), class = "btn-warning btn-block")),
-          column(6,
-            downloadButton("download_expr_after_batch", tagList(icon("download"), " After batch (expression CSV)"), class = "btn-success btn-block"))
+        conditionalPanel(
+          condition = "input.analysis_type != 'parallel'",
+          fluidRow(
+            column(6,
+              downloadButton("download_expr_before_batch", tagList(icon("download"), " Before batch (expression CSV)"), class = "btn-warning btn-block")),
+            column(6,
+              downloadButton("download_expr_after_batch", tagList(icon("download"), " After batch (expression CSV)"), class = "btn-success btn-block"))
+          )
+        ),
+        conditionalPanel(
+          condition = "input.analysis_type == 'parallel'",
+          tags$p(style = "color:#555; font-size:13px;", icon("info-circle"),
+                 " Parallel mode corrects each platform separately, so each platform has its own before and after file (own gene set, no merging)."),
+          fluidRow(
+            column(6,
+              tags$h5(icon("dna"), " RNA-seq", style = "font-weight:bold;"),
+              downloadButton("download_expr_before_batch_rna", tagList(icon("download"), " RNA-seq before batch (CSV)"), class = "btn-warning btn-block"),
+              tags$div(style = "height:8px;"),
+              downloadButton("download_expr_after_batch_rna", tagList(icon("download"), " RNA-seq after batch (CSV)"), class = "btn-success btn-block")),
+            column(6,
+              tags$h5(icon("th"), " Microarray", style = "font-weight:bold;"),
+              downloadButton("download_expr_before_batch_micro", tagList(icon("download"), " Microarray before batch (CSV)"), class = "btn-warning btn-block"),
+              tags$div(style = "height:8px;"),
+              downloadButton("download_expr_after_batch_micro", tagList(icon("download"), " Microarray after batch (CSV)"), class = "btn-success btn-block"))
+          )
         )
       )
     ),

@@ -1126,32 +1126,6 @@ server_wgcna <- function(input, output, session, rv) {
     )
   })
   
-  output$significant_module_count_ui <- renderUI({
-    req(rv$moduleTraitCor, rv$moduleTraitPvalue)
-    
-    p_threshold <- input$gs_pval_threshold
-    cor_threshold <- input$mm_cor_threshold
-    n_pos <- 0
-    n_neg <- 0
-    
-    for (module in rownames(rv$moduleTraitPvalue)) {
-      pval <- rv$moduleTraitPvalue[module, 1]
-      corval <- rv$moduleTraitCor[module, 1]
-      if (!is.na(pval) && !is.na(corval) && pval < p_threshold) {
-        if (corval > cor_threshold) n_pos <- n_pos + 1
-        if (corval < -cor_threshold) n_neg <- n_neg + 1
-      }
-    }
-    
-    tags$div(
-      class = "alert alert-info",
-      tags$p(tags$b("Significant Modules Total:"), n_pos + n_neg),
-      tags$p(icon("arrow-up", class = "text-success"), " Positive: ", n_pos,
-             " | ",
-             icon("arrow-down", class = "text-danger"), " Negative: ", n_neg)
-    )
-  })
-  
   wgcna_module_trait_to_file <- function(file, dev_fun) {
     req(rv$moduleTraitCor)
     if (!requireNamespace("WGCNA", quietly = TRUE)) stop("WGCNA package required")
@@ -1618,9 +1592,17 @@ server_wgcna <- function(input, output, session, rv) {
       }
       
       rv$significant_modules <- sig_modules
-      
+
       add_wgcna_log(paste("Found", nrow(sig_modules), "significant modules"))
-      
+      add_wgcna_log(gexpipe_log_summary_block("Step 8 - WGCNA (Module-Trait Analysis)", list(
+        "Modules tested" = nrow(rv$moduleTraitPvalue),
+        "Significant modules" = nrow(sig_modules),
+        "Positive correlation" = sum(sig_modules$Correlation > 0),
+        "Negative correlation" = sum(sig_modules$Correlation < 0),
+        "Thresholds" = paste0("p < ", p_threshold, ", |cor| > ", cor_threshold),
+        "Status" = "Complete - proceed to Common Genes (Step 9)"
+      )))
+
       shinyjs::enable("identify_significant_modules")
       shinyjs::html("identify_significant_modules", 
                     HTML('<i class="fa fa-search"></i> Identify Significant Modules'))

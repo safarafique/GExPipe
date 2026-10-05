@@ -61,6 +61,13 @@ ui_results_summary <- tabItem(
     )
   ),
 
+  # ----- 1b. Gene funnel -----
+  box(
+    width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
+    title = tags$span(icon("filter"), " Where did my genes go? (gene funnel)"),
+    uiOutput("results_summary_gene_funnel")
+  ),
+
   # ----- 2. Normalization & batch -----
   step_arrow(),
   fluidRow(

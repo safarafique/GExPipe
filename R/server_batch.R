@@ -280,7 +280,20 @@ server_batch <- function(input, output, session, rv) {
       "ComBat-ref on the TMM / log matrix (RNA DE is limma)"
     }
     mode <- if (is.null(input$batch_mode_parallel)) "auto" else input$batch_mode_parallel
-    if (identical(mode, "manual")) {
+    if (identical(mode, "same")) {
+      tags$div(
+        class = "alert alert-info",
+        style = "margin: 8px 0 10px 0; font-size: 13px; line-height: 1.55;",
+        tags$strong("Same method for both platforms."),
+        " RNA-seq and microarray are still corrected separately (no joint ComBat), just with the one method chosen below.",
+        " Count-based RNA-seq DE (DESeq2/edgeR/voom) still uses raw counts with Dataset in the model at Step 6.",
+        if (isTRUE(confounded)) {
+          tags$p(icon("exclamation-triangle"),
+                 " Dataset and Condition look confounded: prefer limma or SVA, since ComBat-family methods can absorb disease signal.",
+                 style = "margin: 6px 0 0 0; color: #856404;")
+        }
+      )
+    } else if (identical(mode, "manual")) {
       tags$div(
         class = "alert alert-warning",
         style = "margin: 8px 0 10px 0; font-size: 13px; line-height: 1.55;",
@@ -642,6 +655,37 @@ server_batch <- function(input, output, session, rv) {
     }
   )
   
+  # Parallel mode: one before / after file PER PLATFORM (each platform is batch-corrected separately)
+  .write_expr_csv <- function(expr, fn, file) {
+    req(expr)
+    M <- as.data.frame(expr, stringsAsFactors = FALSE)
+    M <- cbind(Gene = rownames(M), M)
+    rownames(M) <- NULL
+    write.csv(M, file, row.names = FALSE)
+    try(write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE), silent = TRUE)
+  }
+  for (.pl in c("rna", "micro")) local({
+    pl <- .pl
+    lab <- if (pl == "rna") "RNAseq" else "Microarray"
+    output[[paste0("download_expr_before_batch_", pl)]] <- downloadHandler(
+      filename = function() paste0("Expression_before_batch_", lab, "_", Sys.Date(), ".csv"),
+      content = function(file) {
+        before <- if (pl == "rna") rv$expr_rna else rv$expr_micro
+        after <- if (pl == "rna") rv$batch_corrected_rna else rv$batch_corrected_micro
+        # same samples as the corrected matrix, so before/after files are directly comparable
+        if (!is.null(before) && !is.null(after)) before <- before[, intersect(colnames(after), colnames(before)), drop = FALSE]
+        .write_expr_csv(before, paste0("Expression_before_batch_", lab, "_", Sys.Date(), ".csv"), file)
+      }
+    )
+    output[[paste0("download_expr_after_batch_", pl)]] <- downloadHandler(
+      filename = function() paste0("Expression_after_batch_", lab, "_", Sys.Date(), ".csv"),
+      content = function(file) {
+        .write_expr_csv(if (pl == "rna") rv$batch_corrected_rna else rv$batch_corrected_micro,
+                        paste0("Expression_after_batch_", lab, "_", Sys.Date(), ".csv"), file)
+      }
+    )
+  })
+
   # Info boxes
   output$genes_before_filter <- renderInfoBox({
     n <- if (!is.null(rv$combined_expr)) nrow(rv$combined_expr) else 0
@@ -793,6 +837,8 @@ server_batch <- function(input, output, session, rv) {
   output$gene_variance_plot_micro <- renderPlot({
     .batch_variance_gg(rv$expr_micro, "Microarray gene variance", input$variance_percentile_micro)
   })
+  gexp_register_ggplot_downloads(output, "gene_variance_plot_rna", function() .batch_variance_gg(rv$expr_rna, "RNA-seq gene variance", input$variance_percentile_rna), 7, 5, "Batch_Gene_Variance_RNAseq")
+  gexp_register_ggplot_downloads(output, "gene_variance_plot_micro", function() .batch_variance_gg(rv$expr_micro, "Microarray gene variance", input$variance_percentile_micro), 7, 5, "Batch_Gene_Variance_Microarray")
 
   output$genes_to_keep_rna <- renderText({
     req(input$variance_percentile_rna)
@@ -847,6 +893,11 @@ server_batch <- function(input, output, session, rv) {
       "This platform only"
     )
   })
+
+  gexp_register_ggplot_downloads(output, "pca_before_dataset_rna", function() { req(rv$expr_rna, rv$unified_metadata); .batch_pca_polar_plot(rv$expr_rna, rv$unified_metadata, "Dataset", "RNA-seq before batch - by dataset", "This platform only") }, 6, 6, "Batch_PCA_Before_Dataset_RNAseq")
+  gexp_register_ggplot_downloads(output, "pca_after_dataset_rna", function() { req(rv$batch_corrected_rna, rv$unified_metadata); .batch_pca_polar_plot(rv$batch_corrected_rna, rv$unified_metadata, "Dataset", "RNA-seq after batch - by dataset", "This platform only") }, 6, 6, "Batch_PCA_After_Dataset_RNAseq")
+  gexp_register_ggplot_downloads(output, "pca_before_dataset_micro", function() { req(rv$expr_micro, rv$unified_metadata); .batch_pca_polar_plot(rv$expr_micro, rv$unified_metadata, "Dataset", "Microarray before batch - by dataset", "This platform only") }, 6, 6, "Batch_PCA_Before_Dataset_Microarray")
+  gexp_register_ggplot_downloads(output, "pca_after_dataset_micro", function() { req(rv$batch_corrected_micro, rv$unified_metadata); .batch_pca_polar_plot(rv$batch_corrected_micro, rv$unified_metadata, "Dataset", "Microarray after batch - by dataset", "This platform only") }, 6, 6, "Batch_PCA_After_Dataset_Microarray")
 
   output$download_gene_variance_png <- downloadHandler(
     filename = function() "Batch_Gene_Variance.png",
@@ -948,12 +999,18 @@ server_batch <- function(input, output, session, rv) {
       } else {
         input$batch_mode_parallel
       }
-      rna_method_use <- if (identical(batch_mode_p, "manual") && !is.null(input$batch_method_rna)) {
+      same_method <- if (identical(batch_mode_p, "same") && !is.null(input$batch_method_same) &&
+                         nzchar(input$batch_method_same)) input$batch_method_same else NULL
+      rna_method_use <- if (!is.null(same_method)) {
+        same_method
+      } else if (identical(batch_mode_p, "manual") && !is.null(input$batch_method_rna)) {
         input$batch_method_rna
       } else {
         defs$rna
       }
-      micro_method_use <- if (identical(batch_mode_p, "manual") && !is.null(input$batch_method_micro)) {
+      micro_method_use <- if (!is.null(same_method)) {
+        same_method
+      } else if (identical(batch_mode_p, "manual") && !is.null(input$batch_method_micro)) {
         input$batch_method_micro
       } else {
         defs$micro
@@ -1071,9 +1128,14 @@ server_batch <- function(input, output, session, rv) {
             "OK Batch correction complete\n",
             "Method: ", input$batch_method, "\n\n",
             res$log_text,
-            "\nFinal Dataset:\n",
-            "  Genes: ", format(genes_after, big.mark = ","), "\n",
-            "  Samples: ", format(ncol(rv$batch_corrected), big.mark = ",")
+            gexpipe_log_summary_block("Step 5 - Batch Correction", list(
+              "Method" = input$batch_method,
+              "Genes before filter" = format(genes_before, big.mark = ","),
+              "Genes after filter" = format(genes_after, big.mark = ","),
+              "Filtered out" = paste0(filter_percent, "%"),
+              "Samples" = format(ncol(rv$batch_corrected), big.mark = ","),
+              "Status" = "Complete - proceed to Differential Expression (Step 6)"
+            ))
           )
         }
       })

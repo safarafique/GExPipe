@@ -62,6 +62,9 @@ ui_validation <- tabItem(
   # ---- DE Results (conditional) ----
   uiOutput("val_de_panel_ui"),
 
+  # ---- Signature-level validation (recommended) ----
+  uiOutput("val_signature_ui"),
+
   fluidRow(
     box(
       title = tags$span(icon("file-alt"), " Process Summary"),

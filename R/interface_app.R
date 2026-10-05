@@ -65,7 +65,7 @@ gexp_app_analysis_dashboard_ui <- function() {
         shinydashboard::menuItem("13. ROC Curve Analysis", tabName = "roc", icon = shiny::icon("chart-line", class = "fa-lg"), badgeLabel = "AUC", badgeColor = "green"),
         shinydashboard::menuItem("14. Diagnostic Nomogram", tabName = "nomogram", icon = shiny::icon("calculator", class = "fa-lg"), badgeLabel = "Nomogram", badgeColor = "maroon"),
         shinydashboard::menuItem("15. GSEA Analysis", tabName = "gsea", icon = shiny::icon("project-diagram", class = "fa-lg"), badgeLabel = "GSEA", badgeColor = "teal"),
-        shinydashboard::menuItem("16. Results Summary", tabName = "results_summary", icon = shiny::icon("file-alt", class = "fa-lg"), badgeLabel = "PDF", badgeColor = "red")
+        shinydashboard::menuItem("16. Results Summary", tabName = "results_summary", icon = shiny::icon("file-alt", class = "fa-lg"))
       ),
       shiny::tags$div(
         class = "gexp-sidebar-workspace",
@@ -176,11 +176,11 @@ gexp_app_analysis_dashboard_ui <- function() {
           if (btnId === 'next_page_groups' || btnId === 'next_to_batch_btn') {
             return isSingle ? 'results' : 'batch';
           }
-          if (btnId === 'next_page_batch' || btnId === 'next_page_batch_end') return 'results';
+          if (btnId === 'next_page_batch_end') return 'results';
           if (btnId === 'next_page_results' || btnId === 'next_page_results_end') {
             return mergeAfter ? 'consensus' : 'wgcna';
           }
-          if (btnId === 'next_page_results_parallel' || btnId === 'next_page_results_parallel_end') {
+          if (btnId === 'next_page_results_parallel_end') {
             return 'consensus';
           }
           if (btnId === 'next_page_consensus') return null;

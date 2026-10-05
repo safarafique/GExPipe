@@ -155,6 +155,244 @@ gexp_prepare_download_dirs <- function(
  logs
 }
 
+#' Candidate directories for external-validation GEO caches (read + write)
+#'
+#' Bundled/shipped files live under \code{inst/shinyapp/ext_val_micro} and
+#' \code{ext_val_rna}. Runtime downloads also use \code{getwd()/ext_val_*}.
+#' @param kind \code{"micro"} or \code{"rna"}.
+#' @return Character vector of existing or creatable directory paths (unique).
+#' @keywords internal
+.gexpipe_ext_val_dir_candidates <- function(kind = c("micro", "rna")) {
+ kind <- match.arg(kind)
+ sub <- if (kind == "micro") "ext_val_micro" else "ext_val_rna"
+ wd <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+ shiny_app <- system.file("shinyapp", package = "GExPipe")
+ candidates <- c(
+ file.path(wd, sub),
+ file.path(wd, "inst", "shinyapp", sub),
+ file.path(wd, "..", "..", "inst", "shinyapp", sub)
+ )
+ if (nzchar(shiny_app)) {
+ candidates <- c(candidates, file.path(shiny_app, sub))
+ pkg_inst <- dirname(shiny_app)
+ candidates <- c(candidates, file.path(pkg_inst, sub))
+ }
+ unique(candidates[nzchar(candidates)])
+}
+
+#' Writable directory to persist newly downloaded validation files
+#' @keywords internal
+.gexpipe_ext_val_persist_dir <- function(kind = c("micro", "rna")) {
+ kind <- match.arg(kind)
+ for (d in .gexpipe_ext_val_dir_candidates(kind)) {
+ if (dir.exists(d)) {
+ return(d)
+ }
+ ok <- dir.create(d, recursive = TRUE, showWarnings = FALSE)
+ if (isTRUE(ok) || dir.exists(d)) {
+ return(d)
+ }
+ }
+ .gexpipe_ext_val_dir_candidates(kind)[[1L]]
+}
+
+#' Find a complete microarray series-matrix file for a GSE in validation caches
+#' @keywords internal
+.gexpipe_ext_val_find_micro_matrix <- function(gse_id) {
+ for (d in .gexpipe_ext_val_dir_candidates("micro")) {
+ if (!dir.exists(d)) {
+ next
+ }
+ hits <- .gexpipe_geo_cache_files_for(d, gse_id)
+ hits <- hits[vapply(
+ hits,
+ function(f) {
+ isTRUE(tryCatch(
+ .gexpipe_is_valid_gzip(f) && .gexpipe_series_matrix_complete(f),
+ error = function(e) FALSE
+ ))
+ },
+ logical(1)
+ )]
+ if (length(hits) > 0L) {
+ return(hits[[1L]])
+ }
+ }
+ NA_character_
+}
+
+#' Find NCBI GRCh38.p13 raw counts for a GSE in validation caches
+#' @keywords internal
+.gexpipe_ext_val_find_rna_counts <- function(gse_id) {
+ fname <- paste0(gse_id, "_raw_counts_GRCh38.p13_NCBI.tsv.gz")
+ for (d in .gexpipe_ext_val_dir_candidates("rna")) {
+ if (!dir.exists(d)) {
+ next
+ }
+ flat <- file.path(d, fname)
+ nested <- file.path(d, gse_id, fname)
+ for (f in c(flat, nested)) {
+ if (!file.exists(f) || file.info(f)$size < 512L) {
+ next
+ }
+ if (isTRUE(tryCatch(.gexpipe_file_looks_like_html(f), error = function(e) FALSE))) {
+ next
+ }
+ df <- tryCatch(.gexpipe_rnaseq_read_count_df(f), error = function(e) NULL)
+ if (!is.null(.gexpipe_ncbi_counts_df_to_matrix(df))) {
+ return(f)
+ }
+ }
+ }
+ NA_character_
+}
+
+#' Copy bundled validation microarray matrix into a download destdir if needed
+#' @return Character log fragment (empty if nothing copied).
+#' @keywords internal
+.gexpipe_ext_val_seed_micro_matrix <- function(gse_id, micro_dir) {
+ if (is.null(micro_dir) || !nzchar(micro_dir)) {
+ return("")
+ }
+ dir.create(micro_dir, showWarnings = FALSE, recursive = TRUE)
+ existing <- .gexpipe_geo_cache_files_for(micro_dir, gse_id)
+ existing <- existing[vapply(
+ existing,
+ function(f) {
+ isTRUE(tryCatch(
+ .gexpipe_is_valid_gzip(f) && .gexpipe_series_matrix_complete(f),
+ error = function(e) FALSE
+ ))
+ },
+ logical(1)
+ )]
+ if (length(existing) > 0L) {
+ return("(local validation cache) ")
+ }
+ src <- .gexpipe_ext_val_find_micro_matrix(gse_id)
+ if (!nzchar(src) || !file.exists(src)) {
+ return("")
+ }
+ dest <- file.path(micro_dir, basename(src))
+ if (!identical(normalizePath(src, winslash = "/"), normalizePath(dest, winslash = "/")) &&
+ !file.exists(dest)) {
+ tryCatch(file.copy(src, dest, overwrite = FALSE), error = function(e) NULL)
+ if (file.exists(paste0(src, ".verified"))) {
+ tryCatch(
+ file.copy(paste0(src, ".verified"), paste0(dest, ".verified"), overwrite = FALSE),
+ error = function(e) NULL
+ )
+ }
+ }
+ if (file.exists(dest)) {
+ return("(bundled validation dataset; skipped GEO download) ")
+ }
+ ""
+}
+
+#' Copy bundled validation RNA-seq counts into the per-GSE folder if needed
+#' @return Character log fragment (empty if nothing copied).
+#' @keywords internal
+.gexpipe_ext_val_seed_rna_counts <- function(gse_id, rna_dir) {
+ if (is.null(rna_dir) || !nzchar(rna_dir)) {
+ return("")
+ }
+ gse_dir <- file.path(rna_dir, gse_id)
+ dir.create(gse_dir, showWarnings = FALSE, recursive = TRUE)
+ fname <- paste0(gse_id, "_raw_counts_GRCh38.p13_NCBI.tsv.gz")
+ dest <- file.path(gse_dir, fname)
+ if (file.exists(dest) && file.info(dest)$size >= 512L) {
+ df <- tryCatch(.gexpipe_rnaseq_read_count_df(dest), error = function(e) NULL)
+ if (!is.null(.gexpipe_ncbi_counts_df_to_matrix(df))) {
+ return("(local validation cache) ")
+ }
+ }
+ src <- .gexpipe_ext_val_find_rna_counts(gse_id)
+ if (!nzchar(src) || !file.exists(src)) {
+ return("")
+ }
+ if (!identical(normalizePath(src, winslash = "/"), normalizePath(dest, winslash = "/"))) {
+ tryCatch(file.copy(src, dest, overwrite = FALSE), error = function(e) NULL)
+ }
+ if (file.exists(dest)) {
+ return("(bundled validation dataset; skipped NCBI download) ")
+ }
+ ""
+}
+
+#' Use a counts file placed directly in rna_dir (not in a per-GSE subfolder)
+#'
+#' The download code reads \code{rna_dir/GSE/}; a file dropped flat into
+#' \code{rna_dir} (the natural place for a manual download) is copied there so
+#' it is found and no download starts.
+#' @return Character log fragment (empty if nothing was adopted).
+#' @keywords internal
+.gexpipe_adopt_flat_rna_counts <- function(gse_id, rna_dir) {
+ if (is.null(rna_dir) || !nzchar(rna_dir) || !dir.exists(rna_dir)) {
+ return("")
+ }
+ flat <- list.files(
+ rna_dir,
+ pattern = paste0("^", gse_id, "_raw_counts.*\\.tsv\\.gz$"),
+ full.names = TRUE, ignore.case = TRUE
+ )
+ if (length(flat) == 0L) {
+ return("")
+ }
+ gse_dir <- file.path(rna_dir, gse_id)
+ dir.create(gse_dir, showWarnings = FALSE, recursive = TRUE)
+ adopted <- FALSE
+ for (f in flat) {
+ dest <- file.path(gse_dir, basename(f))
+ if (!file.exists(dest) && file.info(f)$size >= 512L) {
+ adopted <- isTRUE(tryCatch(file.copy(f, dest, overwrite = FALSE), error = function(e) FALSE)) || adopted
+ }
+ }
+ if (adopted) "(local counts file found; skipped download) " else ""
+}
+
+#' Save validation download artifacts into \code{inst/shinyapp/ext_val_*} when writable
+#' @keywords internal
+.gexpipe_ext_val_persist_download <- function(gse_id, platform = c("micro", "rna", "both"), micro_dir = NULL, rna_dir = NULL) {
+ platform <- match.arg(platform)
+ if (platform %in% c("micro", "both") && !is.null(micro_dir) && nzchar(micro_dir)) {
+ store <- .gexpipe_ext_val_persist_dir("micro")
+ dir.create(store, showWarnings = FALSE, recursive = TRUE)
+ hits <- .gexpipe_geo_cache_files_for(micro_dir, gse_id)
+ for (f in hits) {
+ if (!isTRUE(tryCatch(
+ .gexpipe_is_valid_gzip(f) && .gexpipe_series_matrix_complete(f),
+ error = function(e) FALSE
+ ))) {
+ next
+ }
+ dest <- file.path(store, basename(f))
+ if (!file.exists(dest)) {
+ tryCatch(file.copy(f, dest, overwrite = FALSE), error = function(e) NULL)
+ }
+ if (file.exists(paste0(f, ".verified")) && !file.exists(paste0(dest, ".verified"))) {
+ tryCatch(
+ file.copy(paste0(f, ".verified"), paste0(dest, ".verified"), overwrite = FALSE),
+ error = function(e) NULL
+ )
+ }
+ }
+ }
+ if (platform %in% c("rna", "both") && !is.null(rna_dir) && nzchar(rna_dir)) {
+ store <- .gexpipe_ext_val_persist_dir("rna")
+ dir.create(store, showWarnings = FALSE, recursive = TRUE)
+ fname <- paste0(gse_id, "_raw_counts_GRCh38.p13_NCBI.tsv.gz")
+ src <- file.path(rna_dir, gse_id, fname)
+ if (file.exists(src)) {
+ dest <- file.path(store, fname)
+ if (!file.exists(dest)) {
+ tryCatch(file.copy(src, dest, overwrite = FALSE), error = function(e) NULL)
+ }
+ }
+ }
+ invisible(NULL)
+}
+
 #' Detect fread-style generic column names (V1, V2, X1, ...)
 #'
 #' @param nms Character vector of sample/column names.
@@ -715,11 +953,55 @@ gexp_download_finalize_common_genes <- function(
 .gexpipe_clean_corrupt_geo_cache <- function(destdir, gse_id) {
  files <- .gexpipe_geo_cache_files_for(destdir, gse_id)
  for (f in files) {
- if (!.gexpipe_is_valid_gzip(f)) {
+ if (!.gexpipe_is_valid_gzip(f) || !.gexpipe_series_matrix_complete(f)) {
  try(unlink(f), silent = TRUE)
+ try(unlink(paste0(f, ".verified")), silent = TRUE)
  }
  }
  invisible(NULL)
+}
+
+#' Is a cached series-matrix .gz a COMPLETE file?
+#'
+#' The gzip magic-byte check above only proves the FIRST two bytes are right,
+#' so a download cut off by a timeout (very common for huge series such as
+#' GSE13159, ~2000 samples) still passes it. GEOquery then keeps reusing that
+#' truncated file and the app loads only a fragment of the data. A complete
+#' series matrix always ends with a "!series_matrix_table_end" line, so read
+#' the file through and require it. A small ".verified" marker stores the
+#' file size after a successful check, so big complete files are only
+#' streamed once. Only call this after .gexpipe_is_valid_gzip() succeeded.
+#' @keywords internal
+.gexpipe_series_matrix_complete <- function(path) {
+ marker <- paste0(path, ".verified")
+ sz <- file.info(path)$size
+ if (file.exists(marker)) {
+ prev <- suppressWarnings(as.numeric(readLines(marker, n = 1L, warn = FALSE)))
+ if (length(prev) == 1L && !is.na(prev) && prev == sz) {
+ return(TRUE)
+ }
+ }
+ # Chunked binary read (about 3-4x faster than line-by-line readLines on
+ # these very wide files); only the last few KB are needed to find the
+ # end marker. Keep a rolling tail so a marker split across two chunks
+ # is still found.
+ tail_raw <- raw(0)
+ read_ok <- tryCatch({
+ con <- gzfile(path, open = "rb")
+ on.exit(close(con), add = TRUE)
+ repeat {
+ x <- readBin(con, "raw", n = 64e6)
+ if (length(x) == 0L) break
+ tail_raw <- c(utils::tail(tail_raw, 4096L), utils::tail(x, 4096L))
+ }
+ TRUE
+ }, error = function(e) FALSE)
+ tail_txt <- if (length(tail_raw) > 0L) rawToChar(tail_raw[tail_raw != as.raw(0)]) else ""
+ complete <- isTRUE(read_ok) && grepl("!series_matrix_table_end", tail_txt, fixed = TRUE, useBytes = TRUE)
+ if (complete) {
+ try(writeLines(as.character(sz), marker), silent = TRUE)
+ }
+ complete
 }
 
 #' Cached GPL platform-annotation .soft(.gz) files GEOquery would reuse
@@ -749,6 +1031,122 @@ gexp_download_finalize_common_genes <- function(
 
 #' Fetch GEO series matrix via getGEO (ExpressionSet or SummarizedExperiment)
 #' @keywords internal
+#' Resumable pre-fetch of a series-matrix file, for very large series.
+#'
+#' GEOquery's own download (used below) is a single unresumed HTTP
+#' request: on GSE13159 (~2000+ samples, ~300MB series matrix) we found
+#' it can be cut off partway through - sometimes with a clear timeout,
+#' but sometimes NCBI's server just closes the connection early with an
+#' HTTP 200 and no error at all, so a plain "did the request succeed"
+#' check isn't trustworthy for this file. Retrying from scratch every
+#' time makes a file that should take under a minute effectively never
+#' finish on a real connection.
+#'
+#' This pre-populates GEOquery's expected cache file using
+#' curl::multi_download(resume = TRUE), which performs a genuine HTTP
+#' Range-based resume - verified directly (HTTP 206, continuing from the
+#' exact byte a prior attempt stopped at) - and retries several times,
+#' each attempt continuing from wherever the last one stopped rather
+#' than restarting. Completeness is verified with
+#' .gexpipe_series_matrix_complete() (not just "no error"), since that's
+#' the only check we found actually reliable for this endpoint.
+#'
+#' Deliberately conservative: only handles the plain
+#' "<GSE>_series_matrix.txt.gz" filename (not the "-GPLxxxx" multi-
+#' platform variant), and any failure here (wrong URL shape, no network,
+#' curl unavailable) silently falls through to GEOquery's own unchanged
+#' download - this can only help, never make a download worse.
+#'
+#' Reports real, periodic progress (bytes so far / total, as a
+#' percentage) as `incProgress(amount = 0, detail = ...)` - amount=0
+#' only updates the displayed text, it never moves the bar's fill, so it
+#' can't fight with the outer per-dataset progress that already owns the
+#' bar's 0-1 value. This is a no-op when there's no active Shiny
+#' progress (e.g. the manual pipeline scripts, run outside Shiny).
+#' @keywords internal
+.gexpipe_get_content_length <- function(url) {
+ if (!requireNamespace("curl", quietly = TRUE)) return(NA_real_)
+ res <- tryCatch(
+ curl::curl_fetch_memory(url, handle = curl::new_handle(nobody = TRUE, followlocation = TRUE)),
+ error = function(e) NULL
+ )
+ if (is.null(res) || is.null(res$headers)) return(NA_real_)
+ headers <- tryCatch(curl::parse_headers_list(res$headers), error = function(e) NULL)
+ cl <- if (!is.null(headers)) headers[["content-length"]] else NULL
+ if (is.null(cl)) NA_real_ else suppressWarnings(as.numeric(cl[[1]]))
+}
+
+.gexpipe_report_dl_progress <- function(detail) {
+ tryCatch(shiny::incProgress(amount = 0, detail = detail), error = function(e) invisible(NULL))
+}
+
+.gexpipe_format_dl_progress <- function(gse_id, downloaded, total) {
+ done_mb <- round(downloaded / 1e6, 1)
+ if (is.finite(total) && total > 0) {
+ pct <- min(99, round(100 * downloaded / total))
+ total_mb <- round(total / 1e6, 1)
+ sprintf("%s: %d%% (%s of %s MB)", gse_id, pct, done_mb, total_mb)
+ } else {
+ sprintf("%s: %s MB downloaded so far", gse_id, done_mb)
+ }
+}
+
+#' @return A list: `complete` (logical - a genuinely finished file is in
+#'   place), `downloaded`/`total` (bytes, `total` may be `NA` if it
+#'   couldn't be determined), OR `NULL` if this GSE/destdir couldn't be
+#'   handled at all (caller should fall through to GEOquery unchanged).
+.gexpipe_resumable_prefetch_series_matrix <- function(gse_id, destdir, max_attempts = 10L, per_attempt_timeout = 20L) {
+ if (is.null(destdir) || !nzchar(destdir) || !requireNamespace("curl", quietly = TRUE)) {
+ return(NULL)
+ }
+ gse_num <- suppressWarnings(as.integer(gsub("[^0-9]", "", gse_id)))
+ if (is.na(gse_num)) {
+ return(NULL)
+ }
+ range_folder <- paste0("GSE", gse_num %/% 1000L, "nnn")
+ fname <- paste0(gse_id, "_series_matrix.txt.gz")
+ url <- sprintf("https://ftp.ncbi.nlm.nih.gov/geo/series/%s/%s/matrix/%s", range_folder, gse_id, fname)
+ dir.create(destdir, showWarnings = FALSE, recursive = TRUE)
+ dest_file <- file.path(destdir, fname)
+ if (.gexpipe_is_valid_gzip(dest_file) && .gexpipe_series_matrix_complete(dest_file)) {
+ return(list(complete = TRUE, downloaded = file.info(dest_file)$size, total = file.info(dest_file)$size))
+ }
+ total_bytes <- .gexpipe_get_content_length(url)
+ # Short per-attempt window (default 20s, was 300s) so we reliably get
+ # control back often enough to report progress, even on a healthy
+ # connection that would otherwise run the full attempt uninterrupted.
+ # More attempts (was 10) to keep the same overall time budget.
+ n_attempts <- max(max_attempts, ceiling(3000L / max(per_attempt_timeout, 1L)))
+ for (attempt in seq_len(n_attempts)) {
+ tryCatch(
+ curl::multi_download(url, dest_file, resume = file.exists(dest_file), progress = FALSE,
+ multi_timeout = per_attempt_timeout),
+ error = function(e) NULL
+ )
+ downloaded <- if (file.exists(dest_file)) file.info(dest_file)$size else 0
+ .gexpipe_report_dl_progress(.gexpipe_format_dl_progress(gse_id, downloaded, total_bytes))
+ if (downloaded > 1e6 &&
+ isTRUE(tryCatch(.gexpipe_is_valid_gzip(dest_file) && .gexpipe_series_matrix_complete(dest_file), error = function(e) FALSE))) {
+ .gexpipe_report_dl_progress(sprintf("%s: 100%% - download complete", gse_id))
+ return(list(complete = TRUE, downloaded = downloaded, total = total_bytes))
+ }
+ }
+ # Exhausted every attempt without landing a complete file. Earlier this
+ # deleted the partial file here, on the reasoning that GEOquery's own
+ # cache-reuse check only looks at whether a file exists, not whether
+ # it's complete, and would otherwise crash trying to parse a truncated
+ # one. But that threw away real, valid progress on every single retry -
+ # a user who got to 50% before running out of attempts would restart
+ # from 0% every time, never actually finishing a large series. The
+ # partial file (still valid gzip, just incomplete) is now KEPT so the
+ # next attempt resumes from here instead of from scratch; the caller
+ # (.gexpipe_getgeo_series) is responsible for NOT handing an incomplete
+ # file to GEOquery - it stops with a clear "come back and try again"
+ # message instead.
+ downloaded <- if (file.exists(dest_file)) file.info(dest_file)$size else 0
+ list(complete = FALSE, downloaded = downloaded, total = total_bytes)
+}
+
 .gexpipe_getgeo_series <- function(gse_id, ...) {
  # Default getGPL=FALSE for speed; caller ... can override.
  dots <- list(...)
@@ -756,16 +1154,80 @@ gexp_download_finalize_common_genes <- function(
  if (length(dots) > 0L) {
  args[names(dots)] <- dots
  }
+ # CHECK FIRST: if a complete series matrix is already on disk (the given
+ # destdir, or any known cache folder), parse that file directly. getGEO() on
+ # an accession contacts NCBI to list files before it ever looks at the cache,
+ # so without this a downloaded series still needed internet.
+ local_files <- character(0)
+ if (!is.null(args$destdir) && dir.exists(args$destdir)) {
+ local_files <- .gexpipe_geo_cache_files_for(args$destdir, gse_id)
+ local_files <- local_files[vapply(local_files, function(f) {
+ isTRUE(tryCatch(.gexpipe_is_valid_gzip(f) && .gexpipe_series_matrix_complete(f), error = function(e) FALSE))
+ }, logical(1))]
+ }
+ if (length(local_files) == 0L) {
+ local_sm <- tryCatch(.gexpipe_find_local_series_matrix(gse_id, require_complete = TRUE),
+ error = function(e) NULL)
+ if (!is.null(local_sm)) local_files <- local_sm$files
+ }
+ if (length(local_files) > 0L) {
+ esets <- tryCatch({
+ res <- lapply(local_files, function(f) {
+ x <- .gexpipe_geo_quiet(GEOquery::getGEO(filename = f, GSEMatrix = TRUE, getGPL = FALSE))
+ if (is.list(x) && !inherits(x, "ExpressionSet") && length(x) > 0L) x[[1L]] else x
+ })
+ names(res) <- basename(local_files)
+ res
+ }, error = function(e) NULL)
+ if (!is.null(esets) && length(esets) > 0L) {
+ return(esets)
+ }
+ }
+ if (is.null(args$destdir)) {
+ # No cache dir given: reuse a complete local copy rather than letting
+ # GEOquery re-download the series into a temp folder.
+ local_sm <- tryCatch(.gexpipe_find_local_series_matrix(gse_id, require_complete = TRUE),
+ error = function(e) NULL)
+ if (!is.null(local_sm)) args$destdir <- local_sm$dir
+ }
  if (!is.null(args$destdir)) {
  try(.gexpipe_clean_corrupt_geo_cache(args$destdir, gse_id), silent = TRUE)
+ # Try to land a genuinely complete series-matrix file via resumable,
+ # retried download BEFORE handing off to GEOquery. If this succeeds,
+ # GEOquery finds the file already complete in destdir and uses it
+ # directly instead of downloading (its own cache-reuse check is the
+ # same gzip-validity check .gexpipe_clean_corrupt_geo_cache already
+ # applies). NULL means this GSE/destdir shape wasn't handled at all
+ # (e.g. no curl) - fall through to GEOquery unchanged, same as before.
+ # A non-NULL, incomplete result means real progress was made and KEPT
+ # on disk (not deleted) for the next attempt to resume from - handing
+ # that partial file to GEOquery instead would crash it (confirmed:
+ # GEOquery's own cache check only looks at file existence, not
+ # completeness), so we stop here with a clear, honest message instead.
+ prefetch <- tryCatch(.gexpipe_resumable_prefetch_series_matrix(gse_id, args$destdir), error = function(e) NULL)
+ if (!is.null(prefetch) && !isTRUE(prefetch$complete)) {
+ pct_msg <- if (is.finite(prefetch$total) && prefetch$total > 0) {
+ sprintf("%d%% (%s of %s MB)", min(99, round(100 * prefetch$downloaded / prefetch$total)),
+ round(prefetch$downloaded / 1e6, 1), round(prefetch$total / 1e6, 1))
+ } else {
+ sprintf("%s MB downloaded", round(prefetch$downloaded / 1e6, 1))
+ }
+ stop(
+ "download in progress, not yet complete - ", pct_msg, ". Progress is saved; ",
+ "click Download again to continue from here (not from the start)."
+ )
+ }
  }
  # Some series (e.g. GSE13159, ~2000+ samples) have multi-hundred-MB series
  # matrix files; R's default 60s download timeout is easily exceeded on a
  # perfectly fine connection, which then gets misreported as a connectivity
- # problem. Bump it defensively here regardless of how the app was launched.
+ # problem. 600s, then 1800s, were both tried here first and still weren't
+ # enough on a real run for the very largest series - bumped to 1 hour,
+ # which gives even multi-GB series matrix files room to complete on a
+ # slow connection instead of failing partway through.
  old_timeout <- getOption("timeout", 60L)
- if (old_timeout < 600L) {
- options(timeout = 600L)
+ if (old_timeout < 3600L) {
+ options(timeout = 3600L)
  on.exit(options(timeout = old_timeout), add = TRUE)
  }
  .gexpipe_geo_quiet(do.call(GEOquery::getGEO, args))
@@ -923,7 +1385,19 @@ gexp_fetch_full_pdata <- function(gse_id, sample_ids = NULL) {
  return(NULL)
  }
 
- pd <- tryCatch({
+ # Fast path: phenodata only needs the header of an already-downloaded series
+ # matrix. Reading it takes seconds, whereas getGEO would parse (or, with no
+ # cache dir, re-download) the whole expression table - an hour for GSE13159.
+ pd <- NULL
+ local_sm <- .gexpipe_find_local_series_matrix(gse_id)
+ if (!is.null(local_sm)) {
+ pd <- tryCatch(
+ .gexpipe_rbind_pdata_parts(lapply(local_sm$files, .gexpipe_parse_series_matrix_file)),
+ error = function(e) NULL
+ )
+ if (!is.null(pd) && is.data.frame(pd) && ncol(pd) <= 1L) pd <- NULL
+ }
+ if (is.null(pd)) pd <- tryCatch({
  gse_list <- .gexpipe_getgeo_series(gse_id)
  # getGEO returns one element per platform. Series split across platforms
  # (e.g. GSE114007 on GPL11154 + GPL18573) must contribute every sample,
@@ -1022,35 +1496,22 @@ gexp_fetch_geo_series_matrix_metadata <- function(gse_id) {
  paste0(base_url, names_found)
 }
 
-#' Download and parse the sample metadata block of one series-matrix file
-#'
-#' @param url_str URL of a \code{*_series_matrix.txt.gz} file.
-#' @return data.frame of sample metadata, or NULL.
+#' Read only the header of a series-matrix connection (stops at the table)
 #' @keywords internal
-.gexpipe_parse_series_matrix_url <- function(url_str) {
- conn <- NULL
- tmp_gz <- NULL
- tryCatch({
- # Series matrix files are gzip-compressed; url()+readLines alone never
- # decompresses, so !sample_ lines are invisible unless we wrap with gzcon.
- raw_lines <- character(0)
- tryCatch({
- conn <- gzcon(url(url_str, open = "rb"))
- raw_lines <- readLines(conn, warn = FALSE, encoding = "UTF-8")
- try(close(conn), silent = TRUE)
- conn <- NULL
- }, error = function(e) {
- if (!is.null(conn)) {
- try(close(conn), silent = TRUE)
- conn <<- NULL
+.gexpipe_read_series_header_lines <- function(con, chunk = 500L) {
+ out <- character(0)
+ repeat {
+ ln <- readLines(con, n = chunk, warn = FALSE, encoding = "UTF-8")
+ if (length(ln) == 0L) break
+ out <- c(out, ln)
+ if (any(grepl("^!series_matrix_table_begin", ln, ignore.case = TRUE))) break
  }
- tmp_gz <<- tempfile(fileext = ".txt.gz")
- utils::download.file(url_str, destfile = tmp_gz, mode = "wb", quiet = TRUE)
- conn <<- gzfile(tmp_gz, open = "rt")
- raw_lines <<- readLines(conn, warn = FALSE, encoding = "UTF-8")
- try(close(conn), silent = TRUE)
- conn <<- NULL
- })
+ out
+}
+
+#' Turn series-matrix header lines into a sample phenodata data.frame
+#' @keywords internal
+.gexpipe_pdata_from_series_header <- function(raw_lines) {
  if (length(raw_lines) == 0) {
  return(NULL)
  }
@@ -1093,6 +1554,80 @@ gexp_fetch_geo_series_matrix_metadata <- function(gse_id) {
  if (n > 0) out[seq_len(n), j] <- vals[seq_len(n)]
  }
  gexp_expand_geo_characteristics(out)
+}
+
+#' Phenodata from a local series-matrix .gz (reads only the header, seconds)
+#' @keywords internal
+.gexpipe_parse_series_matrix_file <- function(path) {
+ con <- NULL
+ tryCatch({
+ con <- gzfile(path, open = "rt")
+ .gexpipe_pdata_from_series_header(.gexpipe_read_series_header_lines(con))
+ }, error = function(e) NULL, finally = {
+ if (!is.null(con)) try(close(con), silent = TRUE)
+ })
+}
+
+#' Directories that may hold an already-downloaded series matrix
+#' @keywords internal
+.gexpipe_local_micro_cache_dirs <- function() {
+ wd <- normalizePath(getwd(), winslash = "/", mustWork = FALSE)
+ unique(c(
+ file.path(wd, "micro_data"),
+ file.path(wd, "ext_val_micro"),
+ tryCatch(.gexpipe_ext_val_dir_candidates("micro"), error = function(e) character(0))
+ ))
+}
+
+#' Find a local, valid series-matrix file(s) for a GSE in known cache dirs
+#' @param require_complete also verify the closing table marker (slow on huge files)
+#' @return list(dir=, files=) or NULL
+#' @keywords internal
+.gexpipe_find_local_series_matrix <- function(gse_id, require_complete = FALSE) {
+ for (d in .gexpipe_local_micro_cache_dirs()) {
+ if (!dir.exists(d)) next
+ hits <- .gexpipe_geo_cache_files_for(d, gse_id)
+ hits <- hits[vapply(hits, function(f) {
+ isTRUE(tryCatch(
+ .gexpipe_is_valid_gzip(f) && (!require_complete || .gexpipe_series_matrix_complete(f)),
+ error = function(e) FALSE))
+ }, logical(1))]
+ if (length(hits) > 0L) return(list(dir = d, files = hits))
+ }
+ NULL
+}
+
+#' Download and parse the sample metadata block of one series-matrix file
+#'
+#' @param url_str URL of a \code{*_series_matrix.txt.gz} file.
+#' @return data.frame of sample metadata, or NULL.
+#' @keywords internal
+.gexpipe_parse_series_matrix_url <- function(url_str) {
+ fn_env <- environment()
+ conn <- NULL
+ tmp_gz <- NULL
+ tryCatch({
+ # Series matrix files are gzip-compressed; url()+readLines alone never
+ # decompresses, so !sample_ lines are invisible unless we wrap with gzcon.
+ raw_lines <- character(0)
+ tryCatch({
+ conn <- gzcon(url(url_str, open = "rb"))
+ raw_lines <- .gexpipe_read_series_header_lines(conn)
+ try(close(conn), silent = TRUE)
+ conn <- NULL
+ }, error = function(e) {
+ if (!is.null(conn)) {
+ try(close(conn), silent = TRUE)
+ assign("conn", NULL, envir = fn_env)
+ }
+ assign("tmp_gz", tempfile(fileext = ".txt.gz"), envir = fn_env)
+ utils::download.file(url_str, destfile = tmp_gz, mode = "wb", quiet = TRUE)
+ assign("conn", gzfile(tmp_gz, open = "rt"), envir = fn_env)
+ assign("raw_lines", .gexpipe_read_series_header_lines(conn), envir = fn_env)
+ try(close(conn), silent = TRUE)
+ assign("conn", NULL, envir = fn_env)
+ })
+ .gexpipe_pdata_from_series_header(raw_lines)
  }, error = function(e) NULL, finally = {
  if (!is.null(conn)) try(close(conn), silent = TRUE)
  if (!is.null(tmp_gz) && file.exists(tmp_gz)) try(unlink(tmp_gz), silent = TRUE)
@@ -1295,7 +1830,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  if (accept) {
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  all_genes_list[[gse]] <- rownames(cnt)
  log_text <- paste0(log_text, " ", gse, ": converted to ", nrow(cnt), " gene symbols\n")
@@ -1311,7 +1854,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  if (sum(valid) > 0) {
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  all_genes_list[[gse]] <- rownames(cnt)
  }
@@ -1344,7 +1895,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  cnt <- rna_counts_list[[gse]]
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  all_genes_list[[gse]] <- rownames(cnt)
  log_text <- paste0(log_text, " ", gse, ": biomaRt converted to ", nrow(cnt), " gene symbols\n")
@@ -1389,7 +1948,15 @@ gexp_download_normalize_ids_for_overlap <- function(
  if (nrow(cnt) == length(sym)) {
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
- if (any(duplicated(rownames(cnt)))) cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ if (any(duplicated(rownames(cnt)))) {
+ # avereps() averages counts across duplicate gene symbols (e.g. after
+ # Entrez -> symbol mapping), which can produce non-integer values
+ # (e.g. (10+11)/2 = 10.5). Round back to whole counts so this matrix
+ # still qualifies as valid RNA-seq count data for DESeq2/edgeR - an
+ # un-rounded average was silently downgrading DESeq2/edgeR choices to
+ # limma downstream (server_validation.R's integer-count check).
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
+ }
  rna_counts_list[[gse]] <- cnt
  }
  }
@@ -1444,7 +2011,10 @@ gexp_download_normalize_ids_for_overlap <- function(
  rownames(cnt) <- sym
  cnt <- cnt[valid, , drop = FALSE]
  if (any(duplicated(rownames(cnt)))) {
- cnt <- limma::avereps(cnt, ID = rownames(cnt))
+ # See the rounding note above: avereps() on integer counts can
+ # produce non-integer values, which would silently fail the
+ # downstream integer-count check and force a limma fallback.
+ cnt <- round(limma::avereps(cnt, ID = rownames(cnt)))
  }
  rna_counts_list[[gse]] <- cnt
  }
@@ -1527,6 +2097,9 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  micro_eset = NULL, platform_id = NULL, cel_paths = character(0)
  )
 
+ # Always check for an already-downloaded series matrix first.
+ out$log <- paste0(out$log, .gexpipe_ext_val_seed_micro_matrix(gse_id, micro_dir))
+
  micro_data <- tryCatch(
  {
  # Skip GPL download: many series (e.g. GSE89076) return SummarizedExperiment
@@ -1538,7 +2111,12 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
 
  if (inherits(micro_data, "geo_error")) {
  err_msg <- micro_data$error
- out$reason <- if (grepl("timeout|timed out", err_msg, ignore.case = TRUE)) {
+ out$reason <- if (grepl("download in progress, not yet complete", err_msg, ignore.case = TRUE)) {
+ # Real, saved progress from the resumable pre-fetch - already a
+ # clear, specific message (with a percentage); pass it through as-is
+ # rather than replacing it with a generic one.
+ gsub("\n", " ", err_msg)
+ } else if (grepl("timeout|timed out", err_msg, ignore.case = TRUE)) {
  "download timed out - this GSE may be very large (e.g. GSE13159); your internet connection may be fine, just retry, or it will usually succeed on a second attempt once partial data is cached"
  } else if (grepl("connection|hostname|resolve|HTTP|ssl|could not resolve|Unable to", err_msg, ignore.case = TRUE)) {
  "network/HTTP - check internet connection"
@@ -1958,7 +2536,7 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  con <- file(path, "rb")
  on.exit(close(con), add = TRUE)
  b <- readBin(con, what = "raw", n = 2L)
- length(b) >= 2L && identical(b[1:2], as.raw(c(0x1f, 0x8b)))
+ length(b) >= 2L && identical(b[c(1L, 2L)], as.raw(c(0x1f, 0x8b)))
  }, error = function(e) FALSE))
 }
 
@@ -2305,8 +2883,11 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  }
  dir.create(dirname(dest_file), showWarnings = FALSE, recursive = TRUE)
  old_to <- getOption("timeout", 60L)
- if (old_to < 180L) {
- options(timeout = 180L)
+ # Raw supplementary files (e.g. CEL tarballs for large microarray series)
+ # can also run to hundreds of MB - same 1-hour headroom as the series
+ # matrix downloader above, so a big file isn't cut off partway through.
+ if (old_to < 3600L) {
+ options(timeout = 3600L)
  }
  on.exit(options(timeout = old_to), add = TRUE)
  methods <- unique(c("libcurl", getOption("download.file.method"), "auto", "wininet"))
@@ -2381,12 +2962,30 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
 
  # Fast path: current NCBI human GRCh38.p13 filename (GSE50760 and most human RNA-seq)
  p13_name <- paste0(gse_id, "_raw_counts_GRCh38.p13_NCBI.tsv.gz")
+ p13_path <- file.path(dest_dir, p13_name)
+ if (isTRUE(getOption("gexpipe.ext_val_download", FALSE))) {
+ if (!file.exists(p13_path) || file.info(p13_path)$size < 512L) {
+ seeded <- .gexpipe_ext_val_find_rna_counts(gse_id)
+ if (nzchar(seeded) && file.exists(seeded)) {
+ tryCatch(file.copy(seeded, p13_path, overwrite = FALSE), error = function(e) NULL)
+ }
+ }
+ if (file.exists(p13_path) && file.info(p13_path)$size >= 512L) {
+ mat <- .gexpipe_ncbi_counts_df_to_matrix(.gexpipe_rnaseq_read_count_df(p13_path))
+ if (!is.null(mat)) {
+ return(list(
+ count_matrix = mat, metadata = NULL,
+ log = "(bundled/local validation cache GRCh38.p13) "
+ ))
+ }
+ }
+ }
  p13_url <- paste0(
  "https://www.ncbi.nlm.nih.gov/geo/download/?type=rnaseq_counts&acc=",
  gse_id, "&format=file&file=", p13_name
  )
  p13_path <- tryCatch(
- .gexpipe_download_binary_url(p13_url, file.path(dest_dir, p13_name)),
+ .gexpipe_download_binary_url(p13_url, p13_path),
  error = function(e) NULL
  )
  mat <- .gexpipe_ncbi_counts_df_to_matrix(.gexpipe_rnaseq_read_count_df(p13_path))
@@ -2556,7 +3155,12 @@ gexp_download_one_microarray_gse <- function(gse_id, micro_dir, download_cel = N
  return(out)
  }
  if (any(duplicated(rownames(count_matrix)))) {
- count_matrix <- limma::avereps(count_matrix, ID = rownames(count_matrix))
+ # Round back to whole counts - avereps() averages duplicate rows,
+ # which can produce non-integer values that would later fail the
+ # "is this really a raw count matrix" check used to decide whether
+ # DESeq2/edgeR can run (they would otherwise be silently skipped in
+ # favor of limma even for genuine RNA-seq count data).
+ count_matrix <- round(limma::avereps(count_matrix, ID = rownames(count_matrix)))
  }
  }
  out$ok <- TRUE
@@ -2586,6 +3190,12 @@ gexp_download_one_rnaseq_gse <- function(gse_id, rna_dir, fast = NULL) {
  out <- list(ok = FALSE, reason = NULL, log = "", count_matrix = NULL, metadata = NULL)
  gse_dir <- file.path(rna_dir, gse_id)
  dir.create(gse_dir, showWarnings = FALSE, recursive = TRUE)
+
+ # Always check for an already-downloaded / manually-placed counts file first
+ # (flat in rna_dir, or in any known validation cache) and only download when
+ # nothing usable is found.
+ out$log <- paste0(out$log, .gexpipe_adopt_flat_rna_counts(gse_id, rna_dir))
+ out$log <- paste0(out$log, .gexpipe_ext_val_seed_rna_counts(gse_id, rna_dir))
 
  # 1) NCBI uniform counts FIRST (fast; avoids RAW.tar / hundreds of fread calls)
  ncbi_early <- tryCatch(

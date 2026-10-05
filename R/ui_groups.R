@@ -71,6 +71,27 @@ ui_groups <- tabItem(
       )
     ),
     
+    # ---- Group assignment method ----
+    fluidRow(
+      box(
+        title = tags$span(icon("hand-pointer"), " Group assignment method"),
+        width = 12, status = "info", solidHeader = TRUE,
+        radioButtons("group_assign_mode", NULL,
+          choices = c("By phenodata column (extract & categorize)" = "column",
+                      "Manual: tick samples in the phenodata tables above" = "manual"),
+          selected = "column", inline = TRUE),
+        conditionalPanel("input.group_assign_mode == 'manual'",
+          tags$p(icon("info-circle"),
+                 " Tick rows in each dataset's phenodata table (search boxes narrow the table; ",
+                 tags$strong("Tick all filtered rows"), " selects every match), then use ",
+                 tags$strong("Assign ticked"), " to put them in Normal or Disease. Unassigned samples are excluded. ",
+                 "Finish with ", tags$strong("Apply Categorization"), " below.",
+                 style = "font-size: 13px; color: #495057; margin: 0;")
+        )
+      )
+    ),
+
+    conditionalPanel("input.group_assign_mode != 'manual'",
     # ---- Column selector per dataset ----
     fluidRow(
       box(
@@ -100,6 +121,7 @@ ui_groups <- tabItem(
         width = 12, status = "success", solidHeader = TRUE,
         uiOutput("extracted_groups_ui")
       )
+    )
     ),
     
     fluidRow(

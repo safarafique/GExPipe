@@ -6,6 +6,36 @@
 
 server_results_summary <- function(input, output, session, rv) {
 
+  # ---- Gene funnel: where do genes drop out of the pipeline? ----
+  output$results_summary_gene_funnel <- renderUI({
+    nrow_or_na <- function(x) if (is.data.frame(x)) nrow(x) else NA_integer_
+    len_or_na <- function(x) if (is.null(x)) NA_integer_ else length(x)
+    parallel <- isTRUE(rv$merge_after_de) || identical(rv$analysis_type, "parallel")
+    counts <- list(
+      de_rna = nrow_or_na(rv$sig_genes_rna), de_micro = nrow_or_na(rv$sig_genes_micro),
+      de_merged = if (isTRUE(rv$consensus_complete)) NA_integer_ else nrow_or_na(rv$sig_genes),
+      consensus = if (isTRUE(rv$consensus_complete)) nrow_or_na(rv$sig_genes) else NA_integer_,
+      common = len_or_na(rv$common_genes_de_wgcna), ml = len_or_na(rv$ml_common_genes),
+      roc_pass = if (is.null(rv$roc_n_pass)) NA_integer_ else rv$roc_n_pass,
+      roc_selected = len_or_na(rv$roc_selected_genes), nomogram = len_or_na(rv$nomogram_available_genes))
+    tab <- gexp_gene_funnel_table(counts, parallel = parallel)
+    if (all(tab$Status == "not run")) {
+      return(tags$p(style = "color:#7f8c8d;", icon("info-circle"), " Run the analysis steps to see how many genes survive each one."))
+    }
+    stop_row <- which(tab$Status == "STOPS HERE")[1L]
+    col <- c(ok = "#27ae60", `not run` = "#95a5a6", empty = "#e67e22", `STOPS HERE` = "#c0392b")
+    tagList(
+      if (!is.na(stop_row)) tags$div(class = "alert alert-danger", style = "font-size: 14px;",
+        icon("exclamation-triangle"), tags$strong(" No biomarker can be identified because genes drop to zero at: "), tab$Step[stop_row], ".",
+        tags$br(), tab$Hint[stop_row]),
+      tags$table(class = "table table-condensed", style = "font-size: 13px;",
+        tags$thead(tags$tr(tags$th("Step"), tags$th("Genes"), tags$th("Status"))),
+        tags$tbody(lapply(seq_len(nrow(tab)), function(i) tags$tr(
+          tags$td(tab$Step[i]), tags$td(tags$strong(if (is.na(tab$Genes[i])) "-" else format(tab$Genes[i], big.mark = ","))),
+          tags$td(tags$span(style = paste0("color:", col[[tab$Status[i]]], "; font-weight:600;"), tab$Status[i]))))))
+    )
+  })
+
   # Build narrative paragraph from rv (used by UI and PDF download; do not call output$ from downloadHandler)
   narrative_paragraph <- function() {
     expr <- rv$batch_corrected

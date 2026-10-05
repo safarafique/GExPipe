@@ -140,10 +140,6 @@ box(
         )
       )
     ),
-    shiny::conditionalPanel(
-      condition = "input.analysis_type == 'parallel'",
-      gexp_ui_next_tab_button("next_page_results_parallel", "Next: RNA-seq \u2229 microarray")
-    ),
     conditionalPanel(
       condition = "input.analysis_type == 'parallel'",
       gexp_ui_parallel_two_col(
@@ -151,24 +147,38 @@ box(
           box(
             title = tags$span(icon("mountain"), " RNA-seq volcano"),
             width = 12, status = "info", solidHeader = TRUE,
-            plotOutput("volcano_plot_rna", height = "480px")
+            plotOutput("volcano_plot_rna", height = "480px"),
+            gexp_ui_plot_download_bar("download_volcano_plot_rna_png", "download_volcano_plot_rna_jpg", "download_volcano_plot_rna_pdf", "btn-info btn-xs")
           ),
           box(
             title = tags$span(icon("list-ol"), " RNA-seq top DEGs"),
             width = 12, status = "info", solidHeader = TRUE,
             DTOutput("top_degs_table_rna")
+          ),
+          box(
+            title = tags$span(icon("th"), " RNA-seq top DE genes heatmap"),
+            width = 12, status = "info", solidHeader = TRUE,
+            plotOutput("heatmap_plot_rna", height = "480px"),
+            gexp_ui_plot_download_bar("download_heatmap_plot_rna_png", "download_heatmap_plot_rna_jpg", "download_heatmap_plot_rna_pdf", "btn-info btn-xs")
           )
         ),
         tagList(
           box(
             title = tags$span(icon("mountain"), " Microarray volcano"),
             width = 12, status = "warning", solidHeader = TRUE,
-            plotOutput("volcano_plot_micro", height = "480px")
+            plotOutput("volcano_plot_micro", height = "480px"),
+            gexp_ui_plot_download_bar("download_volcano_plot_micro_png", "download_volcano_plot_micro_jpg", "download_volcano_plot_micro_pdf", "btn-warning btn-xs")
           ),
           box(
             title = tags$span(icon("list-ol"), " Microarray top DEGs"),
             width = 12, status = "warning", solidHeader = TRUE,
             DTOutput("top_degs_table_micro")
+          ),
+          box(
+            title = tags$span(icon("th"), " Microarray top DE genes heatmap"),
+            width = 12, status = "warning", solidHeader = TRUE,
+            plotOutput("heatmap_plot_micro", height = "480px"),
+            gexp_ui_plot_download_bar("download_heatmap_plot_micro_png", "download_heatmap_plot_micro_jpg", "download_heatmap_plot_micro_pdf", "btn-warning btn-xs")
           )
         )
       )

@@ -339,6 +339,19 @@ server_groups <- function(input, output, session, rv) {
             )
           ),
           DT::DTOutput(paste0("phenodata_table_", gse)),
+          conditionalPanel("input.group_assign_mode == 'manual'",
+            tags$div(
+              style = "margin-top: 10px; padding: 10px; background: #f0fff4; border: 1px solid #b7e4c7; border-radius: 6px;",
+              tags$div(style = "display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;",
+                actionButton(paste0("manual_select_filtered_", gse), tagList(icon("check-square"), " Tick all filtered rows"), class = "btn-default btn-sm"),
+                actionButton(paste0("manual_normal_", gse), tagList(icon("arrow-right"), " Assign ticked \u2192 Normal"), class = "btn-success btn-sm"),
+                actionButton(paste0("manual_disease_", gse), tagList(icon("arrow-right"), " Assign ticked \u2192 Disease"), class = "btn-danger btn-sm"),
+                actionButton(paste0("manual_clear_", gse), tagList(icon("eraser"), " Unassign ticked"), class = "btn-warning btn-sm"),
+                actionButton(paste0("manual_clear_all_", gse), tagList(icon("trash"), " Clear all"), class = "btn-link btn-sm")
+              ),
+              uiOutput(paste0("manual_summary_", gse))
+            )
+          ),
           tags$p(
             icon("info-circle", style = "color: #17a2b8; margin-right: 5px;"),
             tags$em(
@@ -405,6 +418,8 @@ server_groups <- function(input, output, session, rv) {
               options = list(dom = "t", ordering = FALSE)
             ))
           }
+          manual_on <- identical(input$group_assign_mode, "manual")
+          if (manual_on) display_df <- .groups_manual_df(display_df, shiny::isolate(manual_labels[[gse_local]]))
           DT::datatable(
             display_df,
             options = list(
@@ -422,7 +437,67 @@ server_groups <- function(input, output, session, rv) {
             class = "display compact stripe hover",
             rownames = FALSE,
             filter = "top",
-            selection = "none"
+            selection = if (manual_on) list(mode = "multiple", target = "row") else "none"
+          )
+        })
+      })
+    }
+  })
+
+  # ---- Manual group assignment (tick samples in the table) ----
+  manual_labels <- reactiveValues()
+  manual_registered <- new.env(parent = emptyenv())
+  .groups_manual_df <- function(display_df, lab) {
+    a <- if (length(lab) > 0L) unname(lab[as.character(display_df[[1L]])]) else rep(NA_character_, nrow(display_df))
+    a[is.na(a)] <- ""
+    data.frame(SampleID = display_df[[1L]], Assigned = a, display_df[-1L],
+               check.names = FALSE, stringsAsFactors = FALSE)
+  }
+  observe({
+    all_gses <- .gexpipe_available_gses()
+    req(length(all_gses) > 0L)
+    for (gse in all_gses) {
+      if (isTRUE(manual_registered[[gse]])) next
+      manual_registered[[gse]] <- TRUE
+      local({
+        g <- gse
+        tbl_id <- paste0("phenodata_table_", g)
+        proxy <- DT::dataTableProxy(tbl_id)
+        disp <- function() .gexpipe_pdata_display_df(.gexpipe_get_pdata_for_gse(g))
+        assign_fn <- function(label) {
+          idx <- input[[paste0(tbl_id, "_rows_selected")]]
+          if (length(idx) == 0L) {
+            showNotification("Tick one or more rows in the table first.", type = "warning", duration = 4)
+            return(invisible(NULL))
+          }
+          ids <- as.character(disp()[[1L]])[idx]
+          lab <- manual_labels[[g]]
+          if (is.null(lab)) lab <- character(0)
+          if (is.na(label)) lab <- lab[setdiff(names(lab), ids)] else lab[ids] <- label
+          manual_labels[[g]] <- lab
+          DT::selectRows(proxy, NULL)
+        }
+        observeEvent(input[[paste0("manual_normal_", g)]], assign_fn("Normal"))
+        observeEvent(input[[paste0("manual_disease_", g)]], assign_fn("Disease"))
+        observeEvent(input[[paste0("manual_clear_", g)]], assign_fn(NA_character_))
+        observeEvent(input[[paste0("manual_clear_all_", g)]], manual_labels[[g]] <- character(0))
+        observeEvent(input[[paste0("manual_select_filtered_", g)]],
+                     DT::selectRows(proxy, input[[paste0(tbl_id, "_rows_all")]]))
+        observeEvent(manual_labels[[g]], {
+          if (identical(input$group_assign_mode, "manual")) {
+            d <- disp()
+            if (!is.null(d)) {
+              DT::replaceData(proxy, .groups_manual_df(d, manual_labels[[g]]),
+                              resetPaging = FALSE, rownames = FALSE)
+            }
+          }
+        }, ignoreInit = TRUE)
+        output[[paste0("manual_summary_", g)]] <- renderUI({
+          lab <- manual_labels[[g]]
+          if (is.null(lab)) lab <- character(0)
+          tags$div(
+            tags$span(class = "badge", style = "background:#2ecc71; font-size:13px; padding:6px 12px; margin-right:8px;", paste0("Normal: ", sum(lab == "Normal"))),
+            tags$span(class = "badge", style = "background:#e74c3c; font-size:13px; padding:6px 12px;", paste0("Disease: ", sum(lab == "Disease")))
           )
         })
       })
@@ -614,6 +689,7 @@ server_groups <- function(input, output, session, rv) {
             }
           ),
           count_note,
+          uiOutput(paste0("group_filter2_ui_", gse)),
           tags$div(
             style = "margin-top: 15px;",
             uiOutput(paste0("group_preview_", gse))
@@ -666,6 +742,92 @@ server_groups <- function(input, output, session, rv) {
       }
     }
     selected_columns(sel_cols)
+  })
+
+  # Optional second filter per GSE: keep only samples whose value in another
+  # phenodata column (e.g. tissue / source) is in a chosen keep-list.
+  filter2_open <- reactiveValues()
+  filter2_registered <- new.env(parent = emptyenv())
+  observe({
+    all_gses <- .gexpipe_available_gses()
+    req(length(all_gses) > 0L)
+    for (gse in all_gses) {
+      if (isTRUE(filter2_registered[[gse]])) next
+      filter2_registered[[gse]] <- TRUE
+      local({
+        g <- gse
+        observeEvent(input[[paste0("group_filter2_add_", g)]], filter2_open[[g]] <- TRUE)
+        observeEvent(input[[paste0("group_filter2_remove_", g)]], filter2_open[[g]] <- FALSE)
+        output[[paste0("group_filter2_ui_", g)]] <- renderUI({
+          if (!isTRUE(filter2_open[[g]])) {
+            return(tags$div(style = "margin-top: 8px;",
+              actionButton(paste0("group_filter2_add_", g),
+                           tagList(icon("plus"), " Add second filter (optional)"),
+                           class = "btn-default btn-sm"),
+              tags$span(" e.g. keep only peripheral blood samples",
+                        style = "font-size: 12px; color: #6c757d; margin-left: 6px;")))
+          }
+          pdata <- .gexpipe_align_pdata_to_expr(g, .gexpipe_get_pdata_for_gse(g))
+          if (is.null(pdata) || !is.data.frame(pdata)) return(NULL)
+          cols <- gexp_phenotype_column_choices(gexp_pdata_column_names(pdata))
+          tags$div(
+            style = "margin-top: 12px; padding: 12px; background: #fff8e6; border-radius: 6px; border: 1px solid #ffd98a;",
+            tags$div(style = "display: flex; justify-content: space-between; align-items: center;",
+              tags$strong(icon("filter"), " Second filter (optional)"),
+              actionButton(paste0("group_filter2_remove_", g), tagList(icon("times"), " Remove filter"),
+                           class = "btn-link btn-sm")),
+            tags$p("Choose a column, then untick the values you want to skip. Only samples with a ticked value are kept.",
+                   style = "font-size: 12px; color: #6c757d; margin: 6px 0;"),
+            selectInput(paste0("group_filter2_col_", g), "Filter column:",
+                        choices = c("Select a column..." = "", cols), selectize = FALSE, width = "100%"),
+            uiOutput(paste0("group_filter2_vals_ui_", g)),
+            uiOutput(paste0("group_filter2_effect_", g))
+          )
+        })
+        # Shows what the filter leaves, because the Column Preview below counts BEFORE the filter.
+        output[[paste0("group_filter2_effect_", g)]] <- renderUI({
+          fcol <- input[[paste0("group_filter2_col_", g)]]
+          keep <- input[[paste0("group_filter2_keep_", g)]]
+          gcol <- input[[paste0("group_col_", g)]]
+          pdata <- .gexpipe_align_pdata_to_expr(g, .gexpipe_get_pdata_for_gse(g))
+          if (!isTRUE(filter2_open[[g]]) || is.null(fcol) || !nzchar(fcol) || is.null(gcol) || !nzchar(gcol) ||
+              is.null(pdata) || !all(c(fcol, gcol) %in% colnames(pdata))) return(NULL)
+          fv <- safe_trim(as.character(pdata[[fcol]]))
+          fv[is.na(fv)] <- "(blank)"
+          gv <- safe_trim(as.character(pdata[[gcol]]))
+          sel <- fv %in% keep
+          tab <- table(gv[sel & !is.na(gv)])
+          before <- table(gv[!is.na(gv)])
+          lost <- setdiff(names(before), names(tab))
+          tags$div(
+            style = paste0("margin-top: 8px; padding: 8px 10px; border-radius: 6px; font-size: 13px; ",
+                           if (length(lost) > 0L) "background: #fdecea; border: 1px solid #f5b7b1;" else "background: #e8f6ee; border: 1px solid #b7e4c7;"),
+            if (length(lost) > 0L) icon("exclamation-triangle", style = "color: #c0392b;") else icon("check-circle", style = "color: #27ae60;"),
+            tags$strong(" After this filter: "),
+            if (length(tab) == 0L) "no samples kept" else paste0(names(tab), " = ", as.integer(tab), collapse = ", "),
+            sprintf(" (%d of %d samples kept)", sum(sel), nrow(pdata)),
+            if (length(lost) > 0L) tags$div(style = "color: #c0392b; margin-top: 4px;", tags$strong("This filter removes ALL samples of: "), paste(lost, collapse = ", "),
+                                            ". If those samples have an empty value in this column, tick \"(blank)\" above."),
+            tags$br(), tags$small("The Column Preview below counts before this filter; the filter is applied when you click Extract Groups.")
+          )
+        })
+        output[[paste0("group_filter2_vals_ui_", g)]] <- renderUI({
+          fcol <- input[[paste0("group_filter2_col_", g)]]
+          pdata <- .gexpipe_align_pdata_to_expr(g, .gexpipe_get_pdata_for_gse(g))
+          if (!isTRUE(filter2_open[[g]]) || is.null(fcol) || !nzchar(fcol) ||
+              is.null(pdata) || !fcol %in% colnames(pdata)) return(NULL)
+          fv <- safe_trim(as.character(pdata[[fcol]]))
+          # Empty values (e.g. the stage column only exists for patients, not controls) are a
+          # real choice: "(blank)". Without it those samples could never be ticked and the
+          # filter would silently drop them.
+          fv[is.na(fv)] <- "(blank)"
+          tab <- table(fv)
+          checkboxGroupInput(paste0("group_filter2_keep_", g), "Keep samples with:",
+            choiceNames = paste0(names(tab), " (", as.integer(tab), ")"),
+            choiceValues = names(tab), selected = names(tab))
+        })
+      })
+    }
   })
 
   # Show preview for each GSE when column is selected (using reactive pattern)
@@ -915,6 +1077,35 @@ server_groups <- function(input, output, session, rv) {
           }
         }
         
+        # Optional second filter: drop samples whose value in the filter column
+        # is not in the keep-list (they get no group, so are excluded downstream)
+        fcol <- input[[paste0("group_filter2_col_", gse)]]
+        if (isTRUE(filter2_open[[gse]]) && !is.null(fcol) && nzchar(fcol) && fcol %in% colnames(pdata)) {
+          keep_vals <- input[[paste0("group_filter2_keep_", gse)]]
+          if (length(keep_vals) == 0L) {
+            showNotification(paste0(gse, ": second filter - tick at least one value to keep (or remove the filter)."),
+                             type = "error", duration = 6)
+            return()
+          }
+          f_all <- safe_trim(as.character(pdata[[fcol]]))
+          names(f_all) <- rownames(pdata)
+          fvals <- rep(NA_character_, length(expr_cols))
+          ok_id <- !is.null(gsm_ids) & !is.na(gsm_ids) & gsm_ids %in% rownames(pdata)
+          if (any(ok_id)) {
+            fvals[ok_id] <- f_all[gsm_ids[ok_id]]
+          } else {
+            n_f <- min(length(expr_cols), nrow(pdata))
+            fvals[seq_len(n_f)] <- f_all[seq_len(n_f)]
+          }
+          fvals[is.na(fvals)] <- "(blank)"   # empty values are matched by the "(blank)" choice
+          drop_f <- !(fvals %in% keep_vals)
+          n_before_f <- sum(!is.na(group_raw))
+          group_raw[drop_f] <- NA_character_
+          showNotification(
+            paste0(gse, ": second filter on '", fcol, "' kept ", sum(!is.na(group_raw)), " of ", n_before_f, " samples."),
+            type = "message", duration = 6)
+        }
+
         # Extract unique groups
         gr_vals <- group_raw[!is.na(group_raw) & group_raw != "" & !is.null(group_raw)]
         if (length(gr_vals) > 0) {
@@ -1248,6 +1439,30 @@ server_groups <- function(input, output, session, rv) {
   }
 
   observeEvent(input$apply_groups_btn, {
+    if (identical(input$group_assign_mode, "manual")) {
+      m_samples <- character(0); m_labels <- character(0); m_batches <- character(0)
+      for (gse in .gexpipe_available_gses()) {
+        lab <- manual_labels[[gse]]
+        if (is.null(lab) || length(lab) == 0L) next
+        pd_m <- .gexpipe_align_pdata_to_expr(gse, .gexpipe_get_pdata_for_gse(gse))
+        ids_m <- get_expr_and_gsm_for_gse(gse, pdata = pd_m)
+        if (length(ids_m$expr_cols) == 0L) next
+        mi <- match(ids_m$gsm_ids, names(lab))
+        if (all(is.na(mi))) mi <- match(ids_m$expr_cols, names(lab))
+        m_samples <- c(m_samples, ids_m$expr_cols)
+        m_labels <- c(m_labels, unname(lab[mi]))
+        m_batches <- c(m_batches, rep(gse, length(ids_m$expr_cols)))
+      }
+      keep_m <- !is.na(m_labels)
+      if (!any(m_labels[keep_m] == "Normal") || !any(m_labels[keep_m] == "Disease")) {
+        showNotification("Manual selection: assign at least one Normal and one Disease sample (tick rows, then use the Assign buttons).",
+                         type = "error", duration = 7)
+        return()
+      }
+      .groups_apply_sample_labels(m_samples[keep_m], m_labels[keep_m], m_batches[keep_m])
+      return()
+    }
+
     groups <- extracted_groups()
     per_gse_data <- extracted_groups_per_gse()
 

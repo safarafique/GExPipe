@@ -364,7 +364,6 @@ ui_wgcna <- tabItem(
             )
           ),
           tags$hr(),
-          uiOutput("significant_module_count_ui"),
           tags$div(
             style = "margin-top: 15px;",
             plotOutput("module_trait_heatmap", height = "600px")
@@ -629,11 +628,7 @@ ui_wgcna <- tabItem(
                       tagList(icon("refresh"), " Refresh Log"), 
                       class = "btn-sm btn-warning")
         ),
-        tags$div(
-          class = "scrollable-log-area",
-          style = "max-height: 500px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px; background: #263238; color: #66BB6A; padding: 15px; border-radius: 8px; white-space: pre-wrap;",
-          verbatimTextOutput("wgcna_log", placeholder = TRUE)
-        ),
+        gexp_ui_log_box("wgcna_log"),
         tags$div(
           class = "step-timer",
           style = "margin-top: 15px;",

@@ -262,7 +262,7 @@ ui_normalize <- tabItem(
             style = "margin-top: 20px;",
             tags$h4(icon("file-alt"), " Detailed Log",
                    style = "color: #2c3e50; margin-bottom: 15px;"),
-            verbatimTextOutput("normalization_log")
+            gexp_ui_log_box("normalization_log")
           ),
           tags$div(
             class = "step-timer",
@@ -380,44 +380,52 @@ ui_normalize <- tabItem(
           box(
             title = tags$span(icon("chart-bar"), " RNA-seq boxplot"),
             width = 12, status = "info", solidHeader = TRUE,
-            plotOutput("normalization_plot_rna", height = "320px")
+            plotOutput("normalization_plot_rna", height = "320px"),
+            gexp_ui_plot_download_bar("download_normalization_plot_rna_png", "download_normalization_plot_rna_jpg", "download_normalization_plot_rna_pdf", "btn-info btn-xs")
           ),
           box(
             title = tags$span(icon("wave-square"), " RNA-seq density"),
             width = 12, status = "success", solidHeader = TRUE,
-            plotOutput("normalization_density_rna", height = "280px")
+            plotOutput("normalization_density_rna", height = "280px"),
+            gexp_ui_plot_download_bar("download_normalization_density_rna_png", "download_normalization_density_rna_jpg", "download_normalization_density_rna_pdf", "btn-success btn-xs")
           ),
           box(
             title = tags$span(icon("chart-bar"), " RNA-seq median & range"),
             width = 12, status = "info", solidHeader = TRUE,
-            plotOutput("normalization_median_range_rna", height = "320px")
+            plotOutput("normalization_median_range_rna", height = "320px"),
+            gexp_ui_plot_download_bar("download_normalization_median_range_rna_png", "download_normalization_median_range_rna_jpg", "download_normalization_median_range_rna_pdf", "btn-info btn-xs")
           ),
           box(
             title = tags$span(icon("wave-square"), " RNA-seq distribution overlap"),
             width = 12, status = "success", solidHeader = TRUE,
-            plotOutput("normalization_distribution_overlap_rna", height = "320px")
+            plotOutput("normalization_distribution_overlap_rna", height = "320px"),
+            gexp_ui_plot_download_bar("download_normalization_distribution_overlap_rna_png", "download_normalization_distribution_overlap_rna_jpg", "download_normalization_distribution_overlap_rna_pdf", "btn-success btn-xs")
           )
         ),
         tagList(
           box(
             title = tags$span(icon("chart-bar"), " Microarray boxplot"),
             width = 12, status = "warning", solidHeader = TRUE,
-            plotOutput("normalization_plot_micro", height = "320px")
+            plotOutput("normalization_plot_micro", height = "320px"),
+            gexp_ui_plot_download_bar("download_normalization_plot_micro_png", "download_normalization_plot_micro_jpg", "download_normalization_plot_micro_pdf", "btn-warning btn-xs")
           ),
           box(
             title = tags$span(icon("wave-square"), " Microarray density"),
             width = 12, status = "warning", solidHeader = TRUE,
-            plotOutput("normalization_density_micro", height = "280px")
+            plotOutput("normalization_density_micro", height = "280px"),
+            gexp_ui_plot_download_bar("download_normalization_density_micro_png", "download_normalization_density_micro_jpg", "download_normalization_density_micro_pdf", "btn-warning btn-xs")
           ),
           box(
             title = tags$span(icon("chart-bar"), " Microarray median & range"),
             width = 12, status = "warning", solidHeader = TRUE,
-            plotOutput("normalization_median_range_micro", height = "320px")
+            plotOutput("normalization_median_range_micro", height = "320px"),
+            gexp_ui_plot_download_bar("download_normalization_median_range_micro_png", "download_normalization_median_range_micro_jpg", "download_normalization_median_range_micro_pdf", "btn-warning btn-xs")
           ),
           box(
             title = tags$span(icon("wave-square"), " Microarray distribution overlap"),
             width = 12, status = "warning", solidHeader = TRUE,
-            plotOutput("normalization_distribution_overlap_micro", height = "320px")
+            plotOutput("normalization_distribution_overlap_micro", height = "320px"),
+            gexp_ui_plot_download_bar("download_normalization_distribution_overlap_micro_png", "download_normalization_distribution_overlap_micro_jpg", "download_normalization_distribution_overlap_micro_pdf", "btn-warning btn-xs")
           )
         )
       ),

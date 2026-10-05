@@ -101,6 +101,43 @@ gexp_ui_plot_download_bar <- function(png_id, jpg_id, pdf_id, btn_class = "btn-s
   )
 }
 
+#' Standard dark-terminal log box, used for every step's processing log.
+#' One shared component so every step's log looks the same (background,
+#' font, timestamp handling) instead of each step styling its own.
+#' @param output_id Shiny output id for the log text (a renderText/
+#'   renderPrint producing already-formatted, newline-joined text).
+#' @param height CSS max-height for the scrollable area.
+#' @noRd
+gexp_ui_log_box <- function(output_id, height = "500px") {
+  shiny::tags$div(
+    class = "scrollable-log-area gexp-log-box",
+    style = paste0(
+      "max-height: ", height, "; overflow-y: auto; font-family: 'Courier New', monospace; ",
+      "font-size: 12px; background: #263238; color: #66BB6A; padding: 15px; ",
+      "border-radius: 8px; white-space: pre-wrap;"
+    ),
+    shiny::verbatimTextOutput(output_id, placeholder = TRUE)
+  )
+}
+
+#' Build a consistently-formatted closing summary block, appended to the end
+#' of every step's log text so every step ends the same way. `lines` is a
+#' named character/numeric vector (or list) of label -> value pairs.
+#' @noRd
+gexpipe_log_summary_block <- function(title, lines) {
+  rule <- paste(rep("━", 48), collapse = "")
+  body <- vapply(names(lines), function(nm) {
+    sprintf("  %s: %s", nm, format(lines[[nm]]))
+  }, character(1))
+  paste0(
+    "\n", rule, "\n",
+    "SUMMARY: ", title, "\n",
+    rule, "\n",
+    paste(body, collapse = "\n"), "\n",
+    rule, "\n"
+  )
+}
+
 # Open a graphics device for plot export (png/jpg/pdf inferred from file extension).
 gexp_plot_device_open <- function(file, width, height, bg = "white", type = NULL) {
   if (is.null(type)) {
@@ -124,6 +161,68 @@ gexp_ggsave_from_file <- function(file, plot, width, height, dpi = IMAGE_DPI) {
   ext <- tolower(sub(".*\\.", "", basename(file)))
   device <- if (ext %in% c("jpg", "jpeg")) "jpeg" else if (ext == "pdf") "pdf" else "png"
   ggplot2::ggsave(file, plot = plot, width = width, height = height, dpi = dpi, units = "in", bg = "white", device = device)
+  invisible(NULL)
+}
+
+#' Register PNG/JPG/PDF downloadHandlers for a base-graphics plot function in
+#' one call, so a parallel-mode (RNA-seq/Microarray) plot gets the same three
+#' download buttons a merged-mode plot already has, without hand-writing
+#' three near-identical downloadHandler blocks per plot.
+#' @param output The Shiny `output` object of the calling server function.
+#' @param id_stem Output id stem; registers output[[paste0("download_", id_stem, "_png")]] etc.
+#' @param plot_fn Zero-arg function that draws the plot to the currently open device.
+#' @param width,height Plot size in inches.
+#' @param filename_prefix Downloaded file basename (without extension).
+#' @param csv_dir Optional directory (e.g. CSV_EXPORT_DIR()) to also save a copy into, matching the app's "also save to export dir" convention used elsewhere.
+#' @noRd
+gexp_register_plot_downloads <- function(output, id_stem, plot_fn, width, height, filename_prefix, csv_dir = NULL) {
+  make_handler <- function(ext) {
+    shiny::downloadHandler(
+      filename = function() paste0(filename_prefix, ".", ext),
+      content = function(file) {
+        gexp_plot_device_open(file, width = width, height = height, type = ext)
+        on.exit(grDevices::dev.off(), add = TRUE)
+        plot_fn()
+        if (!is.null(csv_dir)) {
+          dir_val <- if (is.function(csv_dir)) csv_dir() else csv_dir
+          if (!is.null(dir_val) && nzchar(dir_val)) {
+            copy_path <- file.path(dir_val, paste0(filename_prefix, ".", ext))
+            try(file.copy(file, copy_path, overwrite = TRUE), silent = TRUE)
+          }
+        }
+      }
+    )
+  }
+  output[[paste0("download_", id_stem, "_png")]] <- make_handler("png")
+  output[[paste0("download_", id_stem, "_jpg")]] <- make_handler("jpg")
+  output[[paste0("download_", id_stem, "_pdf")]] <- make_handler("pdf")
+  invisible(NULL)
+}
+
+#' Same as gexp_register_plot_downloads(), but for a zero-arg function that
+#' RETURNS a ggplot object (saved via ggsave) instead of drawing directly to
+#' an open base-graphics device.
+#' @noRd
+gexp_register_ggplot_downloads <- function(output, id_stem, plot_fn, width, height, filename_prefix, csv_dir = NULL) {
+  make_handler <- function(ext) {
+    shiny::downloadHandler(
+      filename = function() paste0(filename_prefix, ".", ext),
+      content = function(file) {
+        p <- plot_fn()
+        gexp_ggsave_from_file(file, p, width = width, height = height)
+        if (!is.null(csv_dir)) {
+          dir_val <- if (is.function(csv_dir)) csv_dir() else csv_dir
+          if (!is.null(dir_val) && nzchar(dir_val)) {
+            copy_path <- file.path(dir_val, paste0(filename_prefix, ".", ext))
+            try(file.copy(file, copy_path, overwrite = TRUE), silent = TRUE)
+          }
+        }
+      }
+    )
+  }
+  output[[paste0("download_", id_stem, "_png")]] <- make_handler("png")
+  output[[paste0("download_", id_stem, "_jpg")]] <- make_handler("jpg")
+  output[[paste0("download_", id_stem, "_pdf")]] <- make_handler("pdf")
   invisible(NULL)
 }
 
@@ -1613,6 +1712,12 @@ detect_gene_id_format <- function(ids) {
   if (length(ids) == 0) {
     return("Unknown")
   }
+  if (.gexpipe_is_circbase_id(ids)) {
+    return("circRNA ID (circBase) - converting to host gene symbol")
+  }
+  if (.gexpipe_is_circrna_discovery_id(ids)) {
+    return("circRNA discovery ID (e.g. Arraystar array) - no public gene-symbol mapping available")
+  }
   head_ids <- .gexpipe_stratified_id_sample(ids, 80L)
   if (length(head_ids) > 0L && any(.gexpipe_id_looks_like_probe(head_ids))) {
     if (mean(grepl("^ENSG", head_ids, ignore.case = TRUE), na.rm = TRUE) > 0.3) {
@@ -2316,8 +2421,79 @@ entrez_to_symbol_biomart <- function(ids) {
   if (sum(!is.na(out)) > length(ids) * 0.1) out else NULL
 }
 
+# ==============================================================================
+# circRNA ID -> host gene symbol (circBase naming, e.g. hsa_circ_0004771)
+# ==============================================================================
+# Bundled from circBase (circbase.org)'s downloadable annotation tables
+# (Salzman2013, Jeck2013, Memczak2013, Rybak2015, Zhang2013), which include
+# a host "gene symbol" column - verified directly against the live download
+# before bundling. This ONLY covers circBase's own "hsa_circ_XXXXXXX"
+# numbering. It does NOT cover a study's original discovery-cohort probe/
+# array IDs (e.g. Arraystar circRNA microarray IDs like "A-NT2RP7011570",
+# which encode the tissue/cell line the circRNA was first found in, not a
+# circBase ID) - there is no public, generically-fetchable mapping from
+# that scheme to a gene symbol, so those are correctly left unconverted
+# rather than guessed at (see .gexpipe_is_circrna_discovery_id() below).
+.gexpipe_circbase_table_cache <- new.env(parent = emptyenv())
+
+.gexpipe_circbase_table <- function() {
+  if (!is.null(.gexpipe_circbase_table_cache$tbl)) {
+    return(.gexpipe_circbase_table_cache$tbl)
+  }
+  path <- system.file("extdata", "circbase_circrna_to_symbol.tsv.gz", package = "GExPipe")
+  if (!nzchar(path) || !file.exists(path)) {
+    .gexpipe_circbase_table_cache$tbl <- character(0)
+    return(character(0))
+  }
+  tbl <- tryCatch({
+    df <- utils::read.delim(gzfile(path), header = FALSE, stringsAsFactors = FALSE,
+                             col.names = c("circ_id", "symbol"))
+    stats::setNames(as.character(df$symbol), as.character(df$circ_id))
+  }, error = function(e) character(0))
+  .gexpipe_circbase_table_cache$tbl <- tbl
+  tbl
+}
+
+# circBase's own numbering: species-prefixed "circ" IDs (hsa_circ_..., etc).
+.gexpipe_is_circbase_id <- function(ids) {
+  sample_ids <- head(ids[!is.na(ids) & nzchar(trimws(ids))], 200L)
+  length(sample_ids) > 0L && mean(grepl("^[a-z]{2,4}_circ_[0-9]+$", sample_ids, ignore.case = TRUE), na.rm = TRUE) > 0.5
+}
+
+# A study's ORIGINAL circRNA discovery ID (e.g. Arraystar circRNA
+# microarray / Salzman-Jeck naming: "A-NT2RP7011570", "C-ADG04260") -
+# letter prefix, dash, alphabetic tissue/cell-line code, digits. No public
+# mapping exists from this to a gene symbol; used only to give an honest,
+# specific log message instead of the generic "Microarray probe-like ID"
+# guess, which implied a standard, resolvable probe format.
+.gexpipe_is_circrna_discovery_id <- function(ids) {
+  sample_ids <- head(ids[!is.na(ids) & nzchar(trimws(ids))], 200L)
+  # Tissue/cell-line code can itself contain digits (e.g. "NT2RP" from the
+  # NT2 cell line), so the middle segment must start with a letter but may
+  # mix letters and digits before the long trailing serial number.
+  length(sample_ids) > 0L && mean(grepl("^[A-Za-z]-[A-Za-z][A-Za-z0-9]*[0-9]{4,}$", sample_ids), na.rm = TRUE) > 0.5
+}
+
+# Look up circBase circRNA IDs against the bundled table. Returns NULL if
+# the table is unavailable or IDs don't match circBase's numbering.
+circbase_ids_to_symbol <- function(ids) {
+  if (is.null(ids) || length(ids) == 0 || !.gexpipe_is_circbase_id(ids)) {
+    return(NULL)
+  }
+  tbl <- .gexpipe_circbase_table()
+  if (length(tbl) == 0) {
+    return(NULL)
+  }
+  out <- unname(tbl[as.character(ids)])
+  if (sum(!is.na(out)) > length(ids) * 0.05) out else NULL
+}
+
 # Convert any gene ID (probe, Entrez, Ensembl, or symbol) to gene symbol for overlap
 any_id_to_symbol <- function(ids, gpl_id = NULL, gse_id = NULL) {
+  circ_sym <- circbase_ids_to_symbol(ids)
+  if (!is.null(circ_sym)) {
+    return(circ_sym)
+  }
   if (is.null(ids) || length(ids) == 0) {
     return(ids)
   }
@@ -2943,4 +3119,114 @@ normalize_rnaseq <- function(count_matrix, dataset_name = NULL, method = "TMM") 
   )
 
   return(logcpm_matrix)
+}
+
+#' Per-gene Normal-vs-Disease boxplots with significance stars
+#'
+#' One builder for BOTH the training and the validation expression panels so
+#' they share gene order, panel layout, group order, colours, styling and the
+#' same significance annotation. Significance: Wilcoxon rank-sum test per gene,
+#' Benjamini-Hochberg adjusted across the genes shown; stars: * < 0.05,
+#' ** < 0.01, *** < 0.001, **** < 0.0001, ns = not significant.
+#' @param long data.frame with SampleID, Group, Gene (factor; its level order is
+#'   the panel order) and Expression.
+#' @param title Plot title.
+#' @param max_genes Maximum number of panels (first ones in the factor order).
+#' @noRd
+gexp_expression_boxplot <- function(long, title, max_genes = 12L, ncol_max = 4L) {
+  long <- long[is.finite(long$Expression), , drop = FALSE]
+  genes <- head(levels(droplevels(long$Gene)), max_genes)
+  long <- long[long$Gene %in% genes, , drop = FALSE]
+  long$Gene <- factor(as.character(long$Gene), levels = genes)
+  grp <- as.character(long$Group)
+  lv <- if (all(c("Normal", "Disease") %in% grp)) c("Normal", "Disease") else unique(grp)
+  long$Group <- factor(grp, levels = lv)
+  fill <- c(Normal = "#43A047", Disease = "#E53935")
+  if (!all(lv %in% names(fill))) fill <- stats::setNames(grDevices::hcl.colors(length(lv), "Set 2"), lv)
+  fill <- fill[lv]
+  n_by <- table(unique(long[, c("SampleID", "Group")])$Group)[lv]
+  x_labels <- paste0(lv, "\n(n = ", as.integer(n_by), ")")
+
+  ann <- NULL
+  if (length(lv) == 2L) {
+    pv <- vapply(genes, function(g) {
+      d <- long[long$Gene == g, , drop = FALSE]
+      a <- d$Expression[d$Group == lv[1L]]; b <- d$Expression[d$Group == lv[2L]]
+      if (length(a) < 2L || length(b) < 2L) return(NA_real_)
+      tryCatch(suppressWarnings(stats::wilcox.test(a, b, exact = FALSE)$p.value), error = function(e) NA_real_)
+    }, numeric(1))
+    padj <- stats::p.adjust(pv, method = "BH")
+    lab <- as.character(cut(padj, breaks = c(-Inf, 1e-4, 1e-3, 1e-2, 5e-2, Inf),
+                            labels = c("****", "***", "**", "*", "ns"), right = FALSE))
+    lab[is.na(lab)] <- "ns"
+    rng <- t(vapply(genes, function(g) range(long$Expression[long$Gene == g]), numeric(2)))
+    span <- pmax(rng[, 2L] - rng[, 1L], 1e-9)
+    ann <- data.frame(Gene = factor(genes, levels = genes), y = rng[, 2L] + 0.07 * span,
+                      ylab = rng[, 2L] + 0.085 * span, label = lab, stringsAsFactors = FALSE)
+  }
+
+  n_genes <- length(genes)
+  p <- ggplot2::ggplot(long, ggplot2::aes(x = Group, y = Expression, fill = Group)) +
+    ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.85) +
+    ggplot2::geom_jitter(width = 0.15, size = 1, alpha = 0.5)
+  if (!is.null(ann)) {
+    p <- p +
+      ggplot2::geom_segment(data = ann, ggplot2::aes(x = 1, xend = 2, y = y, yend = y), inherit.aes = FALSE, linewidth = 0.4) +
+      ggplot2::geom_text(data = ann, ggplot2::aes(x = 1.5, y = ylab, label = label), inherit.aes = FALSE,
+                         vjust = 0, size = ifelse(ann$label == "ns", 3, 5), fontface = "bold")
+  }
+  p +
+    ggplot2::facet_wrap(~Gene, scales = "free_y", ncol = min(ncol_max, n_genes)) +
+    ggplot2::scale_fill_manual(values = fill) +
+    ggplot2::scale_x_discrete(labels = x_labels) +
+    ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0.05, 0.15))) +
+    ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(legend.position = "top", axis.title.x = ggplot2::element_blank(),
+                   strip.text = ggplot2::element_text(face = "bold")) +
+    ggplot2::labs(y = "Expression", title = title,
+                  caption = "Wilcoxon rank-sum test per gene, Benjamini-Hochberg adjusted across the genes shown. **** < 0.0001, *** < 0.001, ** < 0.01, * < 0.05, ns = not significant.")
+}
+
+#' Gene funnel: how many genes survive at each pipeline step
+#'
+#' @param n Named list of counts (NULL / NA = step not run yet): de_rna, de_micro, de_merged,
+#'   consensus, common, ml, roc_tested, roc_pass, roc_selected, nomogram.
+#' @param parallel Whether the run is in Parallel mode.
+#' @return data.frame(Step, Genes, Status, Hint); Status is "not run", "ok" or "STOPS HERE"
+#'   (the first step that reached zero genes).
+#' @noRd
+gexp_gene_funnel_table <- function(n, parallel = FALSE) {
+  val <- function(k) { v <- n[[k]]; if (is.null(v) || length(v) != 1L || is.na(v)) NA_integer_ else as.integer(v) }
+  steps <- list(
+    list("Step 6 - significant genes, RNA-seq", "de_rna", parallel,
+         "No gene passes the Step 6 cutoffs. Lower the LogFC cutoff and keep adjusted P at 0.05; check that the groups are Normal vs Disease and that the DE method suits the data."),
+    list("Step 6 - significant genes, microarray", "de_micro", parallel,
+         "No gene passes the Step 6 cutoffs. Microarray fold changes are small, so try a LogFC cutoff of 0.2-0.3; check the groups."),
+    list("Step 6 - significant genes (merged)", "de_merged", !parallel,
+         "No gene passes the Step 6 cutoffs. Lower the LogFC cutoff; check the groups and that batch correction did not remove the disease signal."),
+    list("Step 7 - consensus of both platforms", "consensus", parallel,
+         "No gene is significant on both platforms with the same direction. Relax the Step 6 cutoffs, turn off 'same direction', or switch to Union (exploratory)."),
+    list("Step 8 - common genes (DEG and WGCNA)", "common", TRUE,
+         "No overlap between the significant genes and the WGCNA modules. Relax the DE cutoffs or pick other WGCNA modules."),
+    list("Step 10 - machine-learning genes", "ml", TRUE,
+         "The ML step kept no gene. Check that Step 8 produced genes and that each group has enough samples."),
+    list("Step 12 - genes with training AUC >= 0.8", "roc_pass", TRUE,
+         "No gene reaches AUC 0.8 on the training data (fixed filter). The effect may be weak, or groups/batches may be mixed; recheck Steps 4-6."),
+    list("Step 12 - genes you selected", "roc_selected", TRUE,
+         "Select genes in Step 12 (ROC) to carry into the nomogram."),
+    list("Step 14 - nomogram predictors", "nomogram", TRUE,
+         "The nomogram needs at least 10 Normal and 10 Disease samples and trims the panel to what the sample size supports.")
+  )
+  rows <- Filter(function(s) isTRUE(s[[3L]]), steps)
+  out <- data.frame(Step = vapply(rows, `[[`, character(1), 1L), Genes = vapply(rows, function(s) val(s[[2L]]), integer(1)),
+                    Status = NA_character_, Hint = "", stringsAsFactors = FALSE)
+  stopped <- FALSE
+  for (i in seq_len(nrow(out))) {
+    g <- out$Genes[i]
+    if (is.na(g)) { out$Status[i] <- "not run"; next }
+    if (g == 0L && !stopped) { out$Status[i] <- "STOPS HERE"; out$Hint[i] <- rows[[i]][[4L]]; stopped <- TRUE }
+    else if (g == 0L) out$Status[i] <- "empty"
+    else out$Status[i] <- "ok"
+  }
+  out
 }

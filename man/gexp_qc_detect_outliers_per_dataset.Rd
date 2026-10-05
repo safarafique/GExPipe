@@ -26,3 +26,17 @@ Combined-matrix PCA on mixed microarray + RNA-seq (or un-normalized
 multi-study counts) is not comparable. This helper runs
 \code{\link{gexp_qc_detect_outliers}} on each GSE separately and unions the flags.
 }
+\examples{
+set.seed(1)
+make_mat <- function(prefix) {
+  m <- matrix(rnorm(400), nrow = 40, ncol = 10)
+  dimnames(m) <- list(paste0("Gene", seq_len(40)), paste0(prefix, seq_len(10)))
+  m
+}
+out <- gexp_qc_detect_outliers_per_dataset(
+  micro_expr_list = list(GSE_A = make_mat("A")),
+  rna_counts_list = list(GSE_B = make_mat("B")),
+  top_n = 20
+)
+out$all_outliers
+}

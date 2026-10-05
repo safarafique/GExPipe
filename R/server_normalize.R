@@ -181,31 +181,19 @@ server_normalize <- function(input, output, session, rv) {
     if (isTRUE(keep_platforms_separate)) {
       log_text <- norm_out$log_text
     } else {
+      summary_lines <- list("Initial total genes" = format(initial_total, big.mark = ","))
+      if (rnaseq_removed > 0) {
+        summary_lines[["Removed (low expression)"]] <- format(rnaseq_removed, big.mark = ",")
+        summary_lines[["After filtering"]] <- format(after_filter_total, big.mark = ",")
+      }
+      summary_lines[["Gene filtering"]] <- "Filtered to common genes (intersection)"
+      summary_lines[["Common genes retained"]] <- format(final_count, big.mark = ",")
+      summary_lines[["Final samples"]] <- format(ncol(rv$combined_expr), big.mark = ",")
+      summary_lines[["Note"]] <- "DE (Step 6) and batch correction (Step 5) may apply their own additional gene filtering."
+      summary_lines[["Status"]] <- "Complete - proceed to QC & Visualization (Step 3)"
       log_text <- paste0(
         norm_out$log_text,
-        "\n\u2713 Normalization Complete!\n",
-        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-        "Gene Statistics Summary:\n",
-        "  Initial total genes:     ", format(initial_total, big.mark = ","), "\n"
-      )
-      if (rnaseq_removed > 0) {
-        log_text <- paste0(
-          log_text,
-          "  Removed (low expression): ", format(rnaseq_removed, big.mark = ","), "\n",
-          "  After filtering:         ", format(after_filter_total, big.mark = ","), "\n"
-        )
-      }
-      log_text <- paste0(
-        log_text,
-        "  Gene Filtering:           Filtered to common genes (intersection)\n",
-        "  Common genes retained: ", format(final_count, big.mark = ","), "\n",
-        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-        "Final Dataset:\n",
-        "  Genes:   ", format(nrow(rv$combined_expr), big.mark = ","), "\n",
-        "  Samples: ", format(ncol(rv$combined_expr), big.mark = ","), "\n",
-        "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n",
-        "\nNote: DE analysis applies independent gene filtering (filterByExpr) at Step 6.\n",
-        "      Batch correction may apply an optional variance filter in Step 5.\n"
+        gexpipe_log_summary_block("Step 2 - Normalization", summary_lines)
       )
     }
 
@@ -741,6 +729,17 @@ server_normalize <- function(input, output, session, rv) {
       "Microarray distribution overlap"
     )
   })
+
+  # Parallel-mode plots had no image download buttons (merged mode already
+  # did) - add PNG/JPG/PDF for each, matching the merged-mode plots.
+  gexp_register_ggplot_downloads(output, "normalization_plot_rna", function() { req(isTRUE(rv$normalization_complete)); .norm_platform_boxplot(rv$expr_rna, "RNA-seq expression (this platform only)", "#93c5fd") }, 7, 5, "Normalization_Boxplot_RNAseq")
+  gexp_register_ggplot_downloads(output, "normalization_density_rna", function() { req(isTRUE(rv$normalization_complete)); .norm_platform_density(rv$expr_rna, "RNA-seq density (this platform only)", "#2563eb") }, 7, 5, "Normalization_Density_RNAseq")
+  gexp_register_ggplot_downloads(output, "normalization_median_range_rna", function() { req(isTRUE(rv$normalization_complete)); .norm_median_range_plot(rv$expr_rna, "RNA-seq median & range") }, 7, 5, "Normalization_MedianRange_RNAseq")
+  gexp_register_ggplot_downloads(output, "normalization_distribution_overlap_rna", function() { req(isTRUE(rv$normalization_complete)); .norm_distribution_overlap_plot(.norm_platform_comparison(rv$expr_rna), "RNA-seq distribution overlap") }, 7, 5, "Normalization_DistributionOverlap_RNAseq")
+  gexp_register_ggplot_downloads(output, "normalization_plot_micro", function() { req(isTRUE(rv$normalization_complete)); .norm_platform_boxplot(rv$expr_micro, "Microarray expression (this platform only)", "#fde68a") }, 7, 5, "Normalization_Boxplot_Microarray")
+  gexp_register_ggplot_downloads(output, "normalization_density_micro", function() { req(isTRUE(rv$normalization_complete)); .norm_platform_density(rv$expr_micro, "Microarray density (this platform only)", "#d97706") }, 7, 5, "Normalization_Density_Microarray")
+  gexp_register_ggplot_downloads(output, "normalization_median_range_micro", function() { req(isTRUE(rv$normalization_complete)); .norm_median_range_plot(rv$expr_micro, "Microarray median & range") }, 7, 5, "Normalization_MedianRange_Microarray")
+  gexp_register_ggplot_downloads(output, "normalization_distribution_overlap_micro", function() { req(isTRUE(rv$normalization_complete)); .norm_distribution_overlap_plot(.norm_platform_comparison(rv$expr_micro), "Microarray distribution overlap") }, 7, 5, "Normalization_DistributionOverlap_Microarray")
 
   # Normalization quality visualization: Box plots showing distribution before/after
   output$normalization_plot <- renderPlot({

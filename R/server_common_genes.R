@@ -97,10 +97,31 @@ server_common_genes <- function(input, output, session, rv) {
       return()
     }
 
-    # Get DEG gene column (allow "Gene" or "gene" or first column)
-    sg <- rv$sig_genes
-    deg_col <- if ("Gene" %in% names(sg)) "Gene" else if ("gene" %in% names(sg)) "gene" else names(sg)[1]
-    deg_genes <- unique(trimws(as.character(sg[[deg_col]])))
+    # Get DEG gene column (allow "Gene" or "gene" or first column).
+    # In parallel mode (two separate DE analyses), rv$sig_genes is
+    # permanently overwritten with ONLY the RNA-seq significant genes
+    # right after Step 6 runs (server_results.R) - it is never the
+    # Microarray ones or a combination of both, regardless of anything
+    # the user clicks. Using it here would silently drop every
+    # Microarray DEG from the common-gene pool that feeds ML/ROC/
+    # Nomogram. Union both platforms' own significant-gene tables
+    # instead whenever they exist; only fall back to rv$sig_genes for
+    # merged mode, where it already reflects the single combined DE.
+    .extract_deg_genes <- function(df) {
+      if (is.null(df) || !is.data.frame(df) || nrow(df) == 0) return(character(0))
+      col <- if ("Gene" %in% names(df)) "Gene" else if ("gene" %in% names(df)) "gene" else names(df)[1]
+      unique(trimws(as.character(df[[col]])))
+    }
+    if (isTRUE(rv$consensus_complete)) {
+      # Step 7 (RNA-seq intersect Microarray) already computed the real
+      # combined result and correctly overwrote rv$sig_genes with it -
+      # trust that rather than a broader union of both platforms alone.
+      deg_genes <- .extract_deg_genes(rv$sig_genes)
+    } else if (!is.null(rv$sig_genes_rna) || !is.null(rv$sig_genes_micro)) {
+      deg_genes <- unique(c(.extract_deg_genes(rv$sig_genes_rna), .extract_deg_genes(rv$sig_genes_micro)))
+    } else {
+      deg_genes <- .extract_deg_genes(rv$sig_genes)
+    }
     if (length(deg_genes) == 0) {
       showNotification("No significant DEGs found. Adjust DE cutoffs in Step 6 or re-run DE analysis.", type = "warning", duration = 6)
       return()

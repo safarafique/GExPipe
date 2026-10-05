@@ -60,7 +60,7 @@ ui_roc <- tabItem(
     box(
       title = tags$span(icon("box"), " Gene Expression -- Training Data (Normal vs Disease)"),
       width = 6, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      plotOutput("roc_boxplots_plot", height = "400px"),
+      plotOutput("roc_boxplots_plot", height = "420px"),
       tags$div(style = "margin-top: 10px;",
         downloadButton("download_roc_boxplots_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-right: 6px;"),
         downloadButton("download_roc_boxplots_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm"))

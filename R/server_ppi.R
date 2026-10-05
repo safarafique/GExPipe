@@ -194,23 +194,31 @@ server_ppi <- function(input, output, session, rv) {
   # Applied gene set (updated only when user clicks "Run"); graphs use this
   app_ppi <- reactiveValues(applied_mode = NULL, applied_top_n = NULL, applied_manual_genes = NULL)
 
+  # input$ppi_gene_select_mode can be character(0) (not NULL) when its
+  # widget hasn't rendered into the DOM yet - e.g. right when rv$ppi_complete
+  # first flips TRUE and the mode selector only then becomes visible.
+  # is.null() doesn't catch that, so a later bare `mode == "x"` becomes
+  # logical(0) and `if`/`&&` on it throws "argument is of length zero".
+  # length(mode) == 0 covers both NULL and character(0) in one check.
+  .gexpipe_ppi_normalize_mode <- function(mode, default = "topn") {
+    if (is.null(mode) || length(mode) == 0 || !nzchar(mode[1])) default else mode[1]
+  }
+
   observeEvent(input$ppi_apply_gene_set, {
-    mode <- input$ppi_gene_select_mode
-    if (is.null(mode)) mode <- "topn"
+    mode <- .gexpipe_ppi_normalize_mode(input$ppi_gene_select_mode)
     app_ppi$applied_mode <- mode
     app_ppi$applied_top_n <- tryCatch(as.integer(input$ppi_top_hubs), error = function(e) 15L)
-    app_ppi$applied_manual_genes <- if (mode == "manual" && length(input$ppi_manual_genes) > 0) input$ppi_manual_genes else NULL
+    app_ppi$applied_manual_genes <- if (identical(mode, "manual") && length(input$ppi_manual_genes) > 0) input$ppi_manual_genes else NULL
     showNotification("Gene set applied. Network graphs updated.", type = "message", duration = 3)
   })
 
   # When PPI completes, apply current selection so graphs show without requiring Run first
   observeEvent(rv$ppi_complete, {
     if (!isTRUE(rv$ppi_complete)) return()
-    mode <- input$ppi_gene_select_mode
-    if (is.null(mode)) mode <- "topn"
+    mode <- .gexpipe_ppi_normalize_mode(input$ppi_gene_select_mode)
     app_ppi$applied_mode <- mode
     app_ppi$applied_top_n <- tryCatch(as.integer(input$ppi_top_hubs), error = function(e) 15L)
-    app_ppi$applied_manual_genes <- if (mode == "manual" && length(input$ppi_manual_genes) > 0) input$ppi_manual_genes else NULL
+    app_ppi$applied_manual_genes <- if (identical(mode, "manual") && length(input$ppi_manual_genes) > 0) input$ppi_manual_genes else NULL
   })
 
   output$ppi_placeholder_ui <- renderUI({
@@ -255,10 +263,12 @@ server_ppi <- function(input, output, session, rv) {
       return()
     }
 
-    st <- tryCatch(as.numeric(input$ppi_score_threshold), error = function(e) NA)
-    score_threshold <- max(150, min(900, if (is.na(st)) 400 else st))
-    nt <- tryCatch(as.integer(input$ppi_top_hubs), error = function(e) NA)
-    n_top_hubs <- max(5, min(50, if (is.na(nt)) 15 else nt))
+    # Inputs can be NULL / zero-length if the settings UI has not rendered;
+    # fall back to defaults instead of crashing on `if (logical(0))`.
+    st <- tryCatch(as.numeric(input$ppi_score_threshold)[1L], error = function(e) NA_real_)
+    score_threshold <- max(150, min(900, if (length(st) != 1L || is.na(st)) 400 else st))
+    nt <- tryCatch(as.integer(input$ppi_top_hubs)[1L], error = function(e) NA_integer_)
+    n_top_hubs <- max(5, min(50, if (length(nt) != 1L || is.na(nt)) 15 else nt))
 
     withProgress(message = "PPI analysis (STRINGdb + hub genes)...", value = 0.1, {
       ppi_timeout <- as.integer(getOption("gexpipe.stringdb_timeout", 120L))
@@ -432,17 +442,25 @@ server_ppi <- function(input, output, session, rv) {
           type = "message", duration = 10
         )
       }, error = function(e) {
+        # conditionMessage() is a single string for ordinary R errors, but
+        # some errors surfaced through network/STRINGdb calls can carry a
+        # NULL or zero-length message. grepl() on that returns character(0),
+        # and a bare `if (character(0))` throws "argument is of length
+        # zero" - INSIDE this error handler, where nothing else catches it,
+        # crashing the whole observer instead of showing a notification.
+        # any() makes each check safe regardless of msg's length.
         msg <- conditionMessage(e)
+        if (length(msg) == 0 || !nzchar(msg)) msg <- "unknown error"
 
-        reason <- if (grepl("timeout|timed out", msg, ignore.case = TRUE)) {
+        reason <- if (any(grepl("timeout|timed out", msg, ignore.case = TRUE))) {
           "Network timeout - STRING server did not respond. Check your internet connection and try again."
-        } else if (grepl("protein\\.aliases|alias", msg, ignore.case = TRUE)) {
+        } else if (any(grepl("protein\\.aliases|alias", msg, ignore.case = TRUE))) {
           "STRING alias file could not be downloaded. The STRING version may have changed. Try again later or update STRINGdb."
-        } else if (grepl("cannot open|cannot download|404|URL|curl", msg, ignore.case = TRUE)) {
+        } else if (any(grepl("cannot open|cannot download|404|URL|curl", msg, ignore.case = TRUE))) {
           "Cannot reach STRING server. Check your internet connection."
-        } else if (grepl("no valid|0 edges|No PPI", msg, ignore.case = TRUE)) {
+        } else if (any(grepl("no valid|0 edges|No PPI", msg, ignore.case = TRUE))) {
           "No interactions found. Try lowering the score threshold (e.g. from 400 to 200)."
-        } else if (grepl("No unique vertices|duplicates", msg, ignore.case = TRUE)) {
+        } else if (any(grepl("No unique vertices|duplicates", msg, ignore.case = TRUE))) {
           "Gene mapping produced duplicate entries. Try with a different gene set."
         } else {
           paste("Unexpected error:", msg)
@@ -510,16 +528,16 @@ server_ppi <- function(input, output, session, rv) {
     if (is.null(rv$ppi_graph) || is.null(rv$ppi_hub_scores) || is.null(rv$ppi_interactive_genes) || length(rv$ppi_interactive_genes) == 0)
       return(character(0))
     mode <- app_ppi$applied_mode
-    if (is.null(mode)) return(character(0))
-    if (mode == "hub") {
+    if (is.null(mode) || length(mode) == 0) return(character(0))
+    if (identical(mode, "hub")) {
       hubs <- rv$ppi_consensus_hubs
       if (is.null(hubs) || length(hubs) == 0) return(character(0))
       return(intersect(hubs, rv$ppi_interactive_genes))
     }
-    if (mode == "manual" && length(app_ppi$applied_manual_genes) > 0) {
+    if (identical(mode, "manual") && length(app_ppi$applied_manual_genes) > 0) {
       return(intersect(app_ppi$applied_manual_genes, rv$ppi_interactive_genes))
     }
-    if (mode == "manual") return(character(0))
+    if (identical(mode, "manual")) return(character(0))
     n <- app_ppi$applied_top_n
     if (is.null(n)) n <- 15L
     n <- min(50, max(1, n), length(rv$ppi_interactive_genes))
@@ -579,10 +597,10 @@ server_ppi <- function(input, output, session, rv) {
       return("Run PPI analysis first (Step 1). Then check interacting/non-interacting counts and list above.")
     if (length(rv$ppi_interactive_genes) == 0)
       return("No interacting genes. Lower STRING score threshold or check common genes; then re-run PPI.")
-    if (is.null(app_ppi$applied_mode))
+    if (is.null(app_ppi$applied_mode) || length(app_ppi$applied_mode) == 0)
       return("Select gene set above (Hub genes only, Top N by degree, or manual) and click Run to generate network graphs.")
     mode <- app_ppi$applied_mode
-    if (mode == "hub") return("Choose 'Hub genes only' above and click Run. If no hubs, run PPI and check consensus hubs.")
+    if (identical(mode, "hub")) return("Choose 'Hub genes only' above and click Run. If no hubs, run PPI and check consensus hubs.")
     "Choose gene set above (Hub genes only or Top N by degree) and click Run. Graphs and list below use the applied set."
   })
 
@@ -1274,12 +1292,10 @@ server_ppi <- function(input, output, session, rv) {
   observeEvent(input$ppi_apply_centrality, {
     req(rv$ppi_hub_scores)
     df <- rv$ppi_hub_scores
-    mode <- input$ppi_centrality_mode
-    if (is.null(mode)) mode <- "filter"
+    mode <- .gexpipe_ppi_normalize_mode(input$ppi_centrality_mode, default = "filter")
     n_top <- max(5, min(100, as.integer(input$ppi_centrality_top_n)))
-    metric <- input$ppi_centrality_metric
-    if (is.null(metric)) metric <- "Degree"
-    if (metric == "Composite") {
+    metric <- .gexpipe_ppi_normalize_mode(input$ppi_centrality_metric, default = "Degree")
+    if (identical(metric, "Composite")) {
       df$Rank_Degree <- rank(-df$Degree)
       df$Rank_Betweenness <- rank(-df$Betweenness)
       df$Rank_Closeness <- rank(-df$Closeness)
@@ -1290,7 +1306,7 @@ server_ppi <- function(input, output, session, rv) {
     }
     df_ord <- df[ord, ]
     top_genes <- head(df_ord$SYMBOL, n_top)
-    if (mode == "filter") {
+    if (identical(mode, "filter")) {
       rv$ppi_centrality_filtered_genes <- top_genes
       rv$ppi_centrality_weights <- NULL
     } else {
@@ -1303,7 +1319,7 @@ server_ppi <- function(input, output, session, rv) {
     }
     tab <- df_ord
     tab$Rank <- seq_len(nrow(tab))
-    if (mode == "weight") {
+    if (identical(mode, "weight")) {
       tab$Weight <- (tab$Degree - min(tab$Degree)) / (max(tab$Degree) - min(tab$Degree) + 1e-10)
       bet_n <- (tab$Betweenness - min(tab$Betweenness)) / (max(tab$Betweenness) - min(tab$Betweenness) + 1e-10)
       close_n <- (tab$Closeness - min(tab$Closeness)) / (max(tab$Closeness) - min(tab$Closeness) + 1e-10)
@@ -1312,7 +1328,7 @@ server_ppi <- function(input, output, session, rv) {
       tab$Weight <- NA
     }
     rv$ppi_centrality_table <- tab
-    msg <- if (mode == "filter") paste("Top", length(top_genes), "genes by", metric, "selected for ML. Click 'Extract Data for ML' to use them.") else paste("Centrality weights computed for", nrow(tab), "genes.")
+    msg <- if (identical(mode, "filter")) paste("Top", length(top_genes), "genes by", metric, "selected for ML. Click 'Extract Data for ML' to use them.") else paste("Centrality weights computed for", nrow(tab), "genes.")
     showNotification(msg, type = "message", duration = 4)
   })
 

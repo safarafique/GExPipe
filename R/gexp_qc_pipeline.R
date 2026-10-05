@@ -96,6 +96,20 @@ gexp_qc_detect_outliers <- function(expr, top_n = 5000L) {
 #' @param top_n Integer number of top variable genes per dataset.
 #' @return List with `pca_outliers`, `conn_outliers`, `all_outliers`,
 #'   `skipped` (datasets with fewer than 5 samples), and `log`.
+#'
+#' @examples
+#' set.seed(1)
+#' make_mat <- function(prefix) {
+#'   m <- matrix(rnorm(400), nrow = 40, ncol = 10)
+#'   dimnames(m) <- list(paste0("Gene", seq_len(40)), paste0(prefix, seq_len(10)))
+#'   m
+#' }
+#' out <- gexp_qc_detect_outliers_per_dataset(
+#'   micro_expr_list = list(GSE_A = make_mat("A")),
+#'   rna_counts_list = list(GSE_B = make_mat("B")),
+#'   top_n = 20
+#' )
+#' out$all_outliers
 #' @export
 gexp_qc_detect_outliers_per_dataset <- function(
   micro_expr_list = list(),

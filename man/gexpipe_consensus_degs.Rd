@@ -4,7 +4,12 @@
 \alias{gexpipe_consensus_degs}
 \title{Consensus DEGs from separate RNA-seq and microarray DE}
 \usage{
-gexpipe_consensus_degs(rna_sig, micro_sig, require_same_direction = TRUE)
+gexpipe_consensus_degs(
+  rna_sig,
+  micro_sig,
+  require_same_direction = TRUE,
+  combine = c("intersection", "union")
+)
 }
 \arguments{
 \item{rna_sig}{Significant-gene table from RNA-seq DE (\code{Gene}, \code{logFC},
@@ -13,7 +18,15 @@ gexpipe_consensus_degs(rna_sig, micro_sig, require_same_direction = TRUE)
 \item{micro_sig}{Significant-gene table from microarray DE (same columns).}
 
 \item{require_same_direction}{logical; if TRUE, drop genes with opposite
-fold-change signs.}
+fold-change signs (only affects genes significant on both platforms;
+has no effect on a platform-exclusive gene under \code{combine = "union"},
+since there's no second direction to conflict with).}
+
+\item{combine}{\code{"intersection"} (default; a gene must be significant on
+BOTH platforms - the scientifically stronger, cross-platform-validated
+result) or \code{"union"} (a gene significant on EITHER platform passes,
+with no cross-platform confirmation - more exploratory, more false
+positives; use for hypothesis generation, not a final panel).}
 }
 \value{
 list with \code{table}, \code{genes}, \code{n_rna}, \code{n_micro}, \code{n_overlap},

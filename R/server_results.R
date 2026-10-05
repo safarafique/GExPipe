@@ -1245,6 +1245,27 @@ server_results <- function(input, output, session, rv) {
       logfc = .de_cutoffs("Microarray")$logfc, padj = .de_cutoffs("Microarray")$padj
     )
   })
+
+  # Parallel-mode volcano plots had no image download buttons (merged mode
+  # already did) - add PNG/JPG/PDF for each.
+  gexp_register_ggplot_downloads(output, "volcano_plot_rna", function() {
+    req(rv$de_results_rna)
+    rna_lab <- switch(
+      if (is.null(rv$de_method)) "limma" else rv$de_method,
+      deseq2 = "DESeq2", edger = "edgeR", limma_voom = "limma-voom", "limma"
+    )
+    .gexpipe_draw_volcano(
+      rv$de_results_rna, "RNA-seq volcano (this platform only)", rna_lab,
+      logfc = .de_cutoffs("RNAseq")$logfc, padj = .de_cutoffs("RNAseq")$padj
+    )
+  }, 8, 6, "Volcano_Plot_RNAseq")
+  gexp_register_ggplot_downloads(output, "volcano_plot_micro", function() {
+    req(rv$de_results_micro)
+    .gexpipe_draw_volcano(
+      rv$de_results_micro, "Microarray volcano (this platform only)", "limma",
+      logfc = .de_cutoffs("Microarray")$logfc, padj = .de_cutoffs("Microarray")$padj
+    )
+  }, 8, 6, "Volcano_Plot_Microarray")
   output$top_degs_table_rna <- renderDT({
     .gexpipe_top_degs_dt(rv$sig_genes_rna)
   })
@@ -1331,25 +1352,22 @@ server_results <- function(input, output, session, rv) {
     })
   })
   
-  output$heatmap_plot <- renderPlot({
-    req(rv$de_results, rv$batch_corrected)
-    
+  # Shared top-N DE-gene heatmap drawing, used by merged mode (heatmap_plot)
+  # and both parallel-mode platforms (heatmap_plot_rna/_micro).
+  .gexpipe_draw_de_heatmap <- function(de_results, expr_matrix, metadata, top_n, title_suffix = "") {
     tryCatch({
-      # Get top DE genes sorted by adjusted p-value
-      top <- head(rv$de_results[order(rv$de_results$adj.P.Val), ], input$top_genes)
-      
-      # Filter to genes that actually exist in the batch-corrected matrix
-      valid_genes <- intersect(top$Gene, rownames(rv$batch_corrected))
-      
+      req(de_results, expr_matrix)
+      top <- head(de_results[order(de_results$adj.P.Val), ], top_n)
+
+      valid_genes <- intersect(top$Gene, rownames(expr_matrix))
       if (length(valid_genes) == 0) {
-        # Fallback: try case-insensitive match
-        bc_genes_upper <- toupper(rownames(rv$batch_corrected))
-        names(bc_genes_upper) <- rownames(rv$batch_corrected)
+        bc_genes_upper <- toupper(rownames(expr_matrix))
+        names(bc_genes_upper) <- rownames(expr_matrix)
         top_upper <- toupper(top$Gene)
         matched <- bc_genes_upper[bc_genes_upper %in% top_upper]
         valid_genes <- names(matched)
       }
-      
+
       if (length(valid_genes) < 2) {
         plot.new()
         text(0.5, 0.5,
@@ -1358,26 +1376,24 @@ server_results <- function(input, output, session, rv) {
                     "This can happen when DE was run on raw counts (DESeq2/edgeR)\n",
                     "and gene names differ from the normalized matrix."),
              cex = 1.2, col = "gray40")
-        return()
+        return(invisible(NULL))
       }
-      
-      expr <- rv$batch_corrected[valid_genes, , drop = FALSE]
-      
-      # Remove rows with zero variance (constant expression - can't scale)
+
+      expr <- expr_matrix[valid_genes, , drop = FALSE]
+
       row_vars <- apply(expr, 1, var, na.rm = TRUE)
       expr <- expr[!is.na(row_vars) & row_vars > 0, , drop = FALSE]
-      
+
       if (nrow(expr) < 2) {
         plot.new()
         text(0.5, 0.5, "Too few genes with variable expression for heatmap.",
              cex = 1.2, col = "gray40")
-        return()
+        return(invisible(NULL))
       }
-      
+
       expr_scaled <- t(scale(t(expr)))
-      # Align metadata to expression columns so row.names length = nrow(annot) (avoids "dimnames [1] not equal to array extent")
       samp <- colnames(expr_scaled)
-      meta <- rv$unified_metadata
+      meta <- metadata
       idx <- match(samp, rownames(meta))
       if (any(is.na(idx)) && "SampleID" %in% names(meta)) idx <- match(samp, as.character(meta$SampleID))
       cond <- if ("Condition" %in% names(meta) && all(!is.na(idx))) meta$Condition[idx] else rep(NA_character_, length(samp))
@@ -1385,20 +1401,56 @@ server_results <- function(input, output, session, rv) {
       if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
       if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
       annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
-      
+
       annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
-      
+
       pheatmap::pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
                color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
                show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
-               main = paste0("Top ", nrow(expr), " DE Genes (of ", input$top_genes, " requested)"),
+               main = paste0("Top ", nrow(expr), " DE Genes (of ", top_n, " requested)", title_suffix),
                border_color = NA)
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Heatmap error:", conditionMessage(e)),
            cex = 1.0, col = "#e74c3c")
     })
+  }
+
+  output$heatmap_plot <- renderPlot({
+    req(rv$de_results, rv$batch_corrected)
+    .gexpipe_draw_de_heatmap(rv$de_results, rv$batch_corrected, rv$unified_metadata, input$top_genes)
   })
+
+  # Parallel mode: same top-N DE heatmap, one per platform. Had no heatmap
+  # at all before (only volcano + top-DEGs table).
+  output$heatmap_plot_rna <- renderPlot({
+    req(rv$de_results_rna, rv$batch_corrected_rna)
+    .gexpipe_draw_de_heatmap(
+      rv$de_results_rna, rv$batch_corrected_rna, rv$unified_metadata,
+      as.integer(.de_num(input$top_genes_rna, 50)), " - RNA-seq"
+    )
+  })
+  output$heatmap_plot_micro <- renderPlot({
+    req(rv$de_results_micro, rv$batch_corrected_micro)
+    .gexpipe_draw_de_heatmap(
+      rv$de_results_micro, rv$batch_corrected_micro, rv$unified_metadata,
+      as.integer(.de_num(input$top_genes_micro, 50)), " - Microarray"
+    )
+  })
+  gexp_register_plot_downloads(output, "heatmap_plot_rna", function() {
+    req(rv$de_results_rna, rv$batch_corrected_rna)
+    .gexpipe_draw_de_heatmap(
+      rv$de_results_rna, rv$batch_corrected_rna, rv$unified_metadata,
+      as.integer(.de_num(input$top_genes_rna, 50)), " - RNA-seq"
+    )
+  }, 8, 8, "Heatmap_Top_DEGs_RNAseq")
+  gexp_register_plot_downloads(output, "heatmap_plot_micro", function() {
+    req(rv$de_results_micro, rv$batch_corrected_micro)
+    .gexpipe_draw_de_heatmap(
+      rv$de_results_micro, rv$batch_corrected_micro, rv$unified_metadata,
+      as.integer(.de_num(input$top_genes_micro, 50)), " - Microarray"
+    )
+  }, 8, 8, "Heatmap_Top_DEGs_Microarray")
 
   # Download volcano plot (PNG)
   output$download_volcano_png <- downloadHandler(

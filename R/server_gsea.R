@@ -92,10 +92,19 @@ server_gsea <- function(input, output, session, rv) {
     }
     custom <- trimws(unlist(strsplit(gsub("[,;\n]+", ",", input$gsea_target_genes), ",")))
     custom <- custom[nzchar(custom)]
+    # Same staleness guard as server_nomogram.R: rv$roc_selected_genes is
+    # never cleared when a new analysis starts, so only trust it if it
+    # overlaps the CURRENT run's own candidate gene pool.
+    current_gene_pool <- unique(c(rv$ml_common_genes, rv$common_genes_de_wgcna))
+    roc_genes <- rv$roc_selected_genes
+    if (!is.null(roc_genes) && length(roc_genes) > 0 && length(current_gene_pool) > 0 &&
+        length(intersect(roc_genes, current_gene_pool)) == 0) {
+      roc_genes <- NULL  # stale selection from a different analysis run - discard
+    }
     if (length(custom) > 0) {
       target_genes <- custom
-    } else if (!is.null(rv$roc_selected_genes) && length(rv$roc_selected_genes) > 0) {
-      target_genes <- rv$roc_selected_genes
+    } else if (!is.null(roc_genes) && length(roc_genes) > 0) {
+      target_genes <- roc_genes
     } else if (!is.null(rv$ml_common_genes) && length(rv$ml_common_genes) > 0) {
       target_genes <- rv$ml_common_genes
     } else if (!is.null(rv$common_genes_de_wgcna) && length(rv$common_genes_de_wgcna) > 0) {

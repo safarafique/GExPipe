@@ -224,6 +224,16 @@ gexp_app_server <- function(input, output, session) {
     nomogram_val_roc = NULL,
     nomogram_model_diagnostics = NULL,
     nomogram_performance_comparison = NULL,
+    nomogram_outcome_coding = NULL,
+    nomogram_calibration_stats = NULL,
+    nomogram_confusion_table = NULL,
+    nomogram_run_settings = NULL,
+    nomogram_boot_B = NULL,
+    nomogram_seed = NULL,
+    nomogram_export_dir = NULL,
+    sigval_history = NULL,
+    roc_n_tested = NULL,
+    roc_n_pass = NULL,
     nomogram_cal_train = NULL,
     nomogram_cal_validation = NULL,
     nomogram_dca_train = NULL,
@@ -398,6 +408,7 @@ gexp_app_server <- function(input, output, session) {
     server_nomogram(input, output, session, rv)
     server_gsea(input, output, session, rv)
     server_results_summary(input, output, session, rv)
+
 
     shiny::observeEvent(input$start_tour, {
       if (!is.null(guide)) {

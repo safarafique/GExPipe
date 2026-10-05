@@ -154,8 +154,8 @@ server_qc <- function(input, output, session, rv) {
   # VENN & UPSET (shared draw-to-dev helpers for display + download)
   # ==============================================================================
 
-  draw_qc_venn_to_dev <- function() {
-    venn_prep <- gexp_qc_prepare_venn_sets(rv$all_genes_list, max_sets = 5L)
+  draw_qc_venn_to_dev <- function(gene_list = rv$all_genes_list) {
+    venn_prep <- gexp_qc_prepare_venn_sets(gene_list, max_sets = 5L)
     if (!isTRUE(venn_prep$ok)) {
       plot.new()
       text(0.5, 0.5, venn_prep$message, cex = 1.8, col = "gray40")
@@ -315,7 +315,7 @@ server_qc <- function(input, output, session, rv) {
         # Show summary
         plot.new()
         text(0.5, 0.7, paste("Total Datasets:", length(sets)), cex = 2, font = 2)
-        text(0.5, 0.5, paste("Common Genes:", format(length(rv$common_genes), big.mark = ",")), 
+        text(0.5, 0.5, paste("Common Genes:", format(length(all_intersect), big.mark = ",")), 
              cex = 3, col = "#2ecc71", font = 2)
         text(0.5, 0.3, "See UpSet plot for detailed intersections ->", 
              cex = 1.3, col = "gray40")
@@ -328,8 +328,8 @@ server_qc <- function(input, output, session, rv) {
     draw_qc_venn_to_dev()
   })
   
-  draw_qc_upset_to_dev <- function() {
-    upset_prep <- gexp_qc_prepare_upset_data(rv$all_genes_list)
+  draw_qc_upset_to_dev <- function(gene_list = rv$all_genes_list) {
+    upset_prep <- gexp_qc_prepare_upset_data(gene_list)
     if (!isTRUE(upset_prep$ok)) {
       plot.new()
       text(0.5, 0.5, upset_prep$message, cex = 1.8, col = "gray40")
@@ -469,14 +469,51 @@ server_qc <- function(input, output, session, rv) {
     .qc_platform_density(rv$expr_micro, "Microarray QC density", "#d97706")
   })
 
-  output$venn_plot_parallel <- renderPlot({
-    req(rv$all_genes_list)
-    draw_qc_venn_to_dev()
+  # ---- Parallel mode: gene overlap / common genes identified SEPARATELY per platform ----
+  .platform_gene_sets <- function(platform) {
+    ds <- if (identical(platform, "rna")) names(rv$rna_counts_list) else names(rv$micro_expr_list)
+    rv$all_genes_list[intersect(names(rv$all_genes_list), ds)]
+  }
+  .platform_label <- function(platform) if (identical(platform, "rna")) "RNA-seq" else "Microarray"
+
+  for (.pl in c("rna", "micro")) local({
+    pl <- .pl
+    output[[paste0("venn_plot_", pl)]] <- renderPlot({
+      req(rv$all_genes_list)
+      draw_qc_venn_to_dev(.platform_gene_sets(pl))
+    })
+    output[[paste0("upset_plot_", pl)]] <- renderPlot({
+      req(rv$all_genes_list)
+      draw_qc_upset_to_dev(.platform_gene_sets(pl))
+    })
+    output[[paste0("common_genes_summary_", pl)]] <- renderUI({
+      req(rv$all_genes_list)
+      sets <- .platform_gene_sets(pl)
+      lab <- .platform_label(pl)
+      if (length(sets) == 0L) {
+        return(tags$p(style = "color:#7f8c8d;", icon("info-circle"), paste0(" No ", lab, " datasets loaded.")))
+      }
+      common <- Reduce(intersect, lapply(sets, unique))
+      tags$div(
+        style = "padding: 8px 12px; background: #e8f5e9; border-radius: 6px; margin-bottom: 8px; font-size: 13px;",
+        icon("check-circle", style = "color:#2e7d32;"),
+        tags$strong(paste0(" ", lab, " common genes: ", format(length(common), big.mark = ","))),
+        paste0(" (across ", length(sets), " dataset", if (length(sets) != 1L) "s" else "", ": ", paste(names(sets), collapse = ", "), ")"),
+        if (length(sets) == 1L) tags$span(style = "color:#555;", " - one dataset, so all its genes are used.") else NULL
+      )
+    })
+    gexp_register_plot_downloads(output, paste0("venn_plot_", pl), function() { req(rv$all_genes_list); draw_qc_venn_to_dev(.platform_gene_sets(pl)) }, 7, 7,
+                                 paste0("QC_Venn_Diagram_", .platform_label(pl)))
+    gexp_register_plot_downloads(output, paste0("upset_plot_", pl), function() { req(rv$all_genes_list); draw_qc_upset_to_dev(.platform_gene_sets(pl)) }, 8, 6,
+                                 paste0("QC_UpSet_Plot_", .platform_label(pl)))
   })
-  output$upset_plot_parallel <- renderPlot({
-    req(rv$all_genes_list)
-    draw_qc_upset_to_dev()
-  })
+
+  # Parallel-mode plots had no image download buttons at all (merged mode
+  # already did, via gexp_ui_plot_download_bar) - add PNG/JPG/PDF for each.
+  gexp_register_plot_downloads(output, "qc_boxplot_rna", function() .qc_platform_boxplot(rv$expr_rna, "RNA-seq QC boxplot", "#93c5fd"), 7, 5, "QC_Boxplot_RNAseq")
+  gexp_register_plot_downloads(output, "qc_density_rna", function() .qc_platform_density(rv$expr_rna, "RNA-seq QC density", "#2563eb"), 7, 5, "QC_Density_RNAseq")
+  gexp_register_plot_downloads(output, "qc_boxplot_micro", function() .qc_platform_boxplot(rv$expr_micro, "Microarray QC boxplot", "#fde68a"), 7, 5, "QC_Boxplot_Microarray")
+  gexp_register_plot_downloads(output, "qc_density_micro", function() .qc_platform_density(rv$expr_micro, "Microarray QC density", "#d97706"), 7, 5, "QC_Density_Microarray")
 
   .qc_outlier_table_for <- function(sample_ids) {
     if (!isTRUE(rv$qc_outlier_detection_complete) || is.null(sample_ids) || length(sample_ids) == 0L) {
@@ -578,6 +615,7 @@ server_qc <- function(input, output, session, rv) {
             all_outliers = unique(unlist(lapply(parts, function(z) z$all_outliers)))
           )
         }
+        rna_qc <- micro_qc <- NULL
         qc <- if (isTRUE(parallel_qc)) {
           rna_qc <- if (!is.null(rv$expr_rna) && ncol(rv$expr_rna) >= 5L) {
             gexp_qc_detect_outliers(rv$expr_rna, top_n = 5000L)
@@ -594,6 +632,7 @@ server_qc <- function(input, output, session, rv) {
           gexp_qc_detect_outliers(expr, top_n = 5000L)
         }
         if (is.null(qc)) stop("Outlier detection produced no results.")
+        rv$qc_parts <- if (isTRUE(parallel_qc)) list(rna = rna_qc, micro = micro_qc) else NULL
         incProgress(0.3, detail = "Preparing results...")
 
         # Store results
@@ -671,6 +710,15 @@ server_qc <- function(input, output, session, rv) {
   output$qc_outlier_results_ui <- renderUI({
     if (!isTRUE(rv$qc_outlier_detection_complete)) return(NULL)
 
+    if (isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")) {
+      return(tagList(
+        tags$hr(style = "margin: 15px 0;"),
+        tags$p(style = "color:#555; font-size:13px;", icon("info-circle"),
+               " PCA and connectivity plots for each platform are shown in the RNA-seq and Microarray columns below."),
+        uiOutput("qc_outlier_selector_ui")
+      ))
+    }
+
     tagList(
       tags$hr(style = "margin: 20px 0;"),
       # Row 1: PCA plot | Connectivity plot
@@ -722,15 +770,19 @@ server_qc <- function(input, output, session, rv) {
     unname(ds_map[sample_ids])
   }
 
-  make_qc_pca_plot <- function() {
-    scores <- as.data.frame(rv$qc_pca_scores)
+  make_qc_pca_plot <- function(part = NULL, label = NULL) {
+    if (is.null(part)) {
+      part <- list(scores = rv$qc_pca_scores, distances = rv$qc_pca_distances, pca_threshold = rv$qc_pca_threshold,
+                   pca_var_explained = rv$qc_pca_var_explained)
+    }
+    scores <- as.data.frame(part$scores)
     scores$Sample <- rownames(scores)
-    scores$Distance <- rv$qc_pca_distances[scores$Sample]
-    scores$IsOutlier <- scores$Distance > rv$qc_pca_threshold
+    scores$Distance <- part$distances[scores$Sample]
+    scores$IsOutlier <- scores$Distance > part$pca_threshold
     scores$Dataset <- .qc_sample_dataset(scores$Sample)
     scores$Dataset[is.na(scores$Dataset) | !nzchar(scores$Dataset)] <- "Unknown"
 
-    var_exp <- rv$qc_pca_var_explained * 100
+    var_exp <- part$pca_var_explained * 100
     n_out <- sum(scores$IsOutlier)
 
     p <- ggplot2::ggplot(scores, ggplot2::aes(x = PC1, y = PC2)) +
@@ -741,8 +793,8 @@ server_qc <- function(input, output, session, rv) {
                                   labels = c("FALSE" = "Normal", "TRUE" = "Outlier"), name = "Status") +
       ggplot2::theme_minimal(base_size = 13) +
       ggplot2::labs(
-        title = "PCA-based Outlier Detection",
-        subtitle = paste0("Mahalanobis threshold: ", round(rv$qc_pca_threshold, 2), " | Outliers: ", n_out),
+        title = paste0(if (!is.null(label)) paste0(label, ": ") else "", "PCA-based Outlier Detection"),
+        subtitle = paste0("Mahalanobis threshold: ", round(part$pca_threshold, 2), " | Outliers: ", n_out),
         x = paste0("PC1 (", round(var_exp[1], 1), "%)"),
         y = if (length(var_exp) > 1) paste0("PC2 (", round(var_exp[2], 1), "%)") else "PC2"
       ) +
@@ -765,9 +817,9 @@ server_qc <- function(input, output, session, rv) {
   }
 
   # ---- Plot helper: Connectivity bar chart ----
-  make_qc_conn_plot <- function() {
-    k <- rv$qc_conn_k
-    threshold <- rv$qc_conn_threshold
+  make_qc_conn_plot <- function(part = NULL, label = NULL) {
+    k <- if (is.null(part)) rv$qc_conn_k else part$connectivity
+    threshold <- if (is.null(part)) rv$qc_conn_threshold else part$conn_threshold
     df <- data.frame(Sample = names(k), Connectivity = as.numeric(k),
                      IsOutlier = k < threshold, stringsAsFactors = FALSE)
     df <- df[order(df$Connectivity), , drop = FALSE]
@@ -790,7 +842,7 @@ server_qc <- function(input, output, session, rv) {
       ggplot2::coord_flip() +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::labs(
-        title = paste0("Sample Connectivity", tsuffix),
+        title = paste0(if (!is.null(label)) paste0(label, ": ") else "", "Sample Connectivity", tsuffix),
         subtitle = paste0("Signed network (power=6) | Threshold: mean-2*SD = ", round(threshold, 1)),
         x = "", y = "Connectivity (sum of adjacency)", fill = "Status"
       ) +
@@ -809,6 +861,31 @@ server_qc <- function(input, output, session, rv) {
     req(rv$qc_conn_k)
     make_qc_conn_plot()
   }, height = 420, res = 96)
+
+  # ---- Per-platform plots (parallel mode) ----
+  output$qc_pca_outlier_plot_rna <- renderPlot({ req(rv$qc_parts$rna); make_qc_pca_plot(rv$qc_parts$rna, "RNA-seq") }, height = 380, res = 96)
+  output$qc_pca_outlier_plot_micro <- renderPlot({ req(rv$qc_parts$micro); make_qc_pca_plot(rv$qc_parts$micro, "Microarray") }, height = 380, res = 96)
+  output$qc_connectivity_plot_rna <- renderPlot({ req(rv$qc_parts$rna); make_qc_conn_plot(rv$qc_parts$rna, "RNA-seq") }, height = 380, res = 96)
+  output$qc_connectivity_plot_micro <- renderPlot({ req(rv$qc_parts$micro); make_qc_conn_plot(rv$qc_parts$micro, "Microarray") }, height = 380, res = 96)
+  for (.pl in c("rna", "micro")) local({
+    pl <- .pl; lab <- if (pl == "rna") "RNA-seq" else "Microarray"
+    for (kind in c("pca", "conn")) local({
+      kd <- kind
+      for (ext in c("png", "jpg", "pdf")) local({
+        ex <- ext
+        output[[paste0("dl_qc_", kd, "_plot_", pl, "_", ex)]] <- downloadHandler(
+          filename = function() paste0("QC_", if (kd == "pca") "PCA_Outlier_Detection_" else "Sample_Connectivity_", lab, ".", ex),
+          content = function(file) {
+            req(rv$qc_parts[[pl]])
+            p <- if (kd == "pca") make_qc_pca_plot(rv$qc_parts[[pl]], lab) else make_qc_conn_plot(rv$qc_parts[[pl]], lab)
+            if (ex == "png") ggplot2::ggsave(file, p, width = 8, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+            else if (ex == "jpg") ggplot2::ggsave(file, p, width = 8, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+            else ggplot2::ggsave(file, p, width = 8, height = 6, device = "pdf", bg = "white")
+          }
+        )
+      })
+    })
+  })
 
   # ---- Download handlers for plots ----
   output$dl_qc_pca_plot_jpg <- downloadHandler(

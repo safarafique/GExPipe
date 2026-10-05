@@ -77,15 +77,22 @@ server_roc <- function(input, output, session, rv) {
     if (length(unique(y_binary)) < 2) return(NULL)
     available_genes <- intersect(common_genes, colnames(expr_mat))
     if (length(available_genes) == 0) return(NULL)
+    # The direction (higher or lower in Disease) is determined HERE, on the training data, and
+    # recorded: external validation must score each gene with the SAME direction.
     res <- lapply(available_genes, function(g) {
       ex <- expr_mat[, g]
-      roc_obj <- tryCatch(pROC::roc(y_binary, ex, quiet = TRUE), error = function(e) NULL)
-      auc_val <- if (!is.null(roc_obj)) as.numeric(pROC::auc(roc_obj)) else NA_real_
-      list(Gene = g, AUC = auc_val, roc = roc_obj)
+      r <- tryCatch(gexp_diag_directional_roc(y_binary, ex), error = function(e) NULL)
+      ci <- gexp_diag_auc_ci(if (is.null(r)) NULL else r$roc)
+      list(Gene = g, AUC = if (is.null(r)) NA_real_ else r$auc, roc = if (is.null(r)) NULL else r$roc,
+           Dir = if (is.null(r)) NA_character_ else r$direction, Lo = ci[1], Hi = ci[2])
     })
     df_all <- data.frame(
       Gene = vapply(res, function(x) x$Gene, character(1)),
       AUC = vapply(res, function(x) x$AUC, numeric(1)),
+      AUC_Lower_95CI = vapply(res, function(x) x$Lo, numeric(1)),
+      AUC_Upper_95CI = vapply(res, function(x) x$Hi, numeric(1)),
+      Direction = vapply(res, function(x) if (is.na(x$Dir)) NA_character_ else if (x$Dir == "<") "Up in Disease" else "Down in Disease", character(1)),
+      DirectionCode = vapply(res, function(x) x$Dir, character(1)),
       stringsAsFactors = FALSE
     )
     df_all <- df_all[!is.na(df_all$AUC), , drop = FALSE]
@@ -93,7 +100,7 @@ server_roc <- function(input, output, session, rv) {
     if (nrow(df_all) == 0) return(NULL)
     curves_all <- setNames(lapply(res, function(x) x$roc), vapply(res, function(x) x$Gene, character(1)))
     removed <- df_all[df_all$AUC < AUC_MIN, , drop = FALSE]
-    df <- df_all[df_all$AUC >= AUC_MIN, , drop = FALSE]
+    df <- df_all[df_all$AUC >= AUC_MIN, setdiff(names(df_all), "DirectionCode"), drop = FALSE]
     curves <- curves_all[names(curves_all) %in% df$Gene]
     list(
       df = df,
@@ -103,6 +110,13 @@ server_roc <- function(input, output, session, rv) {
       n_removed = nrow(removed),
       removed_genes = if (nrow(removed) > 0) removed$Gene else character(0)
     )
+  })
+
+  # Counts for the Results Summary "gene funnel"
+  observe({
+    roc <- tryCatch(roc_results(), error = function(e) NULL)
+    rv$roc_n_tested <- if (is.null(roc)) NULL else nrow(roc$df_all)
+    rv$roc_n_pass <- if (is.null(roc)) NULL else nrow(roc$df)
   })
 
   output$roc_filter_message_ui <- renderUI({
@@ -132,7 +146,7 @@ server_roc <- function(input, output, session, rv) {
   output$roc_auc_table <- DT::renderDataTable({
     roc <- roc_results()
     if (is.null(roc) || nrow(roc$df) == 0) return(NULL)
-    roc$df$AUC <- round(roc$df$AUC, 4)
+    for (cc in intersect(c("AUC", "AUC_Lower_95CI", "AUC_Upper_95CI"), names(roc$df))) roc$df[[cc]] <- round(roc$df[[cc]], 4)
     DT::datatable(roc$df, options = list(pageLength = 20), rownames = FALSE)
   })
 
@@ -265,7 +279,7 @@ server_roc <- function(input, output, session, rv) {
 
     pred <- stats::predict(combined_model, type = "response")
     roc_obj <- tryCatch(
-      pROC::roc(df$group, pred, quiet = TRUE),
+      pROC::roc(df$group, pred, levels = c(0, 1), direction = "<", quiet = TRUE),
       error = function(e) NULL
     )
     if (is.null(roc_obj)) return(NULL)
@@ -487,7 +501,25 @@ server_roc <- function(input, output, session, rv) {
     }
   )
 
-  # Boxplots
+  # Boxplots (training + validation use the SAME gene order, layout and styling:
+  # one shared builder, gexp_expression_boxplot())
+  roc_boxplot_gene_order <- reactive({
+    roc <- roc_results()
+    genes <- if (!is.null(roc) && nrow(roc$df) > 0) roc$df$Gene else character(0)
+    if (!is.null(rv$extracted_data_ml)) genes <- intersect(genes, colnames(as.matrix(rv$extracted_data_ml)))
+    # when validation data is loaded, show only genes present in BOTH so the panels line up one-to-one
+    if (!is.null(rv$external_validation_expr)) {
+      shared <- intersect(genes, colnames(rv$external_validation_expr))
+      if (length(shared) > 0L) genes <- shared
+    }
+    head(genes, 12L)
+  })
+
+  roc_boxplot_dims <- function(long) {
+    n_genes <- length(unique(long$Gene))
+    list(width = max(8, 2.5 * min(4, n_genes)), height = 6)
+  }
+
   roc_boxplot_data <- reactive({
     roc <- roc_results()
     if (is.null(roc) || nrow(roc$df) == 0) return(NULL)
@@ -497,8 +529,7 @@ server_roc <- function(input, output, session, rv) {
     common_samples <- intersect(rownames(expr_mat), rownames(sample_info))
     if (length(common_samples) < 2) return(NULL)
     cond_col <- if ("Condition" %in% names(sample_info)) "Condition" else names(sample_info)[1]
-    genes <- roc$df$Gene
-    genes <- intersect(genes, colnames(expr_mat))
+    genes <- roc_boxplot_gene_order()
     if (length(genes) == 0) return(NULL)
     expr_sub <- expr_mat[common_samples, genes, drop = FALSE]
     grp <- sample_info[common_samples, cond_col]
@@ -508,71 +539,39 @@ server_roc <- function(input, output, session, rv) {
     long
   })
 
-  output$roc_boxplots_plot <- renderPlot({
+  roc_boxplot_plot_fn <- function() {
     long <- roc_boxplot_data()
-    if (is.null(long) || nrow(long) == 0) {
+    if (is.null(long) || nrow(long) == 0) return(NULL)
+    gexp_expression_boxplot(long, "Training Data: Gene Expression (Normal vs Disease)")
+  }
+
+  output$roc_boxplots_plot <- renderPlot({
+    p <- roc_boxplot_plot_fn()
+    if (is.null(p)) {
       plot.new()
       text(0.5, 0.5, "No data for boxplots.", cex = 1, col = "gray40")
       return()
     }
-    n_genes <- length(unique(long$Gene))
-    if (n_genes > 12) long <- long[long$Gene %in% levels(long$Gene)[seq_len(12)], , drop = FALSE]
-    grp_levels <- unique(long$Group)
-    fill_colors <- if (length(grp_levels) >= 2) {
-      setNames(c("#43A047", "#E53935")[seq_along(grp_levels)], grp_levels)
-    } else {
-      setNames("#43A047", grp_levels[1])
-    }
-    p <- ggplot2::ggplot(long, ggplot2::aes(x = Group, y = Expression, fill = Group)) +
-      ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.85) +
-      ggplot2::geom_jitter(width = 0.15, size = 1, alpha = 0.5) +
-      ggplot2::facet_wrap(~Gene, scales = "free_y", ncol = min(4, n_genes)) +
-      ggplot2::scale_fill_manual(values = fill_colors) +
-      ggplot2::theme_minimal(base_size = 11) +
-      ggplot2::theme(legend.position = "top", axis.title.x = ggplot2::element_blank()) +
-      ggplot2::labs(y = "Expression", title = "Gene Expression: Normal vs Disease")
     p
-  }, width = 700, height = 400, res = 96)
+  }, height = 420, res = 96)
 
   output$download_roc_boxplots_jpg <- downloadHandler(
     filename = function() "ROC_gene_expression_boxplots.jpg",
     content = function(file) {
-      long <- roc_boxplot_data()
-      if (is.null(long) || nrow(long) == 0) return()
-      n_genes <- length(unique(long$Gene))
-      if (n_genes > 12) long <- long[long$Gene %in% levels(long$Gene)[seq_len(12)], , drop = FALSE]
-      grp_levels <- unique(long$Group)
-      fill_colors <- if (length(grp_levels) >= 2) setNames(c("#43A047", "#E53935")[seq_along(grp_levels)], grp_levels) else setNames("#43A047", grp_levels[1])
-      p <- ggplot2::ggplot(long, ggplot2::aes(x = Group, y = Expression, fill = Group)) +
-        ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.85) +
-        ggplot2::geom_jitter(width = 0.15, size = 1, alpha = 0.5) +
-        ggplot2::facet_wrap(~Gene, scales = "free_y", ncol = min(4, n_genes)) +
-        ggplot2::scale_fill_manual(values = fill_colors) +
-        ggplot2::theme_minimal(base_size = 11) +
-        ggplot2::theme(legend.position = "top", axis.title.x = ggplot2::element_blank()) +
-        ggplot2::labs(y = "Expression", title = "Gene Expression: Normal vs Disease")
-      ggplot2::ggsave(file, plot = p, width = max(8, 2.5 * min(4, n_genes)), height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+      p <- roc_boxplot_plot_fn()
+      if (is.null(p)) return()
+      d <- roc_boxplot_dims(roc_boxplot_data())
+      ggplot2::ggsave(file, plot = p, width = d$width, height = d$height, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     }
   )
 
   output$download_roc_boxplots_pdf <- downloadHandler(
     filename = function() "ROC_gene_expression_boxplots.pdf",
     content = function(file) {
-      long <- roc_boxplot_data()
-      if (is.null(long) || nrow(long) == 0) return()
-      n_genes <- length(unique(long$Gene))
-      if (n_genes > 12) long <- long[long$Gene %in% levels(long$Gene)[seq_len(12)], , drop = FALSE]
-      grp_levels <- unique(long$Group)
-      fill_colors <- if (length(grp_levels) >= 2) setNames(c("#43A047", "#E53935")[seq_along(grp_levels)], grp_levels) else setNames("#43A047", grp_levels[1])
-      p <- ggplot2::ggplot(long, ggplot2::aes(x = Group, y = Expression, fill = Group)) +
-        ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.85) +
-        ggplot2::geom_jitter(width = 0.15, size = 1, alpha = 0.5) +
-        ggplot2::facet_wrap(~Gene, scales = "free_y", ncol = min(4, n_genes)) +
-        ggplot2::scale_fill_manual(values = fill_colors) +
-        ggplot2::theme_minimal(base_size = 11) +
-        ggplot2::theme(legend.position = "top", axis.title.x = ggplot2::element_blank()) +
-        ggplot2::labs(y = "Expression", title = "Gene Expression: Normal vs Disease")
-      ggplot2::ggsave(file, plot = p, width = max(8, 2.5 * min(4, n_genes)), height = 6, device = "pdf", bg = "white")
+      p <- roc_boxplot_plot_fn()
+      if (is.null(p)) return()
+      d <- roc_boxplot_dims(roc_boxplot_data())
+      ggplot2::ggsave(file, plot = p, width = d$width, height = d$height, device = "pdf", bg = "white")
     }
   )
 
@@ -590,16 +589,29 @@ server_roc <- function(input, output, session, rv) {
     available_genes <- intersect(common_genes, colnames(ext_expr))
     if (length(available_genes) == 0) return(NULL)
 
+    # Score every gene with the direction learned on the TRAINING data. pROC's default
+    # (direction = "auto") would re-pick the favourable direction in the validation set, so a gene
+    # that is UP in training but DOWN in validation would still show a high validation AUC.
+    roc_int <- roc_results()
+    dir_train <- if (!is.null(roc_int) && !is.null(roc_int$df_all$DirectionCode)) {
+      setNames(roc_int$df_all$DirectionCode, roc_int$df_all$Gene)
+    } else NULL
     res <- lapply(available_genes, function(g) {
       ex <- ext_expr[, g]
-      roc_obj <- tryCatch(pROC::roc(ext_outcome, ex, quiet = TRUE), error = function(e) NULL)
-      auc_val <- if (!is.null(roc_obj)) as.numeric(pROC::auc(roc_obj)) else NA_real_
-      list(Gene = g, AUC = auc_val, roc = roc_obj)
+      d <- if (!is.null(dir_train) && g %in% names(dir_train)) dir_train[[g]] else NULL
+      r <- tryCatch(gexp_diag_directional_roc(ext_outcome, ex, direction = d), error = function(e) NULL)
+      r_own <- tryCatch(gexp_diag_directional_roc(ext_outcome, ex), error = function(e) NULL)
+      ci <- gexp_diag_auc_ci(if (is.null(r)) NULL else r$roc)
+      list(Gene = g, AUC = if (is.null(r)) NA_real_ else r$auc, roc = if (is.null(r)) NULL else r$roc,
+           Lo = ci[1], Hi = ci[2], Replicated = if (is.null(d) || is.null(r_own)) NA else identical(r_own$direction, d))
     })
 
     df <- data.frame(
       Gene = vapply(res, function(x) x$Gene, character(1)),
       AUC_External = vapply(res, function(x) x$AUC, numeric(1)),
+      AUC_External_Lower_95CI = vapply(res, function(x) x$Lo, numeric(1)),
+      AUC_External_Upper_95CI = vapply(res, function(x) x$Hi, numeric(1)),
+      Direction_Replicated = vapply(res, function(x) x$Replicated, logical(1)),
       stringsAsFactors = FALSE
     )
     df <- df[!is.na(df$AUC_External), , drop = FALSE]
@@ -607,10 +619,19 @@ server_roc <- function(input, output, session, rv) {
     curves <- setNames(lapply(res, function(x) x$roc), vapply(res, function(x) x$Gene, character(1)))
     curves <- curves[names(curves) %in% df$Gene]
 
-    roc_int <- roc_results()
-    if (!is.null(roc_int) && nrow(roc_int$df) > 0) {
-      df <- merge(df, roc_int$df[, c("Gene", "AUC"), drop = FALSE], by = "Gene", all.x = TRUE)
+    # Use df_all (every gene's training AUC), not df (pre-filtered to
+    # AUC >= AUC_MIN for the main biomarker table) - this comparison is
+    # meant to show Training vs Validation for every gene that has BOTH,
+    # so a gene whose training AUC merely fell below the curation bar
+    # must not show a blank Training cell while still appearing on the
+    # Validation side. That asymmetry made it look like the gene was
+    # never tested in training at all, when it actually was.
+    if (!is.null(roc_int) && nrow(roc_int$df_all) > 0) {
+      df <- merge(df, roc_int$df_all[, c("Gene", "AUC", "AUC_Lower_95CI", "AUC_Upper_95CI", "Direction"), drop = FALSE], by = "Gene", all.x = TRUE)
       names(df)[names(df) == "AUC"] <- "AUC_Internal"
+      names(df)[names(df) == "AUC_Lower_95CI"] <- "AUC_Internal_Lower_95CI"
+      names(df)[names(df) == "AUC_Upper_95CI"] <- "AUC_Internal_Upper_95CI"
+      names(df)[names(df) == "Direction"] <- "Direction_Training"
       df$Delta <- round(df$AUC_External - df$AUC_Internal, 4)
       df <- df[order(-df$AUC_External), , drop = FALSE]
     }
@@ -697,14 +718,16 @@ server_roc <- function(input, output, session, rv) {
     ext <- roc_external_results()
     if (is.null(ext) || nrow(ext$df) == 0) return(NULL)
     df <- ext$df
-    for (col in c("AUC_External", "AUC_Internal", "Delta")) {
+    ci_cols <- grep("_95CI$", names(df), value = TRUE)
+    for (col in c("AUC_External", "AUC_Internal", "Delta", ci_cols)) {
       if (col %in% names(df)) df[[col]] <- round(df[[col]], 4)
     }
     # Rename columns for clarity
     names(df)[names(df) == "AUC_External"] <- "AUC_Validation"
     names(df)[names(df) == "AUC_Internal"] <- "AUC_Training"
-    # Reorder: Gene, AUC_Validation, AUC_Training, Delta
-    col_order <- intersect(c("Gene", "AUC_Validation", "AUC_Training", "Delta"), names(df))
+    names(df) <- sub("^AUC_External_", "AUC_Validation_", sub("^AUC_Internal_", "AUC_Training_", names(df)))
+    col_order <- intersect(c("Gene", "AUC_Validation", "AUC_Validation_Lower_95CI", "AUC_Validation_Upper_95CI",
+                             "AUC_Training", "AUC_Training_Lower_95CI", "AUC_Training_Upper_95CI", "Delta"), names(df))
     df <- df[, col_order, drop = FALSE]
     DT::datatable(df, options = list(pageLength = 20, scrollX = TRUE), rownames = FALSE)
   })
@@ -820,16 +843,19 @@ server_roc <- function(input, output, session, rv) {
   # VALIDATION BOXPLOTS (Gene expression from validation data)
   # ============================================================================
   roc_validation_boxplot_data <- reactive({
-    req(rv$external_validation_expr, rv$external_validation_outcome, rv$ml_common_genes)
+    req(rv$external_validation_expr, rv$external_validation_outcome)
     ext_expr <- rv$external_validation_expr
     ext_outcome <- rv$external_validation_outcome
-    common_genes <- rv$ml_common_genes
-    available_genes <- intersect(common_genes, colnames(ext_expr))
+    # same genes, same order as the training panel
+    train_order <- tryCatch(roc_boxplot_gene_order(), error = function(e) character(0))
+    available_genes <- intersect(if (length(train_order) > 0L) train_order else rv$ml_common_genes, colnames(ext_expr))
+    available_genes <- head(available_genes, 12L)
     if (length(available_genes) == 0) return(NULL)
     if (nrow(ext_expr) < 3) return(NULL)
     ext_sub <- ext_expr[, available_genes, drop = FALSE]
     grp <- ifelse(ext_outcome == 0, "Normal", "Disease")
-    wide <- data.frame(SampleID = rownames(ext_sub), Group = grp, ext_sub, check.names = FALSE)
+    ids <- if (!is.null(rownames(ext_sub))) rownames(ext_sub) else paste0("ExtS", seq_len(nrow(ext_sub)))
+    wide <- data.frame(SampleID = ids, Group = grp, ext_sub, check.names = FALSE)
     long <- tidyr::pivot_longer(wide, cols = dplyr::all_of(available_genes), names_to = "Gene", values_to = "Expression")
     long$Gene <- factor(long$Gene, levels = available_genes)
     long
@@ -838,23 +864,7 @@ server_roc <- function(input, output, session, rv) {
   roc_validation_boxplot_fn <- function() {
     long <- roc_validation_boxplot_data()
     if (is.null(long) || nrow(long) == 0) return(NULL)
-    n_genes <- length(unique(long$Gene))
-    if (n_genes > 12) long <- long[long$Gene %in% levels(long$Gene)[seq_len(12)], , drop = FALSE]
-    grp_levels <- unique(long$Group)
-    fill_colors <- if (length(grp_levels) >= 2) {
-      setNames(c("#27ae60", "#e74c3c")[seq_along(grp_levels)], grp_levels)
-    } else {
-      setNames("#27ae60", grp_levels[1])
-    }
-    p <- ggplot2::ggplot(long, ggplot2::aes(x = Group, y = Expression, fill = Group)) +
-      ggplot2::geom_boxplot(outlier.shape = NA, alpha = 0.85) +
-      ggplot2::geom_jitter(width = 0.15, size = 1, alpha = 0.5) +
-      ggplot2::facet_wrap(~Gene, scales = "free_y", ncol = min(4, n_genes)) +
-      ggplot2::scale_fill_manual(values = fill_colors) +
-      ggplot2::theme_minimal(base_size = 11) +
-      ggplot2::theme(legend.position = "top", axis.title.x = ggplot2::element_blank()) +
-      ggplot2::labs(y = "Expression", title = "Validation Data: Gene Expression (Normal vs Disease)")
-    p
+    gexp_expression_boxplot(long, "Validation Data: Gene Expression (Normal vs Disease)")
   }
 
   output$roc_validation_boxplots_plot <- renderPlot({
@@ -865,16 +875,15 @@ server_roc <- function(input, output, session, rv) {
       return()
     }
     p
-  }, height = 450, res = 96)
+  }, height = 420, res = 96)
 
   output$download_roc_val_boxplots_jpg <- downloadHandler(
     filename = function() "Validation_Gene_Expression_Boxplots.jpg",
     content = function(file) {
       p <- roc_validation_boxplot_fn()
       if (is.null(p)) return()
-      long <- roc_validation_boxplot_data()
-      n_genes <- length(unique(long$Gene))
-      ggplot2::ggsave(file, plot = p, width = max(8, 2.5 * min(4, n_genes)), height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+      d <- roc_boxplot_dims(roc_validation_boxplot_data())
+      ggplot2::ggsave(file, plot = p, width = d$width, height = d$height, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     }
   )
 
@@ -883,9 +892,8 @@ server_roc <- function(input, output, session, rv) {
     content = function(file) {
       p <- roc_validation_boxplot_fn()
       if (is.null(p)) return()
-      long <- roc_validation_boxplot_data()
-      n_genes <- length(unique(long$Gene))
-      ggplot2::ggsave(file, plot = p, width = max(8, 2.5 * min(4, n_genes)), height = 6, device = "pdf", bg = "white")
+      d <- roc_boxplot_dims(roc_validation_boxplot_data())
+      ggplot2::ggsave(file, plot = p, width = d$width, height = d$height, device = "pdf", bg = "white")
     }
   )
 
@@ -898,7 +906,7 @@ server_roc <- function(input, output, session, rv) {
     box(
       title = tags$span(icon("box"), " Gene Expression -- Validation Data (Normal vs Disease)"),
       width = 6, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      plotOutput("roc_validation_boxplots_plot", height = "400px"),
+      plotOutput("roc_validation_boxplots_plot", height = "420px"),
       tags$div(style = "margin-top: 10px;",
         downloadButton("download_roc_val_boxplots_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
         downloadButton("download_roc_val_boxplots_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))
@@ -1031,8 +1039,24 @@ server_roc <- function(input, output, session, rv) {
       }
     }, logical(1))
     preselected_genes <- vapply(gene_info[preselected], function(x) x$gene, character(1))
+    if (length(preselected_genes) == 0 && has_validation) {
+      # Nothing cleared BOTH bars - fall back to validation AUC alone (the
+      # stronger evidence when external validation exists) instead of
+      # silently selecting every gene, which would include genes that
+      # clearly failed validation (e.g. AUC well below 0.5).
+      val_ok <- vapply(gene_info, function(x) !is.na(x$auc_val) && x$auc_val >= 0.7, logical(1))
+      preselected_genes <- vapply(gene_info[val_ok], function(x) x$gene, character(1))
+    }
     if (length(preselected_genes) == 0) {
       preselected_genes <- vapply(gene_info, function(x) x$gene, character(1))
+    }
+    # If the user already confirmed a selection earlier this session, show
+    # THAT as the checked state instead of recomputing from scratch - a
+    # re-render of this panel (e.g. revisiting this tab) must not silently
+    # discard a choice the user already confirmed.
+    if (!is.null(rv$roc_selected_genes) && length(rv$roc_selected_genes) > 0) {
+      prior <- intersect(rv$roc_selected_genes, common_genes)
+      if (length(prior) > 0) preselected_genes <- prior
     }
 
     tagList(

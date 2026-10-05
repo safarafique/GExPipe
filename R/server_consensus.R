@@ -31,6 +31,11 @@ server_consensus <- function(input, output, session, rv) {
     isTRUE(gexpipe_parallel_consensus_defaults()$same_direction)
   }
 
+  .combine_method_rule <- function() {
+    m <- input$consensus_combine_method
+    if (is.null(m) || !nzchar(m) || !m %in% c("intersection", "union")) "intersection" else m
+  }
+
   .build_consensus <- function() {
     if (is.null(rv$sig_genes_rna) || is.null(rv$sig_genes_micro)) {
       return(NULL)
@@ -40,7 +45,8 @@ server_consensus <- function(input, output, session, rv) {
       "gexpipe_consensus_degs",
       rv$sig_genes_rna,
       rv$sig_genes_micro,
-      require_same_direction = same_dir
+      require_same_direction = same_dir,
+      combine = .combine_method_rule()
     )
   }
 
@@ -123,6 +129,7 @@ server_consensus <- function(input, output, session, rv) {
   output$consensus_count_legend_ui <- renderUI({
     out <- tryCatch(.build_consensus(), error = function(e) NULL)
     n_disc <- if (!is.null(out)) out$n_discordant else 0L
+    is_union <- identical(.combine_method_rule(), "union")
     tags$div(
       class = "alert alert-secondary",
       style = "margin: 0 15px 12px 15px; padding: 12px 16px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px;",
@@ -138,15 +145,28 @@ server_consensus <- function(input, output, session, rv) {
           icon("circle"), " ", tags$strong("Common"),
           " - in ", tags$em("both"), " lists (Venn center). Opposite direction is still counted here."
         ),
-        tags$li(
-          icon("check-double"), " ", tags$strong("Consensus"),
-          " - Common genes with the ", tags$em("same"), " direction. This is what Apply keeps for Step 9.",
-          if (is.finite(n_disc) && n_disc > 0L) {
-            tagList(" ", tags$span(style = "color: #b45309;", paste0("(", n_disc, " common genes dropped as opposite direction).")))
-          } else {
-            NULL
-          }
-        )
+        if (is_union) {
+          tags$li(
+            icon("check-double"), " ", tags$strong("Consensus (Union mode)"),
+            " - every gene significant on ", tags$em("either"), " platform, plus Common genes with the same direction. ",
+            "This is what Apply keeps for Step 9 while Union is selected above.",
+            if (is.finite(n_disc) && n_disc > 0L) {
+              tagList(" ", tags$span(style = "color: #b45309;", paste0("(", n_disc, " Common genes dropped as opposite direction; platform-exclusive genes are kept regardless).")))
+            } else {
+              NULL
+            }
+          )
+        } else {
+          tags$li(
+            icon("check-double"), " ", tags$strong("Consensus"),
+            " - Common genes with the ", tags$em("same"), " direction. This is what Apply keeps for Step 9.",
+            if (is.finite(n_disc) && n_disc > 0L) {
+              tagList(" ", tags$span(style = "color: #b45309;", paste0("(", n_disc, " common genes dropped as opposite direction).")))
+            } else {
+              NULL
+            }
+          )
+        }
       )
     )
   })
@@ -248,7 +268,7 @@ server_consensus <- function(input, output, session, rv) {
     out <- .build_consensus()
     if (is.null(out) || length(out$genes) < 1L) {
       showNotification(
-        "No consensus genes. Relax Step 6 cutoffs or turn off same-direction if you want the union of overlap regardless of sign.",
+        "No consensus genes. Relax Step 6 cutoffs, turn off same-direction, or switch to Union (Exploratory) above.",
         type = "warning",
         duration = 8
       )
@@ -256,20 +276,26 @@ server_consensus <- function(input, output, session, rv) {
     }
     rv$consensus_result <- out
     rv$consensus_same_direction <- .same_direction_rule()
+    rv$consensus_combine_method <- .combine_method_rule()
     rv$sig_genes <- out$table
     rv$de_results <- out$table
     rv$consensus_complete <- TRUE
+    method_label <- if (identical(rv$consensus_combine_method, "union")) {
+      "Union (significant on either platform)"
+    } else {
+      "Intersection (significant on both platforms)"
+    }
     showNotification(
       tags$div(
         icon("check-circle"),
-        tags$strong(" Consensus applied."),
+        tags$strong(" Consensus applied - ", method_label, "."),
         paste0(
           " ", format(out$n_consensus, big.mark = ","),
-          " same-platform-pair DEGs stored for Step 9 (DEG \u2229 modules). Next: WGCNA on one processed matrix (not this list)."
+          " DEGs stored for Step 9 (DEG \u2229 modules). Next: WGCNA on one processed matrix (not this list)."
         )
       ),
       type = "message",
-      duration = 6
+      duration = 8
     )
   })
 
@@ -298,6 +324,57 @@ server_consensus <- function(input, output, session, rv) {
       write.csv(rv$sig_genes_micro, file, row.names = FALSE)
     }
   )
+
+  # ---- Concordance scatter (RNA-seq vs microarray logFC) ----
+  .concordance_data <- reactive({
+    req(rv$sig_genes_rna, rv$sig_genes_micro)
+    gexp_consensus_concordance_data(rv$sig_genes_rna, rv$sig_genes_micro)
+  })
+  output$consensus_concordance_plot <- renderPlot({
+    gexp_consensus_concordance_plot(.concordance_data())
+  }, res = 96)
+
+  # ---- Hierarchical heatmap of the top consensus DEGs ----
+  .heatmap_data <- reactive({
+    out <- .build_consensus()
+    req(out)
+    n <- input$consensus_heatmap_top
+    if (is.null(n) || !is.finite(n)) n <- 30L
+    gexp_consensus_heatmap_data(out$table, rv$expr_rna, rv$expr_micro, rv$unified_metadata, top_n = max(2L, min(100L, as.integer(n))))
+  })
+  output$consensus_heatmap_plot <- renderPlot({
+    gexp_consensus_heatmap_draw(.heatmap_data())
+  }, res = 96)
+
+  # Auto-save both figures (300 DPI) to the export folder when consensus is applied
+  .save_consensus_figs <- function(dir = CSV_EXPORT_DIR()) {
+    try({
+      dir.create(dir, showWarnings = FALSE, recursive = TRUE)
+      gexp_ggsave_from_file(file.path(dir, "DEG_LogFC_Concordance_Scatter.png"), gexp_consensus_concordance_plot(.concordance_data()), 7, 7)
+      gexp_plot_device_open(file.path(dir, "Consensus_DEG_Hierarchical_Heatmap.png"), 9, 8)
+      gexp_consensus_heatmap_draw(.heatmap_data())
+      grDevices::dev.off()
+    }, silent = TRUE)
+  }
+  observeEvent(input$apply_consensus, {
+    if (isTRUE(rv$consensus_complete)) .save_consensus_figs()
+  }, ignoreInit = TRUE, priority = -1)
+
+  for (.ext in c("png", "jpg", "pdf")) local({
+    ex <- .ext
+    output[[paste0("download_concordance_", ex)]] <- downloadHandler(
+      filename = function() paste0("DEG_LogFC_Concordance_Scatter.", ex),
+      content = function(file) gexp_ggsave_from_file(file, gexp_consensus_concordance_plot(.concordance_data()), 7, 7)
+    )
+    output[[paste0("download_consensus_heatmap_", ex)]] <- downloadHandler(
+      filename = function() paste0("Consensus_DEG_Hierarchical_Heatmap.", ex),
+      content = function(file) {
+        gexp_plot_device_open(file, 9, 8)
+        on.exit(grDevices::dev.off(), add = TRUE)
+        gexp_consensus_heatmap_draw(.heatmap_data())
+      }
+    )
+  })
 
   .save_venn <- function(file, device) {
     if (device == "png") {
