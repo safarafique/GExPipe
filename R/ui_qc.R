@@ -83,19 +83,6 @@ ui_qc <- tabItem(
             width = 12, status = "info", solidHeader = TRUE,
             plotOutput("qc_density_rna", height = "280px"),
             gexp_ui_plot_download_bar("download_qc_density_rna_png", "download_qc_density_rna_jpg", "download_qc_density_rna_pdf", "btn-info btn-xs")
-          ),
-          box(
-            title = tags$span(icon("chart-area"), " RNA-seq outlier plots (PCA and connectivity)"),
-            width = 12, status = "danger", solidHeader = TRUE,
-            plotOutput("qc_pca_outlier_plot_rna", height = "380px"),
-            gexp_ui_plot_download_bar("dl_qc_pca_plot_rna_png", "dl_qc_pca_plot_rna_jpg", "dl_qc_pca_plot_rna_pdf", "btn-danger btn-xs"),
-            plotOutput("qc_connectivity_plot_rna", height = "380px"),
-            gexp_ui_plot_download_bar("dl_qc_conn_plot_rna_png", "dl_qc_conn_plot_rna_jpg", "dl_qc_conn_plot_rna_pdf", "btn-danger btn-xs")
-          ),
-          box(
-            title = tags$span(icon("table"), " RNA-seq outliers"),
-            width = 12, status = "danger", solidHeader = TRUE,
-            DT::DTOutput("qc_outlier_table_rna")
           )
         ),
         tagList(
@@ -110,19 +97,6 @@ ui_qc <- tabItem(
             width = 12, status = "warning", solidHeader = TRUE,
             plotOutput("qc_density_micro", height = "280px"),
             gexp_ui_plot_download_bar("download_qc_density_micro_png", "download_qc_density_micro_jpg", "download_qc_density_micro_pdf", "btn-warning btn-xs")
-          ),
-          box(
-            title = tags$span(icon("chart-area"), " Microarray outlier plots (PCA and connectivity)"),
-            width = 12, status = "danger", solidHeader = TRUE,
-            plotOutput("qc_pca_outlier_plot_micro", height = "380px"),
-            gexp_ui_plot_download_bar("dl_qc_pca_plot_micro_png", "dl_qc_pca_plot_micro_jpg", "dl_qc_pca_plot_micro_pdf", "btn-danger btn-xs"),
-            plotOutput("qc_connectivity_plot_micro", height = "380px"),
-            gexp_ui_plot_download_bar("dl_qc_conn_plot_micro_png", "dl_qc_conn_plot_micro_jpg", "dl_qc_conn_plot_micro_pdf", "btn-danger btn-xs")
-          ),
-          box(
-            title = tags$span(icon("table"), " Microarray outliers"),
-            width = 12, status = "danger", solidHeader = TRUE,
-            DT::DTOutput("qc_outlier_table_micro")
           )
         )
       ),
@@ -168,14 +142,19 @@ ui_qc <- tabItem(
         tags$div(
           style = "padding: 10px 14px; background: linear-gradient(135deg, #fef9e7, #fdebd0); border-left: 4px solid #f39c12; border-radius: 4px; margin-bottom: 15px;",
           icon("lightbulb", style = "color: #f39c12; margin-right: 6px;"),
-          tags$strong("Detect and remove outlier samples after normalization. "),
-          tags$span("If samples are removed, GExPipe re-normalizes the remaining data and re-computes common genes.", style = "font-size: 13px;"),
+          tags$strong("Optional: flag possible outlier samples after normalization. "),
+          tags$span("Each GSE is tested on its own samples (this step is before batch correction, so a pooled test would mostly flag study differences). ",
+                    "Nothing is removed unless you tick it. If samples are removed, GExPipe re-normalizes the remaining data and re-computes common genes.",
+                    style = "font-size: 13px;"),
           tags$br(),
           tags$span(icon("chart-area", style = "margin-right: 4px;"), tags$strong("PCA + Mahalanobis distance:"),
-                    " Identifies samples far from the cluster center in PC1-PC2 space (97.5% chi-squared threshold).",
+                    " Identifies samples far from their GSE's center in PC1-PC2 space (97.5% chi-squared threshold).",
                     style = "font-size: 12px; display: block; margin-top: 4px;"),
           tags$span(icon("project-diagram", style = "margin-right: 4px;"), tags$strong("Sample connectivity (signed network):"),
-                    " Flags samples with low inter-sample correlation (mean - 2*SD threshold).",
+                    " Flags samples with low correlation to the rest of their GSE (z < -2, i.e. mean - 2*SD).",
+                    style = "font-size: 12px; display: block; margin-top: 2px;"),
+          tags$span(icon("lightbulb", style = "margin-right: 4px;"), tags$strong("Advice:"),
+                    " a flag is not proof of a bad sample. Strong disease samples often look 'different'. Exclude only clear technical failures (STRONG = both tests), and check that DE is similar with and without them.",
                     style = "font-size: 12px; display: block; margin-top: 2px;")
         ),
         uiOutput("qc_excluded_info_ui"),

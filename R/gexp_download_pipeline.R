@@ -1104,10 +1104,45 @@ gexp_download_finalize_common_genes <- function(
  return(NULL)
  }
  range_folder <- paste0("GSE", gse_num %/% 1000L, "nnn")
- fname <- paste0(gse_id, "_series_matrix.txt.gz")
- url <- sprintf("https://ftp.ncbi.nlm.nih.gov/geo/series/%s/%s/matrix/%s", range_folder, gse_id, fname)
+ base_url <- sprintf("https://ftp.ncbi.nlm.nih.gov/geo/series/%s/%s/matrix/", range_folder, gse_id)
+ # Multi-platform series (e.g. GSE18123: GPL570 + GPL6244) have NO plain
+ # <GSE>_series_matrix.txt.gz - only <GSE>-GPLxxx_series_matrix.txt.gz per
+ # platform. Requesting the plain name 404s and was reported as "0 MB
+ # downloaded, in progress" forever. List the matrix folder to get the real
+ # file names; NULL (listing failed) falls through to GEOquery unchanged.
+ fnames <- .gexpipe_list_series_matrix_files(base_url, gse_id)
+ if (length(fnames) == 0L) {
+ return(NULL)
+ }
  dir.create(destdir, showWarnings = FALSE, recursive = TRUE)
- dest_file <- file.path(destdir, fname)
+ res <- lapply(fnames, function(fname) {
+ .gexpipe_resumable_prefetch_one(paste0(base_url, fname), file.path(destdir, fname), gse_id,
+ max_attempts = max_attempts, per_attempt_timeout = per_attempt_timeout)
+ })
+ totals <- vapply(res, function(r) r$total, numeric(1))
+ list(
+ complete = all(vapply(res, function(r) isTRUE(r$complete), logical(1))),
+ downloaded = sum(vapply(res, function(r) r$downloaded, numeric(1))),
+ total = if (all(is.finite(totals))) sum(totals) else NA_real_
+ )
+}
+
+#' List the series-matrix file names in a GEO series' matrix/ folder.
+#' @return Character vector of file names (possibly empty if the listing
+#'   could not be fetched or parsed).
+#' @keywords internal
+.gexpipe_list_series_matrix_files <- function(base_url, gse_id) {
+ res <- tryCatch(curl::curl_fetch_memory(base_url, handle = curl::new_handle(followlocation = TRUE)),
+ error = function(e) NULL)
+ if (is.null(res) || !identical(as.integer(res$status_code), 200L)) {
+ return(character(0))
+ }
+ html <- rawToChar(res$content)
+ pat <- paste0(gse_id, "(-GPL[0-9]+)?(-[0-9]+)?_series_matrix\\.txt\\.gz")
+ unique(regmatches(html, gregexpr(pat, html, ignore.case = TRUE))[[1]])
+}
+
+.gexpipe_resumable_prefetch_one <- function(url, dest_file, gse_id, max_attempts = 10L, per_attempt_timeout = 20L) {
  if (.gexpipe_is_valid_gzip(dest_file) && .gexpipe_series_matrix_complete(dest_file)) {
  return(list(complete = TRUE, downloaded = file.info(dest_file)$size, total = file.info(dest_file)$size))
  }
@@ -1125,7 +1160,7 @@ gexp_download_finalize_common_genes <- function(
  )
  downloaded <- if (file.exists(dest_file)) file.info(dest_file)$size else 0
  .gexpipe_report_dl_progress(.gexpipe_format_dl_progress(gse_id, downloaded, total_bytes))
- if (downloaded > 1e6 &&
+ if (downloaded > 0 &&
  isTRUE(tryCatch(.gexpipe_is_valid_gzip(dest_file) && .gexpipe_series_matrix_complete(dest_file), error = function(e) FALSE))) {
  .gexpipe_report_dl_progress(sprintf("%s: 100%% - download complete", gse_id))
  return(list(complete = TRUE, downloaded = downloaded, total = total_bytes))

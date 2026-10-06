@@ -564,6 +564,17 @@ ui_batch <- tabItem(
         title = tags$span(icon("file-csv"), " Download expression data (batch step)"),
         width = 12, status = "warning", solidHeader = TRUE,
         tags$p("Export expression before and after batch correction to verify the pipeline in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
+        tags$h5(icon("check-double"), " Batch effect check (before vs after)", style = "font-weight: bold; margin-top: 4px;"),
+        tags$p(style = "color:#555; font-size:13px;",
+               "Batch = dataset (GSE). After a good correction, ", tags$em("Top-PC var. from batch"), ", ",
+               tags$em("Silhouette (batch)"), " and ", tags$em("Genes with batch effect"), " drop, while ",
+               tags$em("Top-PC var. from condition"), " (biology) is kept."),
+        uiOutput("batch_effect_check_ui"),
+        tags$div(style = "margin: 8px 0 14px 0;",
+          downloadButton("download_batch_before_after", tagList(icon("file-archive"), " Before + after matrices + metadata + check (ZIP)"), class = "btn-primary btn-sm"),
+          tags$span(style = "display: inline-block; width: 8px;"),
+          downloadButton("download_batch_check_csv", tagList(icon("table"), " Batch check table (CSV)"), class = "btn-info btn-sm")),
+        tags$hr(),
         conditionalPanel(
           condition = "input.analysis_type != 'parallel'",
           fluidRow(

@@ -369,6 +369,19 @@ gexp_normalize_and_intersect <- function(
     if (length(gene_symbols) != nrow(probe_mat)) {
       gene_symbols <- rownames(probe_mat)
     }
+    # RMA rebuilds the matrix from CEL files with raw probe-set IDs, and the
+    # GEO object carries no GPL annotation (getGPL = FALSE), so the fData
+    # route above usually returns the probe IDs unchanged (e.g. "1007_s_at").
+    # Those never overlap the symbol-keyed series-matrix datasets, so the
+    # microarray gene intersection came out empty. Use the same GPL /
+    # annotation-package converter Step 1 uses.
+    if (isTRUE(tryCatch(gexpipe_ids_need_symbol_conversion(gene_symbols, gpl_id = plat), error = function(e) FALSE))) {
+      conv <- tryCatch(any_id_to_symbol(rownames(probe_mat), gpl_id = plat, gse_id = gse), error = function(e) NULL)
+      if (!is.null(conv) && length(conv) == nrow(probe_mat) &&
+          sum(!is.na(conv) & nzchar(trimws(conv))) > 0.05 * nrow(probe_mat)) {
+        gene_symbols <- as.character(conv)
+      }
+    }
     rownames(probe_mat) <- gene_symbols
     valid <- !is.na(gene_symbols) & trimws(gene_symbols) != ""
     expr_norm <- probe_mat[valid, , drop = FALSE]
@@ -500,10 +513,10 @@ gexp_normalize_and_intersect <- function(
   if (isTRUE(keep_platforms_separate)) {
     apply_global_quantile <- FALSE
     if (length(micro_names) > 0L && length(micro_genes) == 0L) {
-      stop("No genes remain in microarray after per-dataset normalization.")
+      stop(.gexpipe_no_genes_message("microarray", all_expr_norm[micro_names]))
     }
     if (length(rna_names) > 0L && length(rna_genes) == 0L) {
-      stop("No genes remain in RNA-seq after per-dataset normalization.")
+      stop(.gexpipe_no_genes_message("RNA-seq", all_expr_norm[rna_names]))
     }
     for (gse in micro_names) {
       all_expr_norm[[gse]] <- all_expr_norm[[gse]][micro_genes, , drop = FALSE]
@@ -793,4 +806,24 @@ gexp_normalize_and_intersect <- function(
     log_text_micro = log_text_micro,
     log_text_rna = log_text_rna
   )
+}
+
+#' Explain an empty per-platform gene set (which GSE, how many rows, ID type)
+#' @keywords internal
+.gexpipe_no_genes_message <- function(platform_label, mats) {
+  per <- vapply(names(mats), function(nm) {
+    rn <- rownames(mats[[nm]])
+    paste0(nm, ": ", length(rn), " rows",
+           if (length(rn)) paste0(" (e.g. ", paste(utils::head(rn, 3L), collapse = ", "), ")") else "")
+  }, character(1))
+  empty <- names(mats)[vapply(mats, function(m) is.null(m) || nrow(m) == 0L, logical(1))]
+  hint <- if (length(empty)) {
+    paste0(" ", paste(empty, collapse = ", "), " has no genes left - its row IDs could not be mapped to gene symbols ",
+           "(or it is not a ", platform_label, " dataset: check it is in the correct platform box in Step 1).")
+  } else {
+    paste0(" The datasets share no gene IDs - usually one still has probe / Ensembl / Entrez IDs while the others ",
+           "have gene symbols. Re-run Step 1 (with internet, so the GPL annotation can be fetched) or remove that GSE.")
+  }
+  paste0("No genes remain in ", platform_label, " after per-dataset normalization. ",
+         paste(per, collapse = "; "), ".", hint)
 }

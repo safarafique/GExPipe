@@ -515,47 +515,68 @@ server_qc <- function(input, output, session, rv) {
   gexp_register_plot_downloads(output, "qc_boxplot_micro", function() .qc_platform_boxplot(rv$expr_micro, "Microarray QC boxplot", "#fde68a"), 7, 5, "QC_Boxplot_Microarray")
   gexp_register_plot_downloads(output, "qc_density_micro", function() .qc_platform_density(rv$expr_micro, "Microarray QC density", "#d97706"), 7, 5, "QC_Density_Microarray")
 
-  .qc_outlier_table_for <- function(sample_ids) {
+  # Per-platform outlier table data (shared by the table and its CSV download).
+  .qc_outlier_df <- function(sample_ids) {
     if (!isTRUE(rv$qc_outlier_detection_complete) || is.null(sample_ids) || length(sample_ids) == 0L) {
-      return(DT::datatable(
-        data.frame(Message = "Run outlier detection to see this platform."),
-        rownames = FALSE, options = list(dom = "t")
-      ))
+      return(NULL)
     }
     keep <- intersect(sample_ids, names(rv$qc_pca_distances))
     if (length(keep) == 0L) keep <- intersect(sample_ids, colnames(rv$combined_expr_raw))
-    if (length(keep) == 0L) {
-      return(DT::datatable(
-        data.frame(Message = "No samples for this platform."),
-        rownames = FALSE, options = list(dom = "t")
-      ))
-    }
+    if (length(keep) == 0L) return(NULL)
+    grp <- .qc_sample_condition(keep)
+    dist <- unname(rv$qc_pca_distances[keep])
     df <- data.frame(
       Sample = keep,
       Dataset = .qc_sample_dataset(keep),
-      Mahal_Distance = round(rv$qc_pca_distances[keep], 2),
+      Group = ifelse(is.na(grp), "not set (Step 4)", grp),
+      Mahal_Distance = round(dist, 2),
       PCA_Outlier = ifelse(keep %in% rv$qc_pca_outliers, "Yes", ""),
-      Connectivity = round(rv$qc_conn_k[keep], 2),
+      Connectivity_Z = round(unname(rv$qc_conn_k[keep]), 2),
       Conn_Outlier = ifelse(keep %in% rv$qc_conn_outliers, "Yes", ""),
-      Flagged = ifelse(keep %in% rv$qc_all_outliers, "OUTLIER", ""),
+      Flagged = ifelse(keep %in% rv$qc_strong_outliers, "STRONG",
+                       ifelse(keep %in% rv$qc_all_outliers, "OUTLIER",
+                              ifelse(is.na(dist), "not tested (GSE < 5)", ""))),
       stringsAsFactors = FALSE
     )
-    df <- df[order(-nchar(df$Flagged), -df$Mahal_Distance), , drop = FALSE]
-    dt <- DT::datatable(df, options = list(pageLength = 8, scrollX = TRUE, dom = "frtip"),
-                        rownames = FALSE, selection = "none")
+    rank <- match(df$Flagged, c("STRONG", "OUTLIER"), nomatch = 3L)
+    df[order(rank, -df$Mahal_Distance), , drop = FALSE]
+  }
+  .qc_style_flagged <- function(dt) {
     DT::formatStyle(dt, "Flagged",
-                    backgroundColor = DT::styleEqual("OUTLIER", "#ffebee"),
-                    color = DT::styleEqual("OUTLIER", "#c62828"),
-                    fontWeight = DT::styleEqual("OUTLIER", "bold"))
+                    backgroundColor = DT::styleEqual(c("STRONG", "OUTLIER"), c("#ffcdd2", "#fff3e0")),
+                    color = DT::styleEqual(c("STRONG", "OUTLIER"), c("#b71c1c", "#e65100")),
+                    fontWeight = DT::styleEqual(c("STRONG", "OUTLIER"), c("bold", "bold")))
+  }
+  .qc_platform_ids <- function(pl) {
+    expr <- if (pl == "rna") rv$expr_rna else rv$expr_micro
+    if (!is.null(expr)) colnames(expr) else character(0)
   }
 
-  output$qc_outlier_table_rna <- DT::renderDataTable({
-    ids <- if (!is.null(rv$expr_rna)) colnames(rv$expr_rna) else character(0)
-    .qc_outlier_table_for(ids)
-  })
-  output$qc_outlier_table_micro <- DT::renderDataTable({
-    ids <- if (!is.null(rv$expr_micro)) colnames(rv$expr_micro) else character(0)
-    .qc_outlier_table_for(ids)
+  .qc_outlier_table_for <- function(sample_ids) {
+    df <- .qc_outlier_df(sample_ids)
+    if (is.null(df)) {
+      msg <- if (!isTRUE(rv$qc_outlier_detection_complete)) "Run outlier detection to see this platform." else "No samples for this platform."
+      return(DT::datatable(data.frame(Message = msg), rownames = FALSE, options = list(dom = "t")))
+    }
+    dt <- DT::datatable(df, options = list(pageLength = 8, scrollX = TRUE, dom = "frtip"),
+                        rownames = FALSE, selection = "none")
+    .qc_style_flagged(dt)
+  }
+
+  output$qc_outlier_table_rna <- DT::renderDataTable(.qc_outlier_table_for(.qc_platform_ids("rna")))
+  output$qc_outlier_table_micro <- DT::renderDataTable(.qc_outlier_table_for(.qc_platform_ids("micro")))
+  for (.pl in c("rna", "micro")) local({
+    pl <- .pl
+    fn <- paste0("QC_Outliers_", if (pl == "rna") "RNAseq" else "Microarray", ".csv")
+    output[[paste0("dl_qc_outlier_csv_", pl)]] <- downloadHandler(
+      filename = function() fn,
+      content = function(file) {
+        df <- .qc_outlier_df(.qc_platform_ids(pl))
+        req(df)
+        write.csv(df, file, row.names = FALSE)
+        try(write.csv(df, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE), silent = TRUE)
+      }
+    )
   })
   
   # ==============================================================================
@@ -612,24 +633,24 @@ server_qc <- function(input, output, session, rv) {
             connectivity = unlist(lapply(parts, function(z) z$connectivity)),
             conn_threshold = parts[[1L]]$conn_threshold,
             conn_outliers = unique(unlist(lapply(parts, function(z) z$conn_outliers))),
-            all_outliers = unique(unlist(lapply(parts, function(z) z$all_outliers)))
+            all_outliers = unique(unlist(lapply(parts, function(z) z$all_outliers))),
+            strong_outliers = unique(unlist(lapply(parts, function(z) z$strong_outliers))),
+            skipped = unique(unlist(lapply(parts, function(z) z$skipped))),
+            log = unlist(lapply(parts, function(z) z$log))
           )
+        }
+        # Each GSE is tested on its own samples: Step 3 is before batch
+        # correction, so a pooled test mostly flags study differences.
+        .within_gse <- function(m) {
+          gexp_qc_detect_outliers_within_gse(m, .qc_sample_dataset(colnames(m)), top_n = 5000L)
         }
         rna_qc <- micro_qc <- NULL
         qc <- if (isTRUE(parallel_qc)) {
-          rna_qc <- if (!is.null(rv$expr_rna) && ncol(rv$expr_rna) >= 5L) {
-            gexp_qc_detect_outliers(rv$expr_rna, top_n = 5000L)
-          } else {
-            NULL
-          }
-          micro_qc <- if (!is.null(rv$expr_micro) && ncol(rv$expr_micro) >= 5L) {
-            gexp_qc_detect_outliers(rv$expr_micro, top_n = 5000L)
-          } else {
-            NULL
-          }
+          rna_qc <- if (!is.null(rv$expr_rna) && ncol(rv$expr_rna) >= 5L) .within_gse(rv$expr_rna) else NULL
+          micro_qc <- if (!is.null(rv$expr_micro) && ncol(rv$expr_micro) >= 5L) .within_gse(rv$expr_micro) else NULL
           .merge_qc(list(rna_qc, micro_qc))
         } else {
-          gexp_qc_detect_outliers(expr, top_n = 5000L)
+          .within_gse(expr)
         }
         if (is.null(qc)) stop("Outlier detection produced no results.")
         rv$qc_parts <- if (isTRUE(parallel_qc)) list(rna = rna_qc, micro = micro_qc) else NULL
@@ -645,6 +666,9 @@ server_qc <- function(input, output, session, rv) {
         rv$qc_conn_threshold <- qc$conn_threshold
         rv$qc_conn_outliers <- qc$conn_outliers
         rv$qc_all_outliers <- qc$all_outliers
+        rv$qc_strong_outliers <- qc$strong_outliers
+        rv$qc_skipped_datasets <- qc$skipped
+        rv$qc_outlier_log <- qc$log
         rv$qc_outlier_detection_complete <- TRUE
 
         incProgress(0.1, detail = "Done!")
@@ -652,7 +676,8 @@ server_qc <- function(input, output, session, rv) {
         n_flagged <- length(qc$all_outliers)
         showNotification(
           tags$div(icon(if (n_flagged > 0) "exclamation-triangle" else "check-circle"),
-                   tags$strong(paste0(" Outlier detection complete. ", n_flagged, " sample(s) flagged."))),
+                   tags$strong(paste0(" Outlier detection complete. ", n_flagged, " sample(s) flagged (",
+                                      length(qc$strong_outliers), " by both tests). Nothing is removed unless you tick it."))),
           type = if (n_flagged > 0) "warning" else "message", duration = 6)
 
       }, error = function(e) {
@@ -671,7 +696,8 @@ server_qc <- function(input, output, session, rv) {
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
       tags$p(tags$strong("Step 3 summary."), " ", format(n_genes, big.mark = ","), " genes, ", format(n_samp, big.mark = ","), " samples after normalization. Venn/UpSet show common genes; QC plots show normalized expression."),
-      if (isTRUE(rv$qc_outlier_detection_complete)) tags$p("Outlier detection: ", n_out, " sample(s) flagged (PCA and/or connectivity).") else NULL)
+      if (isTRUE(rv$qc_outlier_detection_complete)) tags$p("Outlier detection (within each GSE): ", n_out, " sample(s) flagged, ",
+               length(rv$qc_strong_outliers), " by both tests. Flagged samples are kept unless you exclude them.") else NULL)
   })
 
   # ---- Summary badges ----
@@ -680,6 +706,7 @@ server_qc <- function(input, output, session, rv) {
     n_pca <- length(rv$qc_pca_outliers)
     n_conn <- length(rv$qc_conn_outliers)
     n_total <- length(rv$qc_all_outliers)
+    n_strong <- length(rv$qc_strong_outliers)
     n_samples <- ncol(.qc_expr())
 
     tags$div(
@@ -702,6 +729,12 @@ server_qc <- function(input, output, session, rv) {
                        "color: ", if (n_total > 0) "#b71c1c" else "#1b5e20", ";"),
         icon(if (n_total > 0) "exclamation-triangle" else "check-circle"),
         paste0(" Total: ", n_total, " / ", n_samples, " flagged")
+      ),
+      tags$div(
+        style = paste0("padding: 8px 14px; border-radius: 20px; font-weight: bold; font-size: 13px; ",
+                       "background: ", if (n_strong > 0) "#ffcdd2" else "#e8f5e9", "; ",
+                       "color: ", if (n_strong > 0) "#b71c1c" else "#2e7d32", ";"),
+        icon("crosshairs"), paste0(" Strong (both tests): ", n_strong)
       )
     )
   })
@@ -711,10 +744,36 @@ server_qc <- function(input, output, session, rv) {
     if (!isTRUE(rv$qc_outlier_detection_complete)) return(NULL)
 
     if (isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")) {
+      # Per-platform plots live here (not as always-visible boxes in the
+      # columns above), so nothing shows as an empty panel before a run.
+      .platform_col <- function(pl, lab) {
+        if (is.null(rv$qc_parts[[pl]])) {
+          expr <- if (pl == "rna") rv$expr_rna else rv$expr_micro
+          n <- if (is.null(expr)) 0L else ncol(expr)
+          return(column(6, tags$h4(lab, style = "margin-top: 0;"),
+                        tags$p(style = "color:#6c757d;", icon("info-circle"),
+                               if (n == 0L) paste0(" No ", lab, " data in this run.")
+                               else paste0(" Skipped: ", n, " sample(s); outlier detection needs at least 5."))))
+        }
+        column(6,
+          tags$h4(lab, style = "margin-top: 0;"),
+          plotOutput(paste0("qc_pca_outlier_plot_", pl), height = "380px"),
+          gexp_ui_plot_download_bar(paste0("dl_qc_pca_plot_", pl, "_png"), paste0("dl_qc_pca_plot_", pl, "_jpg"),
+                                    paste0("dl_qc_pca_plot_", pl, "_pdf"), "btn-danger btn-xs"),
+          plotOutput(paste0("qc_connectivity_plot_", pl), height = "380px"),
+          gexp_ui_plot_download_bar(paste0("dl_qc_conn_plot_", pl, "_png"), paste0("dl_qc_conn_plot_", pl, "_jpg"),
+                                    paste0("dl_qc_conn_plot_", pl, "_pdf"), "btn-danger btn-xs"),
+          tags$p(tags$strong(icon("table"), " ", lab, " outliers"), style = "margin: 10px 0 6px 0;"),
+          DT::DTOutput(paste0("qc_outlier_table_", pl)),
+          tags$div(style = "margin-top: 6px;",
+            downloadButton(paste0("dl_qc_outlier_csv_", pl), tagList(icon("download"), " ", lab, " outliers (CSV)"),
+                           class = "btn-default btn-xs"))
+        )
+      }
       return(tagList(
         tags$hr(style = "margin: 15px 0;"),
-        tags$p(style = "color:#555; font-size:13px;", icon("info-circle"),
-               " PCA and connectivity plots for each platform are shown in the RNA-seq and Microarray columns below."),
+        fluidRow(.platform_col("rna", "RNA-seq"), .platform_col("micro", "Microarray")),
+        tags$hr(style = "margin: 15px 0;"),
         uiOutput("qc_outlier_selector_ui")
       ))
     }
@@ -770,6 +829,15 @@ server_qc <- function(input, output, session, rv) {
     unname(ds_map[sample_ids])
   }
 
+  # Normal/Disease group per sample; NA until groups are set in Step 4.
+  .qc_sample_condition <- function(sample_ids) {
+    md <- rv$unified_metadata
+    if (is.null(md) || !all(c("SampleID", "Condition") %in% names(md))) {
+      return(rep(NA_character_, length(sample_ids)))
+    }
+    as.character(md$Condition[match(sample_ids, md$SampleID)])
+  }
+
   make_qc_pca_plot <- function(part = NULL, label = NULL) {
     if (is.null(part)) {
       part <- list(scores = rv$qc_pca_scores, distances = rv$qc_pca_distances, pca_threshold = rv$qc_pca_threshold,
@@ -778,7 +846,7 @@ server_qc <- function(input, output, session, rv) {
     scores <- as.data.frame(part$scores)
     scores$Sample <- rownames(scores)
     scores$Distance <- part$distances[scores$Sample]
-    scores$IsOutlier <- scores$Distance > part$pca_threshold
+    scores$IsOutlier <- !is.na(scores$Distance) & scores$Distance > part$pca_threshold
     scores$Dataset <- .qc_sample_dataset(scores$Sample)
     scores$Dataset[is.na(scores$Dataset) | !nzchar(scores$Dataset)] <- "Unknown"
 
@@ -794,7 +862,8 @@ server_qc <- function(input, output, session, rv) {
       ggplot2::theme_minimal(base_size = 13) +
       ggplot2::labs(
         title = paste0(if (!is.null(label)) paste0(label, ": ") else "", "PCA-based Outlier Detection"),
-        subtitle = paste0("Mahalanobis threshold: ", round(part$pca_threshold, 2), " | Outliers: ", n_out),
+        subtitle = paste0("Pooled PCA for display; triangles = flagged within their own GSE (Mahalanobis > ",
+                          round(part$pca_threshold, 2), ") | Outliers: ", n_out),
         x = paste0("PC1 (", round(var_exp[1], 1), "%)"),
         y = if (length(var_exp) > 1) paste0("PC2 (", round(var_exp[2], 1), "%)") else "PC2"
       ) +
@@ -822,6 +891,7 @@ server_qc <- function(input, output, session, rv) {
     threshold <- if (is.null(part)) rv$qc_conn_threshold else part$conn_threshold
     df <- data.frame(Sample = names(k), Connectivity = as.numeric(k),
                      IsOutlier = k < threshold, stringsAsFactors = FALSE)
+    df <- df[!is.na(df$Connectivity), , drop = FALSE]
     df <- df[order(df$Connectivity), , drop = FALSE]
     df$Sample <- factor(df$Sample, levels = df$Sample)
 
@@ -843,8 +913,8 @@ server_qc <- function(input, output, session, rv) {
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::labs(
         title = paste0(if (!is.null(label)) paste0(label, ": ") else "", "Sample Connectivity", tsuffix),
-        subtitle = paste0("Signed network (power=6) | Threshold: mean-2*SD = ", round(threshold, 1)),
-        x = "", y = "Connectivity (sum of adjacency)", fill = "Status"
+        subtitle = paste0("Signed network (power=6), z-score within each GSE | Threshold: z < ", threshold, " (mean-2*SD)"),
+        x = "", y = "Connectivity z-score (within GSE)", fill = "Status"
       ) +
       ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", size = 13),
                      legend.position = "top")
@@ -863,10 +933,19 @@ server_qc <- function(input, output, session, rv) {
   }, height = 420, res = 96)
 
   # ---- Per-platform plots (parallel mode) ----
-  output$qc_pca_outlier_plot_rna <- renderPlot({ req(rv$qc_parts$rna); make_qc_pca_plot(rv$qc_parts$rna, "RNA-seq") }, height = 380, res = 96)
-  output$qc_pca_outlier_plot_micro <- renderPlot({ req(rv$qc_parts$micro); make_qc_pca_plot(rv$qc_parts$micro, "Microarray") }, height = 380, res = 96)
-  output$qc_connectivity_plot_rna <- renderPlot({ req(rv$qc_parts$rna); make_qc_conn_plot(rv$qc_parts$rna, "RNA-seq") }, height = 380, res = 96)
-  output$qc_connectivity_plot_micro <- renderPlot({ req(rv$qc_parts$micro); make_qc_conn_plot(rv$qc_parts$micro, "Microarray") }, height = 380, res = 96)
+  # Shown inside qc_outlier_results_ui only after a run (see .platform_col).
+  for (.pl in c("rna", "micro")) local({
+    pl <- .pl
+    lab <- if (pl == "rna") "RNA-seq" else "Microarray"
+    output[[paste0("qc_pca_outlier_plot_", pl)]] <- renderPlot({
+      req(rv$qc_parts[[pl]])
+      make_qc_pca_plot(rv$qc_parts[[pl]], lab)
+    }, height = 380, res = 96)
+    output[[paste0("qc_connectivity_plot_", pl)]] <- renderPlot({
+      req(rv$qc_parts[[pl]])
+      make_qc_conn_plot(rv$qc_parts[[pl]], lab)
+    }, height = 380, res = 96)
+  })
   for (.pl in c("rna", "micro")) local({
     pl <- .pl; lab <- if (pl == "rna") "RNA-seq" else "Microarray"
     for (kind in c("pca", "conn")) local({
@@ -1068,26 +1147,12 @@ server_qc <- function(input, output, session, rv) {
   # ---- Outlier summary table ----
   output$qc_outlier_table <- DT::renderDataTable({
     req(rv$qc_outlier_detection_complete)
-    all_samples <- colnames(rv$combined_expr_raw)
-
-    df <- data.frame(
-      Sample = all_samples,
-      Dataset = .qc_sample_dataset(all_samples),
-      Mahal_Distance = round(rv$qc_pca_distances[all_samples], 2),
-      PCA_Outlier = ifelse(all_samples %in% rv$qc_pca_outliers, "Yes", ""),
-      Connectivity = round(rv$qc_conn_k[all_samples], 2),
-      Conn_Outlier = ifelse(all_samples %in% rv$qc_conn_outliers, "Yes", ""),
-      Flagged = ifelse(all_samples %in% rv$qc_all_outliers, "OUTLIER", ""),
-      stringsAsFactors = FALSE
-    )
-    df <- df[order(-nchar(df$Flagged), -df$Mahal_Distance), , drop = FALSE]
+    df <- .qc_outlier_df(names(rv$qc_pca_distances))
+    req(df)
 
     dt <- DT::datatable(df, options = list(pageLength = 10, scrollX = TRUE, dom = "frtip"),
                         rownames = FALSE, selection = "none")
-    dt <- DT::formatStyle(dt, "Flagged",
-                          backgroundColor = DT::styleEqual("OUTLIER", "#ffebee"),
-                          color = DT::styleEqual("OUTLIER", "#c62828"),
-                          fontWeight = DT::styleEqual("OUTLIER", "bold"))
+    dt <- .qc_style_flagged(dt)
     dt <- DT::formatStyle(dt, "PCA_Outlier",
                           color = DT::styleEqual("Yes", "#e74c3c"),
                           fontWeight = DT::styleEqual("Yes", "bold"))
@@ -1101,16 +1166,8 @@ server_qc <- function(input, output, session, rv) {
     filename = function() "QC_Sample_Outlier_Summary.csv",
     content = function(file) {
       req(rv$qc_outlier_detection_complete)
-      all_samples <- colnames(rv$combined_expr_raw)
-      df <- data.frame(
-        Sample = all_samples,
-        Mahal_Distance = round(rv$qc_pca_distances[all_samples], 4),
-        PCA_Outlier = all_samples %in% rv$qc_pca_outliers,
-        Connectivity = round(rv$qc_conn_k[all_samples], 4),
-        Conn_Outlier = all_samples %in% rv$qc_conn_outliers,
-        Flagged = all_samples %in% rv$qc_all_outliers,
-        stringsAsFactors = FALSE
-      )
+      df <- .qc_outlier_df(names(rv$qc_pca_distances))
+      req(df)
       write.csv(df, file, row.names = FALSE)
       write.csv(df, file.path(CSV_EXPORT_DIR(), "QC_Sample_Outlier_Summary.csv"), row.names = FALSE)
     }
@@ -1134,32 +1191,67 @@ server_qc <- function(input, output, session, rv) {
       ))
     }
 
-    # Build labels with detection method info
-    checkbox_choices <- setNames(outliers, vapply(outliers, function(s) {
+    strong <- intersect(outliers, rv$qc_strong_outliers)
+    # Strong (both tests) first, then by distance
+    outliers <- c(strong, setdiff(outliers, strong))
+    ds <- .qc_sample_dataset(outliers)
+    grp <- .qc_sample_condition(outliers)
+
+    # Build labels with GSE, group and detection method info
+    checkbox_choices <- setNames(outliers, vapply(seq_along(outliers), function(i) {
+      s <- outliers[i]
       methods <- c()
       if (s %in% rv$qc_pca_outliers) methods <- c(methods, "PCA")
       if (s %in% rv$qc_conn_outliers) methods <- c(methods, "Connectivity")
       dist_val <- round(rv$qc_pca_distances[s], 1)
       conn_val <- round(rv$qc_conn_k[s], 1)
-      paste0(s, "  [", paste(methods, collapse = "+"), " | Dist:", dist_val, " | Conn:", conn_val, "]")
+      paste0(if (s %in% strong) "STRONG - " else "", s,
+             "  [", if (is.na(ds[i])) "GSE ?" else ds[i],
+             " | ", if (is.na(grp[i])) "group not set" else grp[i],
+             " | ", paste(methods, collapse = "+"), " | Dist:", dist_val, " | Conn z:", conn_val, "]")
     }, character(1)))
+
+    # Flags concentrated in one group usually mean biology, not bad samples
+    grp_warn <- NULL
+    grp_known <- grp[!is.na(grp)]
+    if (length(grp_known) >= 2L) {
+      tab <- sort(table(grp_known), decreasing = TRUE)
+      if (tab[[1]] / length(grp_known) >= 2 / 3) {
+        grp_warn <- tags$p(
+          icon("exclamation-triangle"),
+          tags$strong(paste0(" ", tab[[1]], " of ", length(grp_known), " flagged samples are ", names(tab)[1], ".")),
+          " This often reflects real biology (for example strong disease samples), not bad arrays. Removing them can weaken DE.",
+          style = "font-size: 12px; color: #856404; margin: 0 0 8px 0;")
+      }
+    }
+    skipped <- rv$qc_skipped_datasets
+    skip_note <- if (length(skipped) > 0L) {
+      tags$p(icon("info-circle"), " Not tested (fewer than 5 samples): ", paste(skipped, collapse = ", "), ".",
+             style = "font-size: 12px; color: #6c757d; margin: 0 0 8px 0;")
+    }
 
     tags$div(
       style = "padding: 15px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 10px;",
       tags$h4(icon("exclamation-triangle", style = "color: #e74c3c;"),
-              tags$strong(paste0(" ", length(outliers), " Outlier(s) Detected")),
+              tags$strong(paste0(" ", length(outliers), " sample(s) flagged (", length(strong), " strong)")),
               style = "margin-top: 0; margin-bottom: 10px; color: #c62828;"),
-      tags$p("Select samples to exclude. Unchecked samples will be kept.",
+      tags$p("Each GSE was tested on its own samples. Nothing is ticked: a flag means 'look at this sample', not 'remove it'. ",
+             "Exclude only clear technical failures - ideally STRONG (flagged by both tests) with an odd boxplot/density too. ",
+             "Then compare DE with and without them.",
              style = "font-size: 13px; margin-bottom: 10px; color: #495057;"),
+      grp_warn,
+      skip_note,
       tags$div(
         style = "max-height: 220px; overflow-y: auto; padding: 8px; background: #fff; border-radius: 6px; border: 1px solid #ddd;",
         checkboxGroupInput("qc_outlier_checkboxes", NULL,
           choices = checkbox_choices,
-          selected = outliers,
+          selected = character(0),
           width = "100%")
       ),
       tags$div(
         style = "margin-top: 8px; display: flex; gap: 6px;",
+        actionButton("qc_select_strong_outliers", tagList(icon("check"), " Strong only"),
+          class = "btn-default btn-xs"),
         actionButton("qc_select_all_outliers", tagList(icon("check-double"), " All"),
           class = "btn-default btn-xs"),
         actionButton("qc_deselect_all_outliers", tagList(icon("square"), " None"),
@@ -1177,6 +1269,11 @@ server_qc <- function(input, output, session, rv) {
   observeEvent(input$qc_select_all_outliers, {
     outliers <- rv$qc_all_outliers
     if (!is.null(outliers)) updateCheckboxGroupInput(session, "qc_outlier_checkboxes", selected = outliers)
+  })
+  observeEvent(input$qc_select_strong_outliers, {
+    strong <- rv$qc_strong_outliers
+    updateCheckboxGroupInput(session, "qc_outlier_checkboxes",
+                             selected = if (is.null(strong)) character(0) else strong)
   })
   observeEvent(input$qc_deselect_all_outliers, {
     updateCheckboxGroupInput(session, "qc_outlier_checkboxes", selected = character(0))
@@ -1263,6 +1360,7 @@ server_qc <- function(input, output, session, rv) {
     # Reset outlier detection so user can re-run on reduced data
     rv$qc_outlier_detection_complete <- FALSE
     rv$qc_all_outliers <- character(0)
+    rv$qc_strong_outliers <- character(0)
 
     showNotification(
       tags$div(icon("check-circle"),

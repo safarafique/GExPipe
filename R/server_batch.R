@@ -686,6 +686,109 @@ server_batch <- function(input, output, session, rv) {
     )
   })
 
+  # Quantitative batch-effect check (before vs after), all analysis types.
+  # Before/after use the same genes and samples so the metrics compare like
+  # with like. Single-dataset runs report "no between-study batch".
+  .batch_check_pairs <- reactive({
+    req(isTRUE(rv$batch_complete) || isTRUE(rv$single_dataset))
+    match_to <- function(before, after) {
+      if (is.null(before) || is.null(after)) return(before)
+      before[intersect(rownames(after), rownames(before)), intersect(colnames(after), colnames(before)), drop = FALSE]
+    }
+    if (identical(input$analysis_type, "parallel") || isTRUE(rv$merge_after_de)) {
+      pr <- list()
+      if (!is.null(rv$batch_corrected_micro)) {
+        pr[["Microarray"]] <- list(before = match_to(rv$expr_micro, rv$batch_corrected_micro), after = rv$batch_corrected_micro)
+      }
+      if (!is.null(rv$batch_corrected_rna)) {
+        pr[["RNA-seq"]] <- list(before = match_to(rv$expr_rna, rv$batch_corrected_rna), after = rv$batch_corrected_rna)
+      }
+      pr
+    } else {
+      after <- if (!is.null(rv$batch_corrected)) rv$batch_corrected else rv$combined_expr
+      before <- if (!is.null(rv$expr_filtered)) rv$expr_filtered else rv$combined_expr
+      list(Combined = list(before = match_to(before, after), after = after))
+    }
+  })
+  .batch_check_table <- reactive({
+    pr <- .batch_check_pairs()
+    req(length(pr) > 0L, rv$unified_metadata)
+    withProgress(message = "Measuring batch effect...", value = 0.5, {
+      tryCatch(gexp_batch_check_table(pr, rv$unified_metadata), error = function(e) {
+        showNotification(paste("Batch-effect check failed:", conditionMessage(e)), type = "error", duration = 8)
+        NULL
+      })
+    })
+  })
+  .batch_methods_used <- function() {
+    if (identical(input$analysis_type, "parallel") || isTRUE(rv$merge_after_de)) {
+      c("Microarray" = as.character(if (is.null(rv$last_batch_method_micro)) "" else rv$last_batch_method_micro),
+        "RNA-seq" = as.character(if (is.null(rv$last_batch_method_rna)) "" else rv$last_batch_method_rna))
+    } else {
+      c("Batch method" = as.character(if (is.null(input$batch_method)) "" else input$batch_method))
+    }
+  }
+
+  output$batch_effect_check_ui <- renderUI({
+    if (!isTRUE(rv$batch_complete) && !isTRUE(rv$single_dataset)) {
+      return(tags$p(style = "color: #6c757d; margin: 0;", icon("info-circle"),
+                    " Apply batch correction to measure the batch effect before and after."))
+    }
+    tb <- .batch_check_table()
+    if (is.null(tb) || nrow(tb) == 0L) {
+      return(tags$p(style = "color: #6c757d;", "Batch effect could not be measured (need sample metadata and at least 3 samples)."))
+    }
+    verdicts <- tb[tb$Stage == "After" & nzchar(tb$Assessment), c("Data", "Assessment"), drop = FALSE]
+    tagList(
+      lapply(seq_len(nrow(verdicts)), function(i) {
+        txt <- verdicts$Assessment[i]
+        cls <- if (startsWith(txt, "OK") || startsWith(txt, "Single")) "alert-success" else if (startsWith(txt, "WARNING")) "alert-danger" else "alert-warning"
+        tags$div(class = paste("alert", cls), style = "margin-bottom: 8px; padding: 8px 12px; font-size: 13px;",
+                 tags$strong(verdicts$Data[i], ": "), txt)
+      }),
+      tableOutput("batch_effect_check_table")
+    )
+  })
+  output$batch_effect_check_table <- renderTable({
+    tb <- .batch_check_table()
+    req(tb)
+    keep <- c("Data", "Stage", "Genes", "Samples", "Batches", "TopPC_variance_from_batch_pct", "PC1_batch_R2",
+              "Silhouette_by_batch", "Genes_with_batch_effect_pct", "TopPC_variance_from_condition_pct")
+    out <- tb[, intersect(keep, names(tb)), drop = FALSE]
+    names(out) <- c("Data", "Stage", "Genes", "Samples", "Batches", "Top-PC var. from batch (%)", "PC1 batch R\u00b2",
+                    "Silhouette (batch)", "Genes with batch effect (%)", "Top-PC var. from condition (%)")[match(names(out), keep)]
+    out
+  }, digits = 3, striped = TRUE, bordered = TRUE, spacing = "s", na = "-")
+
+  output$download_batch_check_csv <- downloadHandler(
+    filename = function() "Batch_effect_check.csv",
+    content = function(file) {
+      tb <- .batch_check_table()
+      req(tb)
+      write.csv(tb, file, row.names = FALSE)
+      try(write.csv(tb, file.path(CSV_EXPORT_DIR(), "Batch_effect_check.csv"), row.names = FALSE), silent = TRUE)
+    }
+  )
+  output$download_batch_before_after <- downloadHandler(
+    filename = function() paste0("Batch_Before_After.", gexp_norm_archive_ext()),
+    content = function(file) {
+      pr <- .batch_check_pairs()
+      req(length(pr) > 0L)
+      tmp <- file.path(tempfile("gexpipe_batch_"), "Batch_Before_After")
+      on.exit(unlink(dirname(tmp), recursive = TRUE), add = TRUE)
+      withProgress(message = "Preparing batch export...", value = 0.4, {
+        gexp_write_batch_before_after(
+          tmp, pr, rv$unified_metadata, .batch_check_table(),
+          analysis_type = if (is.null(input$analysis_type)) "" else as.character(input$analysis_type),
+          methods = .batch_methods_used()
+        )
+        gexp_norm_archive_dir(tmp, file)
+      })
+      try(file.copy(file, file.path(CSV_EXPORT_DIR(), paste0("Batch_Before_After.", gexp_norm_archive_ext())),
+                    overwrite = TRUE), silent = TRUE)
+    }
+  )
+
   # Info boxes
   output$genes_before_filter <- renderInfoBox({
     n <- if (!is.null(rv$combined_expr)) nrow(rv$combined_expr) else 0
@@ -1167,7 +1270,7 @@ server_batch <- function(input, output, session, rv) {
               format(s_r, big.mark = ","), " samples."
             ),
             tags$br(),
-            tags$span("Not one joint batch on all 134 samples."),
+            tags$span("Not one joint batch on all ", format(s_m + s_r, big.mark = ","), " samples."),
             style = "font-size: 13px;"
           )
         } else {

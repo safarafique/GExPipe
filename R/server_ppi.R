@@ -1148,12 +1148,24 @@ server_ppi <- function(input, output, session, rv) {
   output$download_ppi_consensus <- downloadHandler(
     filename = function() "Consensus_Hub_Genes.csv",
     content = function(file) {
-      req(rv$ppi_consensus_hubs)
+      # req(character(0)) would abort the download (browser saves an error
+      # page), so a run with no consensus hub still gets a CSV with headers.
+      req(rv$ppi_hub_rankings)
       hub_rankings <- rv$ppi_hub_rankings
       all_hub_genes <- unlist(lapply(hub_rankings, function(x) x$SYMBOL))
       counts <- table(all_hub_genes)
-      consensus <- rv$ppi_consensus_hubs
-      df <- data.frame(Gene = consensus, Frequency = as.numeric(counts[consensus]))
+      consensus <- as.character(rv$ppi_consensus_hubs)
+      methods_for <- vapply(consensus, function(gn) {
+        paste(names(hub_rankings)[vapply(hub_rankings, function(x) gn %in% x$SYMBOL, logical(1))], collapse = "; ")
+      }, character(1))
+      df <- data.frame(Gene = consensus, Frequency = as.numeric(counts[consensus]),
+                       Methods = unname(methods_for), stringsAsFactors = FALSE)
+      if (!is.null(rv$ppi_hub_scores) && nrow(df) > 0L) {
+        sc <- rv$ppi_hub_scores[match(df$Gene, rv$ppi_hub_scores$SYMBOL), setdiff(names(rv$ppi_hub_scores), "SYMBOL"), drop = FALSE]
+        df <- cbind(df, sc)
+        df <- df[order(-df$Frequency, -df$Degree), , drop = FALSE]
+      }
+      rownames(df) <- NULL
       write.csv(df, file, row.names = FALSE)
       write.csv(df, file.path(CSV_EXPORT_DIR(), "Consensus_Hub_Genes.csv"), row.names = FALSE)
     }

@@ -5,7 +5,7 @@
 
 # GExPipe 0.99.107
 
-- Example GSE IDs: training examples are RNA-seq GSE144119, GSE100026 and microarray GSE47927, GSE26856; validation examples are RNA-seq GSE162462 and microarray GSE13159.
+- Example GSE IDs: training examples are RNA-seq GSE144119, GSE100026 and microarray GSE268456, GSE47927; validation examples are RNA-seq GSE162462 and microarray GSE13159.
 - Batch Correction page, Parallel mode: the expression export now gives a separate before and after
   CSV for RNA-seq and for microarray (four files), matching the per-platform batch correction.
   Single/Merged mode keeps the two combined files.

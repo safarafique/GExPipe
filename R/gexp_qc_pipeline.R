@@ -145,6 +145,69 @@ gexp_qc_detect_outliers_per_dataset <- function(
   )
 }
 
+#' Flag outliers within each GSE of one platform matrix (Step 3 app run)
+#'
+#' Step 3 runs before batch correction, so a pooled PCA mostly separates
+#' studies, and a whole small GSE can be flagged for being a different
+#' study. Here each GSE is tested on its own samples. A pooled PCA is still
+#' returned as `scores` for display only. Connectivity is returned as a
+#' within-GSE z-score so GSEs of different size share one threshold (-2,
+#' the same mean - 2*SD rule). GSEs with fewer than 5 samples are not
+#' tested (NA distance / connectivity) and are listed in `skipped`.
+#'
+#' @param expr Numeric matrix (genes x samples) for one platform.
+#' @param sample_dataset Character vector of GSE IDs, parallel to
+#'   `colnames(expr)`; NA / empty values are pooled as one "Unknown" group.
+#' @param top_n Integer number of top variable genes per GSE.
+#' @return Same fields as [gexp_qc_detect_outliers()], plus
+#'   `strong_outliers` (flagged by both tests), `dataset`, `skipped`, `log`.
+#' @noRd
+gexp_qc_detect_outliers_within_gse <- function(expr, sample_dataset, top_n = 5000L) {
+  samples <- colnames(expr)
+  ds <- as.character(sample_dataset)
+  ds[is.na(ds) | !nzchar(ds)] <- "Unknown"
+  names(ds) <- samples
+
+  pooled <- gexp_qc_detect_outliers(expr, top_n = top_n)
+  distances <- stats::setNames(rep(NA_real_, length(samples)), samples)
+  conn_z <- distances
+  pca_outliers <- conn_outliers <- skipped <- log <- character(0)
+
+  for (g in unique(ds)) {
+    ids <- samples[ds == g]
+    if (length(ids) < 5L) {
+      skipped <- c(skipped, g)
+      log <- c(log, paste0(g, ": not tested (", length(ids), " sample(s); needs 5)"))
+      next
+    }
+    qc <- gexp_qc_detect_outliers(expr[, ids, drop = FALSE], top_n = top_n)
+    distances[ids] <- qc$distances[ids]
+    k <- qc$connectivity[ids]
+    sd_k <- stats::sd(k)
+    conn_z[ids] <- if (is.na(sd_k) || sd_k == 0) 0 else (k - mean(k)) / sd_k
+    pca_outliers <- c(pca_outliers, qc$pca_outliers)
+    conn_outliers <- c(conn_outliers, qc$conn_outliers)
+    log <- c(log, paste0(g, ": ", length(union(qc$pca_outliers, qc$conn_outliers)),
+                         " of ", length(ids), " flagged"))
+  }
+
+  list(
+    scores = pooled$scores,
+    distances = distances,
+    pca_threshold = stats::qchisq(0.975, df = 2),
+    pca_outliers = pca_outliers,
+    pca_var_explained = pooled$pca_var_explained,
+    connectivity = conn_z,
+    conn_threshold = -2,
+    conn_outliers = conn_outliers,
+    all_outliers = union(pca_outliers, conn_outliers),
+    strong_outliers = intersect(pca_outliers, conn_outliers),
+    dataset = ds,
+    skipped = skipped,
+    log = log
+  )
+}
+
 #' Exclude selected samples from download/QC state lists
 #'
 #' @param combined_expr_raw Matrix genes x samples.

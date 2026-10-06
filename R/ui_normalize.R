@@ -274,6 +274,23 @@ ui_normalize <- tabItem(
     ),
     fluidRow(
       box(
+        title = tags$span(icon("file-download"), " Download Before / After Normalization Data"),
+        width = 12, status = "primary", solidHeader = TRUE,
+        tags$p(
+          "Export the expression matrices ", tags$strong("before"), " normalization (Step 1 input) and ",
+          tags$strong("after"), " normalization (per dataset, per platform and combined), with a per-sample ",
+          "and per-dataset statistics table and a README explaining how to check the result. ",
+          "After a correct normalization the values are on a log scale and the sample medians line up ",
+          "(", tags$code("Median_SD_across_samples"), " shrinks towards 0).",
+          style = "font-size: 13px; color: #495057;"
+        ),
+        downloadButton("download_norm_before_after", tagList(icon("file-archive"), " Before + after matrices + check tables (ZIP)"), class = "btn-primary btn-sm"),
+        tags$span(style = "display: inline-block; width: 8px;"),
+        downloadButton("download_norm_check_csv", tagList(icon("table"), " Check table only (CSV)"), class = "btn-info btn-sm")
+      )
+    ),
+    fluidRow(
+      box(
         title = tags$span(icon("file-alt"), " Process Summary"),
         width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("normalize_process_summary_ui"))
@@ -427,6 +444,23 @@ ui_normalize <- tabItem(
             plotOutput("normalization_distribution_overlap_micro", height = "320px"),
             gexp_ui_plot_download_bar("download_normalization_distribution_overlap_micro_png", "download_normalization_distribution_overlap_micro_jpg", "download_normalization_distribution_overlap_micro_pdf", "btn-warning btn-xs")
           )
+        )
+      ),
+      fluidRow(
+        box(
+          title = tags$span(icon("file-download"), " Download Before / After Normalization Data"),
+          width = 12, status = "primary", solidHeader = TRUE,
+          tags$p(
+            "Export the expression matrices ", tags$strong("before"), " normalization (Step 1 input) and ",
+            tags$strong("after"), " normalization (per dataset, per platform and combined), with a per-sample ",
+            "and per-dataset statistics table and a README explaining how to check the result. ",
+            "After a correct normalization the values are on a log scale and the sample medians line up ",
+            "(", tags$code("Median_SD_across_samples"), " shrinks towards 0).",
+            style = "font-size: 13px; color: #495057;"
+          ),
+          downloadButton("download_norm_before_after_parallel", tagList(icon("file-archive"), " Before + after matrices + check tables (ZIP)"), class = "btn-primary btn-sm"),
+          tags$span(style = "display: inline-block; width: 8px;"),
+          downloadButton("download_norm_check_csv_parallel", tagList(icon("table"), " Check table only (CSV)"), class = "btn-info btn-sm")
         )
       ),
       gexp_ui_parallel_run_logs("normalization_log_micro", "normalization_log_rna"),

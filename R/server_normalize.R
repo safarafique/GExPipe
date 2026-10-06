@@ -1544,6 +1544,69 @@ server_normalize <- function(input, output, session, rv) {
     }
   )
 
+  # Before / after normalization export (all analysis types). One handler set
+  # serves both the single-track and the Parallel UI (separate output IDs,
+  # since Shiny output IDs must be unique on the page).
+  .norm_export_entries <- function() {
+    gexp_norm_export_entries(
+      micro_expr_list = rv$micro_expr_list,
+      rna_counts_list = rv$rna_counts_list,
+      all_expr_norm_list = rv$all_expr_norm_list,
+      expr_micro = rv$expr_micro,
+      expr_rna = rv$expr_rna,
+      combined_expr_before_global = rv$combined_expr_before_global_norm,
+      combined_expr = rv$combined_expr,
+      raw_counts_for_deseq2 = rv$raw_counts_for_deseq2,
+      keep_separate = isTRUE(rv$last_keep_platforms_separate)
+    )
+  }
+  .norm_export_methods <- function() {
+    `%||%` <- function(a, b) if (is.null(a)) b else a
+    sm <- rv$last_norm_platform_summary
+    c(
+      "Microarray" = if (!is.null(sm) && nzchar(sm$micro_method)) sm$micro_method else as.character(rv$last_micro_norm_method %||% ""),
+      "RNA-seq" = if (!is.null(sm) && nzchar(sm$rna_method)) sm$rna_method else as.character(rv$last_rnaseq_norm_method %||% ""),
+      "Global quantile" = as.character(isTRUE(rv$last_apply_global_quantile)),
+      "DE method" = as.character(rv$last_de_method %||% "")
+    )
+  }
+  .norm_export_bundle <- function(file, include_matrices) {
+    if (!isTRUE(rv$normalization_complete)) {
+      showNotification("Apply Normalization first, then download.", type = "warning", duration = 6)
+      req(FALSE)
+    }
+    tmp <- file.path(tempfile("gexpipe_norm_"), "Normalization_Before_After")
+    on.exit(unlink(dirname(tmp), recursive = TRUE), add = TRUE)
+    withProgress(message = "Preparing normalization export...", value = 0.3, {
+      gexp_write_norm_before_after(
+        tmp, .norm_export_entries(),
+        analysis_type = if (is.null(input$analysis_type)) "" else as.character(input$analysis_type),
+        methods = .norm_export_methods(),
+        include_matrices = include_matrices
+      )
+      incProgress(0.5)
+      if (isTRUE(include_matrices)) {
+        gexp_norm_archive_dir(tmp, file)
+        try(file.copy(file, file.path(CSV_EXPORT_DIR(), paste0("Normalization_Before_After.", gexp_norm_archive_ext())),
+                      overwrite = TRUE), silent = TRUE)
+      } else {
+        file.copy(file.path(tmp, "Normalization_check_per_dataset.csv"), file, overwrite = TRUE)
+        try(file.copy(file, file.path(CSV_EXPORT_DIR(), "Normalization_check_per_dataset.csv"), overwrite = TRUE), silent = TRUE)
+      }
+    })
+  }
+  for (.sfx in c("", "_parallel")) local({
+    sfx <- .sfx
+    output[[paste0("download_norm_before_after", sfx)]] <- downloadHandler(
+      filename = function() paste0("Normalization_Before_After.", gexp_norm_archive_ext()),
+      content = function(file) .norm_export_bundle(file, include_matrices = TRUE)
+    )
+    output[[paste0("download_norm_check_csv", sfx)]] <- downloadHandler(
+      filename = function() "Normalization_check_per_dataset.csv",
+      content = function(file) .norm_export_bundle(file, include_matrices = FALSE)
+    )
+  })
+
   output$normalize_mixed_scale_ui <- renderUI({
     if (isTRUE(rv$merge_after_de) || identical(input$analysis_type, "parallel")) return(NULL)
     if (!isTRUE(rv$normalization_complete)) return(NULL)
