@@ -131,7 +131,7 @@ Follow the [Bioconductor installation
 instructions](https://contributions.bioconductor.org/docs.html#installation)
 and the [official install guide](https://bioconductor.org/install/) to
 ensure your R version matches a supported Bioconductor release (e.g.
-Bioconductor 3.22 for R 4.6).
+Bioconductor 3.24 for R 4.6).
 
 ## From Bioconductor (recommended)
 
@@ -160,6 +160,21 @@ Until the package is on Bioconductor, install from
 [GitHub](https://github.com/safarafique/GExPipe). Requires **R ≥
 4.6.0** (see DESCRIPTION).
 
+**One line — install, update and open the app.** Start a fresh R session
+(RStudio: `Ctrl+Shift+F10`) and run:
+
+```{r install-github-oneline, eval=FALSE}
+source("https://raw.githubusercontent.com/safarafique/GExPipe/main/install_gexpipe.R")
+```
+
+Each time it runs, the script installs or updates `GExPipe` from the
+latest GitHub `main` together with all CRAN and Bioconductor dependencies
+(missing or out-of-date ones only), retries any that fail, checks that
+the package loads, and then opens the app. If everything is already up to
+date it opens the app straight away. The first install takes 15–30 min.
+
+**Manual install** (same result, step by step):
+
 ```{r install-github, eval=FALSE}
 options(timeout = 3600)
 
@@ -172,7 +187,6 @@ if (!requireNamespace("remotes", quietly = TRUE))
 remotes::install_github(
   "safarafique/GExPipe",
   ref = "main",
-  dependencies = TRUE,
   INSTALL_opts = "--no-staged-install"
 )
 ```
@@ -215,11 +229,11 @@ shiny::runApp(app, port = 3838L)
 ```
 
 ```{r run-latest-reinstall, eval=FALSE}
+options(repos = BiocManager::repositories())
 remotes::install_github(
   "safarafique/GExPipe",
   ref = "main",
   force = TRUE,
-  dependencies = TRUE,
   INSTALL_opts = "--no-staged-install"
 )
 app <- GExPipe::runGExPipe(launch.browser = FALSE)
@@ -1095,7 +1109,8 @@ if (length(top_var) > 1L) {
 | **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
 | **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
-| **Version conflicts** | `remotes::install_github("safarafique/GExPipe", ref = "main", force = TRUE, INSTALL_opts = "--no-staged-install")`. |
+| **Dependencies not installed / "there is no package called"** | Restart R and run the [one-line installer](#installation) — it installs CRAN + Bioconductor dependencies, updates outdated ones and retries failures. |
+| **Version conflicts** (e.g. `namespace 'S4Vectors' ... is already loaded, but >= ... is required`) | Restart R (nothing loaded) and run the [one-line installer](#installation); it updates the outdated packages in GExPipe's dependency tree. |
 | **Corrupt lazy-load database** | Reinstall with `INSTALL_opts = "--no-staged-install"`. |
 | **"No genes remain in microarray / RNA-seq after per-dataset normalization"** | The message names each GSE, its gene count and example IDs. A GSE with 0 genes is usually in the wrong platform box or its probe IDs could not be mapped (re-run Step 1 with internet); datasets sharing no IDs usually means one still has probe / Ensembl IDs. |
 | **Old version opens after reinstalling** | Check `packageVersion("GExPipe")` and the version in the download log. Restart R before launching; if an older copy is installed in a second library (see `.libPaths()`), reinstall the built package into that library too. |
@@ -1107,12 +1122,14 @@ unlink(
     list.files(.libPaths()[1], pattern = "^00LOCK-", full.names = TRUE),
     recursive = TRUE, force = TRUE
 )
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+options(repos = BiocManager::repositories())
 if (!requireNamespace("remotes", quietly = TRUE))
     install.packages("remotes")
 remotes::install_github(
   "safarafique/GExPipe",
   ref = "main",
-  dependencies = TRUE,
   INSTALL_opts = "--no-staged-install"
 )
 ```

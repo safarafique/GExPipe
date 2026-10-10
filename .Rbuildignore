@@ -77,3 +77,4 @@
 ^case_study_table\.csv$
 ^check_output\.txt$
 ^sessionInfo\.txt$
+^install_gexpipe\.R$
