@@ -4,6 +4,37 @@
 #' @importFrom methods slot slotNames
 NULL
 
+.gexpipe_kegg_cache_env <- new.env(parent = emptyenv())
+
+#' Human KEGG pathway data, cached on disk
+#'
+#' `clusterProfiler::enrichKEGG()` downloads the whole KEGG pathway table from
+#' rest.kegg.jp on every new R session, which can take minutes (or time out)
+#' on slow connections. The same object (`clusterProfiler::gson_KEGG("hsa")`,
+#' exactly what `enrichKEGG()` builds internally) is saved under
+#' `tools::R_user_dir("GExPipe", "cache")` and reused for
+#' `getOption("gexpipe.kegg_cache_days", 30)` days. If a refresh fails, the
+#' older copy is used. Returns `NULL` when no copy is available.
+#' @keywords internal
+.gexpipe_kegg_gson <- function(max_age_days = getOption("gexpipe.kegg_cache_days", 30)) {
+  if (!is.null(.gexpipe_kegg_cache_env$gson)) return(.gexpipe_kegg_cache_env$gson)
+  cache_dir <- tools::R_user_dir("GExPipe", which = "cache")
+  f <- file.path(cache_dir, "kegg_hsa_gson.rds")
+  gson <- if (file.exists(f)) tryCatch(readRDS(f), error = function(e) NULL) else NULL
+  fresh <- !is.null(gson) &&
+    as.numeric(difftime(Sys.time(), file.mtime(f), units = "days")) < max_age_days
+  if (!fresh) {
+    new_gson <- tryCatch(clusterProfiler::gson_KEGG("hsa"), error = function(e) NULL)
+    if (!is.null(new_gson)) {
+      dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
+      try(saveRDS(new_gson, f), silent = TRUE)
+      gson <- new_gson
+    }
+  }
+  .gexpipe_kegg_cache_env$gson <- gson
+  gson
+}
+
 server_common_genes <- function(input, output, session, rv) {
 
   .step9_parallel <- function() {
@@ -476,8 +507,11 @@ server_common_genes <- function(input, output, session, rv) {
     }
     
     withProgress(message = "KEGG enrichment...", value = 0.5, {
+      # Cached KEGG data (see .gexpipe_kegg_gson); falls back to online download
+      kegg_org <- .gexpipe_kegg_gson()
+      if (is.null(kegg_org)) kegg_org <- "hsa"
       rv$kegg_enrichment <- tryCatch({
-        clusterProfiler::enrichKEGG(gene = entrez$ENTREZID, organism = "hsa",
+        clusterProfiler::enrichKEGG(gene = entrez$ENTREZID, organism = kegg_org,
                                      pvalueCutoff = input$kegg_pvalue_cutoff)
       }, error = function(e) NULL)
     })
