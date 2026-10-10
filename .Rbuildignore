@@ -72,3 +72,8 @@
 ^inst/shinyapp/saved_workspaces/
 ^inst/shinyapp/csv_exports/
 ^inst/shinyapp/.*\.log$
+^inst/shinyapp/STRINGdb_cache
+^bench_.*\.csv$
+^case_study_table\.csv$
+^check_output\.txt$
+^sessionInfo\.txt$

@@ -125,7 +125,7 @@ gexp_ui_log_box <- function(output_id, height = "500px") {
 #' named character/numeric vector (or list) of label -> value pairs.
 #' @noRd
 gexpipe_log_summary_block <- function(title, lines) {
-  rule <- paste(rep("━", 48), collapse = "")
+  rule <- paste(rep("\u2501", 48), collapse = "")
   body <- vapply(names(lines), function(nm) {
     sprintf("  %s: %s", nm, format(lines[[nm]]))
   }, character(1))

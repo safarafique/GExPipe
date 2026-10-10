@@ -1,3 +1,32 @@
+# GExPipe 0.99.109
+
+- Download (Step 1): multi-platform GEO series (e.g. GSE18123, GPL570 + GPL6244) now download.
+  The resumable pre-fetch reads the series' matrix/ folder and fetches every
+  GSE-GPLxxx_series_matrix file instead of a non-existent single file, which previously
+  reported "0 MB downloaded, in progress" forever. Small (< 1 MB) series matrices are now
+  accepted as complete.
+- Normalization (Step 2): new "Download Before / After Normalization Data" box (all analysis
+  types). ZIP with the Step 1 input matrices, per-dataset / per-platform / combined normalized
+  matrices, per-sample and per-dataset check tables (log scale, spread of sample medians) and a
+  README; or the check table alone as CSV.
+- Normalization (Step 2): RMA from CEL files now converts probe-set IDs to gene symbols with the
+  GPL / annotation-package converter used in Step 1, so Affymetrix datasets overlap the others.
+  "No genes remain ..." errors now name each dataset, its row count and example IDs.
+- Batch Correction (Step 5): new quantitative batch-effect check (before vs after). Reports the %
+  of top-PC variance explained by batch and by condition, PC1 batch R-squared, silhouette by
+  batch, % genes with a significant batch effect (limma) and a verdict per corrected matrix.
+  Downloads: check table (CSV) and ZIP with matched before/after matrices, sample metadata,
+  check table and README. Parallel completion message now shows the real sample count.
+- QC (Step 3), Parallel mode: per-platform outlier plots and tables appear inside Sample Outlier
+  Detection only after it is run (no empty boxes); each outlier table has a CSV download.
+- PPI: Consensus_Hub_Genes.csv now lists the methods that selected each gene and all centrality
+  scores, and downloads (with headers) even when no consensus hub is found.
+- Microarray example IDs corrected to GSE268456, GSE47927 (was GSE26856).
+- QC (Step 3), Parallel mode: common genes are now shown in separate RNA-seq (blue) and
+  microarray (orange) boxes, each with its own Venn and UpSet box, instead of one combined block.
+  Two datasets with identical gene sets are drawn as one labelled circle ("100% overlap")
+  instead of VennDiagram's "n n (Coincidental)".
+
 # GExPipe 0.99.108
 
 - Version bump for Bioconductor: devel branch synced with the GitHub repository (all changes

@@ -266,11 +266,36 @@ button, and confirm the **success check** before continuing.
 
 The sidebar tabs for this phase are **1. Download Data**, **2. Normalize
 Data**, **3. QC & Visualization**, **4. Select Groups**, and **5. Batch
-Correction**. The walkthrough uses an RNA-seq example (`GSE144119`) and a
-microarray example (`GSE268456`); any valid GEO accessions work the same
-way, and either box accepts more than one GSE ID (comma-separated) if you
-want a multi-dataset run. For Parallel DE, enter RNA-seq IDs in the left
-box and microarray IDs in the right box (several IDs per box are allowed).
+Correction**. Any valid GEO accessions work; each box accepts one or more
+GSE IDs, comma-separated.
+
+### Example datasets {#example-datasets}
+
+The walkthrough uses these public GEO series. They are also the examples
+shown under the GSE ID boxes in Step 1.
+
+| Platform | Example GSE IDs (Step 1 box) | Role |
+|----------|------------------------------|------|
+| RNA-seq | `GSE144119, GSE100026` | Training (RNA-seq box) |
+| Microarray | `GSE268456, GSE47927` | Training (microarray box) |
+| RNA-seq | `GSE162462` | External validation (Step 12) |
+| Microarray | `GSE13159` | External validation (Step 12) |
+
+### The four analysis types {#four-analysis-types}
+
+Choose one under **Select Analysis Platform** in Step 1. The table shows
+which box to fill for each type, using the example IDs above.
+
+| Analysis type | RNA-seq box | Microarray box | DE method (Step 6) | What happens |
+|---------------|-------------|----------------|--------------------|--------------|
+| **1. RNA-seq only** | `GSE144119, GSE100026` | — | DESeq2, edgeR, limma-voom (raw counts) or limma (TMM log-CPM) | RNA-seq studies normalized, batch-corrected and analysed together. |
+| **2. Microarray only** | — | `GSE268456, GSE47927` | limma | Microarray studies normalized (quantile / RMA / log2), batch-corrected and analysed with limma. |
+| **3. Merged (Both)** | `GSE144119, GSE100026` | `GSE268456, GSE47927` | limma | Each study normalized on its own scale, common genes kept, global quantile on, **one joint batch correction and one limma DE** on all samples. |
+| **4. Parallel DE, then merge** | `GSE144119, GSE100026` | `GSE268456, GSE47927` | RNA-seq: DESeq2 / edgeR / limma-voom / limma; microarray: limma | Two separate pipelines (each platform keeps its own genes, normalization, batch correction and DE); **Step 7** keeps DEGs found on both platforms with the same direction. |
+
+For a single-study run, choose **Single dataset (1 GSE)** with RNA-seq only
+or microarray only (e.g. just `GSE144119` or just `GSE268456`); Step 5 batch
+correction is then skipped.
 
 ### Step 1 — Download Data
 
@@ -301,10 +326,16 @@ normalization. Parallel DE keeps each platform's genes until Step 7.
    - **limma-voom**, **DESeq2**, or **edgeR** — RNA-seq integer counts.
    - Parallel: RNA-seq method on the left; microarray is always limma.
 5. Enter comma-separated **GSE IDs**. RNA-seq and microarray each have
-   their own box (e.g. `GSE144119` in RNA-seq and `GSE268456` in
-   microarray).
+   their own box, e.g. `GSE144119, GSE100026` in **RNA-seq Datasets** and
+   `GSE268456, GSE47927` in **Microarray Datasets** (see
+   [the four analysis types](#four-analysis-types) for which boxes each type
+   uses).
 6. Click **Start Processing** and read the **Download log**.
 7. Click **Next: Normalize Data**.
+
+A GEO series measured on several platforms (e.g. `GSE18123`: GPL570 and
+GPL6244) is stored on GEO as one matrix file per platform; GExPipe downloads
+all of them and keeps the platform with the most samples.
 
 For **multiple microarray platforms**, install `org.Hs.eg.db` and
 `biomaRt` (see [Installation](#installation)) so **STEP 2b** converts probe
@@ -322,9 +353,10 @@ knitr::include_graphics("images/step01_download.png")
 
 **Sidebar:** `2. Normalize Data`
 
-**Goal:** Normalize **each GSE on its native scale**, then merge on common
-genes. Optional global quantile is off by default; use Step 5 to align
-studies.
+**Goal:** Normalize **each GSE on its native scale**. Merged then keeps the
+common genes (and, by default, applies one global quantile so RNA-seq and
+microarray share one scale); Parallel keeps each platform separate. Step 5
+removes the remaining between-study batch.
 
 **What to do:**
 
@@ -337,15 +369,21 @@ does not). DESeq2/edgeR/voom still use **raw counts**.
 
 1. Choose **Auto** or **Manual** under **Normalization Strategy**.
 2. Microarray: **Quantile** or **RMA** *per GSE*; RNA-seq: **TMM + log2-CPM** *per GSE*.
-3. Leave **Apply global quantile normalization** off unless you have
-   same-platform microarray studies and want extra alignment (mixed
-   microarray + RNA-seq never applies it). Cross-study alignment is Step 5.
+3. **Merged only:** **Apply global quantile** is **on** by default so the
+   RNA-seq and microarray studies share one scale for the single limma DE.
+   Parallel never applies it (each platform is normalized on its own).
 4. Click **Apply Normalization**. Merged intersects common genes here;
    Parallel keeps two separate matrices (no global quantile).
 5. Scroll to **Normalization Quality Assessment** (panels a and b below):
    - Overall density and **Q–Q** plot (panel a).
    - Median/range alignment and distribution overlap (panel b).
-6. Click **Next: QC & Visualization**.
+6. Optional: under **Download Before / After Normalization Data**, download
+   a ZIP with the input matrices (before), the normalized matrices (after,
+   per dataset and per platform or combined), per-sample and per-dataset
+   check tables and a README; or the check table alone as CSV. After a
+   correct normalization `Likely_log_scale` is `TRUE` and
+   `Median_SD_across_samples` falls towards 0.
+7. Click **Next: QC & Visualization**.
 
 **Success check:** Within each dataset, sample medians align. Mixed-platform
 blocks remaining after Step 2 are expected; Step 5 removes study/platform
@@ -369,11 +407,17 @@ not require a gene intersection here.
 
 **What to do:**
 
-1. Review **Venn** and **UpSet** plots (figure below, panel a).
+1. Review **Venn** and **UpSet** plots (figure below, panel a). In
+   Parallel mode RNA-seq (left, blue) and microarray (right, orange) have
+   separate boxes; two datasets with identical gene sets are shown as one
+   circle marked "100% overlap".
 2. Open **Quality Control Plots** — **Boxplot** and **Density** tabs on raw
    expression (panel b).
 3. In **Sample Outlier Detection**, click **Run Outlier Detection** (panel c).
-   Flags are computed **per dataset** (PCA + connectivity on that GSE).
+   PCA (Mahalanobis distance) and sample connectivity are computed on the
+   normalized matrix — the combined matrix in Merged mode, each platform
+   separately in Parallel mode (at least 5 samples per platform). The plots
+   and outlier tables appear after the run; each table has a CSV download.
 4. Exclude flagged samples if needed; keep **≥ 3 samples per group** after
    Step 4.
 5. Review **Data Summary** (datasets, samples, genes).
@@ -441,7 +485,14 @@ Normal vs Disease signal.
 5. Click **Apply Batch Correction**.
 6. Compare **before vs after PCA by dataset** (panel b), plus PCA by
    condition, hierarchical clustering, and **PVCA** on the same panel.
-7. Click **Next: Differential Expression**.
+7. Check **Batch effect check (before vs after)** in the download box. For
+   each corrected matrix it reports the % of top-PC variance explained by
+   batch (dataset) and by condition, PC1 batch R², silhouette by batch and
+   the % of genes with a significant batch effect, with a verdict (OK below
+   10% batch variance; warning above 25%; over-correction warning if the
+   condition signal collapses). Download the check table (CSV) or a ZIP
+   with matched before/after matrices, sample metadata and a README.
+8. Click **Next: Differential Expression**.
 
 **Note:** With only **one GSE** loaded in Step 1, there is no between-study
 batch to remove, so cross-study correction is skipped by default - but a
@@ -453,7 +504,9 @@ covariate versus by Condition, and either confirm there is no batch
 effect or apply `limma::removeBatchEffect()` using that covariate before
 continuing.
 
-**Success check:** After-correction PCA (panel b) shows datasets intermingled.
+**Success check:** After-correction PCA (panel b) shows datasets
+intermingled, and the batch-effect check reports a falling batch share with
+the condition signal kept.
 
 ```{r step05a-screenshot, echo=FALSE, fig.cap="Step 5a: Variance filtering and batch correction method.", out.width="100%"}
 knitr::include_graphics("images/step05a_batch.png")
@@ -627,7 +680,11 @@ and identify hub proteins.
 3. Review **Interactive vs non-interactive** gene counts and table.
 4. Choose genes for network view: **Hub genes only**, **Top N by degree**, or
    **Select genes manually**; click **Run**.
-5. Inspect PPI network layouts (panel b) and **consensus hub** table.
+5. Inspect PPI network layouts (panel b) and the hub score and
+   **consensus hub** tables. **Hub Scores (CSV)** saves
+   `PPI_Hub_Gene_Scores.csv` (all nodes, six centrality measures);
+   **Consensus Hubs (CSV)** saves `Consensus_Hub_Genes.csv` (genes in ≥ 3
+   methods, which methods, and their scores).
 6. Click **Extract Data for ML** (required before Step 11).
 7. Click **Next: Machine Learning Process**.
 
@@ -692,7 +749,8 @@ knitr::include_graphics("images/step10b_ml.png")
    - **Internal Validation** — use a 70/30 stratified split of your current
      data (no extra download).
 2. **External path only:**
-   - Enter validation **GSE IDs** (e.g. `GSE100026`), select **Platform
+   - Enter validation **GSE IDs** (e.g. `GSE162462` for RNA-seq or
+     `GSE13159` for microarray), select **Platform
      Type** and **DE Method** (limma, or DESeq2/edgeR when the platform is
      RNA-seq with raw counts).
    - Click **Download** - this normalizes the validation data with the
@@ -1039,6 +1097,8 @@ if (length(top_var) > 1L) {
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
 | **Version conflicts** | `remotes::install_github("safarafique/GExPipe", ref = "main", force = TRUE, INSTALL_opts = "--no-staged-install")`. |
 | **Corrupt lazy-load database** | Reinstall with `INSTALL_opts = "--no-staged-install"`. |
+| **"No genes remain in microarray / RNA-seq after per-dataset normalization"** | The message names each GSE, its gene count and example IDs. A GSE with 0 genes is usually in the wrong platform box or its probe IDs could not be mapped (re-run Step 1 with internet); datasets sharing no IDs usually means one still has probe / Ensembl IDs. |
+| **Old version opens after reinstalling** | Check `packageVersion("GExPipe")` and the version in the download log. Restart R before launching; if an older copy is installed in a second library (see `.libPaths()`), reinstall the built package into that library too. |
 | **Corporate proxy** | `Sys.setenv(https_proxy = "http://proxy:port")` before installing. |
 
 ```{r windows-fix, eval=FALSE}

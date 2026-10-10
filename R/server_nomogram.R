@@ -1287,7 +1287,7 @@ server_nomogram <- function(input, output, session, rv) {
     DT::datatable(rv$nomogram_optimism_summary, options = list(dom = "t"), rownames = FALSE)
   })
   output$nomogram_optimism_available <- reactive({ !is.null(rv$nomogram_optimism_summary) })
-  outputOptions(output, "nomogram_optimism_available", suspendWhenHidden = FALSE)
+  shiny::outputOptions(output, "nomogram_optimism_available", suspendWhenHidden = FALSE)
 
   # ============================================================================
   # DOWNLOAD HANDLERS

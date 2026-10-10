@@ -162,7 +162,20 @@ server_qc <- function(input, output, session, rv) {
       return(invisible())
     }
     sets <- venn_prep$sets
-    if (length(sets) == 2) {
+    if (length(sets) == 2 && setequal(sets[[1]], sets[[2]])) {
+      # VennDiagram draws identical sets as one circle labelled
+      # "n n (Coincidental)", which reads like an error; say it plainly.
+      n <- format(length(unique(sets[[1]])), big.mark = ",")
+      grid::grid.newpage()
+      grid::grid.circle(x = 0.5, y = 0.45, r = 0.3,
+                        gp = grid::gpar(fill = grDevices::adjustcolor("#3498db", 0.45), col = "black", lwd = 2))
+      grid::grid.text(paste0(n, " genes"), x = 0.5, y = 0.49, gp = grid::gpar(fontsize = 16, fontface = "bold"))
+      grid::grid.text("shared by both datasets (100% overlap)", x = 0.5, y = 0.41, gp = grid::gpar(fontsize = 11))
+      grid::grid.text(paste(names(sets), collapse = "  =  "), x = 0.5, y = 0.88,
+                      gp = grid::gpar(fontsize = 13, fontface = "bold", col = "#2c3e50"))
+      grid::grid.text("Both datasets contain exactly the same gene set", x = 0.5, y = 0.82,
+                      gp = grid::gpar(fontsize = 10, col = "gray40"))
+    } else if (length(sets) == 2) {
       tryCatch({
         # Category names with totals displayed clearly
         cat_names <- paste0(names(sets), "\n", format(vapply(sets, length, integer(1)), big.mark = ","))

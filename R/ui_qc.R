@@ -100,33 +100,40 @@ ui_qc <- tabItem(
           )
         )
       ),
-      fluidRow(
-        box(
-          title = tags$span(icon("info-circle"), " Common genes per platform (RNA-seq and microarray separately)"),
-          width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-          tags$p(
-            "Gene-symbol overlap is shown separately for the RNA-seq datasets (left) and the microarray datasets (right). RNA-seq and microarray are never merged in Parallel mode.",
-            style = "font-size: 13px; color: #555; margin-bottom: 10px;"
+      # One box per platform (same two-column layout and colours as the
+      # boxplot/density boxes above) so RNA-seq and microarray never read as
+      # one merged block.
+      gexp_ui_parallel_two_col(
+        tagList(
+          box(
+            title = tags$span(icon("dna"), " RNA-seq: common genes across RNA-seq datasets"),
+            width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE,
+            uiOutput("common_genes_summary_rna"),
+            tags$h5(tags$strong("Venn diagram"), style = "margin-top: 12px;"),
+            plotOutput("venn_plot_rna", height = "380px"),
+            gexp_ui_plot_download_bar("download_venn_plot_rna_png", "download_venn_plot_rna_jpg", "download_venn_plot_rna_pdf", "btn-info btn-xs")
           ),
-          fluidRow(
-        column(6,
-          tags$h4(icon("dna"), " RNA-seq: common genes across RNA-seq datasets", style = "margin-top: 0;"),
-          uiOutput("common_genes_summary_rna"),
-          plotOutput("venn_plot_rna", height = "380px"),
-          gexp_ui_plot_download_bar("download_venn_plot_rna_png", "download_venn_plot_rna_jpg", "download_venn_plot_rna_pdf", "btn-default btn-xs"),
-          tags$hr(),
-          plotOutput("upset_plot_rna", height = "380px"),
-          gexp_ui_plot_download_bar("download_upset_plot_rna_png", "download_upset_plot_rna_jpg", "download_upset_plot_rna_pdf", "btn-default btn-xs")
+          box(
+            title = tags$span(icon("chart-bar"), " RNA-seq: UpSet plot"),
+            width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE,
+            plotOutput("upset_plot_rna", height = "380px"),
+            gexp_ui_plot_download_bar("download_upset_plot_rna_png", "download_upset_plot_rna_jpg", "download_upset_plot_rna_pdf", "btn-info btn-xs")
+          )
         ),
-        column(6,
-          tags$h4(icon("th"), " Microarray: common genes across Microarray datasets", style = "margin-top: 0;"),
-          uiOutput("common_genes_summary_micro"),
-          plotOutput("venn_plot_micro", height = "380px"),
-          gexp_ui_plot_download_bar("download_venn_plot_micro_png", "download_venn_plot_micro_jpg", "download_venn_plot_micro_pdf", "btn-default btn-xs"),
-          tags$hr(),
-          plotOutput("upset_plot_micro", height = "380px"),
-          gexp_ui_plot_download_bar("download_upset_plot_micro_png", "download_upset_plot_micro_jpg", "download_upset_plot_micro_pdf", "btn-default btn-xs")
-        )
+        tagList(
+          box(
+            title = tags$span(icon("th"), " Microarray: common genes across microarray datasets"),
+            width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE,
+            uiOutput("common_genes_summary_micro"),
+            tags$h5(tags$strong("Venn diagram"), style = "margin-top: 12px;"),
+            plotOutput("venn_plot_micro", height = "380px"),
+            gexp_ui_plot_download_bar("download_venn_plot_micro_png", "download_venn_plot_micro_jpg", "download_venn_plot_micro_pdf", "btn-warning btn-xs")
+          ),
+          box(
+            title = tags$span(icon("chart-bar"), " Microarray: UpSet plot"),
+            width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE,
+            plotOutput("upset_plot_micro", height = "380px"),
+            gexp_ui_plot_download_bar("download_upset_plot_micro_png", "download_upset_plot_micro_jpg", "download_upset_plot_micro_pdf", "btn-warning btn-xs")
           )
         )
       )
