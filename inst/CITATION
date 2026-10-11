@@ -8,11 +8,12 @@ bibentry(
   ),
   year     = "2026",
   note     = paste("R package version", meta$Version),
+  doi      = "10.18129/B9.bioc.GExPipe",
   url      = "https://github.com/safarafique/GExPipe",
   textVersion = paste(
     "Rafique S, Ashraf NM, Sabar MF (2026).",
     "GExPipe: Gene Expression Pipeline Shiny Application.",
     paste0("R package version ", meta$Version, "."),
-    "https://github.com/safarafique/GExPipe"
+    "doi:10.18129/B9.bioc.GExPipe"
   )
 )

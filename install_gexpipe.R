@@ -88,11 +88,19 @@ local({
       c(deps, optional), db = ap, which = c("Depends", "Imports", "LinkingTo"), recursive = TRUE))))
     old  <- tryCatch(rownames(utils::old.packages(available = ap, checkBuilt = TRUE)),
                      error = function(e) character(0))
-    todo <- unique(c(setdiff(c(deps, optional), installed()), intersect(old, tree)))
+    # Retry everything in the tree that is still missing, not only GExPipe's
+    # direct dependencies: one dropped download of a low-level package (e.g.
+    # S4Vectors) otherwise leaves every package built on it uninstallable.
+    tree <- intersect(tree, rownames(ap))
+    missing_tree <- function() setdiff(tree, installed())
+    todo <- unique(c(missing_tree(), intersect(old, tree)))
     if (length(todo)) try(BiocManager::install(todo, ask = FALSE, update = FALSE))
-    for (p in setdiff(c(deps, optional), installed())) {
-      say("Retrying ", p, " ...")
-      try(BiocManager::install(p, ask = FALSE, update = FALSE))
+    for (round in 1:3) {
+      miss <- missing_tree()
+      if (!length(miss)) break
+      say("Retrying ", length(miss), " package(s) that did not install (round ", round, "/3): ",
+          paste(utils::head(miss, 10), collapse = ", "), if (length(miss) > 10) ", ...")
+      try(BiocManager::install(miss, ask = FALSE, update = FALSE))
     }
     left <- setdiff(deps, installed())
     if (length(left)) {

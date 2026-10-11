@@ -1,3 +1,12 @@
+# GExPipe 0.99.113
+
+- Vignette screenshots compressed (3.5 MB to 0.9 MB, same look) so the built package stays under
+  Bioconductor's 5 MB limit (BiocCheck size warning).
+- CITATION: added the Bioconductor DOI (10.18129/B9.bioc.GExPipe).
+- Installer: retries every missing package in the dependency tree (up to three rounds), not only
+  the direct dependencies, so a dropped download of a low-level package (e.g. S4Vectors) no longer
+  makes org.Hs.eg.db / enrichplot fail on a new computer.
+
 # GExPipe 0.99.112
 
 - Vignette: the `shiny::runGitHub()` chunk sets `options(timeout = 600)` so the GitHub download
