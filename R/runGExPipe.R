@@ -55,7 +55,7 @@
 #' # (installing any missing packages on first run); shiny::runApp() starts it.
 #' if (interactive()) {
 #'   app <- GExPipe::runGExPipe()      # Step 1: build the app object
-#'   shiny::runApp(app, port = 3838L)  # Step 2: start the server
+#'   shiny::runApp(app)                # Step 2: start the server
 #' }
 .gexpipe_port_is_free <- function(port, host = "127.0.0.1") {
   port <- as.integer(port)[[1L]]
@@ -263,7 +263,7 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
     message(
       "GExPipe: port = 0 with launch.browser = FALSE - if the console later shows http://127.0.0.1:0, ",
       "that address will not work in a browser. Prefer launch.browser = TRUE, or port = 3838, ",
-      "and pass the same port to shiny::runApp(app, port = ...)."
+      "then start it with shiny::runApp(app)."
     )
   }
 
@@ -288,7 +288,7 @@ runGExPipe <- function(launch.browser = TRUE, port = getOption("shiny.port", 383
   }
   if (isTRUE(launch.browser)) {
     url <- sprintf("http://%s:%s", if (host == "0.0.0.0") "127.0.0.1" else host, port)
-    message("GExPipe: app ready at ", url, " (run with runApp(app, host = host, port = port)).")
+    message("GExPipe: app ready at ", url, " (start it with shiny::runApp(app)).")
   }
   app
 }

@@ -189,19 +189,26 @@ remotes::install_github(
   ref = "main",
   INSTALL_opts = "--no-staged-install"
 )
+
+# Optional packages for the extra ML / plotting features
+BiocManager::install(
+  c("Boruta", "car", "cicerone", "corrplot", "dcurves",
+    "kernlab", "mixOmics", "SHAPforxgboost"),
+  ask = FALSE, update = FALSE
+)
 ```
 
 **Quick start without installing:** see
 [Run latest code for analysis](#run-latest-code) (recommended for mixed
 microarray merges).
 
-For **mixed microarray merges** (probe IDs across platforms), also install
-annotation helpers once:
+The annotation packages used for **mixed microarray merges**
+(`org.Hs.eg.db`, `biomaRt`) are regular dependencies and are installed
+automatically with `GExPipe`.
 
-```{r install-annot, eval=FALSE}
-if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-BiocManager::install(c("org.Hs.eg.db", "biomaRt"), ask = FALSE, update = FALSE)
-```
+Install in a **fresh R session** (RStudio: `Ctrl+Shift+F10`) so no
+package is in use while it is updated; on Windows a package that is
+already loaded cannot be replaced.
 
 # Run latest code for analysis {#run-latest-code}
 
@@ -225,7 +232,7 @@ shiny::runGitHub(
 setwd("path/to/GExPipe")
 pkgload::load_all(".")
 app <- GExPipe::runGExPipe(launch.browser = FALSE)
-shiny::runApp(app, port = 3838L)
+shiny::runApp(app)
 ```
 
 ```{r run-latest-reinstall, eval=FALSE}
@@ -237,7 +244,7 @@ remotes::install_github(
   INSTALL_opts = "--no-staged-install"
 )
 app <- GExPipe::runGExPipe(launch.browser = FALSE)
-shiny::runApp(app, port = 3838L)
+shiny::runApp(app)
 ```
 
 # Launch the Shiny application {#launch-the-shiny-application}
@@ -250,7 +257,7 @@ If you need probe-ID conversion on mixed platforms, prefer
 
 ```{r launch, eval=FALSE}
 app <- GExPipe::runGExPipe()
-shiny::runApp(app, port = 3838L)
+shiny::runApp(app)
 ```
 
 The browser opens at the **welcome screen**. Click **Start Analyzing** to
@@ -259,7 +266,7 @@ begin **Step 1 - Download Data**.
 ```{r launch-github-auto, eval=FALSE}
 options(gexpipe.auto_install = TRUE)  # GitHub installs only
 app <- GExPipe::runGExPipe()
-shiny::runApp(app, port = 3838L)
+shiny::runApp(app)
 ```
 
 ## Run in Google Colab (optional)
@@ -1107,6 +1114,8 @@ if (length(top_var) > 1L) {
 | **IDs still probe-like in log** | Restart R; use [Run latest code](#run-latest-code) — an old install skips STEP 2b fixes. |
 | **Download log says `Code source: installed`** | You are not on the GitHub clone; use `runGitHub(..., ref = "main")` or `pkgload::load_all()`. |
 | **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
+| **`failed to lock directory ... Try removing ... 00LOCK`** | An earlier install was interrupted. Restart R, run the `windows-fix` chunk below (it removes the leftover `00LOCK` folder) and install again. |
+| **`createTcpServer: address already in use`** | GExPipe is already running in another R session (open that browser tab, or stop it). `runGExPipe()` otherwise moves to the next free port; start it with `shiny::runApp(app)` without a fixed `port`. |
 | **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
 | **Dependencies not installed / "there is no package called"** | Restart R and run the [one-line installer](#installation) — it installs CRAN + Bioconductor dependencies, updates outdated ones and retries failures. |
@@ -1119,7 +1128,7 @@ if (length(top_var) > 1L) {
 ```{r windows-fix, eval=FALSE}
 options(download.file.method = "wininet")
 unlink(
-    list.files(.libPaths()[1], pattern = "^00LOCK-", full.names = TRUE),
+    list.files(.libPaths()[1], pattern = "^00LOCK", full.names = TRUE),
     recursive = TRUE, force = TRUE
 )
 if (!requireNamespace("BiocManager", quietly = TRUE))

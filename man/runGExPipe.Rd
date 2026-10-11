@@ -78,6 +78,6 @@ stopifnot(inherits(app, "shiny.appobj"))
 # (installing any missing packages on first run); shiny::runApp() starts it.
 if (interactive()) {
   app <- GExPipe::runGExPipe()      # Step 1: build the app object
-  shiny::runApp(app, port = 3838L)  # Step 2: start the server
+  shiny::runApp(app)                # Step 2: start the server
 }
 }

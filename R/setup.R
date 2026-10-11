@@ -163,11 +163,11 @@ gexpipe_setup <- function(update   = TRUE,
   if (isTRUE(launch) && length(missing) == 0L) {
     message("Launching GExPipe app on port ", port, "...")
     app <- runGExPipe(launch.browser = TRUE, port = as.integer(port))
-    shiny::runApp(app, port = as.integer(port), ...)
+    shiny::runApp(app, ...)
   } else if (isTRUE(launch) && length(missing) > 0L) {
     message("App not launched: fix missing packages above first, then run:\n",
             "  app <- GExPipe::runGExPipe()\n",
-            "  shiny::runApp(app, port = ", port, ")")
+            "  shiny::runApp(app)")
   }
 
   invisible(status)

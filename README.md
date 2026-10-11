@@ -96,14 +96,14 @@ This avoids Windows `glmnet` DLL lock issues and ensures PVCA / ML helpers load 
 
 ```r
 app <- GExPipe::runGExPipe()      # Step 1: build app (check console for "glmnet OK")
-shiny::runApp(app, port = 3838L)  # Step 2: start server
+shiny::runApp(app)  # Step 2: start server
 ```
 
 **Every later session** (no reinstall unless you want updates):
 
 ```r
 app <- GExPipe::runGExPipe()
-shiny::runApp(app, port = 3838L)
+shiny::runApp(app)
 ```
 
 **To pull the latest fixes from GitHub** into an existing install:
@@ -121,7 +121,7 @@ Both options require **R >= 4.6.0** (stable). Bioconductor **3.22** is selected 
 ```r
 BiocManager::install("GExPipe", dependencies = TRUE)
 app <- GExPipe::runGExPipe()
-shiny::runApp(app, port = 3838L)
+shiny::runApp(app)
 ```
 
 Dependencies are installed at package install time. Runtime auto-install is **off** by default for Bioconductor installs.
@@ -131,7 +131,7 @@ For GitHub installs into your normal R library, enable first-run auto-install if
 ```r
 options(gexpipe.auto_install = TRUE)
 app <- GExPipe::runGExPipe()
-shiny::runApp(app, port = 3838L)
+shiny::runApp(app)
 ```
 
 ---
@@ -146,7 +146,7 @@ Use Option 1 or Option 2 above to install, then start with:
 library(GExPipe)
 library(shiny)
 app <- runGExPipe(launch.browser = FALSE, host = "0.0.0.0", port = 3838L)
-shiny::runApp(app, host = "0.0.0.0", port = 3838L)
+shiny::runApp(app)
 ```
 
 Open port **3838** via Colab’s port-forwarding panel, or run a tunnel (`ngrok http 3838`) and open the HTTPS URL.

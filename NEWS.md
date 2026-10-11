@@ -1,3 +1,14 @@
+# GExPipe 0.99.111
+
+- Launch: the vignette, README, one-line installer and `gexpipe_setup()` now start the app with
+  `shiny::runApp(app)` instead of a fixed `port = 3838L`, so the free port chosen by
+  `runGExPipe()` is used. Fixes "createTcpServer: address already in use" when port 3838 is busy.
+- Installer (`install_gexpipe.R`) and the vignette manual install now also install the optional
+  packages (Boruta, car, cicerone, corrplot, dcurves, kernlab, mixOmics, SHAPforxgboost), so
+  every app feature works after one install.
+- Vignette: troubleshooting rows for leftover `00LOCK` folders and busy ports; the Windows fix now
+  also removes a plain `00LOCK` folder.
+
 # GExPipe 0.99.110
 
 - KEGG enrichment (common genes): KEGG pathway data are now cached on disk, so repeat

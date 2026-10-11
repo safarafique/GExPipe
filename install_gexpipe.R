@@ -49,6 +49,10 @@ local({
     setdiff(x[nzchar(x)], rownames(utils::installed.packages(priority = "base")))
   } else character(0)
   deps <- unique(c(deps, "shiny"))
+  # Optional packages for the extra ML / plotting features (Suggests).
+  # Installed too, so every feature works; a failure here does not stop the app.
+  optional <- c("Boruta", "car", "cicerone", "corrplot", "dcurves",
+                "kernlab", "mixOmics", "SHAPforxgboost")
 
   installed <- function() rownames(utils::installed.packages())
   inst_ver  <- function() {
@@ -66,6 +70,7 @@ local({
   reason <- if (is.na(v)) "not installed"
     else if (!is.na(gh_ver) && utils::compareVersion(gh_ver, v) > 0) paste(v, "->", gh_ver)
     else if (length(setdiff(deps, installed()))) "missing dependencies"
+    else if (length(setdiff(optional, installed()))) "missing optional packages"
     else if (!loads_ok()) "outdated dependencies"
     else NULL
 
@@ -79,13 +84,13 @@ local({
     # -- 3. Dependencies: missing ones + outdated ones in GExPipe's own
     #       dependency tree (other packages on the computer are left alone)
     ap   <- utils::available.packages()
-    tree <- unique(c(deps, unlist(tools::package_dependencies(
-      deps, db = ap, which = c("Depends", "Imports", "LinkingTo"), recursive = TRUE))))
+    tree <- unique(c(deps, optional, unlist(tools::package_dependencies(
+      c(deps, optional), db = ap, which = c("Depends", "Imports", "LinkingTo"), recursive = TRUE))))
     old  <- tryCatch(rownames(utils::old.packages(available = ap, checkBuilt = TRUE)),
                      error = function(e) character(0))
-    todo <- unique(c(setdiff(deps, installed()), intersect(old, tree)))
+    todo <- unique(c(setdiff(c(deps, optional), installed()), intersect(old, tree)))
     if (length(todo)) try(BiocManager::install(todo, ask = FALSE, update = FALSE))
-    for (p in setdiff(deps, installed())) {
+    for (p in setdiff(c(deps, optional), installed())) {
       say("Retrying ", p, " ...")
       try(BiocManager::install(p, ask = FALSE, update = FALSE))
     }
@@ -94,6 +99,11 @@ local({
       stop("These packages could not be installed: ", paste(left, collapse = ", "),
            "\nScroll up for the error. Usual fixes: close all other R/RStudio windows, ",
            "check the internet, restart R and run this line again.", call. = FALSE)
+    }
+    opt_left <- setdiff(optional, installed())
+    if (length(opt_left)) {
+      say("Optional packages not installed (the related extra features stay off): ",
+          paste(opt_left, collapse = ", "))
     }
 
     # -- 4. GExPipe itself ---------------------------------------------------
@@ -117,6 +127,6 @@ local({
 
   # -- 5. Launch ---------------------------------------------------------------
   say("GExPipe ", inst_ver(), " is ready. Opening the app ...")
-  app <- GExPipe::runGExPipe()
-  shiny::runApp(app, port = port, launch.browser = TRUE)
+  app <- GExPipe::runGExPipe(port = port)  # moves to a free port if this one is busy
+  shiny::runApp(app, launch.browser = TRUE)
 })
