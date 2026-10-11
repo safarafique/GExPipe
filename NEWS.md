@@ -1,3 +1,10 @@
+# GExPipe 0.99.110
+
+- KEGG enrichment (common genes): KEGG pathway data are now cached on disk, so repeat
+  enrichment runs no longer re-download KEGG and are much faster.
+- Vignette: corrected the installation code; added a one-line installer script
+  (install_gexpipe.R, GitHub only, excluded from the package build).
+
 # GExPipe 0.99.109
 
 - Download (Step 1): multi-platform GEO series (e.g. GSE18123, GPL570 + GPL6244) now download.

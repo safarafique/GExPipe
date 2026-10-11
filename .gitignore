@@ -112,3 +112,10 @@ rsconnect/
 # Local manuscript / BIOS-Rank scratch (not part of Bioconductor package)
 GExPipe(original_paper)/
 *.docx
+
+# Local scratch / benchmark outputs
+.tmp_*
+bench_*.csv
+case_study_table.csv
+sessionInfo.txt
+inst/shinyapp/gexpipe_benchmark_log.csv

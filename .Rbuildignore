@@ -78,3 +78,4 @@
 ^check_output\.txt$
 ^sessionInfo\.txt$
 ^install_gexpipe\.R$
+^inst/shinyapp/gexpipe_benchmark_log\.csv$
