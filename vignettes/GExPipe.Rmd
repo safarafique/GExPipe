@@ -219,6 +219,7 @@ latest `main` branch so Parallel DE, multi-GSE download, probe-ID mapping
 ```{r run-latest-github, eval=FALSE}
 if (!requireNamespace("shiny", quietly = TRUE)) install.packages("shiny")
 if (!requireNamespace("pkgload", quietly = TRUE)) install.packages("pkgload")
+options(timeout = 600)  # the GitHub download can exceed R's 60 s default
 shiny::runGitHub(
   "safarafique/GExPipe",
   ref = "main",
@@ -1126,7 +1127,7 @@ if (length(top_var) > 1L) {
 | **Corporate proxy** | `Sys.setenv(https_proxy = "http://proxy:port")` before installing. |
 
 ```{r windows-fix, eval=FALSE}
-options(download.file.method = "wininet")
+options(timeout = 600)
 unlink(
     list.files(.libPaths()[1], pattern = "^00LOCK", full.names = TRUE),
     recursive = TRUE, force = TRUE

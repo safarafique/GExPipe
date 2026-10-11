@@ -1,3 +1,9 @@
+# GExPipe 0.99.112
+
+- Vignette: the `shiny::runGitHub()` chunk sets `options(timeout = 600)` so the GitHub download
+  is not cut off after R's 60 s default on slow connections ("incomplete block on file").
+- Vignette: the Windows fix no longer sets the deprecated `wininet` download method.
+
 # GExPipe 0.99.111
 
 - Launch: the vignette, README, one-line installer and `gexpipe_setup()` now start the app with
