@@ -1482,12 +1482,12 @@ server_results <- function(input, output, session, rv) {
       n_sig <- n_up + n_down
       logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
       padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
+      ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+      alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
       p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
         ggplot2::geom_point(alpha = 0.6, size = 2) +
         ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
         gexpipe_pub_theme(base_size = 14) +
-        ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
-        alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
         ggplot2::labs(title = paste0("Volcano Plot: ", alt_lab, " vs ", ref_lab), subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
         ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
@@ -1523,12 +1523,12 @@ server_results <- function(input, output, session, rv) {
       n_sig <- n_up + n_down
       logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
       padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
+      ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+      alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
       p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
         ggplot2::geom_point(alpha = 0.6, size = 2) +
         ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
         gexpipe_pub_theme(base_size = 14) +
-        ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
-        alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
         ggplot2::labs(title = paste0("Volcano Plot: ", alt_lab, " vs ", ref_lab), subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
         ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
@@ -1565,12 +1565,12 @@ server_results <- function(input, output, session, rv) {
       n_sig <- n_up + n_down
       logfc_cut <- if (!is.null(input$logfc_cutoff)) input$logfc_cutoff else 0.5
       padj_cut <- if (!is.null(input$padj_cutoff)) input$padj_cutoff else 0.05
+      ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
+      alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
       p <- ggplot2::ggplot(volcano_data, ggplot2::aes(x = logFC, y = neg_log10_padj, color = Significance)) +
         ggplot2::geom_point(alpha = 0.6, size = 2) +
         ggplot2::scale_color_manual(values = c("Up-regulated" = "#e74c3c", "Down-regulated" = "#3498db", "Not Significant" = "gray70"), name = "Significance") +
         gexpipe_pub_theme(base_size = 14) +
-        ref_lab <- if (!is.null(rv$condition_ref_label)) rv$condition_ref_label else "Normal"
-        alt_lab <- if (!is.null(rv$condition_alt_label)) rv$condition_alt_label else "Disease"
         ggplot2::labs(title = paste0("Volcano Plot: ", alt_lab, " vs ", ref_lab), subtitle = paste0("DEGs: ", n_sig, " (Up: ", n_up, ", Down: ", n_down, ")"), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
         ggplot2::geom_hline(yintercept = -log10(padj_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +
         ggplot2::geom_vline(xintercept = c(-logfc_cut, logfc_cut), linetype = "dashed", color = "gray40", alpha = 0.7) +

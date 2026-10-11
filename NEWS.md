@@ -1,3 +1,13 @@
+# GExPipe 0.99.114
+
+- Fix: Volcano plot PNG / JPG / PDF downloads (Step 6) failed on every system and the browser
+  saved `download_volcano_png.htm` ("Site wasn't available"). Two label assignments sat inside
+  the ggplot `+` chain (R error: could not find function "+<-"). New test guards against
+  assignments inside `+` chains anywhere in the package.
+- Vignette: explains the `invalid connection` error from the one-line installer (network blocks
+  raw.githubusercontent.com) and points to the manual install; troubleshooting row for the
+  RStudio "Rtools is required" warning.
+
 # GExPipe 0.99.113
 
 - Vignette screenshots compressed (3.5 MB to 0.9 MB, same look) so the built package stays under

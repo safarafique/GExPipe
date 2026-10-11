@@ -173,6 +173,11 @@ latest GitHub `main` together with all CRAN and Bioconductor dependencies
 the package loads, and then opens the app. If everything is already up to
 date it opens the app straight away. The first install takes 15–30 min.
 
+If this line stops with `Error in summary.connection(connection) :
+invalid connection`, R could not download the script: your network blocks
+or drops `raw.githubusercontent.com`. Use the **Manual install** below
+instead; it downloads from GitHub by a different address.
+
 **Manual install** (same result, step by step):
 
 ```{r install-github, eval=FALSE}
@@ -1116,6 +1121,8 @@ if (length(top_var) > 1L) {
 | **Download log says `Code source: installed`** | You are not on the GitHub clone; use `runGitHub(..., ref = "main")` or `pkgload::load_all()`. |
 | **Locked DLL files (Windows)** | Restart R (`Ctrl+Shift+F10`) before installing or launching. |
 | **`failed to lock directory ... Try removing ... 00LOCK`** | An earlier install was interrupted. Restart R, run the `windows-fix` chunk below (it removes the leftover `00LOCK` folder) and install again. |
+| **`Error in summary.connection(connection) : invalid connection`** (when running `source(...)`) | R could not download the one-line installer: the network blocks or drops `raw.githubusercontent.com`. Check with `readLines("https://raw.githubusercontent.com/safarafique/GExPipe/main/DESCRIPTION", n = 3)`; if that fails too, use the [Manual install](#installation) (`remotes::install_github()`), which downloads from GitHub by a different address. |
+| **"Rtools is required to build R packages" (RStudio warning)** | Usually safe to ignore: `GExPipe` has no compiled code and its dependencies install as ready-made Windows binaries. If R asks *"Do you want to install from sources the packages which need compilation?"*, answer **no** (or install [Rtools](https://cran.r-project.org/bin/windows/Rtools/)). |
 | **`createTcpServer: address already in use`** | GExPipe is already running in another R session (open that browser tab, or stop it). `runGExPipe()` otherwise moves to the next free port; start it with `shiny::runApp(app)` without a fixed `port`. |
 | **Missing C++ compiler** | Install [Rtools](https://cran.r-project.org/bin/windows/Rtools/) (Windows). |
 | **glmnet / ML step skipped** | Restart R after install; ensure glmnet ≥ 4.x or 5.x loads (`packageVersion("glmnet")`). |
