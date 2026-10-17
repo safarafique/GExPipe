@@ -1,3 +1,27 @@
+# GExPipe 0.99.115
+
+Gene ID conversion (Step 1 / STEP 2b) now works for any microarray platform:
+
+- Fix: the platform's own GEO annotation table is used FIRST. Numeric probe IDs (e.g. Agilent
+  feature numbers 1..N, GPL4133) were read as Entrez gene IDs and silently mapped to the wrong
+  genes (0% correct); they now map to the platform's GENE_SYMBOL (99.9% agreement).
+- Fix: when several symbol-like columns exist, a real symbol column is preferred over a generic
+  "GENE" column (Entrez numbers on Agilent platforms); columns of numbers/accessions are skipped.
+- Fix: a "conversion" that returns the input IDs unchanged (e.g. GPL2029 Rosetta probe IDs) is no
+  longer accepted as success; the next method is tried.
+- New: when a route ends on Entrez / Ensembl / RefSeq / GenBank IDs (e.g. GPL2986 "GENE" column),
+  they are converted to gene symbols with org.Hs.eg.db.
+- New: probe-sequence mapping for platforms that publish only probe sequences (e.g. GPL16956,
+  Arraystar lncRNA V3): sequences are matched exactly (both strands) to Ensembl human transcripts
+  and a symbol is kept only when all matches belong to one gene (GPL16956: 39,069 of 58,944 probes,
+  24,041 genes). The Ensembl reference (~225 MB) is downloaded once and cached; needs Biostrings
+  (added to Suggests). Disable with options(gexpipe.probe_sequence_map = FALSE).
+- New: outdated gene symbols are updated to current HGNC symbols in every human dataset (e.g.
+  MARCH6 -> MARCHF6, SEPT7 -> SEPTIN7), so the same gene overlaps across platforms annotated in
+  different years; ambiguous aliases are left unchanged.
+- New: inst/scripts/check-gexpipe-run.R audits a saved Parallel-mode run folder (same run, gene
+  funnel, consensus and ML panel recomputed, panel use, nomogram counts, blank figures).
+
 # GExPipe 0.99.114
 
 - Fix: Volcano plot PNG / JPG / PDF downloads (Step 6) failed on every system and the browser

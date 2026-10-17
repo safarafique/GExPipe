@@ -1122,6 +1122,11 @@ GPL_to_biomart_probe_attr <- c(
     return(FALSE)
   }
   mapped_rate <- mean(sym[valid] != rn[valid], na.rm = TRUE)
+  # Output that is (almost) the input IDs unchanged is not a conversion unless
+  # those IDs already are gene symbols (e.g. numeric probe IDs returned as-is).
+  if (mapped_rate < 0.05 && !isTRUE(gexpipe_ids_are_verified_symbols(sym[valid]))) {
+    return(FALSE)
+  }
   isTRUE(
     .gexpipe_accept_mapped_symbols(sym, length(rn), min_rate = min_rate) ||
       mapped_rate > min_rate ||
@@ -1914,8 +1919,19 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
       "hgnc.symbol", "gene sym", "genesym", "official symbol", "official_symbol",
       "gene", "orf", "associated_gene", "associated gene"
     )
-    for (i in seq_along(cn)) {
-      if (cn_low[i] %in% sym_cands_low) { symbol_col <- cn[i]; break }
+    # Pick by PREFERENCE (a real symbol column beats a generic "GENE" column,
+    # which on Agilent tables holds Entrez numbers), and skip columns whose
+    # values are mostly numbers or accessions rather than gene symbols.
+    .looks_like_symbols <- function(v) {
+      v <- trimws(as.character(v)); v <- v[!is.na(v) & nzchar(v) & !v %in% c("---", "null", "NA")]
+      if (length(v) < 10L) return(FALSE)
+      v <- utils::head(v, 2000L)
+      mean(grepl("^[0-9]+$|^[A-Z]{1,2}_?[0-9]{5,}([.][0-9]+)?$|^ENS[A-Z]*[0-9]+", v)) < 0.5
+    }
+    for (cand in sym_cands_low) {
+      hit <- cn[cn_low == cand]
+      hit <- hit[vapply(hit, function(h) .looks_like_symbols(tab[[h]]), logical(1))]
+      if (length(hit)) { symbol_col <- hit[1]; break }
     }
     if (is.null(symbol_col)) {
       idx <- grep("gene.*(sym|symbol|name)|hgnc|^genename$", cn_low)

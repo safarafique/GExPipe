@@ -1776,9 +1776,20 @@ gexp_download_normalize_ids_for_overlap <- function(
  } else {
  NULL
  }
+ # The platform's own annotation table is the authority for its probe IDs:
+ # try it first, so numeric probe IDs (e.g. Agilent feature numbers 1..N)
+ # are never misread as Entrez gene IDs by a generic converter.
+ sym <- NULL
+ if (!is.null(gpl) && nzchar(gpl)) {
+ sym <- tryCatch(probe_ids_to_symbol_gpl(rn, gpl, gse_id = gse), error = function(e) NULL)
+ if (is.null(sym) || length(sym) != length(rn) || !.gexpipe_accept_overlap_mapping(sym, rn)) sym <- NULL
+ }
+ if (is.null(sym)) {
  sym <- map_microarray_ids(micro_expr, fdata, micro_eset, gse_id = gse)
- if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05) {
+ if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05 ||
+ !.gexpipe_accept_overlap_mapping(sym, rn)) {
  sym <- any_id_to_symbol(rn, gpl_id = gpl, gse_id = gse)
+ }
  }
  converted <- FALSE
  if (!is.null(sym) && length(sym) == length(rn)) {
@@ -1815,6 +1826,30 @@ gexp_download_normalize_ids_for_overlap <- function(
  nrow(micro_expr_fd), " gene symbols\n")
  converted <- TRUE
  }
+ }
+ }
+ # Last resort: platform publishes only probe sequences (e.g. GPL16956) -
+ # match them to Ensembl transcripts (exact, both strands, one gene only).
+ if (!converted && !is.null(gpl) && nzchar(gpl)) {
+ log_text <- paste0(log_text, " ", gse, ": no gene annotation in ", gpl,
+ " - matching probe sequences to Ensembl transcripts (first time per platform can take several minutes)...\n")
+ sq <- tryCatch(.gexpipe_map_probes_by_sequence(rn, gpl, gse_id = gse),
+ error = function(e) list(symbols = NULL, note = conditionMessage(e)))
+ if (!is.null(sq$symbols) && sum(!is.na(sq$symbols)) > length(rn) * 0.05) {
+ valid_sq <- !is.na(sq$symbols)
+ micro_expr_sq <- micro_expr[valid_sq, , drop = FALSE]
+ rownames(micro_expr_sq) <- sq$symbols[valid_sq]
+ if (any(duplicated(rownames(micro_expr_sq)))) {
+ micro_expr_sq <- limma::avereps(micro_expr_sq, ID = rownames(micro_expr_sq))
+ }
+ micro_expr_list[[gse]] <- micro_expr_sq
+ all_genes_list[[gse]] <- rownames(micro_expr_sq)
+ log_text <- paste0(log_text, " ", gse, ": probe-sequence mapping -> ", nrow(micro_expr_sq),
+ " gene symbols (", sq$n_mapped, " of ", length(rn), " probes matched one gene; ",
+ sq$n_ambiguous, " matched several genes and were dropped)\n")
+ converted <- TRUE
+ } else if (!is.null(sq$note)) {
+ log_text <- paste0(log_text, " ", gse, ": probe-sequence mapping not possible: ", sq$note, "\n")
  }
  }
  if (!converted) {
@@ -1856,7 +1891,8 @@ gexp_download_normalize_ids_for_overlap <- function(
  fmt <- detect_gene_id_format(rn)
  log_text <- paste0(log_text, " ", gse, ": format ", fmt, " -> converting to symbols...\n")
  sym <- convert_rnaseq_ids(rn, gse_id = gse)
- if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05) {
+ if (is.null(sym) || sum(!is.na(sym) & nzchar(trimws(sym))) <= length(rn) * 0.05 ||
+ !.gexpipe_accept_overlap_mapping(sym, rn)) {
  sym <- any_id_to_symbol(rn, gpl_id = NULL, gse_id = gse)
  }
  if (!is.null(sym) && length(sym) == length(rn)) {
@@ -2083,6 +2119,42 @@ gexp_download_normalize_ids_for_overlap <- function(
  } else {
  log_text <- paste0(log_text, " ", gse, ": _at conversion error (", .gse_result$msg, ") - kept original IDs\n")
  }
+ }
+
+ # Update outdated symbols to current official HGNC symbols in every dataset,
+ # so the same gene overlaps across platforms annotated in different years.
+ for (gse in names(all_genes_list)) {
+ is_micro <- gse %in% names(micro_expr_list)
+ mat <- if (is_micro) micro_expr_list[[gse]] else rna_counts_list[[gse]]
+ if (is.null(mat) || !nrow(mat)) next
+ changed <- FALSE
+ # (1) A route that ended on Entrez / Ensembl / RefSeq / GenBank IDs -> symbols
+ fin <- tryCatch(.gexpipe_ids_to_symbols_final(rownames(mat)), error = function(e) NULL)
+ if (!is.null(fin) && !is.null(fin$type)) {
+ keep <- !is.na(fin$ids) & nzchar(fin$ids)
+ mat <- mat[keep, , drop = FALSE]
+ rownames(mat) <- fin$ids[keep]
+ changed <- TRUE
+ log_text <- paste0(log_text, " ", gse, ": row IDs were still ", fin$type, " IDs -> ", fin$n,
+ " mapped to gene symbols (org.Hs.eg.db)\n")
+ }
+ # (2) Outdated -> current HGNC symbols (human datasets only)
+ if (isTRUE(.gexpipe_mostly_human_symbols(rownames(mat)))) {
+ hz <- tryCatch(.gexpipe_harmonize_symbols(rownames(mat)), error = function(e) NULL)
+ if (!is.null(hz) && hz$n > 0L) {
+ rownames(mat) <- hz$ids
+ changed <- TRUE
+ log_text <- paste0(log_text, " ", gse, ": ", hz$n, " outdated gene symbols updated to current HGNC names (e.g. ",
+ hz$examples, ")\n")
+ }
+ }
+ if (!changed) next
+ if (any(duplicated(rownames(mat)))) {
+ mat <- limma::avereps(mat, ID = rownames(mat))
+ if (!is_micro) mat <- round(mat)
+ }
+ if (is_micro) micro_expr_list[[gse]] <- mat else rna_counts_list[[gse]] <- mat
+ all_genes_list[[gse]] <- rownames(mat)
  }
 
  log_text <- paste0(log_text, "\nGene symbols extracted per GSE (format detected + sample):\n")

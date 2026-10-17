@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.114
+Version: 0.99.115
 Authors@R: c(
     person(
         given = "Safa",
@@ -107,6 +107,7 @@ Suggests:
     BiocCheck,
     BiocManager,
     BiocStyle,
+    Biostrings,
     Boruta (>= 8.0.0),
     bslib,
     car (>= 3.1.0),

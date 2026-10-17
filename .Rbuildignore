@@ -79,3 +79,4 @@
 ^sessionInfo\.txt$
 ^install_gexpipe\.R$
 ^inst/shinyapp/gexpipe_benchmark_log\.csv$
+^inst/shinyapp/GPL.*\.soft(\.gz)?$
