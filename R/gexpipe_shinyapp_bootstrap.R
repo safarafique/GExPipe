@@ -318,7 +318,7 @@ gexpipe_shinyapp_bootstrap <- function(verbose = TRUE) {
   })
   .gexpipe_verify_core_namespace()
 
-  options(shiny.maxRequestSize = 500 * 1024^2)
+  options(shiny.maxRequestSize = getOption("gexpipe.max_upload_mb", 2048) * 1024^2) # 2 GB default
   options(stringsAsFactors = FALSE)
 
   if (verbose) {

@@ -1239,7 +1239,7 @@ gexp_app_onStart <- function() {
   # and shinytest2 (and browsers) need a live session quickly. Attach runs from gexp_app_ui()
   # and gexp_app_server() on first session instead.
   options(stringsAsFactors = FALSE)
-  options(shiny.maxRequestSize = 500 * 1024^2) # 500 MB
+  options(shiny.maxRequestSize = getOption("gexpipe.max_upload_mb", 2048) * 1024^2) # 2 GB default; options(gexpipe.max_upload_mb = ...) to change
   options(timeout = 3600) # allow long GEO downloads
 }
 

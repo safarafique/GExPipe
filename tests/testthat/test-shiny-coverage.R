@@ -42,7 +42,7 @@ test_that("gexp_app_onStart sets shiny options", {
   on_start <- getFromNamespace("gexp_app_onStart", "GExPipe")
   expect_no_error(on_start())
   expect_false(getOption("stringsAsFactors"))
-  expect_equal(getOption("shiny.maxRequestSize"), 500 * 1024^2)
+  expect_equal(getOption("shiny.maxRequestSize"), 2048 * 1024^2)
 })
 
 test_that("all gexp_ui tab accessors build shiny UI in test mode", {

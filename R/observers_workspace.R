@@ -401,7 +401,7 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
       return()
     }
     if (!file.exists(path)) {
-      shiny::showNotification("Uploaded file not found. The file may be too large (max 500 MB) or the upload was interrupted. Try again or use \"Load from folder\" if the file is in saved_workspaces.", type = "error", duration = 8)
+      shiny::showNotification("Uploaded file not found. The file may be too large (max 2 GB) or the upload was interrupted. Try again or use \"Load from folder\" if the file is in saved_workspaces.", type = "error", duration = 8)
       shinyjs::reset("upload_workspace_file")
       return()
     }

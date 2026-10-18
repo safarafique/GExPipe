@@ -1,3 +1,8 @@
+# GExPipe 0.99.116
+
+- Saved workspaces (.rds) up to 2 GB can be uploaded (was 500 MB). Change with
+  options(gexpipe.max_upload_mb = ...) before runGExPipe().
+
 # GExPipe 0.99.115
 
 Gene ID conversion (Step 1 / STEP 2b) now works for any microarray platform:
