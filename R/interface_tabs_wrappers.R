@@ -329,10 +329,18 @@ gexpipe_pub_theme <- function(base_size = 13) {
 #' @noRd
 gexpipe_pub_padj_scale <- function(aesthetics = "colour") {
   cols <- c("#3C5488", "#4DBBD5", "#E64B35")
+  # Readable legend ticks: 1.0e-29 for tiny values, 0.01 otherwise (never "0.001000000000").
+  fmt <- function(x) ifelse(is.na(x), "", ifelse(abs(x) < 1e-3,
+                                                 formatC(x, format = "e", digits = 1),
+                                                 formatC(x, format = "g", digits = 2)))
+  # log10 so FDRs spanning many orders of magnitude (1e-30 .. 1e-6) still get
+  # a visible gradient; `transform` replaced `trans` in ggplot2 3.5.0.
+  log_arg <- if (utils::packageVersion("ggplot2") >= "3.5.0") list(transform = "log10") else list(trans = "log10")
+  args <- c(list(colours = cols, name = "FDR", labels = fmt), log_arg)
   if (identical(aesthetics, "fill")) {
-    ggplot2::scale_fill_gradientn(colours = cols, name = "FDR")
+    do.call(ggplot2::scale_fill_gradientn, args)
   } else {
-    ggplot2::scale_colour_gradientn(colours = cols, name = "FDR")
+    do.call(ggplot2::scale_colour_gradientn, args)
   }
 }
 

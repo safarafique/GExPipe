@@ -86,8 +86,8 @@ gexp_ui_plot_download_jpg_pdf <- function(jpg_id, pdf_id, btn_class = "btn-succe
   shiny::tags$div(
     class = "gexp-plot-download-bar",
     style = "margin-top: 8px;",
-    shiny::downloadButton(jpg_id, shiny::tagList(shiny::icon("download"), " JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
-    shiny::downloadButton(pdf_id, shiny::tagList(shiny::icon("download"), " PDF"), class = btn_class)
+    shiny::downloadButton(jpg_id, shiny::tagList(" JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+    shiny::downloadButton(pdf_id, shiny::tagList(" PDF"), class = btn_class)
   )
 }
 
@@ -95,9 +95,9 @@ gexp_ui_plot_download_bar <- function(png_id, jpg_id, pdf_id, btn_class = "btn-s
   shiny::tags$div(
     class = "gexp-plot-download-bar",
     style = "margin-top: 8px;",
-    shiny::downloadButton(png_id, shiny::tagList(shiny::icon("download"), " PNG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
-    shiny::downloadButton(jpg_id, shiny::tagList(shiny::icon("download"), " JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
-    shiny::downloadButton(pdf_id, shiny::tagList(shiny::icon("download"), " PDF"), class = btn_class)
+    shiny::downloadButton(png_id, shiny::tagList(" PNG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+    shiny::downloadButton(jpg_id, shiny::tagList(" JPG (300 DPI)"), class = btn_class, style = "margin-right: 6px;"),
+    shiny::downloadButton(pdf_id, shiny::tagList(" PDF"), class = btn_class)
   )
 }
 
@@ -175,14 +175,128 @@ gexp_ggsave_from_file <- function(file, plot, width, height, dpi = IMAGE_DPI) {
 #' @param filename_prefix Downloaded file basename (without extension).
 #' @param csv_dir Optional directory (e.g. CSV_EXPORT_DIR()) to also save a copy into, matching the app's "also save to export dir" convention used elsewhere.
 #' @noRd
+#' Write a small placeholder file of the requested type (png/jpg/pdf/csv/txt)
+#' @noRd
+gexp_write_placeholder_file <- function(file, message) {
+  ext <- tolower(tools::file_ext(file))
+  if (ext %in% c("png", "jpg", "jpeg", "pdf", "tif", "tiff", "svg")) {
+    dev <- switch(ext,
+      png = function() grDevices::png(file, width = 1600, height = 900, res = 150, bg = "white"),
+      jpg = , jpeg = function() grDevices::jpeg(file, width = 1600, height = 900, res = 150, quality = 95, bg = "white"),
+      pdf = function() grDevices::pdf(file, width = 10, height = 5.6, bg = "white"),
+      tif = , tiff = function() grDevices::tiff(file, width = 1600, height = 900, res = 150, bg = "white"),
+      svg = function() grDevices::svg(file, width = 10, height = 5.6, bg = "white"))
+    dev(); on.exit(grDevices::dev.off(), add = TRUE)
+    graphics::plot.new()
+    graphics::text(0.5, 0.5, paste(strwrap(message, 70), collapse = "\n"), cex = 1.1, col = "#7f8c8d")
+  } else if (ext %in% c("csv", "tsv")) {
+    utils::write.csv(data.frame(Note = message), file, row.names = FALSE)
+  } else {
+    writeLines(message, file)
+  }
+  invisible(file)
+}
+
+#' Heatmap annotation colours for the group names actually present
+#'
+#' Fixed colours for "Normal"/"Disease" made pheatmap fail ("Factor levels on
+#' variable Condition do not match with annotation_colors") whenever groups
+#' were renamed in Step 4 (e.g. "CP"/"BC").
+#' @noRd
+gexp_condition_annotation_colors <- function(condition, ref_label = NULL, alt_label = NULL) {
+  lev <- unique(as.character(stats::na.omit(condition)))
+  if (!length(lev)) return(NA)
+  ref <- if (!is.null(ref_label) && nzchar(ref_label)) ref_label else "Normal"
+  alt <- if (!is.null(alt_label) && nzchar(alt_label)) alt_label else "Disease"
+  pal <- c("#2ecc71", "#9b59b6", "#f39c12", "#1abc9c", "#34495e", "#e67e22", "#7f8c8d")
+  cols <- stats::setNames(rep(NA_character_, length(lev)), lev)
+  cols[lev == ref] <- "#3498db"
+  cols[lev == alt] <- "#e74c3c"
+  rest <- which(is.na(cols))
+  if (length(rest)) cols[rest] <- rep(pal, length.out = length(rest))
+  list(Condition = cols)
+}
+
+.gexp_download_log <- new.env(parent = emptyenv())
+
+#' downloadHandler() that never hands the browser an error page
+#'
+#' Masks shiny::downloadHandler() inside the package, so every download button
+#' is covered. If content() fails, or writes no file (step not run yet, or a
+#' plot function that draws nothing), the user gets a real file of the
+#' requested type explaining why, plus an on-screen warning, instead of an
+#' HTML error page saved as "download_<id>_<ext>".
+#' @noRd
+downloadHandler <- function(filename, content, contentType = NULL, outputArgs = list()) {
+  safe_content <- function(file) {
+    devs_before <- grDevices::dev.list()
+    err <- tryCatch({ content(file); NULL }, error = function(e) e)
+    # Close graphics devices the handler opened but did not close (png(); plot;
+    # dev.off() with an error in between). A leaked device swallows the next
+    # download's drawing and leaves this file unfinished.
+    for (d in rev(setdiff(grDevices::dev.list(), devs_before))) try(grDevices::dev.off(d), silent = TRUE)
+    no_file <- !file.exists(file) || isTRUE(file.size(file) == 0)
+    if (is.null(err) && !no_file) return(invisible(file))
+    msg <- if (!is.null(err) && !inherits(err, "shiny.silent.error") && nzchar(conditionMessage(err))) {
+      paste0("This download could not be created: ", conditionMessage(err))
+    } else {
+      "Nothing to download yet: complete this step in the app first (the result shown on screen is what gets downloaded)."
+    }
+    unlink(file)
+    gexp_write_placeholder_file(file, msg)
+    .gexp_download_log$placeholders <- c(.gexp_download_log$placeholders, msg)
+    if (!is.null(shiny::getDefaultReactiveDomain())) {
+      shiny::showNotification(msg, type = "warning", duration = 10)
+    }
+    invisible(file)
+  }
+  shiny::downloadHandler(filename = filename, content = safe_content, contentType = contentType, outputArgs = outputArgs)
+}
+
+#' Draw a plot function's result into the open device, whatever it returns
+#'
+#' Base-graphics functions draw as a side effect; ggplot / grid objects are
+#' only drawn when printed. Calling such a function inside a file device
+#' without printing produced blank exported images (QC boxplots, DCA). On
+#' error the message is drawn into the image and a warning is shown, so a
+#' failed plot is never exported as a silent blank file.
+#' @noRd
+gexp_draw_plot_result <- function(plot_fn, label = "plot") {
+  res <- tryCatch(plot_fn(), error = function(e) e)
+  # req() not met (step not run yet): pass it on so the download writes a
+  # clear "complete this step first" file instead of a near-blank image.
+  if (inherits(res, "shiny.silent.error")) stop(res)
+  if (inherits(res, "error")) {
+    msg <- conditionMessage(res)
+    graphics::plot.new()
+    graphics::text(0.5, 0.5, paste0(label, " could not be drawn:\n", msg), cex = 0.9, col = "#c0392b")
+    if (!is.null(shiny::getDefaultReactiveDomain())) {
+      shiny::showNotification(paste0(label, " could not be drawn: ", msg), type = "warning", duration = 10)
+    }
+    return(invisible(FALSE))
+  }
+  if (inherits(res, c("ggplot", "gg"))) {
+    grid::grid.draw(res)
+  } else if (inherits(res, c("gtable", "grob", "gTree"))) {
+    grid::grid.newpage(); grid::grid.draw(res)
+  } else if (inherits(res, "pheatmap") && !is.null(res$gtable)) {
+    grid::grid.newpage(); grid::grid.draw(res$gtable)
+  } else if (inherits(res, c("upset", "trellis"))) {
+    methods::show(res)                     # UpSetR / lattice objects draw when shown
+  } else if (inherits(res, "recordedplot")) {
+    grDevices::replayPlot(res)
+  }
+  invisible(TRUE)
+}
+
 gexp_register_plot_downloads <- function(output, id_stem, plot_fn, width, height, filename_prefix, csv_dir = NULL) {
   make_handler <- function(ext) {
-    shiny::downloadHandler(
+    downloadHandler(
       filename = function() paste0(filename_prefix, ".", ext),
       content = function(file) {
         gexp_plot_device_open(file, width = width, height = height, type = ext)
         on.exit(grDevices::dev.off(), add = TRUE)
-        plot_fn()
+        gexp_draw_plot_result(plot_fn, filename_prefix)
         if (!is.null(csv_dir)) {
           dir_val <- if (is.function(csv_dir)) csv_dir() else csv_dir
           if (!is.null(dir_val) && nzchar(dir_val)) {
@@ -204,26 +318,11 @@ gexp_register_plot_downloads <- function(output, id_stem, plot_fn, width, height
 #' an open base-graphics device.
 #' @noRd
 gexp_register_ggplot_downloads <- function(output, id_stem, plot_fn, width, height, filename_prefix, csv_dir = NULL) {
-  make_handler <- function(ext) {
-    shiny::downloadHandler(
-      filename = function() paste0(filename_prefix, ".", ext),
-      content = function(file) {
-        p <- plot_fn()
-        gexp_ggsave_from_file(file, p, width = width, height = height)
-        if (!is.null(csv_dir)) {
-          dir_val <- if (is.function(csv_dir)) csv_dir() else csv_dir
-          if (!is.null(dir_val) && nzchar(dir_val)) {
-            copy_path <- file.path(dir_val, paste0(filename_prefix, ".", ext))
-            try(file.copy(file, copy_path, overwrite = TRUE), silent = TRUE)
-          }
-        }
-      }
-    )
-  }
-  output[[paste0("download_", id_stem, "_png")]] <- make_handler("png")
-  output[[paste0("download_", id_stem, "_jpg")]] <- make_handler("jpg")
-  output[[paste0("download_", id_stem, "_pdf")]] <- make_handler("pdf")
-  invisible(NULL)
+  # Same handler as gexp_register_plot_downloads(): it opens the file device and
+  # draws whatever plot_fn produces (ggplot object OR base graphics). Saving
+  # only a returned ggplot wrote no file for base-graphics functions, and the
+  # browser then saved an HTML error page ("download_..._jpg", HTML Document).
+  gexp_register_plot_downloads(output, id_stem, plot_fn, width, height, filename_prefix, csv_dir = csv_dir)
 }
 
 # ==============================================================================
@@ -893,16 +992,19 @@ gexp_draw_ml_methods_venn <- function(sets,
       return(invisible(NULL))
     }
     max_set_size <- max(c(set_sizes, 1L))
-    all_query <- list(list(
+    # UpSetR fails ("replacement has 1 row, data has 0") when a query matches no
+    # intersection, so highlight the all-methods bar only when it exists.
+    all_query <- if (n_common > 0L) list(list(
       query = UpSetR::intersects,
       params = colnames(upset_df),
-      color = if (n_common == 0L) "#C0392B" else "#1B5E20",
+      color = "#1B5E20",
       active = TRUE,
       query.name = "All methods"
-    ))
+    )) else NULL
     ts <- c(1.45, 1.15, 1.15, 1.05, 1.45, 1.15) * text_scale
     tryCatch({
-      UpSetR::upset(
+      # upset() returns an object that only draws when shown
+      p <- UpSetR::upset(
         upset_df,
         sets = colnames(upset_df),
         keep.order = TRUE,
@@ -921,6 +1023,7 @@ gexp_draw_ml_methods_venn <- function(sets,
         mainbar.y.label = "Intersection size",
         sets.x.label = "Genes per method"
       )
+      methods::show(p)
       .draw_footer()
     }, error = function(e) {
       graphics::plot.new()
@@ -938,9 +1041,11 @@ gexp_draw_ml_methods_venn <- function(sets,
   sets_draw <- lapply(sets, function(g) unique(as.character(g)))
   cat_names <- names(sets_draw)
   n_draw <- length(sets_draw)
-  # scaled/euler only work for 2-3 circles. rotation= matches multiple
-  # formals in 5-set venn.diagram and used to blank this plot.
-  scaled_ok <- n_draw <= 3L
+  # Always symmetric circles: area-scaled (euler) layouts nest a smaller set
+  # inside a larger one (e.g. RF/SVM-RFE inside LASSO), which drops category
+  # labels inside the wrong circle. rotation= matches multiple formals in
+  # 5-set venn.diagram and used to blank this plot.
+  scaled_ok <- FALSE
   venn_args <- list(
     x = sets_draw,
     category.names = cat_names,
@@ -975,7 +1080,11 @@ gexp_draw_ml_methods_venn <- function(sets,
     .draw_upset()
     return(invisible(NULL))
   }
+  # Draw the diagram in the top 88% so the bottom category label never
+  # collides with the footer text underneath it.
+  grid::pushViewport(grid::viewport(y = 0.56, height = 0.88))
   grid::grid.draw(vp)
+  grid::popViewport()
   if (n_common == 0L) {
     grid::grid.text(
       "0",

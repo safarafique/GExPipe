@@ -210,9 +210,10 @@ server_gsea <- function(input, output, session, rv) {
         DT::dataTableOutput(id_table, height = "500px"))
       inner_row <- fluidRow(left_col, right_col)
       dl_btns <- tags$div(style = "margin-top: 10px;",
-        downloadButton(paste0("download_gsea_plot_jpg_", i), tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
-        downloadButton(paste0("download_gsea_plot_pdf_", i), tagList(icon("download"), " PDF"), class = "btn-primary btn-sm", style = "margin-right: 8px;"),
-        downloadButton(paste0("download_gsea_table_", i), tagList(icon("download"), " Table (", gene, ")"), class = "btn-success btn-sm"))
+        downloadButton(paste0("download_gsea_plot_png_", i), tagList(" PNG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
+        downloadButton(paste0("download_gsea_plot_jpg_", i), tagList(" JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
+        downloadButton(paste0("download_gsea_plot_pdf_", i), tagList(" PDF"), class = "btn-primary btn-sm", style = "margin-right: 8px;"),
+        downloadButton(paste0("download_gsea_table_", i), tagList(" Table (", gene, ")"), class = "btn-success btn-sm"))
       b <- box(
         title = tags$span(icon("dna"), " GSEA for ", gene),
         width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
@@ -288,13 +289,15 @@ server_gsea <- function(input, output, session, rv) {
           DT::datatable(out, options = dt_opts, rownames = FALSE, filter = "top", style = "bootstrap", class = "compact stripe")
         })
 
+        # Exported figures show the top 6 sets with a taller running-score panel:
+        # with 10 sets the in-panel legend overflowed the top edge (first entry clipped).
         output[[paste0("download_gsea_plot_jpg_", ii)]] <- downloadHandler(
           filename = function() paste0("GSEA_plot_", g, ".jpg"),
           content = function(file) {
             if (nrow(res_df) == 0 || length(top_terms) == 0) return()
             tryCatch({
-              p <- enrichplot::gseaplot2(result, geneSetID = top_terms, title = paste("GSEA for", g),
-                base_size = 14, subplots = seq_len(3), pvalue_table = FALSE, rel_heights = c(1.2, 0.3, 0.5))
+              p <- enrichplot::gseaplot2(result, geneSetID = head(top_terms, 6L), title = paste("GSEA for", g),
+                base_size = 12, subplots = seq_len(3), pvalue_table = FALSE, rel_heights = c(1.6, 0.25, 0.45))
               if (inherits(p, "ggplot")) {
                 ggplot2::ggsave(file, plot = p, width = 10, height = 8, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
               } else if (inherits(p, "list")) {
@@ -309,13 +312,25 @@ server_gsea <- function(input, output, session, rv) {
             }, error = function(e) NULL)
           }
         )
+        output[[paste0("download_gsea_plot_png_", ii)]] <- downloadHandler(
+          filename = function() paste0("GSEA_plot_", g, ".png"),
+          content = function(file) {
+            if (nrow(res_df) == 0 || length(top_terms) == 0) return()
+            p <- enrichplot::gseaplot2(result, geneSetID = head(top_terms, 6L), title = paste("GSEA for", g),
+              base_size = 12, subplots = seq_len(3), pvalue_table = FALSE, rel_heights = c(1.6, 0.25, 0.45))
+            png(file, width = 10 * IMAGE_DPI, height = 8 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+            on.exit(dev.off(), add = TRUE)
+            if (inherits(p, "list") && !inherits(p, "ggplot")) do.call(gridExtra::grid.arrange, p)
+            else { grid::grid.newpage(); grid::grid.draw(p) }
+          }
+        )
         output[[paste0("download_gsea_plot_pdf_", ii)]] <- downloadHandler(
           filename = function() paste0("GSEA_plot_", g, ".pdf"),
           content = function(file) {
             if (nrow(res_df) == 0 || length(top_terms) == 0) return()
             tryCatch({
-              p <- enrichplot::gseaplot2(result, geneSetID = top_terms, title = paste("GSEA for", g),
-                base_size = 14, subplots = seq_len(3), pvalue_table = FALSE, rel_heights = c(1.2, 0.3, 0.5))
+              p <- enrichplot::gseaplot2(result, geneSetID = head(top_terms, 6L), title = paste("GSEA for", g),
+                base_size = 12, subplots = seq_len(3), pvalue_table = FALSE, rel_heights = c(1.6, 0.25, 0.45))
               if (inherits(p, "ggplot")) {
                 ggplot2::ggsave(file, plot = p, width = 10, height = 8, device = "pdf", bg = "white")
               } else if (inherits(p, "list")) {

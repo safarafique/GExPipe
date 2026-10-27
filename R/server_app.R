@@ -1,5 +1,12 @@
 gexp_app_server <- function(input, output, session) {
 
+  # -- Upload limit (2 GB) ---------------------------------------------------------
+  # Set per session as well as in onStart: when the app is started from
+  # inst/shinyapp (RStudio "Run App", runApp(), runGitHub()) onStart is not
+  # used and Shiny would fall back to its 5 MB default ("Maximum upload size
+  # exceeded" for any saved workspace).
+  options(shiny.maxRequestSize = getOption("gexpipe.max_upload_mb", 2048) * 1024^2)
+
   # -- Keep-alive heartbeat -----------------------------------------------------
   # Client-side JS (see gexp_app_head()) pings this input every 15s while the
   # user has been active within the last 30 minutes, so the round-trip itself

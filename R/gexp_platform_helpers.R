@@ -297,10 +297,12 @@ gexpipe_pca_polar_df <- function(expr, metadata, color_by = "Dataset") {
   theta <- atan2(pc2, pc1)
   r <- sqrt(pc1^2 + pc2^2)
   if (max(r) > 0) r <- r / max(r)
-  df <- data.frame(theta = theta, r = r, stringsAsFactors = FALSE)
+  df <- data.frame(theta = theta, r = r, PC1 = pc1, PC2 = pc2, stringsAsFactors = FALSE)
   if (color_by %in% colnames(metadata)) {
     df[[color_by]] <- metadata[[color_by]]
   }
+  # % variance of PC1/PC2 for Cartesian PCA axis labels
+  attr(df, "var_pct") <- round(100 * pca$sdev[1:2]^2 / sum(pca$sdev^2), 1)
   df
 }
 
@@ -355,7 +357,10 @@ gexpipe_pvca_df <- function(expr, metadata, max_samples = 100L, max_pcs = 10L) {
 
   n_samples <- min(as.integer(max_samples), ncol(expr))
   if (ncol(expr) > n_samples) {
-    sample_idx <- seq_len(n_samples)
+    # Evenly spaced, not the first n: columns are ordered by dataset, so the
+    # first 100 samples can all come from one GSE and Dataset/Platform then
+    # silently drop out of the PVCA (before and after look identical).
+    sample_idx <- unique(round(seq(1, ncol(expr), length.out = n_samples)))
     expr <- expr[, sample_idx, drop = FALSE]
     metadata <- metadata[colnames(expr), , drop = FALSE]
   }

@@ -706,7 +706,7 @@ server_validation <- function(input, output, session, rv) {
       ),
       DT::dataTableOutput("ext_val_phenodata_table"),
       tags$div(style = "margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;",
-        downloadButton("download_ext_val_phenodata_csv", tagList(icon("download"), " Phenodata (CSV)"), class = "btn-info btn-sm"),
+        downloadButton("download_ext_val_phenodata_csv", tagList(" Phenodata (CSV)"), class = "btn-info btn-sm"),
         actionButton(
           "ext_val_refresh_pdata_btn",
           tagList(icon("sync"), " Re-fetch full GEO phenodata"),
@@ -1410,14 +1410,15 @@ server_validation <- function(input, output, session, rv) {
               tags$p(tags$strong("Volcano Plot -- Validation Dataset"), style = "margin-bottom: 6px;"),
               plotOutput("val_volcano_plot", height = "450px"),
               tags$div(style = "margin-top: 8px;",
-                downloadButton("download_val_volcano_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-                downloadButton("download_val_volcano_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))
+                downloadButton("download_val_volcano_png", tagList(" PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+                downloadButton("download_val_volcano_jpg", tagList(" JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+                downloadButton("download_val_volcano_pdf", tagList(" PDF"), class = "btn-info btn-sm"))
             ),
             column(6,
               tags$p(tags$strong("Top Significant DEGs -- Validation"), style = "margin-bottom: 6px;"),
               DT::dataTableOutput("val_de_table"),
               tags$div(style = "margin-top: 8px;",
-                downloadButton("download_val_de_csv", tagList(icon("download"), " Full DE Results (CSV)"), class = "btn-info btn-sm"))
+                downloadButton("download_val_de_csv", tagList(" Full DE Results (CSV)"), class = "btn-info btn-sm"))
             )
           ),
 
@@ -1539,7 +1540,7 @@ server_validation <- function(input, output, session, rv) {
           tags$p(tags$strong("ML genes also significant in validation DE:"), style = "font-size: 13px; margin-bottom: 6px;"),
           DT::dataTableOutput("val_overlap_de_table"),
           tags$div(style = "margin-top: 8px;",
-            downloadButton("download_val_overlap_de_csv", tagList(icon("download"), " Overlap table (CSV)"), class = "btn-success btn-sm"))
+            downloadButton("download_val_overlap_de_csv", tagList(" Overlap table (CSV)"), class = "btn-success btn-sm"))
         )
       } else {
         tags$p(tags$em("No ML test genes are significantly DE in the validation dataset."),
@@ -1587,6 +1588,15 @@ server_validation <- function(input, output, session, rv) {
       ggrepel::geom_text_repel(ggplot2::aes(label = Label), size = 3, max.overlaps = 20) +
       ggplot2::theme(plot.title = ggplot2::element_text(face = "bold"))
   }
+
+  output$download_val_volcano_png <- downloadHandler(
+    filename = function() "Validation_Volcano_Plot.png",
+    content = function(file) {
+      req(rv$ext_val_de_results)
+      p <- make_volcano_plot()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
 
   output$download_val_volcano_jpg <- downloadHandler(
     filename = function() "Validation_Volcano_Plot.jpg",

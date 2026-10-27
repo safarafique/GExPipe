@@ -34,13 +34,14 @@ ui_roc <- tabItem(
                tags$p(tags$strong("AUC scores (biomarkers with AUC >= 0.8)"), style = "margin-bottom: 6px;"),
                DT::dataTableOutput("roc_auc_table"),
                tags$div(style = "margin-top: 8px;",
-                        downloadButton("download_roc_auc", tagList(icon("download"), " AUC table (CSV)"), class = "btn-success btn-sm"))),
+                        downloadButton("download_roc_auc", tagList(" AUC table (CSV)"), class = "btn-success btn-sm"))),
         column(6,
                tags$p(tags$strong("AUC bar plot (top biomarkers)"), style = "margin-bottom: 6px;"),
                plotOutput("roc_auc_barplot", height = "320px"),
                tags$div(style = "margin-top: 8px;",
-                        downloadButton("download_roc_auc_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
-                        downloadButton("download_roc_auc_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-sm")))
+                        downloadButton("download_roc_auc_plot_png", tagList(" PNG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
+                        downloadButton("download_roc_auc_plot_jpg", tagList(" JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
+                        downloadButton("download_roc_auc_plot_pdf", tagList(" PDF"), class = "btn-primary btn-sm")))
       )
     )
   ),
@@ -51,8 +52,9 @@ ui_roc <- tabItem(
       width = 12, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       plotOutput("roc_curves_plot", height = "520px"),
       tags$div(style = "margin-top: 10px;",
-        downloadButton("download_roc_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_roc_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-primary btn-sm"))
+        downloadButton("download_roc_plot_png", tagList(" PNG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_roc_plot_jpg", tagList(" JPG (300 DPI)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_roc_plot_pdf", tagList(" PDF"), class = "btn-primary btn-sm"))
     )
   ),
 
@@ -62,8 +64,9 @@ ui_roc <- tabItem(
       width = 6, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       plotOutput("roc_boxplots_plot", height = "420px"),
       tags$div(style = "margin-top: 10px;",
-        downloadButton("download_roc_boxplots_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_roc_boxplots_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm"))
+        downloadButton("download_roc_boxplots_png", tagList(" PNG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_roc_boxplots_jpg", tagList(" JPG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_roc_boxplots_pdf", tagList(" PDF"), class = "btn-warning btn-sm"))
     ),
     uiOutput("roc_validation_boxplots_ui")
   ),
@@ -87,9 +90,10 @@ ui_roc <- tabItem(
           tags$p(tags$strong("AUC comparison: single vs combined"), style = "margin-bottom: 6px;"),
           DT::dataTableOutput("roc_combined_panel_table"),
           tags$div(style = "margin-top: 6px;",
-            downloadButton("download_roc_combined_panel_csv", tagList(icon("download"), " Table (CSV)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_roc_combined_panel_plot_jpg", tagList(icon("download"), " Plot JPG"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
-            downloadButton("download_roc_combined_panel_plot_pdf", tagList(icon("download"), " Plot PDF"), class = "btn-primary btn-sm"))
+            downloadButton("download_roc_combined_panel_csv", tagList(" Table (CSV)"), class = "btn-primary btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_roc_combined_panel_plot_png", tagList(" Plot PNG"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
+            downloadButton("download_roc_combined_panel_plot_jpg", tagList(" Plot JPG"), class = "btn-primary btn-sm", style = "margin-right: 4px;"),
+            downloadButton("download_roc_combined_panel_plot_pdf", tagList(" Plot PDF"), class = "btn-primary btn-sm"))
         )
       )
     )

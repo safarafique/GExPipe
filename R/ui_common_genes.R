@@ -23,6 +23,14 @@ ui_common_genes <- tabItem(
         style = "padding: 15px 0;",
         tags$div(
           style = "display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 15px;",
+          selectInput("wgcna_gene_scope",
+                      label = tags$strong("WGCNA genes to intersect with DEGs:"),
+                      choices = c(
+                        "Key module only (highest |module-trait r|)" = "top",
+                        "Hub genes (GS/MM-significant) in significant modules" = "hub",
+                        "All significant modules (lenient)" = "all"
+                      ),
+                      selected = "top", width = "380px"),
           actionButton("compute_common_genes",
                       tagList(icon("calculator"), " Compute Common Genes"),
                       class = "btn-primary btn-lg")
@@ -33,15 +41,15 @@ ui_common_genes <- tabItem(
         uiOutput("common_genes_venn_heading_ui"),
         plotOutput("common_genes_venn_plot", height = "420px"),
         tags$div(style = "margin-top: 8px; margin-bottom: 15px;",
-          downloadButton("download_common_genes_venn_png", tagList(icon("download"), " Venn diagram (PNG)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_common_genes_venn_jpg", tagList(icon("download"), " Venn diagram (JPG)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_common_genes_venn_pdf", tagList(icon("download"), " Venn diagram (PDF)"), class = "btn-success btn-sm")),
+          downloadButton("download_common_genes_venn_png", tagList(" Venn diagram (PNG)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_common_genes_venn_jpg", tagList(" Venn diagram (JPG)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_common_genes_venn_pdf", tagList(" Venn diagram (PDF)"), class = "btn-success btn-sm")),
         tags$hr(),
         DT::dataTableOutput("common_genes_table"),
         tags$div(
           style = "margin-top: 15px;",
           downloadButton("download_common_genes",
-                        tagList(icon("download"), " Download Common Genes (CSV)"),
+                        tagList(" Download Common Genes (CSV)"),
                         class = "btn-success")
         )
       )
@@ -81,23 +89,23 @@ ui_common_genes <- tabItem(
         tags$h5(icon("chart-bar"), " GO Enrichment (Biological Process)", style = "margin-top: 15px;"),
         plotOutput("go_bp_plot", height = "500px"),
         tags$div(style = "margin-top: 6px;",
-          downloadButton("download_go_bp_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_go_bp_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_go_bp_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")),
+          downloadButton("download_go_bp_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_go_bp_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_go_bp_pdf", tagList(" PDF"), class = "btn-success btn-sm")),
         tags$h5(icon("chart-bar"), " GO Enrichment (Molecular Function)", style = "margin-top: 20px;"),
         plotOutput("go_mf_plot", height = "500px"),
         tags$div(style = "margin-top: 6px;",
-          downloadButton("download_go_mf_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_go_mf_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_go_mf_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")),
+          downloadButton("download_go_mf_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_go_mf_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_go_mf_pdf", tagList(" PDF"), class = "btn-success btn-sm")),
         tags$h5(icon("chart-bar"), " GO Enrichment (Cellular Component)", style = "margin-top: 20px;"),
         plotOutput("go_cc_plot", height = "500px"),
         tags$div(style = "margin-top: 6px;",
-          downloadButton("download_go_cc_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_go_cc_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-          downloadButton("download_go_cc_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")),
+          downloadButton("download_go_cc_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_go_cc_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+          downloadButton("download_go_cc_pdf", tagList(" PDF"), class = "btn-success btn-sm")),
         tags$div(style = "margin-top: 15px;",
-                 downloadButton("download_go_results", tagList(icon("download"), " Download GO Results (CSV)"), class = "btn-success"))
+                 downloadButton("download_go_results", tagList(" Download GO Results (CSV)"), class = "btn-success"))
       )
     )
   ),
@@ -140,20 +148,20 @@ ui_common_genes <- tabItem(
                           tags$p(icon("chart-bar"), " Bar plot - pathway count and p.adjust", style = "color: #495057; margin-bottom: 8px; font-size: 13px;"),
                           plotOutput("kegg_barplot", height = "480px"),
                           tags$div(style = "margin-top: 6px;",
-                            downloadButton("download_kegg_barplot_png", tagList(icon("download"), " PNG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
-                            downloadButton("download_kegg_barplot_jpg", tagList(icon("download"), " JPG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
-                            downloadButton("download_kegg_barplot_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm")))),
+                            downloadButton("download_kegg_barplot_png", tagList(" PNG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
+                            downloadButton("download_kegg_barplot_jpg", tagList(" JPG"), class = "btn-warning btn-sm", style = "margin-right: 4px;"),
+                            downloadButton("download_kegg_barplot_pdf", tagList(" PDF"), class = "btn-warning btn-sm")))),
           column(6,
                  tags$div(style = "background: #fafbfc; border-radius: 8px; padding: 12px; border: 1px solid #e9ecef;",
                           tags$p(icon("circle"), " Chord - pathway IDs on circle, genes as ribbons", style = "color: #495057; margin-bottom: 8px; font-size: 13px;"),
                           plotOutput("kegg_chord_plot", height = "480px"),
                           tags$div(style = "margin-top: 6px;",
-                            downloadButton("download_kegg_chord", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
-                            downloadButton("download_kegg_chord_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
-                            downloadButton("download_kegg_chord_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))))
+                            downloadButton("download_kegg_chord", tagList(" PNG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
+                            downloadButton("download_kegg_chord_jpg", tagList(" JPG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
+                            downloadButton("download_kegg_chord_pdf", tagList(" PDF"), class = "btn-info btn-sm"))))
         ),
         tags$div(style = "margin-top: 12px;",
-                 downloadButton("download_kegg_results", tagList(icon("download"), " Download KEGG Results (CSV)"), class = "btn-warning btn-sm")),
+                 downloadButton("download_kegg_results", tagList(" Download KEGG Results (CSV)"), class = "btn-warning btn-sm")),
         tags$hr(style = "margin: 18px 0; border-color: #dee2e6;"),
         tags$h5(icon("table"), " Pathway list table (expand to view)", style = "margin-bottom: 8px; color: #5a6268; font-weight: 600;"),
         box(
@@ -162,7 +170,7 @@ ui_common_genes <- tabItem(
           tags$p("Open this box to view or download the pathway-gene table.", style = "margin-bottom: 10px; color: #6c757d; font-size: 12px;"),
           DT::dataTableOutput("kegg_pathway_list_table"),
           tags$div(style = "margin-top: 10px;",
-            downloadButton("download_kegg_pathway_list_csv", tagList(icon("download"), " Pathway list (CSV)"), class = "btn-warning btn-sm"))
+            downloadButton("download_kegg_pathway_list_csv", tagList(" Pathway list (CSV)"), class = "btn-warning btn-sm"))
         )
       )
     )

@@ -165,9 +165,9 @@ ui_wgcna <- tabItem(
                 plotOutput("wgcna_sample_tree", height = "420px", width = "100%")
               ),
               tags$div(style = "margin-top: 8px;",
-                downloadButton("download_wgcna_sample_tree_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-                downloadButton("download_wgcna_sample_tree_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-                downloadButton("download_wgcna_sample_tree_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
+                downloadButton("download_wgcna_sample_tree_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                downloadButton("download_wgcna_sample_tree_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                downloadButton("download_wgcna_sample_tree_pdf", tagList(" PDF"), class = "btn-success btn-sm")
               )
             ),
             column(4,
@@ -240,9 +240,9 @@ ui_wgcna <- tabItem(
           tags$hr(),
           plotOutput("soft_threshold_plot", height = "400px"),
           tags$div(style = "margin-top: 8px;",
-            downloadButton("download_soft_threshold_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_soft_threshold_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_soft_threshold_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
+            downloadButton("download_soft_threshold_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_soft_threshold_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_soft_threshold_pdf", tagList(" PDF"), class = "btn-success btn-sm")
           )
         )
       )
@@ -313,9 +313,9 @@ ui_wgcna <- tabItem(
             plotOutput("wgcna_dendrogram", height = "500px")
           ),
           tags$div(style = "margin-top: 8px;",
-            downloadButton("download_wgcna_dendrogram_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_wgcna_dendrogram_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_wgcna_dendrogram_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm")
+            downloadButton("download_wgcna_dendrogram_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_wgcna_dendrogram_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_wgcna_dendrogram_pdf", tagList(" PDF"), class = "btn-success btn-sm")
           )
         )
       )
@@ -371,11 +371,11 @@ ui_wgcna <- tabItem(
           tags$hr(),
           tags$div(
             style = "text-align: center;",
-            downloadButton("download_module_trait", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_module_trait_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_module_trait_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm", style = "margin-right: 10px;"),
+            downloadButton("download_module_trait", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_module_trait_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_module_trait_pdf", tagList(" PDF"), class = "btn-success btn-sm", style = "margin-right: 10px;"),
             downloadButton("download_all_sig_genes", 
-                          tagList(icon("download"), " Download All Significant Genes"),
+                          tagList(" Download All Significant Genes"),
                           class = "btn-warning")
           )
         )
@@ -403,9 +403,9 @@ ui_wgcna <- tabItem(
                      style = "color: #2c3e50; margin-bottom: 15px;"),
               plotOutput("me_correlation_heatmap", height = "500px"),
               tags$div(style = "margin-top: 6px;",
-                downloadButton("download_me_correlation_heatmap_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_me_correlation_heatmap_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_me_correlation_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+                downloadButton("download_me_correlation_heatmap_png", tagList(" PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_correlation_heatmap_jpg", tagList(" JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_correlation_heatmap_pdf", tagList(" PDF"), class = "btn-sm btn-success")
               )
             ),
             column(6,
@@ -413,9 +413,9 @@ ui_wgcna <- tabItem(
                      style = "color: #2c3e50; margin-bottom: 15px;"),
               plotOutput("me_dendrogram_plot", height = "500px"),
               tags$div(style = "margin-top: 6px;",
-                downloadButton("download_me_dendrogram_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_me_dendrogram_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_me_dendrogram_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+                downloadButton("download_me_dendrogram_png", tagList(" PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_dendrogram_jpg", tagList(" JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_dendrogram_pdf", tagList(" PDF"), class = "btn-sm btn-success")
               )
             )
           ),
@@ -426,9 +426,9 @@ ui_wgcna <- tabItem(
                      style = "color: #2c3e50; margin-bottom: 15px;"),
               plotOutput("me_scatter_plot", height = "400px"),
               tags$div(style = "margin-top: 6px;",
-                downloadButton("download_me_scatter_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_me_scatter_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_me_scatter_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+                downloadButton("download_me_scatter_png", tagList(" PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_scatter_jpg", tagList(" JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_me_scatter_pdf", tagList(" PDF"), class = "btn-sm btn-success")
               )
             ),
             column(6,
@@ -436,9 +436,9 @@ ui_wgcna <- tabItem(
                      style = "color: #2c3e50; margin-bottom: 15px;"),
               plotOutput("eigengene_distance_heatmap", height = "400px"),
               tags$div(style = "margin-top: 6px;",
-                downloadButton("download_eigengene_distance_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_eigengene_distance_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_eigengene_distance_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+                downloadButton("download_eigengene_distance_png", tagList(" PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_eigengene_distance_jpg", tagList(" JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_eigengene_distance_pdf", tagList(" PDF"), class = "btn-sm btn-success")
               )
             )
           )
@@ -493,9 +493,9 @@ ui_wgcna <- tabItem(
                      style = "color: #2c3e50; margin-bottom: 15px;"),
               plotOutput("module_significance_barplot", height = "400px"),
               tags$div(style = "margin-top: 6px;",
-                downloadButton("download_module_significance_barplot_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_module_significance_barplot_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_module_significance_barplot_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+                downloadButton("download_module_significance_barplot_png", tagList(" PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_module_significance_barplot_jpg", tagList(" JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_module_significance_barplot_pdf", tagList(" PDF"), class = "btn-sm btn-success")
               )
             ),
             column(6,
@@ -503,9 +503,9 @@ ui_wgcna <- tabItem(
                      style = "color: #2c3e50; margin-bottom: 15px;"),
               plotOutput("module_size_correlation_plot", height = "400px"),
               tags$div(style = "margin-top: 6px;",
-                downloadButton("download_module_size_correlation_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_module_size_correlation_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-                downloadButton("download_module_size_correlation_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success")
+                downloadButton("download_module_size_correlation_png", tagList(" PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_module_size_correlation_jpg", tagList(" JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+                downloadButton("download_module_size_correlation_pdf", tagList(" PDF"), class = "btn-sm btn-success")
               )
             )
           ),
@@ -517,17 +517,17 @@ ui_wgcna <- tabItem(
           fluidRow(
             column(4,
               downloadButton("download_sig_modules_table",
-                            tagList(icon("download"), " Download Significant Modules Table"),
+                            tagList(" Download Significant Modules Table"),
                             class = "btn-danger btn-block")
             ),
             column(4,
               downloadButton("download_sig_modules_genes",
-                            tagList(icon("download"), " Download Gene Lists per Module"),
+                            tagList(" Download Gene Lists per Module"),
                             class = "btn-warning btn-block")
             ),
             column(4,
               downloadButton("download_module_analysis_plots",
-                            tagList(icon("download"), " Download Analysis Plots (PDF)"),
+                            tagList(" Download Analysis Plots (PDF)"),
                             class = "btn-info btn-block")
             )
           )
@@ -586,9 +586,9 @@ ui_wgcna <- tabItem(
           plotOutput("gs_mm_plot", height = "460px"),
           tags$div(
             style = "margin-top: 12px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px;",
-            downloadButton("download_gs_mm_plot_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_gs_mm_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-            downloadButton("download_gs_mm_plot_pdf", tagList(icon("download"), " PDF (vector)"), class = "btn-success btn-sm"),
+            downloadButton("download_gs_mm_plot_png", tagList(" PNG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_gs_mm_plot_jpg", tagList(" JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+            downloadButton("download_gs_mm_plot_pdf", tagList(" PDF (vector)"), class = "btn-success btn-sm"),
             tags$span(style = "font-size: 12px; color: #6c757d; margin-left: 4px;", "Suitable for figures.")
           ),
           tags$hr(),
@@ -599,17 +599,17 @@ ui_wgcna <- tabItem(
           fluidRow(
             column(4,
               downloadButton("download_module_genes",
-                            tagList(icon("download"), " Download Module Genes (with GS/MM)"),
+                            tagList(" Download Module Genes (with GS/MM)"),
                             class = "btn-success btn-block")
             ),
             column(4,
               downloadButton("download_all_modules",
-                            tagList(icon("download"), " Download All Module Assignments"),
+                            tagList(" Download All Module Assignments"),
                             class = "btn-primary btn-block")
             ),
             column(4,
               downloadButton("download_module_eigengenes",
-                            tagList(icon("download"), " Download Module Eigengenes"),
+                            tagList(" Download Module Eigengenes"),
                             class = "btn-info btn-block")
             )
           )

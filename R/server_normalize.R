@@ -243,12 +243,9 @@ server_normalize <- function(input, output, session, rv) {
   }
   
   observeEvent(input$analysis_type, {
-    if (identical(input$analysis_type, "merged")) {
-      tryCatch(
-        updateCheckboxInput(session, "apply_global_quantile", value = TRUE),
-        error = function(e) NULL
-      )
-    } else if (identical(input$analysis_type, "parallel")) {
+    # Global quantile stays off for both modes; in Merged mode the cross-platform
+    # shift is removed by ComBat (Condition protected) in Step 5.
+    if (input$analysis_type %in% c("merged", "parallel")) {
       tryCatch(
         updateCheckboxInput(session, "apply_global_quantile", value = FALSE),
         error = function(e) NULL
@@ -357,7 +354,7 @@ server_normalize <- function(input, output, session, rv) {
       } else if (!is.null(input$apply_global_quantile)) {
         isTRUE(input$apply_global_quantile)
       } else {
-        TRUE
+        FALSE
       }
       rv$last_micro_norm_method <- micro_norm_method
       rv$last_rnaseq_norm_method <- rnaseq_norm_method
@@ -472,7 +469,7 @@ server_normalize <- function(input, output, session, rv) {
     tryCatch({
       rv$normalize_running <- TRUE
       de_method <- if (!is.null(input$de_method)) input$de_method else "limma"
-      apply_gq <- if (!is.null(input$apply_global_quantile)) isTRUE(input$apply_global_quantile) else TRUE
+      apply_gq <- if (!is.null(input$apply_global_quantile)) isTRUE(input$apply_global_quantile) else FALSE
       .apply_norm_pipeline_to_rv(rv, "auto", "auto", de_method, apply_global_quantile = apply_gq)
       rv$last_micro_norm_method <- "auto"
       rv$last_rnaseq_norm_method <- "auto"

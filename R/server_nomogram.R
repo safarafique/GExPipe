@@ -419,6 +419,33 @@ server_nomogram <- function(input, output, session, rv) {
         }
       }
     }, error = function(e) NULL)
+    # Composite panel score: co-expressed panels (e.g. interferon genes, |r| > 0.8)
+    # lose all but one gene to the collinearity pruning below. Collapsing them into
+    # one predictor - the mean of per-gene z-scores, each sign-aligned so higher =
+    # more disease-like - keeps every selected gene in the model. Each cohort is
+    # z-scored on its own (same rationale as the cross-cohort harmonization below).
+    panel_score_genes <- NULL
+    panel_score_signs <- NULL
+    .gexpipe_panel_score <- function(m, genes, signs) {
+      z <- vapply(genes, function(g) {
+        v <- suppressWarnings(as.numeric(m[, g]))
+        s <- stats::sd(v, na.rm = TRUE)
+        if (is.finite(s) && s > 0) (v - mean(v, na.rm = TRUE)) / s else rep(0, length(v))
+      }, numeric(nrow(m)))
+      z <- matrix(z, nrow = nrow(m))
+      as.numeric(z %*% signs[genes]) / length(genes)
+    }
+    if (identical(input$nomogram_predictor_mode, "score") && length(available_genes) >= 2) {
+      panel_score_genes <- available_genes
+      panel_score_signs <- vapply(panel_score_genes, function(g) {
+        r <- suppressWarnings(stats::cor(expr_nomogram[[g]], outcome, use = "pairwise.complete.obs"))
+        if (is.na(r) || r >= 0) 1 else -1
+      }, numeric(1))
+      expr_nomogram$Panel_score <- .gexpipe_panel_score(expr_nomogram, panel_score_genes, panel_score_signs)
+      available_genes <- "Panel_score"
+      qc_notes <- c(qc_notes, paste0("Composite panel score of ", length(panel_score_genes), " genes: ",
+                                     paste(panel_score_genes, collapse = ", ")))
+    }
     min_events <- min(sum(outcome == 1), sum(outcome == 0))
     epv <- min_events / length(available_genes)
     # If sample size or panel size forces a reduction, rank by each gene's
@@ -572,6 +599,10 @@ server_nomogram <- function(input, output, session, rv) {
       # Build external validation data.frame (strict checks, no imputation)
       ext_expr <- rv$external_validation_expr
       ext_outcome <- rv$external_validation_outcome
+      if (!is.null(panel_score_genes) && !is.null(ext_expr) && all(panel_score_genes %in% colnames(ext_expr))) {
+        ext_expr <- as.data.frame(ext_expr, check.names = FALSE)
+        ext_expr$Panel_score <- .gexpipe_panel_score(ext_expr, panel_score_genes, panel_score_signs)
+      }
       ext_problem <- NULL
       if (is.null(ext_expr) || nrow(ext_expr) == 0) {
         ext_problem <- "The external validation dataset has no samples."
@@ -1069,7 +1100,8 @@ server_nomogram <- function(input, output, session, rv) {
     compute_dca <- function(dat) {
       if (identical(dca_engine, "dcurves")) {
         tryCatch(
-          dcurves::dca(Outcome ~ Predicted_Prob, data = dat, thresholds = dca_thresholds),
+          dcurves::dca(Outcome ~ Predicted_Prob, data = dat, thresholds = dca_thresholds,
+                       label = list(Predicted_Prob = "Nomogram")),
           error = function(e) NULL)
       } else {
         NULL
@@ -1154,8 +1186,14 @@ server_nomogram <- function(input, output, session, rv) {
 
   render_dca <- function(dca_obj, model_col, title = NULL) {
     p <- plot(dca_obj, smooth = FALSE)
-    p <- p + ggplot2::scale_color_manual(values = c("grey60", model_col, "grey60")) +
-      ggplot2::theme(legend.position = c(0.99, 0.99), legend.justification = c(1, 1))
+    # Colour by name, not position: dcurves orders the curves Treat All,
+    # Treat None, model - a positional palette gave the model curve grey.
+    labs_all <- unique(as.character(dca_obj$dca$label))
+    cols <- setNames(rep(model_col, length(labs_all)), labs_all)
+    cols[labs_all == "Treat All"] <- "grey55"
+    cols[labs_all == "Treat None"] <- "black"
+    p <- suppressMessages(p + ggplot2::scale_color_manual(values = cols)) +
+      ggplot2::theme(legend.position = "bottom")
     if (!is.null(title)) {
       p <- p + ggplot2::labs(title = title) +
         ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", hjust = 0.5))
@@ -1366,7 +1404,7 @@ server_nomogram <- function(input, output, session, rv) {
       png(file, width = width * IMAGE_DPI, height = height * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
     }
     on.exit(dev.off(), add = TRUE)
-    plotfun()
+    gexp_draw_plot_result(plotfun, sub("[.][^.]+$", "", basename(file)))
   }
 
   nomo_train_col <- "#C0392B"

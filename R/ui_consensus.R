@@ -104,9 +104,9 @@ ui_consensus <- tabItem(
       plotOutput("consensus_venn_plot", height = "440px"),
       tags$div(
         style = "margin-top: 10px;",
-        downloadButton("download_consensus_venn_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_consensus_venn_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_consensus_venn_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")
+        downloadButton("download_consensus_venn_png", tagList(" PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_consensus_venn_jpg", tagList(" JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_consensus_venn_pdf", tagList(" PDF"), class = "btn-info btn-sm")
       )
     ),
     box(
@@ -115,9 +115,9 @@ ui_consensus <- tabItem(
       DTOutput("consensus_table"),
       tags$div(
         style = "margin-top: 12px;",
-        downloadButton("download_consensus_genes", tagList(icon("download"), " Consensus genes (CSV)"), class = "btn-success"),
-        downloadButton("download_consensus_rna_only", tagList(icon("download"), " RNA-only DEGs"), class = "btn-default", style = "margin-left: 8px;"),
-        downloadButton("download_consensus_micro_only", tagList(icon("download"), " Microarray-only DEGs"), class = "btn-default", style = "margin-left: 8px;")
+        downloadButton("download_consensus_genes", tagList(" Consensus genes (CSV)"), class = "btn-success"),
+        downloadButton("download_consensus_rna_only", tagList(" RNA-only DEGs"), class = "btn-default", style = "margin-left: 8px;"),
+        downloadButton("download_consensus_micro_only", tagList(" Microarray-only DEGs"), class = "btn-default", style = "margin-left: 8px;")
       )
     )
   ),
@@ -131,9 +131,9 @@ ui_consensus <- tabItem(
       plotOutput("consensus_concordance_plot", height = "480px"),
       tags$div(
         style = "margin-top: 10px;",
-        downloadButton("download_concordance_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_concordance_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_concordance_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")
+        downloadButton("download_concordance_png", tagList(" PNG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_concordance_jpg", tagList(" JPG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_concordance_pdf", tagList(" PDF"), class = "btn-info btn-sm")
       )
     ),
     box(
@@ -143,9 +143,9 @@ ui_consensus <- tabItem(
       plotOutput("consensus_heatmap_plot", height = "480px"),
       tags$div(
         style = "margin-top: 10px;",
-        downloadButton("download_consensus_heatmap_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_consensus_heatmap_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_consensus_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")
+        downloadButton("download_consensus_heatmap_png", tagList(" PNG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_consensus_heatmap_jpg", tagList(" JPG (300 DPI)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_consensus_heatmap_pdf", tagList(" PDF"), class = "btn-info btn-sm")
       )
     )
   ),

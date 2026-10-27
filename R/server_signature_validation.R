@@ -207,7 +207,7 @@ server_signature_validation <- function(input, output, session, rv) {
           gexp_ui_plot_download_bar("download_sigval_null_png", "download_sigval_null_jpg", "download_sigval_null_pdf", "btn-success btn-xs")),
         column(6, tags$h5(tags$strong("AUC by signature size (shown openly - fix N in advance)")),
           DT::dataTableOutput("sigval_sweep_table"),
-          tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_sweep", tagList(icon("download"), " Size sweep (CSV)"), class = "btn-info btn-xs")))
+          tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_sweep", tagList(" Size sweep (CSV)"), class = "btn-info btn-xs")))
       ),
       if (!is.null(sv$lodo)) tagList(
         tags$h5(tags$strong("Leave-one-dataset-out across the training datasets"),
@@ -216,12 +216,12 @@ server_signature_validation <- function(input, output, session, rv) {
           column(6, plotOutput("sigval_lodo_plot", height = "300px"),
             gexp_ui_plot_download_bar("download_sigval_lodo_png", "download_sigval_lodo_jpg", "download_sigval_lodo_pdf", "btn-success btn-xs")),
           column(6, DT::dataTableOutput("sigval_lodo_table"),
-            tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_lodo", tagList(icon("download"), " Leave-one-out (CSV)"), class = "btn-info btn-xs")))
+            tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_lodo", tagList(" Leave-one-out (CSV)"), class = "btn-info btn-xs")))
         )
       ),
       tags$h5(tags$strong("Per-gene replication")),
       DT::dataTableOutput("sigval_pergene_table"),
-      tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_pergene", tagList(icon("download"), " Per-gene table (CSV)"), class = "btn-info btn-xs"))
+      tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_pergene", tagList(" Per-gene table (CSV)"), class = "btn-info btn-xs"))
     )
   })
 
@@ -232,7 +232,7 @@ server_signature_validation <- function(input, output, session, rv) {
       tags$h5(icon("clipboard-list"), tags$strong(" Validation attempts log"),
               tags$small(" - every run is recorded; report all of them", style = "color:#6c757d;")),
       DT::dataTableOutput("sigval_history_table"),
-      tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_history", tagList(icon("download"), " Attempts log (CSV)"), class = "btn-info btn-xs"))
+      tags$div(style = "margin-top: 6px;", downloadButton("download_sigval_history", tagList(" Attempts log (CSV)"), class = "btn-info btn-xs"))
     )
   })
 }

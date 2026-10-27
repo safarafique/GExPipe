@@ -74,7 +74,7 @@ gexp_app_analysis_dashboard_ui <- function() {
         shiny::textInput("workspace_save_filename", NULL, placeholder = "e.g. my_analysis", value = "my_analysis", width = "100%"),
         shiny::tags$div(
           shiny::actionButton("save_workspace_to_folder", shiny::tagList(shiny::icon("save"), " Save to folder"), class = "btn-success btn-block", style = "font-size: 13px; margin-top: 8px; margin-bottom: 6px;"),
-          shiny::downloadButton("download_workspace", shiny::tagList(shiny::icon("download"), " Save workspace (download)"), class = "btn-info btn-block", style = "font-size: 12px; margin-bottom: 10px;")
+          shiny::downloadButton("download_workspace", shiny::tagList(" Save workspace (download)"), class = "btn-info btn-block", style = "font-size: 12px; margin-bottom: 10px;")
         ),
         shiny::tags$p(shiny::tags$strong("Save to folder:"), " Saves to 'saved_workspaces' in the app directory. Use this if the download button does nothing.", class = "gexp-sidebar-help"),
         shiny::tags$p(shiny::tags$strong("Save (download):"), " Same save + browser may download a copy.", class = "gexp-sidebar-help"),

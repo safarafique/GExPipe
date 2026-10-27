@@ -29,6 +29,37 @@ gexp_get_saved_workspaces_dir <- function() {
   TRUE
 }
 
+#' Settings inputs worth saving with a workspace (analysis type, DE method,
+#' cut-offs, selected methods, ...). Buttons, uploads, table internals and
+#' layout state are excluded so restoring can never trigger a step.
+#' @noRd
+.gexp_workspace_inputs <- function(input) {
+  vals <- tryCatch(shiny::isolate(shiny::reactiveValuesToList(input)), error = function(e) list())
+  skip <- paste0("(^\\.|_rows_|_cell_|_cells_|_columns_|_search|_state$|_rows$|^sidebar|^upload_|^load_from|_btn$|",
+                 "^shinyjs|^gexp_keepalive|_file$|^(run|apply|start|go|save|download|load|reset|clear|stop|confirm|cancel)_)")
+  keep <- list()
+  for (nm in names(vals)) {
+    v <- vals[[nm]]
+    if (grepl(skip, nm) || is.null(v) || inherits(v, "shinyActionButtonValue")) next
+    if (!is.atomic(v) || is.data.frame(v) || length(v) == 0L || length(v) > 100L) next
+    keep[[nm]] <- v
+  }
+  keep
+}
+
+#' Put saved settings back into the UI (inputs that exist now; others are
+#' applied when their tab renders, since Shiny keeps the message queue).
+#' @noRd
+.gexp_restore_workspace_inputs <- function(saved, session) {
+  if (!is.list(saved) || !length(saved)) return(0L)
+  n <- 0L
+  for (nm in names(saved)) {
+    ok <- tryCatch({ session$sendInputMessage(nm, list(value = saved[[nm]])); TRUE }, error = function(e) FALSE)
+    if (ok) n <- n + 1L
+  }
+  n
+}
+
 gexp_make_workspace_state <- function(input, rv) {
   current_step <- input$sidebar_menu
   if (is.null(current_step) || !nzchar(current_step)) current_step <- "download"
@@ -47,6 +78,7 @@ gexp_make_workspace_state <- function(input, rv) {
         state[[nm]] <- val
       }
       if (!"saved_step" %in% names(state)) state$saved_step <- current_step
+      state$saved_inputs <- .gexp_workspace_inputs(input)
       state
     },
     error = function(e) {
@@ -62,7 +94,8 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
   }
   step <- state$saved_step
   if (!is.character(step) || !nzchar(step)) step <- "download"
-  for (nm in setdiff(names(state), "saved_step")) {
+  saved_inputs <- state$saved_inputs
+  for (nm in setdiff(names(state), c("saved_step", "saved_inputs"))) {
     tryCatch(
       {
         rv[[nm]] <- state[[nm]]
@@ -120,6 +153,32 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
   if (isTRUE(rv$nomogram_complete) || (!is.null(rv$nomogram_model) && inherits(rv$nomogram_model, "rms"))) {
     rv$nomogram_complete <- TRUE
   }
+  # A file saved while a step was running must not leave that step "busy".
+  for (nm in grep("_running$", names(state), value = TRUE)) {
+    tryCatch(rv[[nm]] <- FALSE, error = function(e) NULL)
+  }
+
+  # Settings the next steps read from the UI (analysis type, DE method, ...).
+  # Older workspaces have no saved_inputs: rebuild the key ones from rv.
+  if (!is.list(saved_inputs)) saved_inputs <- list()
+  if (is.null(saved_inputs$analysis_type) && !is.null(rv$analysis_type)) {
+    saved_inputs$analysis_type <- if (isTRUE(rv$merge_after_de)) "parallel" else rv$analysis_type
+  }
+  if (!is.null(rv$de_method) && nzchar(rv$de_method)) {
+    if (is.null(saved_inputs$de_method)) saved_inputs$de_method <- rv$de_method
+    if (is.null(saved_inputs$de_method_rna) && identical(saved_inputs$analysis_type, "parallel")) {
+      saved_inputs$de_method_rna <- rv$de_method
+    }
+  }
+  # Per-platform DE cut-offs (Parallel mode) are also kept in rv.
+  cut_map <- c(logfc_cutoff_rna = "de_logfc_rna", padj_cutoff_rna = "de_padj_rna", top_genes_rna = "de_top_rna",
+               logfc_cutoff_micro = "de_logfc_micro", padj_cutoff_micro = "de_padj_micro", top_genes_micro = "de_top_micro")
+  for (inp in names(cut_map)) {
+    v <- tryCatch(shiny::isolate(rv[[cut_map[[inp]]]]), error = function(e) NULL)
+    if (is.null(saved_inputs[[inp]]) && length(v) == 1L && !is.na(suppressWarnings(as.numeric(v)))) saved_inputs[[inp]] <- v
+  }
+  .gexp_restore_workspace_inputs(saved_inputs, session)
+
   valid_tabs <- c(
     "download", "qc", "normalize", "groups", "batch", "results", "consensus", "wgcna",
     "common_genes", "ppi", "ml", "validation", "roc", "nomogram", "gsea",
@@ -137,7 +196,7 @@ gexp_restore_workspace_from_state <- function(state, session, rv) {
 gexp_register_workspace_observers <- function(input, output, session, rv) {
   # nocov start
   workspace_download_handler <- function() {
-    shiny::downloadHandler(
+    downloadHandler(
       filename = function() {
         tryCatch(
           {

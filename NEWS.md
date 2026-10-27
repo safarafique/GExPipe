@@ -1,3 +1,70 @@
+# GExPipe 0.99.117
+
+Exports and batch correction:
+
+- Fix: blank exported figures (QC_Boxplot_*.jpg/png, Nomogram_DCA_*.jpg). Plot functions that
+  return a ggplot were called inside the file device without being printed. All plot-export
+  helpers (QC, nomogram, ML) now draw ggplot/grid results; if a plot fails, the image shows the
+  error and the app shows a warning instead of saving a silent blank file.
+- Fix: DEGs_RNA_only.csv / DEGs_Microarray_only.csv were copies of the full significant lists.
+  They now contain only platform-specific DEGs (significant on that platform, not in the
+  consensus) with a Reason column (not measured / not significant / opposite direction on the
+  other platform).
+- The consensus export records Combine_Mode, Same_Direction_Required and the cut-offs used; a
+  Union (exploratory) export is named Consensus_DEGs_RNAseq_Microarray_UNION.csv.
+- Fix: batch correction could be skipped as "single dataset" while several datasets were loaded
+  (merged run: after-batch file identical to before-batch, 4 datasets). The decision now uses the
+  datasets actually present among the samples. Any skip, or a correction that leaves a platform
+  unchanged, shows a warning, and the exported after-batch file is named ..._NOT_CORRECTED_....
+- check-gexpipe-run.R reports NOT_CORRECTED and UNION exports.
+
+Figure downloads (every figure can be saved as PNG, JPG and PDF):
+
+- Fix: some figure downloads saved an "HTML Document" instead of an image (e.g. normalization
+  density plots). Every download in the app now goes through one handler that always writes a
+  file of the requested type; when a step has not been run yet, or the plot fails, the file shows
+  the reason and the app shows a warning.
+- Fix: graphics devices left open by a failed download are closed, so later downloads are not
+  written to the wrong device.
+- Fix: UpSet plots (gene overlap, QC, ML methods) were saved blank; they are now drawn into the
+  file. The ML-methods UpSet (6+ methods, or a method with no genes) also showed only an error
+  on screen when no gene was selected by every method; it now draws normally.
+- Fix: heatmaps failed to export when the groups were renamed (e.g. "CP"/"BC" instead of
+  Normal/Disease); annotation colours now follow the actual group names.
+- Fix: the KEGG chord diagram "no data" download wrote a PNG regardless of the format chosen.
+- Download buttons showed the download icon twice; they now show it once.
+- Added the missing PNG option to the ROC figures (AUC, curves, box plots, combined panel,
+  validation box plots, comparison, external curves), the QC PCA / connectivity plots, the
+  validation volcano and the GSEA plots, and PNG/JPG/PDF downloads for the single-dataset PCA
+  plots on the batch-correction page.
+
+Results Summary:
+
+- Fix: the Step 6 (DE) card always said "limma" and, in Parallel mode, showed the consensus
+  table as if it were one DE run. It now shows the method actually used. In Parallel mode it
+  lists RNA-seq and microarray separately (method, significant DEGs, up, down, cut-offs), then
+  the consensus genes (up/down, combine rule), the genes significant on both platforms but in
+  opposite directions, and how many DEGs of each platform are not in the consensus. The
+  narrative paragraph is corrected the same way.
+
+Workspaces:
+
+- Fix: "Maximum upload size exceeded" for small saved workspaces (20-70 MB). When the app was
+  started from inst/shinyapp (RStudio "Run App", shiny::runApp(), shiny::runGitHub()) the 2 GB
+  limit set in onStart was never applied and Shiny's 5 MB default was used. The limit is now also
+  set at the start of every session, so it applies however the app is launched.
+- Fix: loading a saved workspace now also restores the analysis settings shown on screen
+  (analysis type, DE method, per-platform cut-offs, ...). Before, these went back to their
+  defaults and the analysis continued with e.g. DESeq2 instead of the saved limma. New saves store
+  the settings; older workspaces rebuild the key ones from the saved state. Buttons and uploads
+  are never stored, so loading cannot start a step by itself.
+- Fix: a workspace saved while a step was running no longer leaves that step "busy" after loading.
+- Fix: Parallel DE failed with "subscript out of bounds" when a per-platform cut-off input was not
+  yet available (e.g. right after loading a workspace); the default cut-off is now used.
+- Tested end to end with real saved workspaces (26-362 MB, RNA-seq / microarray / Parallel):
+  all objects restored identically, DE re-run from the restored data reproduces the saved DEG
+  counts exactly, and Consensus continues from there.
+
 # GExPipe 0.99.116
 
 - Saved workspaces (.rds) up to 2 GB can be uploaded (was 500 MB). Change with

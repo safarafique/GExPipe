@@ -101,9 +101,9 @@ ui_ml <- tabItem(
         uiOutput("ml_final_list_ui"),
         DT::dataTableOutput("ml_final_list_table"),
         tags$div(style = "margin-top: 8px;",
-                 downloadButton("download_ml_final_list", tagList(icon("download"), " Final List (CSV)"), class = "btn-success btn-sm"),
+                 downloadButton("download_ml_final_list", tagList(" Final List (CSV)"), class = "btn-success btn-sm"),
                  tags$span(style = "margin-left: 8px;"),
-                 downloadButton("download_ml_combined_list", tagList(icon("download"), " Combined List (CSV)"), class = "btn-info btn-sm"))
+                 downloadButton("download_ml_combined_list", tagList(" Combined List (CSV)"), class = "btn-info btn-sm"))
       )
     )
   ),
@@ -154,7 +154,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("chart-line"), " LASSO (gene list)"),
         width = NULL, status = "danger", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_lasso_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_lasso", tagList(icon("download"), " LASSO (CSV)"), class = "btn-success btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_lasso", tagList(" LASSO (CSV)"), class = "btn-success btn-sm"))
       )
     ),
     column(6,
@@ -162,7 +162,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("chart-area"), " Elastic Net (gene list)"),
         width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_elastic_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_elastic", tagList(icon("download"), " Elastic Net (CSV)"), class = "btn-info btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_elastic", tagList(" Elastic Net (CSV)"), class = "btn-info btn-sm"))
       )
     )
   ),
@@ -172,7 +172,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("chart-bar"), " Ridge (gene list)"),
         width = NULL, status = "primary", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_ridge_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_ridge", tagList(icon("download"), " Ridge (CSV)"), class = "btn-primary btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_ridge", tagList(" Ridge (CSV)"), class = "btn-primary btn-sm"))
       )
     ),
     column(6,
@@ -180,7 +180,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("tree"), " Random Forest (gene list)"),
         width = NULL, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_rf_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_rf", tagList(icon("download"), " RF (CSV)"), class = "btn-success btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_rf", tagList(" RF (CSV)"), class = "btn-success btn-sm"))
       )
     )
   ),
@@ -190,7 +190,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("sort-amount-down"), " SVM-RFE (gene list)"),
         width = NULL, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_svm_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_svm", tagList(icon("download"), " SVM-RFE (CSV)"), class = "btn-warning btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_svm", tagList(" SVM-RFE (CSV)"), class = "btn-warning btn-sm"))
       )
     ),
     column(6,
@@ -198,7 +198,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("fire"), " Boruta (gene list)"),
         width = NULL, status = "danger", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_boruta_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_boruta", tagList(icon("download"), " Boruta (CSV)"), class = "btn-danger btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_boruta", tagList(" Boruta (CSV)"), class = "btn-danger btn-sm"))
       )
     )
   ),
@@ -208,7 +208,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("chart-pie"), " sPLS-DA (gene list)"),
         width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_splsda_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_splsda", tagList(icon("download"), " sPLS-DA (CSV)"), class = "btn-info btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_splsda", tagList(" sPLS-DA (CSV)"), class = "btn-info btn-sm"))
       )
     ),
     column(6,
@@ -216,7 +216,7 @@ ui_ml <- tabItem(
         title = tags$span(icon("bolt"), " XGBoost+SHAP (gene list)"),
         width = NULL, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         DT::dataTableOutput("ml_xgboost_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_xgboost", tagList(icon("download"), " XGBoost+SHAP (CSV)"), class = "btn-success btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_xgboost", tagList(" XGBoost+SHAP (CSV)"), class = "btn-success btn-sm"))
       )
     )
   ),
@@ -227,7 +227,7 @@ ui_ml <- tabItem(
         width = NULL, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
         uiOutput("ml_common_genes_ui"),
         DT::dataTableOutput("ml_common_genes_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_common_genes", tagList(icon("download"), " Common Genes (CSV)"), class = "btn-info btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_ml_common_genes", tagList(" Common Genes (CSV)"), class = "btn-info btn-sm"))
       )
     )
   ),

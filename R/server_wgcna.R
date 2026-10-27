@@ -358,10 +358,10 @@ server_wgcna <- function(input, output, session, rv) {
       tags$div(
         style = "margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;",
         downloadButton("download_wgcna_gene_list",
-                       tagList(icon("download"), " Gene list (Rank & Variance)"),
+                       tagList(" Gene list (Rank & Variance)"),
                        class = "btn-sm btn-info"),
         downloadButton("download_wgcna_scaled_expr",
-                       tagList(icon("download"), " Scaled expression (z-score)"),
+                       tagList(" Scaled expression (z-score)"),
                        class = "btn-sm btn-success")
       )
     )
@@ -572,10 +572,13 @@ server_wgcna <- function(input, output, session, rv) {
       node
     }
     d <- dendrapply(d, set_leaf_par)
+    # Beyond ~80 samples the leaf IDs overprint into a solid block - hide them.
+    show_leaves <- n_samp <= 80
     op <- par(mar = c(6, 4.5, 5, 1.5), bg = "white", fg = "#2c3e50", xpd = NA,
-              plt = c(0.14, 0.98, 0.22, 0.88))
+              plt = c(0.14, 0.98, if (show_leaves) 0.22 else 0.08, 0.82))
     on.exit(par(op), add = TRUE)
-    plot(d, main = "", xlab = "", ylab = "Height", sub = "", leaflab = "perpendicular", axes = FALSE)
+    plot(d, main = "", xlab = "", ylab = "Height", sub = "",
+         leaflab = if (show_leaves) "perpendicular" else "none", axes = FALSE)
     title(main = "Sample clustering (outlier check)", line = 2.8, col.main = "#1a252f", font.main = 2, cex.main = 1.2)
     mtext(side = 3, text = sprintf("%s samples x %s genes", format(n_samp, big.mark = ","), format(n_genes, big.mark = ",")), line = 1.4, cex = 0.9, col = "#5d6d7e")
     h_max <- max(ht$height)
@@ -1794,9 +1797,17 @@ server_wgcna <- function(input, output, session, rv) {
     req(rv$moduleColors)
     
     unique_modules <- sort(unique(rv$moduleColors))
+    # Default to the key (most trait-correlated) module so the GS-vs-MM plot
+    # and gene table open on it, not on the alphabetically first module.
+    selected <- unique_modules[1]
+    sig <- rv$significant_modules
+    if (is.data.frame(sig) && nrow(sig) > 0) {
+      key <- sub("^ME", "", as.character(sig$Module[which.max(abs(sig$Correlation))]))
+      if (key %in% unique_modules) selected <- key
+    }
     updateSelectInput(session, "select_module",
                      choices = unique_modules,
-                     selected = unique_modules[1])
+                     selected = selected)
   })
   
   output$module_gene_stats <- renderUI({
@@ -1877,7 +1888,8 @@ server_wgcna <- function(input, output, session, rv) {
         labels = c("FALSE" = "No", "TRUE" = "Yes")
       ) +
       ggplot2::labs(
-        title = paste0("Gene significance vs. module membership - ", module_color, " (trait: ", trait_col, ")"),
+        # two-line title: the one-line version was clipped at the right edge
+        title = paste0("GS vs. MM - ", module_color, " module\n(trait: ", trait_col, ")"),
         x = "Module membership (MM)",
         y = "Gene significance (GS)"
       ) +
@@ -1955,8 +1967,8 @@ server_wgcna <- function(input, output, session, rv) {
       style = "margin-top: 10px;",
       tags$p(tags$strong("GS vs MM for all signed modules (one plot per module):"), style = "margin-bottom: 8px;"),
       tags$div(
-        downloadButton("download_gs_mm_all_modules_pdf", tagList(icon("download"), " Download all as PDF"), class = "btn-info btn-sm", style = "margin-right: 8px;"),
-        downloadButton("download_gs_mm_all_modules_zip", tagList(icon("download"), " Download as ZIP (PNG per module)"), class = "btn-info btn-sm")
+        downloadButton("download_gs_mm_all_modules_pdf", tagList(" Download all as PDF"), class = "btn-info btn-sm", style = "margin-right: 8px;"),
+        downloadButton("download_gs_mm_all_modules_zip", tagList(" Download as ZIP (PNG per module)"), class = "btn-info btn-sm")
       )
     )
   })

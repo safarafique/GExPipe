@@ -1273,7 +1273,7 @@ server_ppi <- function(input, output, session, rv) {
     tags$span(
       style = "margin-left: 10px;",
       downloadButton("download_ppi_extracted_expr",
-                     tagList(icon("download"), " Expression data (interacting genes, ", n_found, " genes x samples)"),
+                     tagList(" Expression data (interacting genes, ", n_found, " genes x samples)"),
                      class = "btn-info")
     )
   })
@@ -1429,7 +1429,7 @@ server_ppi <- function(input, output, session, rv) {
   output$ppi_download_extracted_ml_ui <- renderUI({
     if (is.null(rv$extracted_data_ml)) return(NULL)
     downloadButton("download_extracted_ml_csv",
-                   tagList(icon("download"), " Download Extracted Data (CSV)"),
+                   tagList(" Download Extracted Data (CSV)"),
                    class = "btn-info")
   })
 

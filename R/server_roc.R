@@ -206,6 +206,23 @@ server_roc <- function(input, output, session, rv) {
     }
   )
 
+  output$download_roc_auc_plot_png <- downloadHandler(
+    filename = function() "ROC_AUC_barplot.png",
+    content = function(file) {
+      df <- roc_auc_plot_data()
+      if (is.null(df)) return()
+      cols <- RColorBrewer::brewer.pal(max(3, min(8, nrow(df))), "Set2")
+      cols <- rep(cols, length.out = nrow(df))
+      png(file, width = 7 * IMAGE_DPI, height = 5 * IMAGE_DPI, res = IMAGE_DPI, bg = "white")
+      op <- par(mar = c(5, 7, 3, 1), cex.main = 1, cex.lab = 0.95, cex.axis = 0.9)
+      on.exit(par(op), add = TRUE)
+      barplot(df$AUC, names.arg = df$Gene, horiz = TRUE, las = 1, col = rev(cols),
+              xlim = c(0, 1), main = "Top AUC biomarkers", xlab = "AUC (>= 0.8)")
+      abline(v = 0.8, col = "red", lty = 2)
+      dev.off()
+    }
+  )
+
   output$download_roc_auc_plot_pdf <- downloadHandler(
     filename = function() "ROC_AUC_barplot.pdf",
     content = function(file) {
@@ -315,11 +332,12 @@ server_roc <- function(input, output, session, rv) {
 
     cols <- c("Combined panel" = "#E74C3C", "Best single gene" = "#3498DB")
     pROC::plot.roc(combined_roc, col = cols["Combined panel"], lwd = 2.5,
-                   main = "Multi-variable ROC (Combined Biomarker Panel)", legacy.axes = TRUE)
+                   main = "Multi-variable ROC (Combined Biomarker Panel)", legacy.axes = TRUE, asp = NA)
     if (!is.null(best_roc)) {
       pROC::lines.roc(best_roc, col = cols["Best single gene"], lwd = 2, lty = 2)
     }
-    abline(0, 1, lty = 2, col = "grey60")
+    # (no abline: pROC already draws the chance diagonal, and on its reversed
+    # specificity axis abline(0, 1) drew a second, wrong diagonal)
 
     legend("bottomright",
            legend = c(
@@ -373,6 +391,16 @@ server_roc <- function(input, output, session, rv) {
       dev.off()
     }
   )
+  output$download_roc_combined_panel_plot_png <- downloadHandler(
+    filename = function() "ROC_Combined_Panel.png",
+    content = function(file) {
+      res <- roc_combined_panel()
+      if (is.null(res)) return()
+      png(file, width = 7 * IMAGE_DPI, height = 5 * IMAGE_DPI, res = IMAGE_DPI, bg = "#FAFAFA")
+      roc_combined_panel_plot_to_dev()
+      dev.off()
+    }
+  )
   output$download_roc_combined_panel_plot_pdf <- downloadHandler(
     filename = function() "ROC_Combined_Panel.pdf",
     content = function(file) {
@@ -393,9 +421,10 @@ server_roc <- function(input, output, session, rv) {
     op <- par(mar = c(4, 4, 3, 2), bg = "#FAFAFA")
     on.exit(par(op), add = TRUE)
     pROC::plot.roc(combined_roc, col = cols["Combined panel"], lwd = 2.5,
-                   main = "Multi-variable ROC (Combined Biomarker Panel)", legacy.axes = TRUE)
+                   main = "Multi-variable ROC (Combined Biomarker Panel)", legacy.axes = TRUE, asp = NA)
     if (!is.null(best_roc)) pROC::lines.roc(best_roc, col = cols["Best single gene"], lwd = 2, lty = 2)
-    abline(0, 1, lty = 2, col = "grey60")
+    # (no abline: pROC already draws the chance diagonal, and on its reversed
+    # specificity axis abline(0, 1) drew a second, wrong diagonal)
     legend("bottomright",
            legend = c(
              paste0("Combined panel (AUC=", round(res$auc, 3), ")"),
@@ -436,7 +465,7 @@ server_roc <- function(input, output, session, rv) {
     op <- par(mar = c(4, 4, 3, 2), bg = "#FAFAFA")
     on.exit(par(op), add = TRUE)
     tryCatch({
-      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2)
+      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2, asp = NA)
       for (i in seq_along(curves_plot)[-1]) {
         pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
       }
@@ -472,7 +501,27 @@ server_roc <- function(input, output, session, rv) {
       jpeg(file, width = 8, height = 6.67, res = IMAGE_DPI, units = "in", bg = "#FAFAFA", quality = 95)
       op <- par(mar = c(4, 4, 3, 2))
       on.exit(par(op), add = TRUE)
-      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2)
+      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2, asp = NA)
+      for (i in seq_along(curves_plot)[-1]) pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
+      auc_vals <- vapply(curves_plot, function(r) as.numeric(pROC::auc(r)), numeric(1))
+      legend("bottomright", legend = paste0(names(curves_plot), " (AUC=", round(auc_vals, 3), ")"),
+             col = cols[seq_along(curves_plot)], lwd = 2, cex = 0.9, bty = "n")
+      dev.off()
+    }
+  )
+
+  output$download_roc_plot_png <- downloadHandler(
+    filename = function() "ROC_curves_common_genes.png",
+    content = function(file) {
+      dat <- roc_curves_plot_data()
+      if (is.null(dat)) return()
+      curves_plot <- dat$curves_plot
+      cols <- c("#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#00ACC1", "#7B1FA2", "#C62828", "#2E7D32", "#EF6C00")
+      cols <- rep(cols, length.out = length(curves_plot))
+      png(file, width = 8 * IMAGE_DPI, height = 6.67 * IMAGE_DPI, res = IMAGE_DPI, bg = "#FAFAFA")
+      op <- par(mar = c(4, 4, 3, 2))
+      on.exit(par(op), add = TRUE)
+      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2, asp = NA)
       for (i in seq_along(curves_plot)[-1]) pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
       auc_vals <- vapply(curves_plot, function(r) as.numeric(pROC::auc(r)), numeric(1))
       legend("bottomright", legend = paste0(names(curves_plot), " (AUC=", round(auc_vals, 3), ")"),
@@ -492,7 +541,7 @@ server_roc <- function(input, output, session, rv) {
       pdf(file, width = 8, height = 6.67, bg = "#FAFAFA")
       op <- par(mar = c(4, 4, 3, 2))
       on.exit(par(op), add = TRUE)
-      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2)
+      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2, main = "ROC Curves (Common ML Genes)", cex.main = 1.2, asp = NA)
       for (i in seq_along(curves_plot)[-1]) pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
       auc_vals <- vapply(curves_plot, function(r) as.numeric(pROC::auc(r)), numeric(1))
       legend("bottomright", legend = paste0(names(curves_plot), " (AUC=", round(auc_vals, 3), ")"),
@@ -565,6 +614,16 @@ server_roc <- function(input, output, session, rv) {
     }
   )
 
+  output$download_roc_boxplots_png <- downloadHandler(
+    filename = function() "ROC_gene_expression_boxplots.png",
+    content = function(file) {
+      p <- roc_boxplot_plot_fn()
+      if (is.null(p)) return()
+      d <- roc_boxplot_dims(roc_boxplot_data())
+      ggplot2::ggsave(file, plot = p, width = d$width, height = d$height, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+
   output$download_roc_boxplots_pdf <- downloadHandler(
     filename = function() "ROC_gene_expression_boxplots.pdf",
     content = function(file) {
@@ -586,13 +645,18 @@ server_roc <- function(input, output, session, rv) {
     if (length(common_genes) == 0 || nrow(ext_expr) < 3) return(NULL)
     if (length(unique(ext_outcome)) < 2) return(NULL)
 
+    # Validate only the biomarkers that passed the training AUC bar, so the
+    # validation ROC, the Training-vs-Validation comparison and every
+    # training-side panel report the same gene set (a gene removed in training,
+    # e.g. AUC < AUC_MIN, must not reappear on the validation side).
+    roc_int <- roc_results()
+    if (!is.null(roc_int) && nrow(roc_int$df) > 0) common_genes <- intersect(common_genes, roc_int$df$Gene)
     available_genes <- intersect(common_genes, colnames(ext_expr))
     if (length(available_genes) == 0) return(NULL)
 
     # Score every gene with the direction learned on the TRAINING data. pROC's default
     # (direction = "auto") would re-pick the favourable direction in the validation set, so a gene
     # that is UP in training but DOWN in validation would still show a high validation AUC.
-    roc_int <- roc_results()
     dir_train <- if (!is.null(roc_int) && !is.null(roc_int$df_all$DirectionCode)) {
       setNames(roc_int$df_all$DirectionCode, roc_int$df_all$Gene)
     } else NULL
@@ -619,13 +683,8 @@ server_roc <- function(input, output, session, rv) {
     curves <- setNames(lapply(res, function(x) x$roc), vapply(res, function(x) x$Gene, character(1)))
     curves <- curves[names(curves) %in% df$Gene]
 
-    # Use df_all (every gene's training AUC), not df (pre-filtered to
-    # AUC >= AUC_MIN for the main biomarker table) - this comparison is
-    # meant to show Training vs Validation for every gene that has BOTH,
-    # so a gene whose training AUC merely fell below the curation bar
-    # must not show a blank Training cell while still appearing on the
-    # Validation side. That asymmetry made it look like the gene was
-    # never tested in training at all, when it actually was.
+    # Merge training AUCs (from df_all; the gene set is already restricted to
+    # training-passing genes above, so every row has both values).
     if (!is.null(roc_int) && nrow(roc_int$df_all) > 0) {
       df <- merge(df, roc_int$df_all[, c("Gene", "AUC", "AUC_Lower_95CI", "AUC_Upper_95CI", "Direction"), drop = FALSE], by = "Gene", all.x = TRUE)
       names(df)[names(df) == "AUC"] <- "AUC_Internal"
@@ -658,13 +717,14 @@ server_roc <- function(input, output, session, rv) {
                  tags$p(tags$strong(icon("table"), " Gene | AUC Training | AUC Validation | Delta"), style = "margin-bottom: 6px;"),
                  DT::dataTableOutput("roc_ext_auc_comparison_table"),
                  tags$div(style = "margin-top: 8px;",
-                   downloadButton("download_roc_ext_auc", tagList(icon("download"), " Comparison (CSV)"), class = "btn-success btn-sm"))),
+                   downloadButton("download_roc_ext_auc", tagList(" Comparison (CSV)"), class = "btn-success btn-sm"))),
           column(6,
                  tags$p(tags$strong(icon("chart-bar"), " Bar chart: Training vs Validation"), style = "margin-bottom: 6px;"),
                  plotOutput("roc_comparison_auc_plot", height = "380px"),
                  tags$div(style = "margin-top: 8px;",
-                   downloadButton("download_roc_comparison_plot_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-                   downloadButton("download_roc_comparison_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))))
+                   downloadButton("download_roc_comparison_plot_png", tagList(" PNG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                   downloadButton("download_roc_comparison_plot_jpg", tagList(" JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                   downloadButton("download_roc_comparison_plot_pdf", tagList(" PDF"), class = "btn-success btn-sm"))))
       )
     )
   })
@@ -705,8 +765,9 @@ server_roc <- function(input, output, session, rv) {
               tags$p(tags$strong(icon("chart-area"), " Validation ROC Curves"), style = "margin-bottom: 6px; margin-top: 20px;"),
               plotOutput("roc_ext_curves_plot", height = "450px"),
               tags$div(style = "margin-top: 8px;",
-                downloadButton("download_roc_ext_curves_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-                downloadButton("download_roc_ext_curves_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))
+                downloadButton("download_roc_ext_curves_png", tagList(" PNG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                downloadButton("download_roc_ext_curves_jpg", tagList(" JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+                downloadButton("download_roc_ext_curves_pdf", tagList(" PDF"), class = "btn-success btn-sm"))
             )
           )
         )
@@ -757,7 +818,7 @@ server_roc <- function(input, output, session, rv) {
     op <- par(mar = c(4, 4, 3, 2), bg = "#FAFAFA")
     on.exit(par(op), add = TRUE)
     pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2,
-                   main = "Validation ROC Curves", cex.main = 1.2)
+                   main = "Validation ROC Curves", cex.main = 1.2, asp = NA)
     for (i in seq_along(curves_plot)[-1]) {
       pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
     }
@@ -820,6 +881,15 @@ server_roc <- function(input, output, session, rv) {
     }
     p
   }, height = 380, res = 96)
+
+  output$download_roc_comparison_plot_png <- downloadHandler(
+    filename = function() "AUC_Training_vs_Validation.png",
+    content = function(file) {
+      p <- roc_comparison_plot_fn()
+      if (is.null(p)) return()
+      ggplot2::ggsave(file, plot = p, width = 8, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
 
   output$download_roc_comparison_plot_jpg <- downloadHandler(
     filename = function() "AUC_Training_vs_Validation.jpg",
@@ -887,6 +957,16 @@ server_roc <- function(input, output, session, rv) {
     }
   )
 
+  output$download_roc_val_boxplots_png <- downloadHandler(
+    filename = function() "Validation_Gene_Expression_Boxplots.png",
+    content = function(file) {
+      p <- roc_validation_boxplot_fn()
+      if (is.null(p)) return()
+      d <- roc_boxplot_dims(roc_validation_boxplot_data())
+      ggplot2::ggsave(file, plot = p, width = d$width, height = d$height, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
+
   output$download_roc_val_boxplots_pdf <- downloadHandler(
     filename = function() "Validation_Gene_Expression_Boxplots.pdf",
     content = function(file) {
@@ -908,12 +988,44 @@ server_roc <- function(input, output, session, rv) {
       width = 6, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       plotOutput("roc_validation_boxplots_plot", height = "420px"),
       tags$div(style = "margin-top: 10px;",
-        downloadButton("download_roc_val_boxplots_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_roc_val_boxplots_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))
+        downloadButton("download_roc_val_boxplots_png", tagList(" PNG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_roc_val_boxplots_jpg", tagList(" JPG (300 DPI)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_roc_val_boxplots_pdf", tagList(" PDF"), class = "btn-success btn-sm"))
     )
   })
 
   # ---- Download handlers for validation ROC curves ----
+  output$download_roc_ext_curves_png <- downloadHandler(
+    filename = function() "Validation_ROC_Curves.png",
+    content = function(file) {
+      ext <- roc_external_results()
+      if (is.null(ext) || length(ext$curves) == 0) return()
+      curves <- ext$curves[!vapply(ext$curves, is.null, logical(1))]
+      if (length(curves) == 0) return()
+      n_plot <- min(10, length(curves))
+      top_genes <- ext$df$Gene[seq_len(n_plot)]
+      curves_plot <- curves[intersect(top_genes, names(curves))]
+      curves_plot <- curves_plot[!vapply(curves_plot, is.null, logical(1))]
+      if (length(curves_plot) == 0) return()
+      cols <- c("#27AE60", "#1ABC9C", "#2ECC71", "#16A085", "#009688",
+                "#00BCD4", "#26A69A", "#66BB6A", "#81C784", "#A5D6A7")
+      cols <- rep(cols, length.out = length(curves_plot))
+      png(file, width = 8 * IMAGE_DPI, height = 6 * IMAGE_DPI, res = IMAGE_DPI, bg = "#FAFAFA")
+      op <- par(mar = c(4, 4, 3, 2))
+      on.exit(par(op), add = TRUE)
+      pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2,
+                     main = "Validation ROC Curves", cex.main = 1.2, asp = NA)
+      for (i in seq_along(curves_plot)[-1]) {
+        pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
+      }
+      auc_vals <- vapply(curves_plot, function(r) as.numeric(pROC::auc(r)), numeric(1))
+      legend("bottomright",
+             legend = paste0(names(curves_plot), " (AUC=", round(auc_vals, 3), ")"),
+             col = cols[seq_along(curves_plot)], lwd = 2, cex = 0.85, bty = "n")
+      dev.off()
+    }
+  )
+
   output$download_roc_ext_curves_jpg <- downloadHandler(
     filename = function() "Validation_ROC_Curves.jpg",
     content = function(file) {
@@ -933,7 +1045,7 @@ server_roc <- function(input, output, session, rv) {
       op <- par(mar = c(4, 4, 3, 2))
       on.exit(par(op), add = TRUE)
       pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2,
-                     main = "Validation ROC Curves", cex.main = 1.2)
+                     main = "Validation ROC Curves", cex.main = 1.2, asp = NA)
       for (i in seq_along(curves_plot)[-1]) {
         pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
       }
@@ -964,7 +1076,7 @@ server_roc <- function(input, output, session, rv) {
       op <- par(mar = c(4, 4, 3, 2))
       on.exit(par(op), add = TRUE)
       pROC::plot.roc(curves_plot[[1]], col = cols[1], lwd = 2,
-                     main = "Validation ROC Curves", cex.main = 1.2)
+                     main = "Validation ROC Curves", cex.main = 1.2, asp = NA)
       for (i in seq_along(curves_plot)[-1]) {
         pROC::lines.roc(curves_plot[[i]], col = cols[i], lwd = 2)
       }

@@ -47,6 +47,13 @@ ui_nomogram <- tabItem(
           "B resamples drive the optimism-corrected C-index and the bias-corrected calibration curve (default 1000, range 100-5000). ",
           "The same seed reproduces the split and the bootstrap exactly."))
       ),
+      radioButtons("nomogram_predictor_mode",
+        tags$span("Model predictors:"),
+        choices = c(
+          "Individual genes (correlated genes are pruned; may leave one gene)" = "genes",
+          "Composite panel score (mean z-score of all selected genes; one predictor)" = "score"
+        ),
+        selected = "genes"),
       radioButtons("nomogram_val_standardize",
         tags$span("External validation: how are the validation predictors standardized?",
                   tags$small(" (used in External mode)", style = "font-weight: normal; color: #888;")),
@@ -151,13 +158,13 @@ ui_nomogram <- tabItem(
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
       tags$h5(tags$strong("Confusion matrices (TP / TN / FP / FN)")),
       DT::dataTableOutput("nomogram_confusion_table"),
-      tags$div(style = "margin: 8px 0 14px 0;", downloadButton("download_nomogram_confusion", tagList(icon("download"), " Confusion matrices (CSV)"), class = "btn-info btn-sm")),
+      tags$div(style = "margin: 8px 0 14px 0;", downloadButton("download_nomogram_confusion", tagList(" Confusion matrices (CSV)"), class = "btn-info btn-sm")),
       tags$h5(tags$strong("Calibration (intercept, slope, Brier score)")),
       tags$p(style = "font-size: 12px; color: #666;",
         "Intercept = calibration-in-the-large (ideal 0), slope = calibration slope (ideal 1). Estimated only when each class has at least 10 samples; ",
         "otherwise shown as 'not estimated'. Validation predictions use the training model unchanged, so a non-zero intercept reflects a real prevalence/scale difference, not a refit."),
       DT::dataTableOutput("nomogram_calibration_table"),
-      tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_calibration", tagList(icon("download"), " Calibration statistics (CSV)"), class = "btn-info btn-sm"))
+      tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_calibration", tagList(" Calibration statistics (CSV)"), class = "btn-info btn-sm"))
     )
   ),
 
@@ -206,9 +213,9 @@ ui_nomogram <- tabItem(
       uiOutput("nomogram_diagnostics_note_ui"),
       DT::dataTableOutput("nomogram_diagnostics_table"),
       tags$div(style = "margin-top: 8px;",
-        downloadButton("download_nomogram_coefficients", tagList(icon("download"), " Model coefficients (CSV)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_nomogram_firth", tagList(icon("download"), " Firth coefficients (CSV)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_nomogram_diagnostics", tagList(icon("download"), " All diagnostics (CSV)"), class = "btn-info btn-sm"))
+        downloadButton("download_nomogram_coefficients", tagList(" Model coefficients (CSV)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_nomogram_firth", tagList(" Firth coefficients (CSV)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_nomogram_diagnostics", tagList(" All diagnostics (CSV)"), class = "btn-info btn-sm"))
     )
   ),
 
@@ -220,7 +227,7 @@ ui_nomogram <- tabItem(
         width = 12, status = "warning", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
         uiOutput("nomogram_optimism_note_ui"),
         DT::dataTableOutput("nomogram_optimism_table"),
-        tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_optimism", tagList(icon("download"), " Optimism Correction (CSV)"), class = "btn-warning btn-sm"))
+        tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_optimism", tagList(" Optimism Correction (CSV)"), class = "btn-warning btn-sm"))
       )
     )
   ),
@@ -235,9 +242,9 @@ ui_nomogram <- tabItem(
         "95% CIs: exact Clopper-Pearson for accuracy, sensitivity, specificity, PPV and NPV; DeLong for AUC. ",
         "Sensitivity_n / Specificity_n give numerator/denominator."),
       tags$div(style = "margin-top: 8px;",
-        downloadButton("download_nomogram_performance", tagList(icon("download"), " Comparison (CSV)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_nomogram_perf_training", tagList(icon("download"), " Training performance (CSV)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_nomogram_perf_validation", tagList(icon("download"), " Validation performance (CSV)"), class = "btn-success btn-sm"))
+        downloadButton("download_nomogram_performance", tagList(" Comparison (CSV)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_nomogram_perf_training", tagList(" Training performance (CSV)"), class = "btn-success btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_nomogram_perf_validation", tagList(" Validation performance (CSV)"), class = "btn-success btn-sm"))
     )
   ),
 
@@ -246,7 +253,7 @@ ui_nomogram <- tabItem(
       title = tags$span(icon("clipboard-list"), " Outcome Coding, Methods & Run Settings"),
       width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = TRUE,
       DT::dataTableOutput("nomogram_settings_table"),
-      tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_settings", tagList(icon("download"), " Settings (CSV)"), class = "btn-info btn-sm"))
+      tags$div(style = "margin-top: 8px;", downloadButton("download_nomogram_settings", tagList(" Settings (CSV)"), class = "btn-info btn-sm"))
     )
   ),
 

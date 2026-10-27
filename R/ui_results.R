@@ -220,9 +220,9 @@ box(
             width = 8, status = "danger", solidHeader = TRUE,
             plotOutput("volcano_plot", height = "550px"),
             tags$div(style = "margin-top: 10px;",
-              downloadButton("download_volcano_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-              downloadButton("download_volcano_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-              downloadButton("download_volcano_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))),
+              downloadButton("download_volcano_png", tagList(" PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_volcano_jpg", tagList(" JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_volcano_pdf", tagList(" PDF"), class = "btn-info btn-sm"))),
         box(title = tags$span(icon("list-ol"), " Top DEGs"),
             width = 4, status = "info", solidHeader = TRUE,
             DTOutput("top_degs_table"))
@@ -232,9 +232,9 @@ box(
             width = 12, status = "success", solidHeader = TRUE,
             plotOutput("heatmap_plot", height = "600px"),
             tags$div(style = "margin-top: 10px;",
-              downloadButton("download_heatmap_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-              downloadButton("download_heatmap_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-              downloadButton("download_heatmap_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm")))
+              downloadButton("download_heatmap_png", tagList(" PNG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_heatmap_jpg", tagList(" JPG"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+              downloadButton("download_heatmap_pdf", tagList(" PDF"), class = "btn-info btn-sm")))
       )
     ),
     
@@ -245,16 +245,16 @@ box(
           title = tags$span(icon("file-csv"), " Download DE results"),
           width = 12, status = "info", solidHeader = TRUE,
           tags$p("Export the differential expression (volcano) table to check results in R, Excel, or other tools.", style = "margin-bottom: 12px; color: #555;"),
-          downloadButton("download_de_results", tagList(icon("download"), " DE results / volcano table (CSV)"), class = "btn-primary btn-lg")
+          downloadButton("download_de_results", tagList(" DE results / volcano table (CSV)"), class = "btn-primary btn-lg")
         )
       ),
       fluidRow(
         box(
           title = tags$span(icon("download"), " Download Results"),
           width = 12, status = "warning", solidHeader = TRUE,
-          column(4, downloadButton("download_de_results_alt", tagList(icon("download"), " DE Results"), class = "btn-success btn-block")),
-          column(4, downloadButton("download_sig_genes", tagList(icon("download"), " Significant Genes"), class = "btn-success btn-block")),
-          column(4, downloadButton("download_workspace_results", tagList(icon("download"), " Workspace"), class = "btn-success btn-block"))
+          column(4, downloadButton("download_de_results_alt", tagList(" DE Results"), class = "btn-success btn-block")),
+          column(4, downloadButton("download_sig_genes", tagList(" Significant Genes"), class = "btn-success btn-block")),
+          column(4, downloadButton("download_workspace_results", tagList(" Workspace"), class = "btn-success btn-block"))
         )
       )
     ),
@@ -268,17 +268,17 @@ box(
           gexp_ui_parallel_two_col(
             tagList(
               tags$h5(icon("dna"), " RNA-seq", style = "color: #1e3a8a;"),
-              downloadButton("download_de_results_rna", tagList(icon("download"), " DE Results (CSV)"), class = "btn-info btn-block", style = "margin-bottom: 6px;"),
-              downloadButton("download_sig_genes_rna", tagList(icon("download"), " Significant Genes (CSV)"), class = "btn-success btn-block")
+              downloadButton("download_de_results_rna", tagList(" DE Results (CSV)"), class = "btn-info btn-block", style = "margin-bottom: 6px;"),
+              downloadButton("download_sig_genes_rna", tagList(" Significant Genes (CSV)"), class = "btn-success btn-block")
             ),
             tagList(
               tags$h5(icon("th"), " Microarray", style = "color: #9a3412;"),
-              downloadButton("download_de_results_micro", tagList(icon("download"), " DE Results (CSV)"), class = "btn-info btn-block", style = "margin-bottom: 6px;"),
-              downloadButton("download_sig_genes_micro", tagList(icon("download"), " Significant Genes (CSV)"), class = "btn-success btn-block")
+              downloadButton("download_de_results_micro", tagList(" DE Results (CSV)"), class = "btn-info btn-block", style = "margin-bottom: 6px;"),
+              downloadButton("download_sig_genes_micro", tagList(" Significant Genes (CSV)"), class = "btn-success btn-block")
             )
           ),
           tags$div(style = "margin-top: 14px; text-align: center;",
-            downloadButton("download_workspace_results_parallel", tagList(icon("download"), " Workspace"), class = "btn-success btn-lg"))
+            downloadButton("download_workspace_results_parallel", tagList(" Workspace"), class = "btn-success btn-lg"))
         )
       )
     ),

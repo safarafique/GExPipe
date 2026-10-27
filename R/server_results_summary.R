@@ -71,7 +71,7 @@ server_results_summary <- function(input, output, session, rv) {
     s1 <- sprintf("This analysis pipeline processed %s genes across %s samples. ", format(n_genes_expr, big.mark = ","), format(n_samp, big.mark = ","))
     s2 <- if (norm_ok) "Normalization (Step 2) was applied; " else "Normalization was not run. "
     s3 <- if (batch_ok) "batch correction (Step 5) was performed to reduce technical variation, as shown in the before/after PCA. " else "Batch correction was not run. "
-    s4 <- sprintf("Differential expression (limma) identified %s significant genes (%s up-regulated, %s down-regulated), summarized in the volcano plot and top-gene heatmap. ", format(n_sig, big.mark = ","), format(n_up, big.mark = ","), format(n_down, big.mark = ","))
+    s4 <- .de_narrative(n_sig, n_up, n_down)
     s5 <- sprintf("WGCNA yielded %s significant modules; the soft-threshold plot, sample clustering tree, gene dendrogram, and module-trait heatmap are shown. ", format(n_mods, big.mark = ","))
     s6 <- sprintf("The intersection of DEGs and WGCNA genes gave %s common genes, used for GO/KEGG enrichment (%s BP, %s MF, %s CC terms; %s KEGG pathways) and for PPI network analysis (%s hub genes, %s interactive genes). ", format(n_common, big.mark = ","), n_bp, n_mf, n_cc, n_kegg, format(n_hub, big.mark = ","), format(n_inter, big.mark = ","))
     s7 <- if (length(methods_run) > 0) sprintf("Machine learning (%s) was run; the Venn/UpSet plot shows overlap across methods, with %s genes common to all selected methods. ", paste(methods_run, collapse = ", "), format(n_ml, big.mark = ",")) else "Machine learning was not run. "
@@ -213,17 +213,110 @@ server_results_summary <- function(input, output, session, rv) {
   })
 
   # ----- 3. DE -----
+  .de_method_label <- function(m) {
+    m <- if (is.null(m) || !length(m) || !nzchar(m[1L])) "limma" else as.character(m[1L])
+    switch(m, deseq2 = "DESeq2", edger = "edgeR", limma_voom = "limma-voom", limma = "limma", m)
+  }
+  .fmt_n <- function(x) format(as.integer(x), big.mark = ",")
+  .de_narrative <- function(n_sig, n_up, n_down) {
+    if (!(isTRUE(rv$merge_after_de) || identical(rv$analysis_type, "parallel")))
+      return(sprintf("Differential expression (%s) identified %s significant genes (%s up-regulated, %s down-regulated), summarized in the volcano plot and top-gene heatmap. ",
+                     .de_method_label(rv$de_method), .fmt_n(n_sig), .fmt_n(n_up), .fmt_n(n_down)))
+    rna <- .up_down(rv$sig_genes_rna); micro <- .up_down(rv$sig_genes_micro)
+    txt <- sprintf("Differential expression was run on each platform separately: RNA-seq (%s) identified %s significant genes (%s up, %s down) and microarray (%s) %s (%s up, %s down). ",
+                   .de_method_label(if (!is.null(rv$de_method_rna)) rv$de_method_rna else rv$de_method),
+                   .fmt_n(NROW(rv$sig_genes_rna)), .fmt_n(rna[["up"]]), .fmt_n(rna[["down"]]),
+                   .de_method_label(if (!is.null(rv$de_method_micro)) rv$de_method_micro else "limma"),
+                   .fmt_n(NROW(rv$sig_genes_micro)), .fmt_n(micro[["up"]]), .fmt_n(micro[["down"]]))
+    cons <- rv$consensus_result
+    if (isTRUE(rv$consensus_complete) && !is.null(cons$table)) {
+      cud <- .up_down(cons$table)
+      txt <- paste0(txt, sprintf("The %s consensus kept %s genes (%s up, %s down). ",
+                                 if (identical(rv$consensus_combine_method, "union")) "union (exploratory)" else "intersection",
+                                 .fmt_n(NROW(cons$table)), .fmt_n(cud[["up"]]), .fmt_n(cud[["down"]])))
+    }
+    txt
+  }
+  # Up/down counts of a DE table (Significance column, else the sign of logFC)
+  .up_down <- function(tab) {
+    if (is.null(tab) || !NROW(tab)) return(c(up = 0L, down = 0L))
+    if ("Significance" %in% names(tab)) {
+      s <- as.character(tab$Significance)
+      return(c(up = sum(s == "Up-regulated", na.rm = TRUE), down = sum(s == "Down-regulated", na.rm = TRUE)))
+    }
+    fc <- suppressWarnings(as.numeric(tab$logFC))
+    c(up = sum(fc > 0, na.rm = TRUE), down = sum(fc < 0, na.rm = TRUE))
+  }
+  .de_row <- function(label, tab, method, logfc = NULL, padj = NULL) {
+    ud <- .up_down(tab)
+    cell <- function(..., style = "") tags$td(style = paste("padding: 4px 12px;", style), ...)
+    cut_txt <- if (length(logfc) && length(padj)) sprintf("|log2FC| > %s, adj. p < %s", logfc[1L], padj[1L]) else ""
+    tags$tr(
+      cell(tags$strong(label)), cell(method), cell(.fmt_n(NROW(tab))),
+      cell(.fmt_n(ud[["up"]]), style = "color: #c0392b;"),
+      cell(.fmt_n(ud[["down"]]), style = "color: #2471a3;"),
+      cell(cut_txt, style = "color: #7f8c8d; font-size: 12px;")
+    )
+  }
+
   output$results_summary_de <- renderUI({
-    sig <- rv$sig_genes
-    de <- rv$de_results
-    n_sig <- if (!is.null(sig)) nrow(sig) else 0L
-    n_up <- if (!is.null(de)) sum(de$Significance == "Up-regulated", na.rm = TRUE) else 0L
-    n_down <- if (!is.null(de)) sum(de$Significance == "Down-regulated", na.rm = TRUE) else 0L
+    parallel <- isTRUE(rv$merge_after_de) || identical(rv$analysis_type, "parallel")
+    if (!parallel) {
+      sig <- rv$sig_genes
+      n_sig <- if (!is.null(sig)) nrow(sig) else 0L
+      ud <- .up_down(sig)
+      return(tags$div(
+        tags$p(tags$strong("DE method:"), .de_method_label(rv$de_method)),
+        tags$p(tags$strong("Significant genes (DEG):"), .fmt_n(n_sig)),
+        tags$p(tags$strong("Up-regulated:"), .fmt_n(ud[["up"]]), " | ", tags$strong("Down-regulated:"), .fmt_n(ud[["down"]])),
+        if (n_sig == 0) tags$p(style = "color: #7f8c8d;", "Run DE analysis (Step 6) to see results here.")
+      ))
+    }
+
+    # Parallel: DE runs on each platform with its own method, then Consensus combines them.
+    # (After Consensus, rv$sig_genes holds the consensus table, so it is not used here.)
+    if (is.null(rv$sig_genes_rna) && is.null(rv$sig_genes_micro))
+      return(tags$p(style = "color: #7f8c8d;", "Run DE analysis (Step 6) on both platforms to see results here."))
+    rna_method <- .de_method_label(if (!is.null(rv$de_method_rna)) rv$de_method_rna else rv$de_method)
+    micro_method <- .de_method_label(if (!is.null(rv$de_method_micro)) rv$de_method_micro else "limma")
+    cons <- rv$consensus_result
+    cons_done <- isTRUE(rv$consensus_complete) && !is.null(cons) && !is.null(cons$table)
+    union_mode <- identical(rv$consensus_combine_method, "union")
+    cons_label <- if (union_mode) "union, exploratory" else if (isTRUE(rv$consensus_same_direction)) "intersection, same direction" else "intersection"
+    th <- function(x) tags$th(style = "padding: 4px 12px; border-bottom: 1px solid #ddd;", x)
     tags$div(
-      tags$p(tags$strong("DE method:"), "limma"),
-      tags$p(tags$strong("Significant genes (DEG):"), format(n_sig, big.mark = ",")),
-      tags$p(tags$strong("Up-regulated:"), format(n_up, big.mark = ","), " | ", tags$strong("Down-regulated:"), format(n_down, big.mark = ",")),
-      if (n_sig == 0) tags$p(style = "color: #7f8c8d;", "Run DE analysis (Step 6) to see results here.")
+      tags$table(
+        style = "border-collapse: collapse; margin-bottom: 12px;",
+        tags$thead(tags$tr(th("Platform"), th("DE method"), th("Significant DEGs"), th("Up"), th("Down"), th("Cut-offs"))),
+        tags$tbody(
+          .de_row("RNA-seq", rv$sig_genes_rna, rna_method, rv$de_logfc_rna, rv$de_padj_rna),
+          .de_row("Microarray", rv$sig_genes_micro, micro_method, rv$de_logfc_micro, rv$de_padj_micro),
+          if (cons_done) .de_row(paste0("Consensus (", cons_label, ")"), cons$table, "RNA-seq + microarray")
+        )
+      ),
+      if (!cons_done) {
+        tags$p(style = "color: #7f8c8d;", "Run the Consensus step to combine the two platforms; the consensus genes will then be shown here.")
+      } else {
+        cons_genes <- as.character(cons$table$Gene)
+        n_disc <- if (length(cons$n_discordant)) cons$n_discordant else 0L
+        rna_out <- sum(!as.character(rv$sig_genes_rna$Gene) %in% cons_genes)
+        micro_out <- sum(!as.character(rv$sig_genes_micro$Gene) %in% cons_genes)
+        tags$div(
+          if (length(cons$n_overlap)) tags$p(
+            tags$strong("Significant on both platforms:"), .fmt_n(cons$n_overlap),
+            if (n_disc > 0) paste0(" (", .fmt_n(n_disc), " of these change in opposite directions",
+                                   if (!union_mode && isTRUE(rv$consensus_same_direction)) " and are left out of the consensus)" else ")")),
+          tags$p(
+            tags$strong("Not in the consensus:"),
+            sprintf(" RNA-seq %s of %s DEGs | Microarray %s of %s DEGs",
+                    .fmt_n(rna_out), .fmt_n(NROW(rv$sig_genes_rna)), .fmt_n(micro_out), .fmt_n(NROW(rv$sig_genes_micro)))),
+          tags$p(style = "color: #7f8c8d; font-size: 12px;",
+                 "These are significant on one platform only, not measured on the other, or change in the opposite direction. ",
+                 "The gene lists, with the reason for each gene, are DEGs_RNA_only.csv and DEGs_Microarray_only.csv on the Consensus tab."),
+          if (union_mode) tags$p(style = "color: #b9770e;", icon("exclamation-triangle"),
+                                 " Union mode keeps genes significant on either platform; use the intersection for the main result.")
+        )
+      }
     )
   })
 

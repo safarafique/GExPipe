@@ -303,7 +303,11 @@ gexp_consensus_heatmap_draw <- function(hd) {
     return(invisible(NULL))
   }
   colors <- list(Platform = c(RNA_seq = "#8E24AA", Microarray = "#FB8C00"))
-  if ("Condition" %in% names(hd$annot)) colors$Condition <- c(Normal = "#43A047", Disease = "#E53935")
+  if ("Condition" %in% names(hd$annot)) {
+    # colours for the group names actually present (renamed groups broke pheatmap)
+    cc <- gexp_condition_annotation_colors(hd$annot$Condition)
+    if (is.list(cc)) colors$Condition <- cc$Condition
+  }
   pheatmap::pheatmap(
     hd$mat, annotation_col = hd$annot, annotation_colors = colors,
     color = grDevices::colorRampPalette(c("#1E88E5", "white", "#E53935"))(100), breaks = seq(-3, 3, length.out = 101),

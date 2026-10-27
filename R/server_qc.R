@@ -351,7 +351,8 @@ server_qc <- function(input, output, session, rv) {
     upset_df <- upset_prep$upset_df
     max_set_size <- upset_prep$max_set_size
     tryCatch({
-      UpSetR::upset(
+      # upset() returns an object that only draws when shown (file devices do not auto-print)
+      p <- UpSetR::upset(
         upset_df,
         sets = colnames(upset_df),
         keep.order = TRUE,
@@ -366,6 +367,7 @@ server_qc <- function(input, output, session, rv) {
         set_size.show = TRUE,
         set_size.scale_max = max_set_size * 1.1
       )
+      methods::show(p)
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error creating UpSet plot:", e$message), cex = 1.2, col = "red")
@@ -779,7 +781,7 @@ server_qc <- function(input, output, session, rv) {
           tags$p(tags$strong(icon("table"), " ", lab, " outliers"), style = "margin: 10px 0 6px 0;"),
           DT::DTOutput(paste0("qc_outlier_table_", pl)),
           tags$div(style = "margin-top: 6px;",
-            downloadButton(paste0("dl_qc_outlier_csv_", pl), tagList(icon("download"), " ", lab, " outliers (CSV)"),
+            downloadButton(paste0("dl_qc_outlier_csv_", pl), tagList(" ", lab, " outliers (CSV)"),
                            class = "btn-default btn-xs"))
         )
       }
@@ -799,15 +801,17 @@ server_qc <- function(input, output, session, rv) {
           tags$p(tags$strong(icon("chart-area"), " PCA Outlier Detection"), style = "margin-bottom: 6px;"),
           plotOutput("qc_pca_outlier_plot", height = "420px"),
           tags$div(style = "margin-top: 6px;",
-            downloadButton("dl_qc_pca_plot_jpg", tagList(icon("download"), " JPG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
-            downloadButton("dl_qc_pca_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs"))
+            downloadButton("dl_qc_pca_plot_png", tagList(" PNG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
+            downloadButton("dl_qc_pca_plot_jpg", tagList(" JPG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
+            downloadButton("dl_qc_pca_plot_pdf", tagList(" PDF"), class = "btn-danger btn-xs"))
         ),
         column(6,
           tags$p(tags$strong(icon("project-diagram"), " Sample Connectivity"), style = "margin-bottom: 6px;"),
           plotOutput("qc_connectivity_plot", height = "420px"),
           tags$div(style = "margin-top: 6px;",
-            downloadButton("dl_qc_conn_plot_jpg", tagList(icon("download"), " JPG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
-            downloadButton("dl_qc_conn_plot_pdf", tagList(icon("download"), " PDF"), class = "btn-danger btn-xs"))
+            downloadButton("dl_qc_conn_plot_png", tagList(" PNG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
+            downloadButton("dl_qc_conn_plot_jpg", tagList(" JPG"), class = "btn-danger btn-xs", style = "margin-right: 4px;"),
+            downloadButton("dl_qc_conn_plot_pdf", tagList(" PDF"), class = "btn-danger btn-xs"))
         )
       ),
       # Row 2: Outlier table + selector
@@ -817,7 +821,7 @@ server_qc <- function(input, output, session, rv) {
           tags$p(tags$strong(icon("table"), " All Samples -- Outlier Summary"), style = "margin-bottom: 6px;"),
           DT::dataTableOutput("qc_outlier_table"),
           tags$div(style = "margin-top: 6px;",
-            downloadButton("dl_qc_outlier_csv", tagList(icon("download"), " CSV"), class = "btn-default btn-xs"))
+            downloadButton("dl_qc_outlier_csv", tagList(" CSV"), class = "btn-default btn-xs"))
         ),
         column(5,
           uiOutput("qc_outlier_selector_ui")
@@ -980,6 +984,13 @@ server_qc <- function(input, output, session, rv) {
   })
 
   # ---- Download handlers for plots ----
+  output$dl_qc_pca_plot_png <- downloadHandler(
+    filename = function() "QC_PCA_Outlier_Detection.png",
+    content = function(file) {
+      req(rv$qc_pca_scores)
+      ggplot2::ggsave(file, make_qc_pca_plot(), width = 8, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+    }
+  )
   output$dl_qc_pca_plot_jpg <- downloadHandler(
     filename = function() "QC_PCA_Outlier_Detection.jpg",
     content = function(file) {
@@ -992,6 +1003,13 @@ server_qc <- function(input, output, session, rv) {
     content = function(file) {
       req(rv$qc_pca_scores)
       ggplot2::ggsave(file, make_qc_pca_plot(), width = 8, height = 6, device = "pdf", bg = "white")
+    }
+  )
+  output$dl_qc_conn_plot_png <- downloadHandler(
+    filename = function() "QC_Sample_Connectivity.png",
+    content = function(file) {
+      req(rv$qc_conn_k)
+      ggplot2::ggsave(file, make_qc_conn_plot(), width = 8, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
     }
   )
   output$dl_qc_conn_plot_jpg <- downloadHandler(

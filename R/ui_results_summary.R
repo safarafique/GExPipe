@@ -92,7 +92,7 @@ ui_results_summary <- tabItem(
   # ----- 3. Differential expression -----
   step_card(
     "6", "chart-line", "Differential expression",
-    "DEGs identified (e.g. limma).",
+    "Significant genes per platform and DE method; in Parallel mode also the consensus of both platforms.",
     "success",
     uiOutput("results_summary_de")
   ),

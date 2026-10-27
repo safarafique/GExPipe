@@ -299,21 +299,60 @@ server_consensus <- function(input, output, session, rv) {
     )
   })
 
+  # Union is an exploratory list (significant on EITHER platform), not a
+  # consensus: give it its own file name and record the rule in every export.
+  .consensus_file_name <- function() {
+    if (identical(.combine_method_rule(), "union")) "Consensus_DEGs_RNAseq_Microarray_UNION.csv"
+    else "Consensus_DEGs_RNAseq_Microarray.csv"
+  }
+  .consensus_export_table <- function(out) {
+    tab <- out$table
+    if (is.null(tab) || !nrow(tab)) return(tab)
+    num1 <- function(x) { v <- suppressWarnings(as.numeric(x)); if (length(v) && !is.na(v[1])) v[1] else NA_real_ }
+    tab$Combine_Mode <- if (identical(.combine_method_rule(), "union")) "Union (significant on either platform)"
+                        else "Intersection (significant on both platforms)"
+    tab$Same_Direction_Required <- isTRUE(.same_direction_rule())
+    tab$LogFC_Cutoff_RNAseq <- num1(rv$de_logfc_rna)
+    tab$Padj_Cutoff_RNAseq <- num1(rv$de_padj_rna)
+    tab$LogFC_Cutoff_Microarray <- num1(rv$de_logfc_micro)
+    tab$Padj_Cutoff_Microarray <- num1(rv$de_padj_micro)
+    tab
+  }
+
   output$download_consensus_genes <- downloadHandler(
-    filename = function() "Consensus_DEGs_RNAseq_Microarray.csv",
+    filename = function() .consensus_file_name(),
     content = function(file) {
       out <- .build_consensus()
       req(out)
-      write.csv(out$table, file, row.names = FALSE)
-      write.csv(out$table, file.path(CSV_EXPORT_DIR(), "Consensus_DEGs_RNAseq_Microarray.csv"), row.names = FALSE)
+      tab <- .consensus_export_table(out)
+      write.csv(tab, file, row.names = FALSE)
+      write.csv(tab, file.path(CSV_EXPORT_DIR(), .consensus_file_name()), row.names = FALSE)
     }
   )
+
+  # Platform-specific DEGs = significant on this platform but NOT in the
+  # consensus (these files used to contain the full significant lists).
+  .platform_only_degs <- function(sig_this, sig_other, tested_other, other_label) {
+    cons <- tryCatch(.build_consensus(), error = function(e) NULL)
+    cons_genes <- if (!is.null(cons) && !is.null(cons$table)) as.character(cons$table$Gene) else character(0)
+    out <- sig_this[!as.character(sig_this$Gene) %in% cons_genes, , drop = FALSE]
+    g <- as.character(out$Gene)
+    other_fc <- if (!is.null(sig_other)) sig_other$logFC[match(g, as.character(sig_other$Gene))] else rep(NA_real_, length(g))
+    tested <- if (!is.null(tested_other)) g %in% as.character(tested_other$Gene) else rep(NA, length(g))
+    out$Reason <- ifelse(!is.na(other_fc) & sign(other_fc) != sign(out$logFC),
+                         paste("significant on", other_label, "but opposite direction"),
+                  ifelse(!is.na(other_fc), "significant on both platforms but excluded by the consensus rule",
+                  ifelse(is.na(tested), paste("not tested on", other_label),
+                  ifelse(tested, paste("not significant on", other_label), paste("not measured on", other_label)))))
+    out
+  }
 
   output$download_consensus_rna_only <- downloadHandler(
     filename = function() "DEGs_RNA_only.csv",
     content = function(file) {
       req(rv$sig_genes_rna)
-      write.csv(rv$sig_genes_rna, file, row.names = FALSE)
+      write.csv(.platform_only_degs(rv$sig_genes_rna, rv$sig_genes_micro, rv$de_results_micro, "microarray"),
+                file, row.names = FALSE)
     }
   )
 
@@ -321,7 +360,8 @@ server_consensus <- function(input, output, session, rv) {
     filename = function() "DEGs_Microarray_only.csv",
     content = function(file) {
       req(rv$sig_genes_micro)
-      write.csv(rv$sig_genes_micro, file, row.names = FALSE)
+      write.csv(.platform_only_degs(rv$sig_genes_micro, rv$sig_genes_rna, rv$de_results_rna, "RNA-seq"),
+                file, row.names = FALSE)
     }
   )
 

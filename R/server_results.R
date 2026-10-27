@@ -95,8 +95,10 @@ server_results <- function(input, output, session, rv) {
   }
 
   .de_num <- function(x, default) {
-    v <- suppressWarnings(as.numeric(x)[[1]])
-    if (length(v) != 1L || is.na(v) || !is.finite(v)) default else v
+    # NULL (input not rendered yet, e.g. right after loading a workspace) must
+    # fall back to the default: as.numeric(NULL)[[1]] would error.
+    v <- suppressWarnings(as.numeric(x))
+    if (length(v) < 1L || is.na(v[1L]) || !is.finite(v[1L])) default else v[1L]
   }
 
   .de_cutoffs <- function(platform = NULL) {
@@ -1402,12 +1404,12 @@ server_results <- function(input, output, session, rv) {
       if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
       annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
 
-      annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
+      annot_colors <- gexp_condition_annotation_colors(annot$Condition, rv$condition_ref_label, rv$condition_alt_label)
 
       pheatmap::pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
                color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
                show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
-               main = paste0("Top ", nrow(expr), " DE Genes (of ", top_n, " requested)", title_suffix),
+               main = paste0("Top ", nrow(expr), " DE Genes", title_suffix),
                border_color = NA)
     }, error = function(e) {
       plot.new()
@@ -1606,12 +1608,12 @@ server_results <- function(input, output, session, rv) {
       if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
       if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
       annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
-      annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
+      annot_colors <- gexp_condition_annotation_colors(annot$Condition, rv$condition_ref_label, rv$condition_alt_label)
       png(file, width = 1200, height = 800, res = 150, bg = "white")
       pheatmap::pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
                color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
                show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
-               main = paste0("Top ", nrow(expr), " DE Genes (of ", input$top_genes, " requested)"), border_color = NA)
+               main = paste0("Top ", nrow(expr), " DE Genes"), border_color = NA)
       dev.off()
     }
   )
@@ -1641,12 +1643,13 @@ server_results <- function(input, output, session, rv) {
       if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
       if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
       annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
-      annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
-      jpeg(file, width = 8, height = 5.33, res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
+      annot_colors <- gexp_condition_annotation_colors(annot$Condition, rv$condition_ref_label, rv$condition_alt_label)
+      # Height grows with the gene count so row labels (~0.14 in each) don't overlap.
+      jpeg(file, width = 9, height = max(5.33, 2.2 + 0.14 * nrow(expr)), res = IMAGE_DPI, units = "in", bg = "white", quality = 95)
       pheatmap::pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
                color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
                show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
-               main = paste0("Top ", nrow(expr), " DE Genes (of ", input$top_genes, " requested)"), border_color = NA)
+               main = paste0("Top ", nrow(expr), " DE Genes"), border_color = NA)
       dev.off()
     }
   )
@@ -1677,12 +1680,12 @@ server_results <- function(input, output, session, rv) {
       if (length(cond) != length(samp)) cond <- rep(NA_character_, length(samp))
       if (length(dset) != length(samp)) dset <- rep(NA_character_, length(samp))
       annot <- data.frame(Condition = cond, Dataset = dset, row.names = samp)
-      annot_colors <- list(Condition = c(Normal = "#3498db", Disease = "#e74c3c"))
-      pdf(file, width = 10, height = 7, bg = "white")
+      annot_colors <- gexp_condition_annotation_colors(annot$Condition, rv$condition_ref_label, rv$condition_alt_label)
+      pdf(file, width = 10, height = max(7, 2.2 + 0.14 * nrow(expr)), bg = "white")
       pheatmap::pheatmap(expr_scaled, annotation_col = annot, annotation_colors = annot_colors,
                color = colorRampPalette(c("#3498db", "white", "#e74c3c"))(100),
                show_colnames = FALSE, fontsize_row = max(6, 12 - nrow(expr)/10),
-               main = paste0("Top ", nrow(expr), " DE Genes (of ", input$top_genes, " requested)"), border_color = NA)
+               main = paste0("Top ", nrow(expr), " DE Genes"), border_color = NA)
       dev.off()
     }
   )

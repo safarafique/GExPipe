@@ -48,7 +48,7 @@ ui_ppi <- tabItem(
       tags$hr(),
       DT::dataTableOutput("ppi_gene_status_table"),
       tags$div(style = "margin-top: 10px;",
-               downloadButton("download_ppi_gene_status", tagList(icon("download"), " Download Interactive/Non-interactive (CSV)"), class = "btn-info"))
+               downloadButton("download_ppi_gene_status", tagList(" Download Interactive/Non-interactive (CSV)"), class = "btn-info"))
     )
   ),
   
@@ -89,31 +89,31 @@ ui_ppi <- tabItem(
                tags$h5(icon("circle-nodes"), " 1. Fruchterman-Reingold (force-directed)", style = "margin-top: 8px; margin-bottom: 6px; color: #1976D2; font-size: 13px;"),
                plotOutput("ppi_plot_traditional", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
-                 downloadButton("download_ppi_traditional_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_traditional_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_traditional_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
+                 downloadButton("download_ppi_traditional_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_traditional_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_traditional_pdf", tagList(" PDF"), class = "btn-success btn-sm"))),
         column(6,
                tags$h5(icon("circle"), " 2. Circular layout (by degree)", style = "margin-top: 8px; margin-bottom: 6px; color: #388E3C; font-size: 13px;"),
                plotOutput("ppi_plot_circular", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
-                 downloadButton("download_ppi_circular_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_circular_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_circular_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
+                 downloadButton("download_ppi_circular_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_circular_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_circular_pdf", tagList(" PDF"), class = "btn-success btn-sm"))),
       fluidRow(
         column(6,
                tags$h5(icon("project-diagram"), " 3. ggraph (modern edges + nodes)", style = "margin-top: 8px; margin-bottom: 6px; color: #7B1FA2; font-size: 13px;"),
                plotOutput("ppi_plot_ggraph", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
-                 downloadButton("download_ppi_ggraph_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_ggraph_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_ggraph_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
+                 downloadButton("download_ppi_ggraph_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_ggraph_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_ggraph_pdf", tagList(" PDF"), class = "btn-success btn-sm"))),
         column(6,
                tags$h5(icon("project-diagram"), " 4. Kamada-Kawai (stress-minimization)", style = "margin-top: 8px; margin-bottom: 6px; color: #E65100; font-size: 13px;"),
                plotOutput("ppi_plot_kamada", height = "520px", width = "100%"),
                tags$div(style = "margin-top: 6px;",
-                 downloadButton("download_ppi_kamada_png", tagList(icon("download"), " PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_kamada_jpg", tagList(icon("download"), " JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
-                 downloadButton("download_ppi_kamada_pdf", tagList(icon("download"), " PDF"), class = "btn-success btn-sm"))),
+                 downloadButton("download_ppi_kamada_png", tagList(" PNG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_kamada_jpg", tagList(" JPG"), class = "btn-success btn-sm", style = "margin-right: 4px;"),
+                 downloadButton("download_ppi_kamada_pdf", tagList(" PDF"), class = "btn-success btn-sm"))),
       )
     )
   ),
@@ -126,9 +126,9 @@ ui_ppi <- tabItem(
       uiOutput("ppi_hub_or_other_title_ui"),
       plotOutput("ppi_plot_hub_or_other", height = "520px", width = "100%"),
       tags$div(style = "margin-top: 6px;",
-        downloadButton("download_ppi_hub_or_other_png", tagList(icon("download"), " PNG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
-        downloadButton("download_ppi_hub_or_other_jpg", tagList(icon("download"), " JPG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
-        downloadButton("download_ppi_hub_or_other_pdf", tagList(icon("download"), " PDF"), class = "btn-info btn-sm"))
+        downloadButton("download_ppi_hub_or_other_png", tagList(" PNG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
+        downloadButton("download_ppi_hub_or_other_jpg", tagList(" JPG"), class = "btn-info btn-sm", style = "margin-right: 4px;"),
+        downloadButton("download_ppi_hub_or_other_pdf", tagList(" PDF"), class = "btn-info btn-sm"))
     )
   ),
 
@@ -142,11 +142,11 @@ ui_ppi <- tabItem(
       tags$h5("Consensus hub genes (appear in 3+ methods)", style = "margin-top: 15px;"),
       uiOutput("ppi_consensus_ui"),
       tags$div(style = "margin-top: 15px;",
-               downloadButton("download_ppi_hub_scores", tagList(icon("download"), " Hub Scores (CSV)"), class = "btn-success"),
-               downloadButton("download_ppi_consensus", tagList(icon("download"), " Consensus Hubs (CSV)"), class = "btn-info", style = "margin-left: 10px;"),
-               downloadButton("download_ppi_network_png", tagList(icon("download"), " PNG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-left: 6px;"),
-               downloadButton("download_ppi_network_jpg", tagList(icon("download"), " JPG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-left: 4px;"),
-               downloadButton("download_ppi_network_pdf", tagList(icon("download"), " PDF"), class = "btn-warning btn-sm", style = "margin-left: 4px;"))
+               downloadButton("download_ppi_hub_scores", tagList(" Hub Scores (CSV)"), class = "btn-success"),
+               downloadButton("download_ppi_consensus", tagList(" Consensus Hubs (CSV)"), class = "btn-info", style = "margin-left: 10px;"),
+               downloadButton("download_ppi_network_png", tagList(" PNG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-left: 6px;"),
+               downloadButton("download_ppi_network_jpg", tagList(" JPG (300 DPI)"), class = "btn-warning btn-sm", style = "margin-left: 4px;"),
+               downloadButton("download_ppi_network_pdf", tagList(" PDF"), class = "btn-warning btn-sm", style = "margin-left: 4px;"))
     )
   ),
   
@@ -165,7 +165,7 @@ ui_ppi <- tabItem(
       DT::dataTableOutput("ppi_interactive_list_table"),
       tags$hr(),
       tags$div(style = "margin-top: 10px;",
-               downloadButton("download_ppi_interactive_genes", tagList(icon("download"), " Download Interactive Gene List (CSV)"), class = "btn-success"),
+               downloadButton("download_ppi_interactive_genes", tagList(" Download Interactive Gene List (CSV)"), class = "btn-success"),
                uiOutput("ppi_extract_expr_ui"))
     )
   ),

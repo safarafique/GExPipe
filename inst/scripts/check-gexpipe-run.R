@@ -454,6 +454,12 @@ gexpipe_check_run <- function(dir, labels = NULL, stale_minutes = 30, out_dir = 
   dup <- dup[!vapply(dup, expected, logical(1))]
   if (length(dup)) for (d in dup) add("10 Figures", "Different files with identical content", "WARN", paste(d, collapse = " == "))
   else add("10 Figures", "Different files with identical content", "PASS", "none")
+  nc <- list.files(dir, pattern = "^Expression_after_batch_.*NOT_CORRECTED", ignore.case = TRUE)
+  if (length(nc)) add("10 Batch", "Exports marked as not batch-corrected", "WARN",
+                      paste0(paste(nc, collapse = ", "), " - the app skipped correction (e.g. a single dataset); state this in the methods"))
+  un <- list.files(dir, pattern = "^Consensus_DEGs_RNAseq_Microarray_UNION", ignore.case = TRUE)
+  if (length(un)) add("3 Consensus", "Union (exploratory) list exported", "WARN",
+                      paste0(paste(un, collapse = ", "), " - significant on EITHER platform; not a consensus"))
 
   # ---------------------------------------------------------------------------
   # Report

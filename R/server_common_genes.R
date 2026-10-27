@@ -158,10 +158,24 @@ server_common_genes <- function(input, output, session, rv) {
       return()
     }
 
-    sig_mod_names <- as.character(rv$significant_modules$Module)
+    sig_mods <- rv$significant_modules
+    # Pooling every significant module (both directions, thousands of genes)
+    # makes the WGCNA filter non-selective - nearly all DEGs pass. Default to
+    # the key module (strongest |module-trait r|); "hub" keeps GS/MM-significant
+    # genes inside the significant modules; "all" is the previous behaviour.
+    scope <- input$wgcna_gene_scope
+    if (length(scope) != 1L || !scope %in% c("top", "hub", "all")) scope <- "top"
+    if (scope == "top") sig_mods <- sig_mods[which.max(abs(sig_mods$Correlation)), , drop = FALSE]
     # Module column is "MEblue" etc.; gene_metrics$Module is "blue"
-    module_colors <- unique(sub("^ME", "", sig_mod_names))
-    wgcna_genes <- unique(trimws(rv$gene_metrics$Gene[rv$gene_metrics$Module %in% module_colors]))
+    module_colors <- unique(sub("^ME", "", as.character(sig_mods$Module)))
+    in_mod <- rv$gene_metrics$Module %in% module_colors
+    if (scope == "hub") {
+      gs_p <- if (!is.null(input$gs_pval_threshold)) input$gs_pval_threshold else 0.05
+      mm_r <- if (!is.null(input$mm_cor_threshold)) input$mm_cor_threshold else 0.8
+      in_mod <- in_mod & rv$gene_metrics$GS.pvalue < gs_p & abs(rv$gene_metrics$MM) > mm_r
+    }
+    wgcna_genes <- unique(trimws(rv$gene_metrics$Gene[in_mod]))
+    rv$common_genes_wgcna_scope <- paste0(scope, ": ", paste(module_colors, collapse = ", "))
     if (length(wgcna_genes) == 0) {
       showNotification("No genes in significant WGCNA modules. Check module-trait thresholds in Step 8.", type = "warning", duration = 6)
       return()
@@ -382,11 +396,17 @@ server_common_genes <- function(input, output, session, rv) {
     df <- as.data.frame(go_obj)
     if (nrow(df) == 0) return(NULL)
     n_show <- min(20, nrow(df))
-    enrichplot::dotplot(go_obj, showCategory = n_show, x = "GeneRatio", color = "p.adjust", size = "Count") +
-      gexpipe_pub_padj_scale("colour") +
-      gexpipe_pub_theme(base_size = 13) +
-      ggplot2::theme(axis.text.y = ggplot2::element_text(size = 11)) +
-      ggplot2::ggtitle(title)
+    # Recent enrichplot maps p.adjust to `fill` (outlined points), so set both
+    # scales; wider label wrap stops long GO terms overprinting each other.
+    suppressMessages(
+      enrichplot::dotplot(go_obj, showCategory = n_show, x = "GeneRatio", color = "p.adjust", size = "Count",
+                          label_format = 50) +
+        gexpipe_pub_padj_scale("colour") +
+        gexpipe_pub_padj_scale("fill") +
+        gexpipe_pub_theme(base_size = 13) +
+        ggplot2::theme(axis.text.y = ggplot2::element_text(size = 11, lineheight = 0.85)) +
+        ggplot2::ggtitle(title)
+    )
   }
 
   output$go_bp_plot <- renderPlot({
@@ -423,11 +443,11 @@ server_common_genes <- function(input, output, session, rv) {
     p <- make_go_dot_plot(go_obj, title)
     if (is.null(p)) return()
     if (device == "png")
-      ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
+      ggplot2::ggsave(file, plot = p, width = 10, height = 8, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
     else if (device %in% c("jpeg", "jpg"))
-      ggplot2::ggsave(file, plot = p, width = 9, height = 6, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
+      ggplot2::ggsave(file, plot = p, width = 10, height = 8, dpi = IMAGE_DPI, units = "in", bg = "white", device = "jpeg")
     else
-      ggplot2::ggsave(file, plot = p, width = 9, height = 6, device = "pdf", bg = "white")
+      ggplot2::ggsave(file, plot = p, width = 10, height = 8, device = "pdf", bg = "white")
   }
   output$download_go_bp_png <- downloadHandler(
     filename = function() "GO_Enrichment_Biological_Process.png",
@@ -749,11 +769,9 @@ server_common_genes <- function(input, output, session, rv) {
   kegg_chord_to_file <- function(file, dev_fun) {
     dat <- kegg_chord_data()
     if (is.null(dat)) {
-      grDevices::png(file, width = 800, height = 800)
-      plot.new()
-      text(0.5, 0.5, "No chord data. Run KEGG enrichment first.")
-      grDevices::dev.off()
-      return()
+      # Let the safe downloadHandler write a "run this step first" file in the
+      # REQUESTED format (this used to write a PNG for every format).
+      return(invisible(NULL))
     }
     chord_df <- dat$chord_df
     pathways <- dat$pathways
@@ -844,7 +862,7 @@ server_common_genes <- function(input, output, session, rv) {
   output$common_genes_download_extracted_ml_ui <- renderUI({
     if (is.null(rv$extracted_data_ml)) return(NULL)
     downloadButton("download_common_genes_extracted_ml",
-                  tagList(icon("download"), " Download Extracted Data (CSV)"),
+                  tagList(" Download Extracted Data (CSV)"),
                   class = "btn-info")
   })
 

@@ -4,6 +4,30 @@
 
 server_batch <- function(input, output, session, rv) {
 
+  # Number of datasets actually present among the samples (not a stored flag),
+  # so batch correction is never skipped as "single dataset" when several
+  # datasets are loaded.
+  .n_datasets_in_samples <- function() {
+    m <- rv$unified_metadata
+    if (!is.null(m) && "Dataset" %in% colnames(m)) length(unique(stats::na.omit(as.character(m$Dataset))))
+    else if (!is.null(rv$dataset_count)) as.integer(rv$dataset_count) else NA_integer_
+  }
+  .really_single_dataset <- function() {
+    n <- .n_datasets_in_samples()
+    if (isTRUE(rv$single_dataset) && !is.na(n) && n > 1L) {
+      rv$single_dataset <- FALSE           # stored flag was wrong: correct it
+      return(FALSE)
+    }
+    isTRUE(rv$single_dataset) || identical(n, 1L)
+  }
+  .mark_batch_skipped <- function(reason) {
+    rv$batch_skipped_reason <- reason
+    showNotification(
+      tags$div(icon("exclamation-triangle"), tags$strong(" Batch correction NOT applied: "), reason,
+               " Exported 'after batch' files are marked NOT_CORRECTED."),
+      type = "warning", duration = 12, id = "gexp_batch_skipped")
+  }
+
   output$batch_log_micro <- renderText({
     if (!is.null(rv$batch_log_micro) && nzchar(rv$batch_log_micro)) rv$batch_log_micro
     else "Apply batch correction to see the microarray run log."
@@ -119,11 +143,15 @@ server_batch <- function(input, output, session, rv) {
           fluidRow(
             column(6,
               tags$h5("By candidate covariate", style = "text-align: center;"),
-              plotOutput("single_ds_pca_covariate", height = "350px")
+              plotOutput("single_ds_pca_covariate", height = "350px"),
+              gexp_ui_plot_download_bar("download_single_ds_pca_covariate_png", "download_single_ds_pca_covariate_jpg",
+                                        "download_single_ds_pca_covariate_pdf", "btn-default btn-xs")
             ),
             column(6,
               tags$h5("By Condition", style = "text-align: center;"),
-              plotOutput("single_ds_pca_condition", height = "350px")
+              plotOutput("single_ds_pca_condition", height = "350px"),
+              gexp_ui_plot_download_bar("download_single_ds_pca_condition_png", "download_single_ds_pca_condition_jpg",
+                                        "download_single_ds_pca_condition_pdf", "btn-default btn-xs")
             )
           ),
           tags$div(
@@ -140,7 +168,7 @@ server_batch <- function(input, output, session, rv) {
     )
   })
 
-  output$single_ds_pca_covariate <- renderPlot({
+  .single_ds_pca_covariate_plot <- function() {
     pd <- single_ds_full_pdata()
     expr <- if (!is.null(rv$expr_filtered)) rv$expr_filtered else rv$combined_expr
     req(pd, input$single_ds_covariate, expr)
@@ -153,9 +181,8 @@ server_batch <- function(input, output, session, rv) {
       paste0("By ", input$single_ds_covariate),
       "Clustering here suggests a technical batch effect"
     )
-  })
-
-  output$single_ds_pca_condition <- renderPlot({
+  }
+  .single_ds_pca_condition_plot <- function() {
     expr <- if (!is.null(rv$expr_filtered)) rv$expr_filtered else rv$combined_expr
     req(rv$unified_metadata, expr)
     .batch_pca_polar_plot(
@@ -163,7 +190,13 @@ server_batch <- function(input, output, session, rv) {
       "By Condition",
       "Clean separation here (not by the covariate) means no correction needed"
     )
-  })
+  }
+  output$single_ds_pca_covariate <- renderPlot({ .single_ds_pca_covariate_plot() })
+  output$single_ds_pca_condition <- renderPlot({ .single_ds_pca_condition_plot() })
+  gexp_register_plot_downloads(output, "single_ds_pca_covariate", .single_ds_pca_covariate_plot, 7, 6,
+                               "Batch_Check_PCA_by_Covariate")
+  gexp_register_plot_downloads(output, "single_ds_pca_condition", .single_ds_pca_condition_plot, 7, 6,
+                               "Batch_Check_PCA_by_Condition")
 
   observeEvent(input$single_ds_confirm_skip, {
     showNotification("Keeping batch correction skipped for this single dataset.", type = "message", duration = 4)
@@ -579,6 +612,7 @@ server_batch <- function(input, output, session, rv) {
     if (!isTRUE(rv$single_dataset)) return()
     if (!isTRUE(rv$groups_applied)) return()
     if (isTRUE(rv$batch_complete)) return()
+    if (!isTRUE(.really_single_dataset())) return()   # several datasets among the samples: do not skip
 
     base_expr <- NULL
     if (!is.null(rv$combined_expr) && (is.matrix(rv$combined_expr) || is.data.frame(rv$combined_expr)) && nrow(rv$combined_expr) > 0) {
@@ -594,6 +628,7 @@ server_batch <- function(input, output, session, rv) {
     rv$batch_corrected_micro <- rv$expr_micro
     rv$batch_complete <- TRUE
     rv$batch_running <- FALSE
+    .mark_batch_skipped("only 1 dataset among the samples, so there is no between-study batch to remove.")
 
     output$batch_log <- renderText({
       paste0(
@@ -642,14 +677,26 @@ server_batch <- function(input, output, session, rv) {
   )
 
   # Expression AFTER batch correction (genes x samples) - in batch step
+  # File names say when the "after" matrix was NOT batch-corrected.
+  .after_tag <- function(expr = NULL) {
+    if (!is.null(expr)) {                           # per platform: datasets among its own samples
+      m <- rv$unified_metadata
+      n <- if (!is.null(m) && "Dataset" %in% colnames(m)) {
+        length(unique(stats::na.omit(as.character(m[intersect(colnames(expr), rownames(m)), "Dataset"]))))
+      } else NA_integer_
+      return(if (isTRUE(n < 2L)) "NOT_CORRECTED_" else "")
+    }
+    if (!is.null(rv$batch_skipped_reason)) "NOT_CORRECTED_" else ""
+  }
+
   output$download_expr_after_batch <- downloadHandler(
-    filename = function() paste0("Expression_after_batch_", Sys.Date(), ".csv"),
+    filename = function() paste0("Expression_after_batch_", .after_tag(), Sys.Date(), ".csv"),
     content = function(file) {
       req(rv$batch_corrected)
       M <- as.data.frame(rv$batch_corrected, stringsAsFactors = FALSE)
       M <- cbind(Gene = rownames(M), M)
       rownames(M) <- NULL
-      fn <- paste0("Expression_after_batch_", Sys.Date(), ".csv")
+      fn <- paste0("Expression_after_batch_", .after_tag(), Sys.Date(), ".csv")
       write.csv(M, file, row.names = FALSE)
       write.csv(M, file.path(CSV_EXPORT_DIR(), fn), row.names = FALSE)
     }
@@ -678,10 +725,13 @@ server_batch <- function(input, output, session, rv) {
       }
     )
     output[[paste0("download_expr_after_batch_", pl)]] <- downloadHandler(
-      filename = function() paste0("Expression_after_batch_", lab, "_", Sys.Date(), ".csv"),
+      filename = function() {
+        ex <- if (pl == "rna") rv$batch_corrected_rna else rv$batch_corrected_micro
+        paste0("Expression_after_batch_", lab, "_", .after_tag(ex), Sys.Date(), ".csv")
+      },
       content = function(file) {
-        .write_expr_csv(if (pl == "rna") rv$batch_corrected_rna else rv$batch_corrected_micro,
-                        paste0("Expression_after_batch_", lab, "_", Sys.Date(), ".csv"), file)
+        ex <- if (pl == "rna") rv$batch_corrected_rna else rv$batch_corrected_micro
+        .write_expr_csv(ex, paste0("Expression_after_batch_", lab, "_", .after_tag(ex), Sys.Date(), ".csv"), file)
       }
     )
   })
@@ -1026,7 +1076,9 @@ server_batch <- function(input, output, session, rv) {
   
   observeEvent(input$apply_batch, {
     # If only one dataset is present, skip batch correction and mark complete.
-    if (isTRUE(rv$single_dataset)) {
+    # Decided from the samples, so several datasets are never skipped.
+    rv$batch_skipped_reason <- NULL
+    if (isTRUE(.really_single_dataset())) {
       if (!isTRUE(rv$groups_applied)) {
         showNotification("Step 4 required: apply group labels before proceeding.", type = "error", duration = 6)
         return()
@@ -1044,6 +1096,7 @@ server_batch <- function(input, output, session, rv) {
       rv$batch_corrected_micro <- rv$expr_micro
       rv$batch_complete <- TRUE
       rv$batch_running <- FALSE
+      .mark_batch_skipped("only 1 dataset among the samples, so there is no between-study batch to remove.")
       output$batch_log <- renderText({
         paste0(
           "OK Batch correction skipped (single dataset)\n\n",
@@ -1151,6 +1204,26 @@ server_batch <- function(input, output, session, rv) {
       
       rv$expr_filtered <- res$expr_filtered
       rv$batch_corrected <- res$batch_corrected
+      # A correction that leaves the data unchanged must not pass silently.
+      .same_values <- function(after, before) {
+        if (is.null(after) || is.null(before)) return(FALSE)
+        g <- intersect(rownames(after), rownames(before)); s <- intersect(colnames(after), colnames(before))
+        length(g) > 0L && length(s) > 0L &&
+          isTRUE(all.equal(unname(as.matrix(after[g, s])), unname(as.matrix(before[g, s]))))
+      }
+      unchanged_note <- tryCatch({
+        if (!is.null(res$n_datasets_rna) || !is.null(res$n_datasets_micro)) {
+          # Parallel: each platform corrected separately; compare per platform
+          bad <- c(
+            if (isTRUE(res$n_datasets_rna >= 2L) && .same_values(res$batch_corrected_rna, rv$expr_rna)) "RNA-seq",
+            if (isTRUE(res$n_datasets_micro >= 2L) && .same_values(res$batch_corrected_micro, rv$expr_micro)) "microarray")
+          if (length(bad)) paste0("the ", paste(bad, collapse = " and "), " correction left the data unchanged although that platform has several datasets.")
+          else NULL
+        } else if (isTRUE(.n_datasets_in_samples() > 1L) && .same_values(res$batch_corrected, res$expr_filtered)) {
+          paste0("the selected method left the data unchanged although ", .n_datasets_in_samples(), " datasets are present.")
+        } else NULL
+      }, error = function(e) NULL)
+      if (!is.null(unchanged_note)) .mark_batch_skipped(paste(unchanged_note, "Check the log and try another method."))
       rv$batch_corrected_rna <- res$batch_corrected_rna
       rv$batch_corrected_micro <- res$batch_corrected_micro
       
@@ -1383,15 +1456,21 @@ server_batch <- function(input, output, session, rv) {
     )
   }
 
+  # Standard PC1 vs PC2 scatter (with % variance) - the polar angle/radius
+  # view was hard to read and is not what reviewers expect for batch QC.
+  .batch_pca_axes <- function(df) {
+    vp <- attr(df, "var_pct")
+    if (length(vp) == 2L) c(paste0("PC1 (", vp[1], "%)"), paste0("PC2 (", vp[2], "%)")) else c("PC1", "PC2")
+  }
+
   .batch_pca_polar_plot <- function(expr, meta, color_by, title, subtitle) {
     df <- gexpipe_pca_polar_df(expr, meta, color_by)
-    base <- ggplot(df, aes(x = theta, y = r)) +
-      coord_polar(theta = "x", start = -pi / 2, direction = 1) +
-      scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
-                        labels = c("-180 deg", "-90 deg", "0 deg", "90 deg", "180 deg")) +
-      scale_y_continuous(limits = c(0, NA)) +
+    ax <- .batch_pca_axes(df)
+    base <- ggplot(df, aes(x = PC1, y = PC2)) +
+      geom_hline(yintercept = 0, color = "gray85") +
+      geom_vline(xintercept = 0, color = "gray85") +
       theme_bw(base_size = 14) +
-      labs(title = title, subtitle = subtitle, x = "Angle (PC1-PC2)", y = "Radius") +
+      labs(title = title, subtitle = subtitle, x = ax[1], y = ax[2]) +
       .batch_pca_polar_theme()
 
     if (color_by == "Condition" &&
@@ -1416,7 +1495,7 @@ server_batch <- function(input, output, session, rv) {
     .batch_pca_polar_plot(
       rv$expr_filtered, rv$unified_metadata, "Dataset",
       "Before Batch Correction - By Dataset",
-      "Batch effects visible as dataset separation (circular)"
+      "Batch effects visible as dataset separation"
     )
   })
   
@@ -1428,9 +1507,9 @@ server_batch <- function(input, output, session, rv) {
       "Before Batch Correction - By Condition",
       if (all(is.na(rv$unified_metadata$Condition)) ||
           length(unique(rv$unified_metadata$Condition[!is.na(rv$unified_metadata$Condition)])) < 2) {
-        "Conditions not yet assigned (circular)"
+        "Conditions not yet assigned"
       } else {
-        "Biological signal may be obscured by batch effects (circular)"
+        "Biological signal may be obscured by batch effects"
       }
     )
   })
@@ -1449,18 +1528,18 @@ server_batch <- function(input, output, session, rv) {
         width = 6, status = "warning", solidHeader = TRUE,
         plotOutput("pca_before_platform", height = "400px"),
         tags$div(style = "margin-top: 6px;",
-          downloadButton("download_pca_before_platform_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"),
-          downloadButton("download_pca_before_platform_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"),
-          downloadButton("download_pca_before_platform_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-warning"))
+          downloadButton("download_pca_before_platform_png", tagList(" PNG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"),
+          downloadButton("download_pca_before_platform_jpg", tagList(" JPG"), class = "btn-sm btn-warning", style = "margin-right: 4px;"),
+          downloadButton("download_pca_before_platform_pdf", tagList(" PDF"), class = "btn-sm btn-warning"))
       ),
       box(
         title = tags$span(icon("check-circle"), " After Batch Correction - By Platform"),
         width = 6, status = "success", solidHeader = TRUE,
         plotOutput("pca_after_platform", height = "400px"),
         tags$div(style = "margin-top: 6px;",
-          downloadButton("download_pca_after_platform_png", tagList(icon("download"), " PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-          downloadButton("download_pca_after_platform_jpg", tagList(icon("download"), " JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
-          downloadButton("download_pca_after_platform_pdf", tagList(icon("download"), " PDF"), class = "btn-sm btn-success"))
+          downloadButton("download_pca_after_platform_png", tagList(" PNG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+          downloadButton("download_pca_after_platform_jpg", tagList(" JPG"), class = "btn-sm btn-success", style = "margin-right: 4px;"),
+          downloadButton("download_pca_after_platform_pdf", tagList(" PDF"), class = "btn-sm btn-success"))
       )
     )
   })
@@ -1478,15 +1557,14 @@ server_batch <- function(input, output, session, rv) {
     } else {
       "Platforms should intermingle; persistent separation suggests residual platform bias"
     }
-    ggplot(df, aes(x = theta, y = r, color = Platform)) +
+    ax <- .batch_pca_axes(df)
+    ggplot(df, aes(x = PC1, y = PC2, color = Platform)) +
+      geom_hline(yintercept = 0, color = "gray85") +
+      geom_vline(xintercept = 0, color = "gray85") +
       geom_point(size = 3.5, alpha = 0.7) +
       scale_color_manual(values = c("Microarray" = "#e67e22", "RNAseq" = "#9b59b6")) +
-      coord_polar(theta = "x", start = -pi / 2, direction = 1) +
-      scale_x_continuous(limits = c(-pi, pi), breaks = c(-pi, -pi/2, 0, pi/2, pi),
-                        labels = c("-180 deg", "-90 deg", "0 deg", "90 deg", "180 deg")) +
-      scale_y_continuous(limits = c(0, NA)) +
       theme_bw(base_size = 14) +
-      labs(title = ttl, subtitle = sub, x = "Angle (PC1-PC2)", y = "Radius", color = "Platform") +
+      labs(title = ttl, subtitle = sub, x = ax[1], y = ax[2], color = "Platform") +
       theme(
         plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
         plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray50"),
@@ -1511,7 +1589,7 @@ server_batch <- function(input, output, session, rv) {
     .batch_pca_polar_plot(
       rv$batch_corrected, rv$unified_metadata, "Dataset",
       "After Batch Correction - By Dataset",
-      "Datasets should be intermingled (batch effects removed) (circular)"
+      "Datasets should be intermingled (batch effects removed)"
     )
   })
   
@@ -1523,9 +1601,9 @@ server_batch <- function(input, output, session, rv) {
       "After Batch Correction - By Condition",
       if (all(is.na(rv$unified_metadata$Condition)) ||
           length(unique(rv$unified_metadata$Condition[!is.na(rv$unified_metadata$Condition)])) < 2) {
-        "Conditions not yet assigned (circular)"
+        "Conditions not yet assigned"
       } else {
-        "Biological signal should be clearly visible (circular)"
+        "Biological signal should be clearly visible"
       }
     )
   })
@@ -1557,7 +1635,8 @@ server_batch <- function(input, output, session, rv) {
       # Create annotation for heatmap
       annotation_col <- data.frame(
         Dataset = metadata_subset$Dataset,
-        Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", metadata_subset$Condition),
+        # as.character: ifelse() on a factor returns its integer codes (legend showed 1/2)
+        Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", as.character(metadata_subset$Condition)),
         row.names = colnames(expr_subset)
       )
       if (gexpipe_has_mixed_platforms(metadata_subset)) {
@@ -1615,7 +1694,8 @@ server_batch <- function(input, output, session, rv) {
       # Create annotation for heatmap
       annotation_col <- data.frame(
         Dataset = metadata_subset$Dataset,
-        Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", metadata_subset$Condition),
+        # as.character: ifelse() on a factor returns its integer codes (legend showed 1/2)
+        Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", as.character(metadata_subset$Condition)),
         row.names = colnames(expr_subset)
       )
       if (gexpipe_has_mixed_platforms(metadata_subset)) {
@@ -1675,19 +1755,19 @@ server_batch <- function(input, output, session, rv) {
   .batch_pca_subtitle <- function(color_by, when, meta) {
     if (color_by == "Dataset") {
       if (when == "before") {
-        "Batch effects visible as dataset separation (circular)"
+        "Batch effects visible as dataset separation"
       } else {
-        "Datasets should be intermingled (batch effects removed) (circular)"
+        "Datasets should be intermingled (batch effects removed)"
       }
     } else {
       unassigned <- all(is.na(meta$Condition)) ||
         length(unique(meta$Condition[!is.na(meta$Condition)])) < 2
       if (when == "before") {
-        if (unassigned) "Conditions not yet assigned (circular)" else "Biological signal may be obscured by batch effects (circular)"
+        if (unassigned) "Conditions not yet assigned" else "Biological signal may be obscured by batch effects"
       } else if (unassigned) {
-        "Conditions not yet assigned (circular)"
+        "Conditions not yet assigned"
       } else {
-        "Biological signal should be clearly visible (circular)"
+        "Biological signal should be clearly visible"
       }
     }
   }
@@ -1800,7 +1880,7 @@ server_batch <- function(input, output, session, rv) {
     cor_matrix <- cor(expr_subset, use = "pairwise.complete.obs")
     dist_matrix <- as.dist(1 - cor_matrix)
     hclust_result <- hclust(dist_matrix, method = "ward.D2")
-    annotation_col <- data.frame(Dataset = metadata_subset$Dataset, Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", metadata_subset$Condition), row.names = colnames(expr_subset))
+    annotation_col <- data.frame(Dataset = metadata_subset$Dataset, Condition = ifelse(is.na(metadata_subset$Condition), "Unknown", as.character(metadata_subset$Condition)), row.names = colnames(expr_subset))
     if (gexpipe_has_mixed_platforms(metadata_subset)) {
       annotation_col$Platform <- metadata_subset$Platform
     }

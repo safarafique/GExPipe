@@ -126,9 +126,11 @@ ui_normalize <- tabItem(
                 "apply_global_quantile",
                 tags$span(
                   tags$strong("Apply global quantile"),
-                  " after common genes (on by default for Merged so RNA-seq and microarray share one scale)"
+                  " after common genes (off by default: forcing microarray and RNA-seq onto one quantile",
+                  " distribution distorts gene-level signal; use ComBat with Condition in Step 5 to remove",
+                  " the platform/dataset shift instead)"
                 ),
-                value = TRUE
+                value = FALSE
               )
             )
           ),
@@ -255,7 +257,7 @@ ui_normalize <- tabItem(
                    style = "color: #2c3e50; margin-bottom: 15px;"),
             tableOutput("normalization_summary_table"),
             tags$div(style = "margin-top: 10px;",
-              downloadButton("download_normalization_summary_csv", tagList(icon("download"), " Summary table (CSV)"), class = "btn-info btn-sm"))
+              downloadButton("download_normalization_summary_csv", tagList(" Summary table (CSV)"), class = "btn-info btn-sm"))
           ),
           tags$hr(),
           tags$div(
