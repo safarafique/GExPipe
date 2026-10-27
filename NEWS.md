@@ -1,3 +1,8 @@
+# GExPipe 0.99.118
+
+- Example GSE IDs: added RNA-seq GSE112087 and microarray GSE49454 to the examples shown in the
+  Step 1 dataset boxes and in the vignette (alongside GSE144119, GSE100026 and GSE268456, GSE47927).
+
 # GExPipe 0.99.117
 
 Exports and batch correction:

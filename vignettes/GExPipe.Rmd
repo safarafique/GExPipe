@@ -303,8 +303,8 @@ shown under the GSE ID boxes in Step 1.
 
 | Platform | Example GSE IDs (Step 1 box) | Role |
 |----------|------------------------------|------|
-| RNA-seq | `GSE144119, GSE100026` | Training (RNA-seq box) |
-| Microarray | `GSE268456, GSE47927` | Training (microarray box) |
+| RNA-seq | `GSE144119, GSE100026, GSE112087` | Training (RNA-seq box) |
+| Microarray | `GSE268456, GSE47927, GSE49454` | Training (microarray box) |
 | RNA-seq | `GSE162462` | External validation (Step 12) |
 | Microarray | `GSE13159` | External validation (Step 12) |
 
@@ -315,10 +315,10 @@ which box to fill for each type, using the example IDs above.
 
 | Analysis type | RNA-seq box | Microarray box | DE method (Step 6) | What happens |
 |---------------|-------------|----------------|--------------------|--------------|
-| **1. RNA-seq only** | `GSE144119, GSE100026` | — | DESeq2, edgeR, limma-voom (raw counts) or limma (TMM log-CPM) | RNA-seq studies normalized, batch-corrected and analysed together. |
-| **2. Microarray only** | — | `GSE268456, GSE47927` | limma | Microarray studies normalized (quantile / RMA / log2), batch-corrected and analysed with limma. |
-| **3. Merged (Both)** | `GSE144119, GSE100026` | `GSE268456, GSE47927` | limma | Each study normalized on its own scale, common genes kept, global quantile on, **one joint batch correction and one limma DE** on all samples. |
-| **4. Parallel DE, then merge** | `GSE144119, GSE100026` | `GSE268456, GSE47927` | RNA-seq: DESeq2 / edgeR / limma-voom / limma; microarray: limma | Two separate pipelines (each platform keeps its own genes, normalization, batch correction and DE); **Step 7** keeps DEGs found on both platforms with the same direction. |
+| **1. RNA-seq only** | `GSE144119, GSE100026, GSE112087` | — | DESeq2, edgeR, limma-voom (raw counts) or limma (TMM log-CPM) | RNA-seq studies normalized, batch-corrected and analysed together. |
+| **2. Microarray only** | — | `GSE268456, GSE47927, GSE49454` | limma | Microarray studies normalized (quantile / RMA / log2), batch-corrected and analysed with limma. |
+| **3. Merged (Both)** | `GSE144119, GSE100026, GSE112087` | `GSE268456, GSE47927, GSE49454` | limma | Each study normalized on its own scale, common genes kept, global quantile on, **one joint batch correction and one limma DE** on all samples. |
+| **4. Parallel DE, then merge** | `GSE144119, GSE100026, GSE112087` | `GSE268456, GSE47927, GSE49454` | RNA-seq: DESeq2 / edgeR / limma-voom / limma; microarray: limma | Two separate pipelines (each platform keeps its own genes, normalization, batch correction and DE); **Step 7** keeps DEGs found on both platforms with the same direction. |
 
 For a single-study run, choose **Single dataset (1 GSE)** with RNA-seq only
 or microarray only (e.g. just `GSE144119` or just `GSE268456`); Step 5 batch
@@ -353,8 +353,8 @@ normalization. Parallel DE keeps each platform's genes until Step 7.
    - **limma-voom**, **DESeq2**, or **edgeR** — RNA-seq integer counts.
    - Parallel: RNA-seq method on the left; microarray is always limma.
 5. Enter comma-separated **GSE IDs**. RNA-seq and microarray each have
-   their own box, e.g. `GSE144119, GSE100026` in **RNA-seq Datasets** and
-   `GSE268456, GSE47927` in **Microarray Datasets** (see
+   their own box, e.g. `GSE144119, GSE100026, GSE112087` in **RNA-seq Datasets** and
+   `GSE268456, GSE47927, GSE49454` in **Microarray Datasets** (see
    [the four analysis types](#four-analysis-types) for which boxes each type
    uses).
 6. Click **Start Processing** and read the **Download log**.
