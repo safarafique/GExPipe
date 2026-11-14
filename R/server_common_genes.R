@@ -183,7 +183,26 @@ server_common_genes <- function(input, output, session, rv) {
 
     common <- intersect(deg_genes, wgcna_genes)
     rv$common_genes_de_wgcna <- common
-    rv$common_genes_df <- data.frame(Gene = common, stringsAsFactors = FALSE)
+    # Record which modules fed this list (scope "top" = only the module with the
+    # strongest |module-trait r|, not every significant module), per gene and as
+    # a separate module table, so the choice is visible in the exported files.
+    # rep_len() keeps the columns the same length when the overlap is empty.
+    n_common <- length(common)
+    rv$common_genes_df <- data.frame(Gene = as.character(common),
+                                     WGCNA_Module = as.character(rv$gene_metrics$Module[match(common, trimws(rv$gene_metrics$Gene))]),
+                                     WGCNA_Scope = rep_len(scope, n_common),
+                                     Modules_Used = rep_len(paste(module_colors, collapse = ";"), n_common),
+                                     stringsAsFactors = FALSE)
+    all_sig <- rv$significant_modules
+    if (is.data.frame(all_sig) && nrow(all_sig) > 0) try({
+      all_sig$Module_Color <- sub("^ME", "", as.character(all_sig$Module))
+      all_sig$Used_In_Step8 <- all_sig$Module_Color %in% module_colors
+      all_sig$Genes_In_Module <- vapply(all_sig$Module_Color, function(m) sum(rv$gene_metrics$Module == m, na.rm = TRUE), integer(1))
+      all_sig$DEGs_In_Module <- vapply(all_sig$Module_Color, function(m) length(intersect(deg_genes, rv$gene_metrics$Gene[rv$gene_metrics$Module == m])), integer(1))
+      all_sig$WGCNA_Scope <- scope
+      rv$common_genes_module_table <- all_sig
+      utils::write.csv(all_sig, file.path(CSV_EXPORT_DIR(), "Step8_WGCNA_Modules_Used.csv"), row.names = FALSE)
+    }, silent = TRUE)
     rv$common_genes_deg_n <- length(deg_genes)
     rv$common_genes_wgcna_n <- length(wgcna_genes)
     rv$common_genes_deg_list <- deg_genes
@@ -192,7 +211,9 @@ server_common_genes <- function(input, output, session, rv) {
     if (length(common) == 0) {
       showNotification("Computation done: no overlap between DEGs and WGCNA significant module genes. Try relaxing DE or module-trait cutoffs.", type = "warning", duration = 8)
     } else {
-      showNotification(paste("Found", length(common), "genes (", .step9_labels()$overlap, ")."), type = "message", duration = 5)
+      showNotification(paste0("Found ", length(common), " genes (", .step9_labels()$overlap, "). WGCNA modules used (",
+                              scope, "): ", paste(module_colors, collapse = ", "), " of ", NROW(rv$significant_modules), " significant."),
+                       type = "message", duration = 8)
     }
   })
   

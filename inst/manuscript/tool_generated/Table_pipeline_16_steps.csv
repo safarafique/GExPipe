@@ -1,7 +1,7 @@
 Step,Sidebar_label,Phase,Tool_capabilities
 1,Download Data,Data preparation,GEOquery; RNA-seq + microarray GSE boxes; empty Series Matrix count ingest; probe→HGNC (Step 2b); four analysis types
 2,Normalize Data,Data preparation,"Per-GSE platform normalization; Auto/Manual; Merged: common genes + optional global quantile; Parallel: separate, no intersection"
-3,QC & Visualization,Data preparation,Sample/gene QC; density/boxplot; outlier exclusion; Venn/UpSet gene overlap (Parallel: per-platform plots)
+3,QC & Visualization,Data preparation,Sample/gene QC; density/boxplot; Venn/UpSet gene overlap (Parallel: per-platform plots)
 4,Select Groups,Data preparation,Normal vs Disease (and related); Parallel: separate success banners per platform
 5,Batch Correction,Data preparation,Variance filter; 6 joint methods (Merged/single); Parallel: per-platform batch (no joint ComBat)
 6,Differential Expression,Gene discovery,"limma, limma-voom, DESeq2, edgeR; Parallel: dual engines one click; independent cutoffs per platform"

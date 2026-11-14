@@ -603,13 +603,16 @@
 
 ## cv.glmnet in a child R process when the parent session cannot load glmnet's DLL.
 .gexpipe_glmnet_cv_subprocess <- function(x, y, alpha = 1, family = "binomial",
-                                          lib = .gexpipe_get_lib()) {
+                                          lib = .gexpipe_get_lib(), foldid = NULL) {
+  if (is.null(foldid)) foldid <- .gexpipe_glmnet_foldid(nrow(x))
   tmp_x <- normalizePath(tempfile(pattern = "gexp_x_", fileext = ".rds"), winslash = "/", mustWork = FALSE)
   tmp_y <- normalizePath(tempfile(pattern = "gexp_y_", fileext = ".rds"), winslash = "/", mustWork = FALSE)
+  tmp_f <- normalizePath(tempfile(pattern = "gexp_f_", fileext = ".rds"), winslash = "/", mustWork = FALSE)
   tmp_out <- normalizePath(tempfile(pattern = "gexp_fit_", fileext = ".rds"), winslash = "/", mustWork = FALSE)
-  on.exit(unlink(c(tmp_x, tmp_y, tmp_out)), add = TRUE)
+  on.exit(unlink(c(tmp_x, tmp_y, tmp_f, tmp_out)), add = TRUE)
   saveRDS(x, tmp_x)
   saveRDS(y, tmp_y)
+  saveRDS(foldid, tmp_f)
   lib_fwd <- gsub("\\\\", "/", normalizePath(lib, winslash = "/", mustWork = FALSE))
   libs_fwd <- vapply(unique(c(lib, .libPaths())), function(lp) {
     gsub("\\\\", "/", normalizePath(lp, winslash = "/", mustWork = FALSE))
@@ -620,8 +623,9 @@
     "suppressPackageStartupMessages(library(glmnet))",
     paste0('x <- readRDS("', tmp_x, '")'),
     paste0('y <- readRDS("', tmp_y, '")'),
+    paste0('foldid <- readRDS("', tmp_f, '")'),
     paste0('fit <- glmnet::cv.glmnet(x, y, alpha = ', as.numeric(alpha),
-           ', family = "', family, '")'),
+           ', family = "', family, '", foldid = foldid)'),
     paste0('saveRDS(fit, "', tmp_out, '")')
   ), timeout = 1800L)
   if (!isTRUE(res$ok) || !file.exists(tmp_out)) {
@@ -631,9 +635,18 @@
   readRDS(tmp_out)
 }
 
+## Cross-validation folds for cv.glmnet, drawn from a fixed seed. Same draw as
+## cv.glmnet's own default (sample(rep(seq(10), length = N))) after set.seed(seed),
+## but made explicit so the in-session fit and the subprocess fallback (which
+## has its own, unseeded RNG) use identical folds.
+.gexpipe_glmnet_foldid <- function(n, nfolds = 10L, seed = 123L) {
+  withr::with_seed(seed, sample(rep(seq_len(nfolds), length.out = n)))
+}
+
 ## cv.glmnet in the current session, or subprocess fallback - no R restart required.
 .gexpipe_glmnet_cv_fit <- function(x, y, alpha = 1, family = "binomial",
-                                   lib = .gexpipe_get_lib()) {
+                                   lib = .gexpipe_get_lib(), seed = 123L) {
+  foldid <- .gexpipe_glmnet_foldid(nrow(x), seed = seed)
   in_session <- tryCatch({
     if (!requireNamespace("glmnet", quietly = TRUE)) {
       stop("glmnet is not installed")
@@ -644,7 +657,7 @@
     if (!isTRUE(.gexpipe_glmnet_smoke())) {
       stop("glmnet smoke test failed")
     }
-    glmnet::cv.glmnet(x, y, alpha = alpha, family = family)
+    glmnet::cv.glmnet(x, y, alpha = alpha, family = family, foldid = foldid)
   }, error = function(e) NULL)
   if (inherits(in_session, "cv.glmnet")) {
     options(gexpipe.glmnet_subprocess = FALSE)
@@ -659,7 +672,7 @@
     )
   }
   options(gexpipe.glmnet_subprocess = TRUE)
-  .gexpipe_glmnet_cv_subprocess(x, y, alpha = alpha, family = family, lib = lib)
+  .gexpipe_glmnet_cv_subprocess(x, y, alpha = alpha, family = family, lib = lib, foldid = foldid)
 }
 
 ## Unload pkg and remove it from every library on .libPaths().

@@ -653,6 +653,12 @@ server_wgcna <- function(input, output, session, rv) {
         tryCatch(updateNumericInput(session, "wgcna_power", value = rec_power), error = function(e) NULL)
       }
       add_wgcna_log("Soft-threshold calculation complete")
+      try({
+        fi <- as.data.frame(sft$fitIndices)
+        fi$Signed_R2 <- -sign(fi$slope) * fi$SFT.R.sq
+        fi$Recommended_Power <- if (length(rec_power) && !is.na(rec_power)) rec_power else NA_integer_
+        utils::write.csv(fi, file.path(CSV_EXPORT_DIR(), "wgcna_soft_threshold_table.csv"), row.names = FALSE)
+      }, silent = TRUE)
       
       shinyjs::enable("pick_soft_threshold")
       shinyjs::html("pick_soft_threshold", 
@@ -795,9 +801,16 @@ server_wgcna <- function(input, output, session, rv) {
         deepSplit <- tryCatch(max(0L, min(4L, as.integer(input$wgcna_deep_split))), error = function(e) 2L)
         if (length(deepSplit) == 0 || is.na(deepSplit)) deepSplit <- 2L
         
-        add_wgcna_log(paste("Building network with power =", power, 
+        add_wgcna_log(paste("Building network with power =", power,
                           ", minModuleSize =", minModuleSize,
                           ", mergeCutHeight =", mergeCutHeight))
+        # Settings actually used (exported with Step 8/9 gene lists and the run manifest)
+        rv$wgcna_settings_used <- data.frame(
+          Power = power, Recommended_Power = c(rv$soft_threshold$powerEstimate, NA_integer_)[1L],
+          Network_Type = "signed", Min_Module_Size = minModuleSize, Deep_Split = deepSplit,
+          Merge_Cut_Height = mergeCutHeight, N_Genes = ncol(datExpr), N_Samples = nrow(datExpr),
+          stringsAsFactors = FALSE)
+        try(utils::write.csv(rv$wgcna_settings_used, file.path(CSV_EXPORT_DIR(), "wgcna_settings_used.csv"), row.names = FALSE), silent = TRUE)
         
         # Build adjacency matrix
         incProgress(0.2, detail = "Building adjacency matrix...")

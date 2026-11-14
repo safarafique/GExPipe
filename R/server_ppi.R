@@ -310,6 +310,31 @@ server_ppi <- function(input, output, session, rv) {
           return()
         }
         mapped <- ppi_data$mapped
+        # Provenance: which STRING release answered (the code falls back from
+        # the first version in the list to older ones on failure), when, and
+        # where the cached files live. Exported as PPI_STRING_Provenance.csv.
+        string_tried <- getOption("gexpipe.stringdb_try_versions", c("12.0", "11.5", "11"))
+        rv$ppi_string_info <- data.frame(
+          STRING_Version = ppi_data$version_used,
+          Fallback_Used = !identical(as.character(ppi_data$version_used), as.character(string_tried[1L])),
+          Score_Threshold = score_threshold,
+          Top_Hubs_Per_Metric = n_top_hubs,
+          Species = 9606L,
+          Input_Genes = length(valid_genes),
+          Access_Time = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
+          Cache_Dir = .gexpipe_stringdb_cache_dir(),
+          STRINGdb_Package = as.character(utils::packageVersion("STRINGdb")),
+          Earlier_Version_Errors = paste(ppi_data$try_errors, collapse = " | "),
+          stringsAsFactors = FALSE
+        )
+        if (isTRUE(rv$ppi_string_info$Fallback_Used)) {
+          showNotification(
+            tags$div(icon("exclamation-triangle"), tags$strong(paste0(" STRING v", string_tried[1L], " was unavailable; used v", ppi_data$version_used, ".")),
+                     tags$br(), tags$small(paste0("A different STRING release gives a different network and hub genes. To pin a version, set options(gexpipe.stringdb_try_versions = \"",
+                                                  ppi_data$version_used, "\") before runGExPipe()."))),
+            type = "warning", duration = 20)
+        }
+        try(utils::write.csv(rv$ppi_string_info, file.path(CSV_EXPORT_DIR(), "PPI_STRING_Provenance.csv"), row.names = FALSE), silent = TRUE)
 
         pct_mapped <- ppi_data$pct_mapped
         if (!is.null(pct_mapped)) {
@@ -387,12 +412,15 @@ server_ppi <- function(input, output, session, rv) {
 
         incProgress(0.75, detail = "Consensus hubs...")
         n_top <- min(n_top_hubs, nrow(hub_scores))
+        # Ties at the top-N cut-off are broken by gene symbol (scores rounded
+        # to 8 significant digits), not by the order STRING returned the nodes.
+        .top_by <- function(v) head(hub_scores[order(-signif(v, 8), hub_scores$SYMBOL), ], n_top)
         hub_rankings <- list(
-          Degree = head(hub_scores[order(-hub_scores$Degree), ], n_top),
-          Betweenness = head(hub_scores[order(-hub_scores$Betweenness), ], n_top),
-          Closeness = head(hub_scores[order(-hub_scores$Closeness), ], n_top),
-          Eigenvector = head(hub_scores[order(-hub_scores$Eigenvector), ], n_top),
-          PageRank = head(hub_scores[order(-hub_scores$PageRank), ], n_top)
+          Degree = .top_by(hub_scores$Degree),
+          Betweenness = .top_by(hub_scores$Betweenness),
+          Closeness = .top_by(hub_scores$Closeness),
+          Eigenvector = .top_by(hub_scores$Eigenvector),
+          PageRank = .top_by(hub_scores$PageRank)
         )
         all_hub_genes <- unlist(lapply(hub_rankings, function(x) x$SYMBOL))
         hub_gene_counts <- table(all_hub_genes)
@@ -431,6 +459,15 @@ server_ppi <- function(input, output, session, rv) {
         rv$ppi_non_interactive_genes <- non_interactive_genes
         rv$ppi_gene_status_table <- status_df
         rv$ppi_complete <- TRUE
+        # Hub scores are saved on every run (not only when the download button is clicked).
+        try({
+          hs <- hub_scores
+          hs$Consensus_Hub <- hs$SYMBOL %in% consensus_hubs
+          hs$STRING_Version <- rv$ppi_string_info$STRING_Version[1L]
+          hs$STRING_Access_Time <- rv$ppi_string_info$Access_Time[1L]
+          hs$Score_Threshold <- score_threshold
+          utils::write.csv(hs, file.path(CSV_EXPORT_DIR(), "PPI_Hub_Gene_Scores.csv"), row.names = FALSE)
+        }, silent = TRUE)
         incProgress(1)
         n_int <- length(interactive_genes)
         n_non <- length(non_interactive_genes)
@@ -1140,8 +1177,14 @@ server_ppi <- function(input, output, session, rv) {
     filename = function() "PPI_Hub_Gene_Scores.csv",
     content = function(file) {
       req(rv$ppi_hub_scores)
-      write.csv(rv$ppi_hub_scores, file, row.names = FALSE)
-      write.csv(rv$ppi_hub_scores, file.path(CSV_EXPORT_DIR(), "PPI_Hub_Gene_Scores.csv"), row.names = FALSE)
+      df <- rv$ppi_hub_scores
+      if (!is.null(rv$ppi_string_info)) {
+        df$STRING_Version <- rv$ppi_string_info$STRING_Version[1L]
+        df$STRING_Access_Time <- rv$ppi_string_info$Access_Time[1L]
+        df$Score_Threshold <- rv$ppi_string_info$Score_Threshold[1L]
+      }
+      write.csv(df, file, row.names = FALSE)
+      write.csv(df, file.path(CSV_EXPORT_DIR(), "PPI_Hub_Gene_Scores.csv"), row.names = FALSE)
     }
   )
 

@@ -305,7 +305,7 @@ shown under the GSE ID boxes in Step 1.
 |----------|------------------------------|------|
 | RNA-seq | `GSE144119, GSE100026, GSE112087` | Training (RNA-seq box) |
 | Microarray | `GSE268456, GSE47927, GSE49454` | Training (microarray box) |
-| RNA-seq | `GSE162462` | External validation (Step 12) |
+| RNA-seq | `GSE162462, GSE72509` | External validation (Step 12) |
 | Microarray | `GSE13159` | External validation (Step 12) |
 
 ### The four analysis types {#four-analysis-types}
@@ -353,8 +353,8 @@ normalization. Parallel DE keeps each platform's genes until Step 7.
    - **limma-voom**, **DESeq2**, or **edgeR** — RNA-seq integer counts.
    - Parallel: RNA-seq method on the left; microarray is always limma.
 5. Enter comma-separated **GSE IDs**. RNA-seq and microarray each have
-   their own box, e.g. `GSE144119, GSE100026, GSE112087` in **RNA-seq Datasets** and
-   `GSE268456, GSE47927, GSE49454` in **Microarray Datasets** (see
+   their own box, e.g. `GSE144119, GSE100026, GSE112087` in **RNA-seq
+   Datasets** and `GSE268456, GSE47927, GSE49454` in **Microarray Datasets** (see
    [the four analysis types](#four-analysis-types) for which boxes each type
    uses).
 6. Click **Start Processing** and read the **Download log**.
@@ -428,9 +428,8 @@ knitr::include_graphics("images/step03b_normalize.png")
 
 **Sidebar:** `3. QC & Visualization`
 
-**Goal:** Check gene overlap, inspect expression **per platform** after
-Step 2, and detect outlier samples **within each GSE**. Parallel DE does
-not require a gene intersection here.
+**Goal:** Check gene overlap and inspect expression **per platform** after
+Step 2. Parallel DE does not require a gene intersection here.
 
 **What to do:**
 
@@ -440,17 +439,10 @@ not require a gene intersection here.
    circle marked "100% overlap".
 2. Open **Quality Control Plots** — **Boxplot** and **Density** tabs on raw
    expression (panel b).
-3. In **Sample Outlier Detection**, click **Run Outlier Detection** (panel c).
-   PCA (Mahalanobis distance) and sample connectivity are computed on the
-   normalized matrix — the combined matrix in Merged mode, each platform
-   separately in Parallel mode (at least 5 samples per platform). The plots
-   and outlier tables appear after the run; each table has a CSV download.
-4. Exclude flagged samples if needed; keep **≥ 3 samples per group** after
-   Step 4.
-5. Review **Data Summary** (datasets, samples, genes).
-6. Proceed to Step 4 (Select Groups).
+3. Review **Data Summary** (datasets, samples, genes).
+4. Proceed to Step 4 (Select Groups).
 
-**Success check:** Overlap and QC plots look reasonable; outliers reviewed.
+**Success check:** Overlap and QC plots look reasonable.
 
 ```{r step02a-screenshot, echo=FALSE, fig.cap="Step 3a: Venn and UpSet gene overlap.", out.width="100%"}
 knitr::include_graphics("images/step02a_qc.png")
@@ -458,10 +450,6 @@ knitr::include_graphics("images/step02a_qc.png")
 
 ```{r step02b-screenshot, echo=FALSE, fig.cap="Step 3b: Expression boxplot.", out.width="100%"}
 knitr::include_graphics("images/step02b_qc.png")
-```
-
-```{r step02c-screenshot, echo=FALSE, fig.cap="Step 3c: PCA and connectivity outlier detection.", out.width="100%"}
-knitr::include_graphics("images/step02c_qc.png")
 ```
 
 ### Step 4 — Select Groups
@@ -776,7 +764,7 @@ knitr::include_graphics("images/step10b_ml.png")
    - **Internal Validation** — use a 70/30 stratified split of your current
      data (no extra download).
 2. **External path only:**
-   - Enter validation **GSE IDs** (e.g. `GSE162462` for RNA-seq or
+   - Enter validation **GSE IDs** (e.g. `GSE162462` or `GSE72509` for RNA-seq or
      `GSE13159` for microarray), select **Platform
      Type** and **DE Method** (limma, or DESeq2/edgeR when the platform is
      RNA-seq with raw counts).
@@ -862,7 +850,10 @@ calibration curve, and decision curve analysis.
 1. Confirm the validation mode banner (external or internal 70/30 split).
 2. Click **Run Nomogram Analysis**.
 3. Review outputs in order:
-   - **Panel A:** nomogram (points scale).
+   - **Panel A:** nomogram (points scale). Drawn only when the model has two
+     or more predictors. With one predictor (a single gene or the composite
+     panel score) and no clinical covariates, a one-axis nomogram adds nothing,
+     so Panel A shows a note instead; report Panels B-D (ROC, calibration, DCA).
    - **Panel B:** training and validation ROC curves.
    - **Panel C:** calibration curves.
    - **Panel D:** decision curve analysis (DCA).

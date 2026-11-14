@@ -60,7 +60,7 @@ server_nomogram <- function(input, output, session, rv) {
     val_auc <- if (!is.null(rv$nomogram_val_metrics) && "AUC" %in% names(rv$nomogram_val_metrics)) round(rv$nomogram_val_metrics$AUC, 3) else NA
     tags$div(
       style = "font-size: 14px; line-height: 1.6; color: #333;",
-      tags$p(tags$strong("Step 13 complete."), " Nomogram built. Training AUC: ", train_auc, "; Validation AUC: ", val_auc, ". Calibration and DCA plots above."))
+      tags$p(tags$strong("Step 13 complete."), if (gexp_nomogram_is_univariable(rv$nomogram_available_genes)) " One-predictor logistic model built (nomogram omitted). Training AUC: " else " Nomogram built. Training AUC: ", train_auc, "; Validation AUC: ", val_auc, ". Calibration and DCA plots above."))
   })
 
   output$nomogram_placeholder_ui <- renderUI({
@@ -83,7 +83,8 @@ server_nomogram <- function(input, output, session, rv) {
     tags$div(
       class = "alert alert-success",
       icon("check-circle"),
-      paste0(" Nomogram complete. Training: ", n_train, " samples, ", val_label, ": ", n_val, " samples. ", n_pred, " predictors.")
+      paste0(if (gexp_nomogram_is_univariable(rv$nomogram_available_genes)) " Model complete (one predictor: ROC, calibration and DCA reported; nomogram omitted). Training: " else " Nomogram complete. Training: ",
+             n_train, " samples, ", val_label, ": ", n_val, " samples. ", n_pred, if (n_pred == 1L) " predictor." else " predictors.")
     )
   })
 
@@ -114,6 +115,7 @@ server_nomogram <- function(input, output, session, rv) {
       Nomogram_Calibration_Statistics = rv$nomogram_calibration_stats,
       Nomogram_Confusion_Matrices = rv$nomogram_confusion_table,
       Nomogram_Model_Diagnostics = d,
+      Nomogram_Predictor_Selection = rv$nomogram_predictor_log,
       Nomogram_Outcome_Coding_and_Settings = rv$nomogram_run_settings
     )
   }
@@ -268,33 +270,23 @@ server_nomogram <- function(input, output, session, rv) {
       }
     }
 
-    # External mode: the trained model can only be applied to genes the
-    # validation dataset actually contains. Restrict the predictor pool to the
-    # shared genes BEFORE fitting (never impute missing genes), and say so.
+    # The training model must not depend on the validation input: the
+    # predictor pool is NOT restricted to the genes the external dataset
+    # contains (that made the panel, the model and the threshold change with
+    # the validation cohort). If a final predictor is missing from the external
+    # dataset, validation stops below with a clear message (never imputed).
     if (mode == "external") {
-      ext_cols <- colnames(rv$external_validation_expr)
-      not_in_ext <- setdiff(available_genes, ext_cols)
+      not_in_ext <- setdiff(available_genes, colnames(rv$external_validation_expr))
       if (length(not_in_ext) > 0) {
-        available_genes <- intersect(available_genes, ext_cols)
         showNotification(
           tags$div(
-            icon("exclamation-triangle"),
-            tags$strong(paste0(" ", length(not_in_ext), " gene(s) absent from the external dataset were excluded from the model:")),
+            icon("info-circle"),
+            tags$strong(paste0(" ", length(not_in_ext), " candidate gene(s) are absent from the external dataset:")),
             tags$br(), paste(not_in_ext, collapse = ", "),
-            tags$br(), tags$small("The training model is applied unchanged to the validation data, so it can only use genes both datasets contain (no imputation).")
+            tags$br(), tags$small("They stay in the training candidate pool (training never depends on the validation data). If one ends up in the final model, external validation cannot run on this dataset.")
           ),
           type = "warning", duration = 15
         )
-      }
-      if (length(available_genes) == 0) {
-        showNotification(
-          tags$div(icon("exclamation-triangle"),
-                   tags$strong(" No overlapping genes between the model predictors and the external dataset."),
-                   tags$br(),
-                   tags$small(paste0("Model genes: ", paste(head(not_in_ext, 5), collapse = ", "),
-                                     " ... External genes (first 5): ", paste(head(ext_cols, 5), collapse = ", ")))),
-          type = "error", duration = 12)
-        return()
       }
     }
 
@@ -352,6 +344,38 @@ server_nomogram <- function(input, output, session, rv) {
     expr_nomogram <- expr_nomogram[valid, , drop = FALSE]
     sample_info   <- sample_info[valid, , drop = FALSE]
     outcome       <- outcome[valid]
+
+    # Internal mode: draw the 70/30 split NOW, so every data-driven predictor
+    # choice below (trim, correlation/VIF pruning, panel-score signs) uses the
+    # training split only. Same seed and outcome vector as the split further
+    # down, so the partition itself is unchanged.
+    sel_rows <- seq_along(outcome)
+    internal_train_ids <- NULL
+    if (mode != "external") {
+      sel_rows <- as.integer(withr::with_seed(run_seed, caret::createDataPartition(outcome, p = 0.7, list = FALSE)))
+      internal_train_ids <- rownames(expr_nomogram)[sel_rows]
+    }
+    # Predictor-selection log (exported as Nomogram_Predictor_Selection.csv)
+    pred_log <- data.frame(Gene = character(0), Stage = character(0), Action = character(0),
+                           Detail = character(0), stringsAsFactors = FALSE)
+    .log_pred <- function(genes, stage, action, detail = "") {
+      if (length(genes) == 0L) return(invisible(NULL))
+      pred_log <<- rbind(pred_log, data.frame(Gene = genes, Stage = stage, Action = action,
+                                              Detail = rep_len(as.character(detail), length(genes)),
+                                              stringsAsFactors = FALSE))
+    }
+    .log_pred(available_genes, "Candidate pool", "Candidate")
+    if (length(platform_incomplete) > 0) .log_pred(platform_incomplete, "Platform check", "Removed", "Not measured on both platforms")
+    # |point-biserial r| with the outcome on the selection rows, ranked
+    # deterministically: 4 d.p., then gene name (ties no longer depend on the
+    # order genes arrived in from earlier steps).
+    .gexpipe_outcome_assoc <- function(genes) {
+      vapply(genes, function(g) {
+        r <- suppressWarnings(stats::cor(expr_nomogram[[g]][sel_rows], outcome[sel_rows], use = "pairwise.complete.obs"))
+        if (is.na(r)) 0 else abs(r)
+      }, numeric(1))
+    }
+    .gexpipe_rank_genes <- function(assoc) gexp_rank_genes_det(assoc, 4L)
 
     # ---- Training-data quality checks (warnings only; never stop the run) ----
     qc_notes <- character(0)
@@ -438,11 +462,13 @@ server_nomogram <- function(input, output, session, rv) {
     if (identical(input$nomogram_predictor_mode, "score") && length(available_genes) >= 2) {
       panel_score_genes <- available_genes
       panel_score_signs <- vapply(panel_score_genes, function(g) {
-        r <- suppressWarnings(stats::cor(expr_nomogram[[g]], outcome, use = "pairwise.complete.obs"))
+        r <- suppressWarnings(stats::cor(expr_nomogram[[g]][sel_rows], outcome[sel_rows], use = "pairwise.complete.obs"))
         if (is.na(r) || r >= 0) 1 else -1
       }, numeric(1))
       expr_nomogram$Panel_score <- .gexpipe_panel_score(expr_nomogram, panel_score_genes, panel_score_signs)
       available_genes <- "Panel_score"
+      .log_pred(panel_score_genes, "Composite panel score", "Combined into Panel_score",
+                ifelse(panel_score_signs > 0, "sign +1", "sign -1"))
       qc_notes <- c(qc_notes, paste0("Composite panel score of ", length(panel_score_genes), " genes: ",
                                      paste(panel_score_genes, collapse = ", ")))
     }
@@ -456,16 +482,12 @@ server_nomogram <- function(input, output, session, rv) {
     # high-variance one. Any trim is also reported to the user, never silent.
     .gexpipe_nomogram_trim <- function(genes, keep_n) {
       if (length(genes) <= keep_n) return(genes)
-      assoc <- vapply(genes, function(g) {
-        # Use expr_nomogram (samples x genes), already filtered to `valid`
-        # and aligned with `outcome` - NOT expr_mat, which is still the
-        # full, unfiltered batch-corrected matrix and would mismatch
-        # outcome's length whenever samples were dropped above.
-        r <- suppressWarnings(stats::cor(expr_nomogram[[g]], outcome, use = "pairwise.complete.obs"))
-        if (is.na(r)) 0 else abs(r)
-      }, numeric(1))
-      kept <- names(sort(assoc, decreasing = TRUE))[seq_len(keep_n)]
+      # expr_nomogram (samples x genes) is already filtered to `valid` and
+      # aligned with `outcome`; sel_rows limits it to the training rows.
+      assoc <- .gexpipe_outcome_assoc(genes)
+      kept <- .gexpipe_rank_genes(assoc)[seq_len(keep_n)]
       dropped <- setdiff(genes, kept)
+      .log_pred(dropped, "Sample-size trim", "Removed", sprintf("|r| with outcome = %.4f; limit %d predictors", assoc[dropped], keep_n))
       showNotification(
         tags$div(
           icon("exclamation-triangle"),
@@ -493,18 +515,20 @@ server_nomogram <- function(input, output, session, rv) {
     # highly-correlated pair; never silent.
     .gexpipe_nomogram_corr_prune <- function(genes, corr_cutoff = 0.8) {
       if (length(genes) < 2) return(genes)
-      assoc <- vapply(genes, function(g) {
-        r <- suppressWarnings(stats::cor(expr_nomogram[[g]], outcome, use = "pairwise.complete.obs"))
-        if (is.na(r)) 0 else abs(r)
-      }, numeric(1))
-      ordered_genes <- names(sort(assoc, decreasing = TRUE))
+      assoc <- .gexpipe_outcome_assoc(genes)
+      ordered_genes <- .gexpipe_rank_genes(assoc)
       kept <- character(0)
       dropped_info <- character(0)
       for (g in ordered_genes) {
         redundant_with <- NA_character_
         for (k in kept) {
-          r <- suppressWarnings(stats::cor(expr_nomogram[[g]], expr_nomogram[[k]], use = "pairwise.complete.obs"))
-          if (!is.na(r) && abs(r) > corr_cutoff) { redundant_with <- k; break }
+          r <- suppressWarnings(stats::cor(expr_nomogram[[g]][sel_rows], expr_nomogram[[k]][sel_rows], use = "pairwise.complete.obs"))
+          if (!is.na(r) && abs(r) > corr_cutoff) {
+            redundant_with <- k
+            .log_pred(g, "Correlation pruning", "Removed",
+                      sprintf("|r| = %.3f with %s (kept); |r| with outcome %.4f vs %.4f", abs(r), k, assoc[[g]], assoc[[k]]))
+            break
+          }
         }
         if (is.na(redundant_with)) kept <- c(kept, g)
         else dropped_info[g] <- redundant_with
@@ -538,7 +562,7 @@ server_nomogram <- function(input, output, session, rv) {
       dropped <- character(0)
       repeat {
         if (length(genes) < min_genes) break
-        fit_data <- cbind(expr_nomogram[, genes, drop = FALSE], Outcome = outcome)
+        fit_data <- cbind(expr_nomogram[sel_rows, genes, drop = FALSE], Outcome = outcome[sel_rows])
         glm_fit <- tryCatch(
           glm(as.formula(paste("Outcome ~", paste(genes, collapse = " + "))), data = fit_data, family = binomial()),
           error = function(e) NULL
@@ -548,6 +572,7 @@ server_nomogram <- function(input, output, session, rv) {
         if (is.null(vifs) || length(vifs) != length(genes) || all(vifs <= vif_cutoff, na.rm = TRUE)) break
         worst <- names(vifs)[which.max(vifs)]
         dropped[worst] <- sprintf("VIF = %.1f", max(vifs, na.rm = TRUE))
+        .log_pred(worst, "VIF pruning", "Removed", dropped[[worst]])
         genes <- setdiff(genes, worst)
       }
       if (length(dropped) > 0) {
@@ -671,10 +696,10 @@ server_nomogram <- function(input, output, session, rv) {
 
     } else {
       # INTERNAL MODE: 70/30 stratified split
-      withr::local_seed(run_seed)
-      train_idx <- caret::createDataPartition(nomogram_data$Outcome, p = 0.7, list = FALSE)
-      train_data <- nomogram_data[train_idx, ]
-      validation_data <- nomogram_data[-train_idx, ]
+      # Same split that predictor selection used above (drawn once, training rows only).
+      in_train <- nomogram_data$SampleID %in% internal_train_ids
+      train_data <- nomogram_data[in_train, ]
+      validation_data <- nomogram_data[!in_train, ]
     }
 
     # ==================================================================
@@ -1057,6 +1082,9 @@ server_nomogram <- function(input, output, session, rv) {
     confusion_tbl <- rbind(gexp_diag_confusion_table(train_metrics), gexp_diag_confusion_table(val_metrics))
 
     # Methods / run settings recorded with the results (also downloadable)
+    if (gexp_nomogram_is_univariable(available_genes)) {
+      qc_notes <- c(qc_notes, gexp_nomogram_univariable_message(available_genes, panel_score_genes))
+    }
     run_settings <- data.frame(
       Setting = c(
         "Validation mode", "Outcome column", "Outcome coding", "Predictors (n)", "Predictors",
@@ -1129,7 +1157,10 @@ server_nomogram <- function(input, output, session, rv) {
     rv$nomogram_train_data <- train_data
     rv$nomogram_validation_data <- validation_data
     rv$nomogram_available_genes <- available_genes
+    rv$nomogram_panel_score_genes <- panel_score_genes
     rv$nomogram_optimal_threshold <- optimal_threshold
+    .log_pred(available_genes, "Final model", "Kept", sprintf("training Youden threshold %.4f", optimal_threshold))
+    rv$nomogram_predictor_log <- pred_log
     rv$nomogram_train_metrics <- train_metrics
     rv$nomogram_val_metrics <- val_metrics
     rv$nomogram_train_roc <- train_roc
@@ -1155,6 +1186,23 @@ server_nomogram <- function(input, output, session, rv) {
 
     # Save the new figures and tables to the existing export folder (300 DPI PNG + PDF)
     nomogram_export_all()
+    # Provenance for this run (settings, seeds, datasets, sample IDs, genes at each
+    # stage, STRING release, package versions), timestamped so runs never overwrite it.
+    try({
+      manifest <- gexp_run_manifest(rv, list(
+        Nomogram_Mode = mode,
+        Nomogram_Seed = run_seed,
+        Nomogram_Bootstrap_B = boot_B,
+        Nomogram_Predictor_Mode = if (is.null(input$nomogram_predictor_mode)) "genes" else input$nomogram_predictor_mode,
+        Nomogram_Final_Predictors = paste(available_genes, collapse = ";"),
+        Nomogram_Youden_Threshold_Training = signif(optimal_threshold, 6),
+        Validation_Standardization = val_std,
+        Validation_GSE = if (mode == "external") paste(input$ext_val_gse_ids, collapse = " ") else "internal 70/30 split",
+        Training_Sample_IDs = paste(train_data$SampleID, collapse = ";"),
+        Validation_Sample_IDs = paste(validation_data$SampleID, collapse = ";")
+      ))
+      utils::write.csv(manifest, file.path(CSV_EXPORT_DIR(), paste0("Run_Manifest_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".csv")), row.names = FALSE)
+    }, silent = TRUE)
 
     val_label <- if (mode == "external") "External" else "Internal (30%)"
     msg <- paste0("Nomogram analysis complete. ",
@@ -1166,8 +1214,20 @@ server_nomogram <- function(input, output, session, rv) {
   # ============================================================================
   # PLOTS
   # ============================================================================
+  output$nomogram_panel_a_ui <- renderUI({
+    if (isTRUE(rv$nomogram_complete) && gexp_nomogram_is_univariable(rv$nomogram_available_genes)) {
+      return(tags$div(class = "alert alert-info", icon("info-circle"), " ",
+                      gexp_nomogram_univariable_message(rv$nomogram_available_genes, rv$nomogram_panel_score_genes)))
+    }
+    tagList(
+      plotOutput("nomogram_plot_panel_a", height = "500px"),
+      gexp_ui_plot_download_bar("download_nomogram_panel_a", "download_nomogram_panel_a_jpg", "download_nomogram_panel_a_pdf", "btn-success btn-sm")
+    )
+  })
+
   output$nomogram_plot_panel_a <- renderPlot({
     req(rv$nomogram_model, rv$nomogram_available_genes)
+    req(!gexp_nomogram_is_univariable(rv$nomogram_available_genes))
     dd <- rms::datadist(rv$nomogram_train_data[, rv$nomogram_available_genes, drop = FALSE])
     options(datadist = dd)
     on.exit(options(datadist = NULL), add = TRUE)
@@ -1332,6 +1392,8 @@ server_nomogram <- function(input, output, session, rv) {
   # ============================================================================
   nomogram_plot_to_file <- function(file, dev_open, dev_close = function() dev.off()) {
     req(rv$nomogram_model, rv$nomogram_available_genes)
+    validate(need(!gexp_nomogram_is_univariable(rv$nomogram_available_genes),
+                  "Nomogram omitted for a one-predictor model; download the ROC, calibration and DCA plots instead."))
     dd <- rms::datadist(rv$nomogram_train_data[, rv$nomogram_available_genes, drop = FALSE])
     options(datadist = dd)
     on.exit(options(datadist = NULL), add = TRUE)
@@ -1375,6 +1437,7 @@ server_nomogram <- function(input, output, session, rv) {
     download_nomogram_calibration = "Nomogram_Calibration_Statistics",
     download_nomogram_confusion = "Nomogram_Confusion_Matrices",
     download_nomogram_diagnostics = "Nomogram_Model_Diagnostics",
+    download_nomogram_predictor_selection = "Nomogram_Predictor_Selection",
     download_nomogram_settings = "Nomogram_Outcome_Coding_and_Settings"
   )
   for (out_id in names(nomo_csv_downloads)) {

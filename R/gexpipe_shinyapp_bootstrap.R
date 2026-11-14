@@ -5,7 +5,7 @@
   c(
     "gexp_parse_gse_inputs", "gexp_prepare_download_dirs", "gexp_download_finalize_common_genes",
     "gexp_download_normalize_ids_for_overlap", "gexp_download_one_microarray_gse",
-    "gexp_download_one_rnaseq_gse", "gexp_qc_detect_outliers", "gexp_qc_exclude_samples",
+    "gexp_download_one_rnaseq_gse",
     "gexp_register_pipeline_observers", "gexp_register_navigation_observers",
     "gexp_register_workspace_observers", "gexp_register_help_observers"
   )

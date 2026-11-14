@@ -162,7 +162,7 @@ def main() -> None:
     # Feature checklist paragraph (16 steps overview)
     steps_overview = (
         "The 16 sidebar steps are grouped as data preparation (1–5: download, per-study normalisation, "
-        "QC and outlier handling, group selection, batch correction), gene discovery (6–9: differential "
+        "QC, group selection, batch correction), gene discovery (6–9: differential "
         "expression, optional RNA-seq ∩ microarray consensus, WGCNA, DEG ∩ module overlap with GO/KEGG), "
         "candidate refinement (10–13: PPI, ML ensemble, validation, ROC with optional immune deconvolution), "
         "and clinical translation (14–16: nomogram, GSEA, automated PDF summary). Probe-to-symbol mapping, "

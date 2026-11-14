@@ -526,7 +526,7 @@ server_download <- function(input, output, session, rv) {
                 icon("exclamation-triangle"),
                 tags$strong(" Generic sample names detected (e.g. V2, V3)."),
                 tags$p(
-                  "Some RNA-seq count files lacked headers. Sample IDs were inferred from GEO metadata when possible. If QC outlier plots look wrong, check the download log or try re-downloading.",
+                  "Some RNA-seq count files lacked headers. Sample IDs were inferred from GEO metadata when possible. If QC plots look wrong, check the download log or try re-downloading.",
                   style = "margin-top: 6px; font-size: 12px;"
                 )
               ),

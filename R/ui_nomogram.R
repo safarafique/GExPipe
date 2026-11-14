@@ -79,8 +79,7 @@ ui_nomogram <- tabItem(
     box(
       title = tags$span(icon("chart-bar"), " Panel A: Nomogram"),
       width = 12, status = "success", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-      plotOutput("nomogram_plot_panel_a", height = "500px"),
-      gexp_ui_plot_download_bar("download_nomogram_panel_a", "download_nomogram_panel_a_jpg", "download_nomogram_panel_a_pdf", "btn-success btn-sm")
+      uiOutput("nomogram_panel_a_ui")
     )
   ),
 
@@ -215,7 +214,8 @@ ui_nomogram <- tabItem(
       tags$div(style = "margin-top: 8px;",
         downloadButton("download_nomogram_coefficients", tagList(" Model coefficients (CSV)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
         downloadButton("download_nomogram_firth", tagList(" Firth coefficients (CSV)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
-        downloadButton("download_nomogram_diagnostics", tagList(" All diagnostics (CSV)"), class = "btn-info btn-sm"))
+        downloadButton("download_nomogram_diagnostics", tagList(" All diagnostics (CSV)"), class = "btn-info btn-sm", style = "margin-right: 6px;"),
+        downloadButton("download_nomogram_predictor_selection", tagList(" Predictor selection log (CSV)"), class = "btn-info btn-sm"))
     )
   ),
 

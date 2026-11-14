@@ -170,6 +170,18 @@ server_results_summary <- function(input, output, session, rv) {
       plot.new(); text(0.5, 0.5, "Run Nomogram (Step 12) to see plot.", cex = 1, col = "gray40"); return(invisible(NULL))
     }
     tryCatch({
+      if (gexp_nomogram_is_univariable(rv$nomogram_available_genes)) {
+        # One predictor, no covariates: a nomogram adds nothing, show ROC instead.
+        rocs <- Filter(Negate(is.null), list(rv$nomogram_train_roc, rv$nomogram_val_roc))
+        perf <- Filter(Negate(is.null), list(rv$nomogram_train_metrics, rv$nomogram_val_metrics))
+        if (length(rocs) == 0L || length(rocs) != length(perf)) {
+          plot.new(); text(0.5, 0.5, "One-predictor model: nomogram omitted (see ROC/calibration/DCA in Step 13).", cex = 0.9, col = "gray40"); return(invisible(NULL))
+        }
+        gexp_diag_plot_roc(rocs, perf, c("Training", "Validation")[seq_along(rocs)],
+                           c("#C0392B", "#2471A3")[seq_along(rocs)],
+                           "One-predictor model: ROC (nomogram omitted)")
+        return(invisible(NULL))
+      }
       genes <- rv$nomogram_available_genes
       train_df <- rv$nomogram_train_data[, c(genes, "Outcome"), drop = FALSE]
       dd <- rms::datadist(train_df)
@@ -888,6 +900,18 @@ server_results_summary <- function(input, output, session, rv) {
   draw_rs_nomogram_plot <- function() {
     if (!isTRUE(rv$nomogram_complete) || is.null(rv$nomogram_model) || is.null(rv$nomogram_train_data) || is.null(rv$nomogram_available_genes) || length(rv$nomogram_available_genes) == 0) {
       plot.new(); text(0.5, 0.5, "Run Nomogram (Step 12) to see plot.", cex = 1, col = "gray40"); return()
+    }
+    if (gexp_nomogram_is_univariable(rv$nomogram_available_genes)) {
+      # One predictor, no covariates: a nomogram adds nothing, show ROC instead.
+      rocs <- Filter(Negate(is.null), list(rv$nomogram_train_roc, rv$nomogram_val_roc))
+      perf <- Filter(Negate(is.null), list(rv$nomogram_train_metrics, rv$nomogram_val_metrics))
+      if (length(rocs) == 0L || length(rocs) != length(perf)) {
+        plot.new(); text(0.5, 0.5, "One-predictor model: nomogram omitted (see ROC/calibration/DCA in Step 13).", cex = 0.9, col = "gray40"); return(invisible(NULL))
+      }
+      gexp_diag_plot_roc(rocs, perf, c("Training", "Validation")[seq_along(rocs)],
+                         c("#C0392B", "#2471A3")[seq_along(rocs)],
+                         "One-predictor model: ROC (nomogram omitted)")
+      return(invisible(NULL))
     }
     genes <- rv$nomogram_available_genes
     train_df <- rv$nomogram_train_data[, c(genes, "Outcome"), drop = FALSE]

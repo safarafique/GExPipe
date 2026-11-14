@@ -467,3 +467,35 @@ gexp_diag_scale_check <- function(train_df, val_df, genes, flag_at = 2) {
                stringsAsFactors = FALSE)
   }))
 }
+
+#' Is the fitted diagnostic model univariable (one predictor, no covariates)?
+#'
+#' A nomogram with a single predictor axis only rescales that predictor to a
+#' risk scale and adds nothing beyond the ROC and calibration curves, so
+#' reviewers commonly reject it. Step 13 therefore omits the nomogram (Panel A)
+#' in this case and reports discrimination (ROC), calibration and decision-curve
+#' analysis instead.
+#' @param predictors Character vector of final model predictors.
+#' @return Logical scalar.
+#' @noRd
+gexp_nomogram_is_univariable <- function(predictors) {
+  length(unique(stats::na.omit(as.character(predictors)))) < 2L
+}
+
+#' Explanation shown in place of a one-axis nomogram
+#' @param predictors Final model predictors (length 1 in practice).
+#' @param panel_genes Genes combined into `Panel_score`, or NULL.
+#' @noRd
+gexp_nomogram_univariable_message <- function(predictors, panel_genes = NULL) {
+  what <- if (identical(as.character(predictors), "Panel_score") && length(panel_genes) > 0) {
+    paste0("a single composite panel score (", length(panel_genes), " genes: ",
+           paste(panel_genes, collapse = ", "), ")")
+  } else {
+    paste0("a single predictor (", paste(predictors, collapse = ", "), ")")
+  }
+  paste0("Nomogram not drawn: the final model contains ", what,
+         " and no clinical covariates. A one-axis nomogram only re-labels that predictor on a risk scale ",
+         "and adds nothing beyond the ROC and calibration curves. Report the ROC curves (Panel B), ",
+         "calibration curves (Panel C) and decision-curve analysis (Panel D) instead. ",
+         "A nomogram is drawn when the model has two or more predictors.")
+}

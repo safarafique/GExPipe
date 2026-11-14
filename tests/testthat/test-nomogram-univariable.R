@@ -1,0 +1,13 @@
+test_that("one-predictor models are flagged so the nomogram is omitted", {
+  is_uni <- getFromNamespace("gexp_nomogram_is_univariable", "GExPipe")
+  msg <- getFromNamespace("gexp_nomogram_univariable_message", "GExPipe")
+  expect_true(is_uni("OAS3"))
+  expect_true(is_uni("Panel_score"))
+  expect_true(is_uni(character(0)))
+  expect_true(is_uni(c("OAS3", "OAS3")))
+  expect_false(is_uni(c("OAS3", "IFI44L")))
+  m <- msg("Panel_score", c("OAS3", "IFI44L", "RSAD2", "ISG15"))
+  expect_match(m, "composite panel score (4 genes", fixed = TRUE)
+  expect_match(m, "decision-curve")
+  expect_match(msg("OAS3"), "single predictor (OAS3)", fixed = TRUE)
+})

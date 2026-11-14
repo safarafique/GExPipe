@@ -1468,7 +1468,7 @@ server_batch <- function(input, output, session, rv) {
     ax <- .batch_pca_axes(df)
     base <- ggplot(df, aes(x = PC1, y = PC2)) +
       geom_hline(yintercept = 0, color = "gray85") +
-      geom_vline(xintercept = 0, color = "gray85") +
+      ggplot2::geom_vline(xintercept = 0, color = "gray85") +
       theme_bw(base_size = 14) +
       labs(title = title, subtitle = subtitle, x = ax[1], y = ax[2]) +
       .batch_pca_polar_theme()
@@ -1560,7 +1560,7 @@ server_batch <- function(input, output, session, rv) {
     ax <- .batch_pca_axes(df)
     ggplot(df, aes(x = PC1, y = PC2, color = Platform)) +
       geom_hline(yintercept = 0, color = "gray85") +
-      geom_vline(xintercept = 0, color = "gray85") +
+      ggplot2::geom_vline(xintercept = 0, color = "gray85") +
       geom_point(size = 3.5, alpha = 0.7) +
       scale_color_manual(values = c("Microarray" = "#e67e22", "RNAseq" = "#9b59b6")) +
       theme_bw(base_size = 14) +

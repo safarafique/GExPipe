@@ -1,7 +1,53 @@
 # GExPipe 0.99.118
 
+- QC (Step 3): the "Sample Outlier Detection" box (PCA / connectivity flags and the "Exclude
+  Selected Outliers" selector) was removed from the app. Step 3 now shows gene overlap, QC plots
+  and the data summary only; no samples are flagged or removed there. The exported functions
+  gexp_qc_detect_outliers(), gexp_qc_detect_outliers_per_dataset() and gexp_qc_exclude_samples()
+  are unchanged for scripted use. The WGCNA sample-dendrogram check (Step 8) is unchanged.
+- Nomogram (Step 13): when the final model has a single predictor (one gene, or the composite
+  panel score) and no clinical covariates, Panel A no longer draws a one-axis nomogram. It shows a
+  note explaining that the ROC (Panel B), calibration (Panel C) and decision-curve (Panel D) plots
+  are the appropriate summary; the Results Summary and PDF report show the ROC curve in its place.
+  The note is also recorded in Nomogram_Outcome_Coding_and_Settings.csv.
 - Example GSE IDs: added RNA-seq GSE112087 and microarray GSE49454 to the examples shown in the
   Step 1 dataset boxes and in the vignette (alongside GSE144119, GSE100026 and GSE268456, GSE47927).
+  Added RNA-seq GSE72509 to the external validation examples (Step 12), alongside GSE162462 and
+  microarray GSE13159.
+- Workspace saving: the sidebar now has one "Save workspace" button instead of "Save to folder" and
+  "Save workspace (download)". It downloads the workspace under the name typed in "File name"
+  (my_analysis.rds when the box is empty) and keeps a copy in 'saved_workspaces' as before.
+- Workspace loading: Step 1 "Resume from saved data" again has a "Load from folder" dropdown that
+  reads a workspace straight from 'saved_workspaces' (newest first, with sizes), so workspaces
+  larger than the 2 GB upload limit can be loaded.
+- Nomogram (Step 13): the training model no longer depends on the validation dataset. The
+  predictor pool used to be cut to the genes present in the external dataset before fitting, so the
+  panel, the coefficients and the Youden threshold changed with the validation cohort. Training now
+  uses the training data only; a final predictor missing from the validation data stops validation
+  with a message instead of silently changing the model.
+- Nomogram, internal 70/30 mode: the split is drawn first and the sample-size trim, correlation
+  pruning, VIF pruning and panel-score signs use the training split only (they used all samples,
+  including the held-out 30%). The partition itself is unchanged for the same seed.
+- Nomogram: genes tied on outcome association are ranked deterministically (4 decimal places, then
+  gene name) instead of by the order they arrived from earlier steps. Every candidate, trimmed,
+  pruned and final predictor is written to Nomogram_Predictor_Selection.csv.
+- ML (Step 10): LASSO / Elastic Net / Ridge use fixed cross-validation folds (seed 123). The isolated
+  R process used as a glmnet fallback drew unseeded folds, so the LASSO genes could change between
+  runs. In-session results are unchanged (same folds as before).
+- PPI (Step 9): the STRING release used (with fallback flag, score threshold and access time) is
+  recorded in PPI_STRING_Provenance.csv and in PPI_Hub_Gene_Scores.csv, which is now saved on every
+  run. A warning is shown when the first STRING version fails and an older release is used. Ties at
+  the top-N hub cut-off are broken by gene symbol.
+- WGCNA / Step 8: the power and settings used (wgcna_settings_used.csv), the soft-threshold table
+  (wgcna_soft_threshold_table.csv) and the modules that fed the common-gene list
+  (Step8_WGCNA_Modules_Used.csv; WGCNA_Module and WGCNA_Scope columns in the common-gene CSV) are
+  exported.
+- External validation: expression columns are matched to phenodata rows by sample ID before
+  groups are applied (no positional fallback).
+- Each nomogram run writes a timestamped Run_Manifest_<time>.csv (seeds, datasets, sample IDs,
+  genes at each stage, STRING release, WGCNA settings, package versions).
+- Fix: the batch-correction PCA polar / platform plots called geom_vline() without the ggplot2
+  namespace, so they could fail when ggplot2 was not attached (R CMD check NOTE in 0.99.117).
 
 # GExPipe 0.99.117
 

@@ -43,7 +43,7 @@ function New-VigScreenshot {
 
 $shots = @(
   @("step1_download.png", "Step 1 - Download Data", "Enter GEO accessions and download merged expression data."),
-  @("step2_qc.png", "Step 2 - Quality Control", "Review boxplots, density curves, and outlier flags."),
+  @("step2_qc.png", "Step 2 - Quality Control", "Review boxplots, density curves, and gene overlap."),
   @("step6_de.png", "Step 6 - Differential Expression", "Volcano plot and top differentially expressed genes."),
   @("step9_ppi.png", "Step 9 - PPI Network", "STRING protein-protein interaction network and hub genes."),
   @("step15_summary.png", "Step 15 - Summary Report", "Download the integrated PDF results summary.")

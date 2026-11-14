@@ -100,10 +100,10 @@ server_validation <- function(input, output, session, rv) {
               ),
               value = "",
               rows = 2,
-              placeholder = "e.g. GSE162462 (RNA-seq) or GSE13159 (Microarray)"
+              placeholder = "e.g. GSE162462, GSE72509 (RNA-seq) or GSE13159 (Microarray)"
             ),
             tags$p(
-              tags$strong("Examples: "), "GSE162462 (RNA-seq) or GSE13159 (Microarray) as the validation dataset.",
+              tags$strong("Examples: "), "GSE162462, GSE72509 (RNA-seq) or GSE13159 (Microarray) as the validation dataset.",
               style = "margin: -6px 0 0 0; font-size: 11px; color: #999;"
             )
           ),
@@ -264,7 +264,7 @@ server_validation <- function(input, output, session, rv) {
         tags$div(
           icon("exclamation-triangle"),
           tags$strong(" Enter at least one GSE ID."),
-          " Examples: GSE162462 (RNA-seq), GSE13159 (Microarray)"
+          " Examples: GSE162462, GSE72509 (RNA-seq), GSE13159 (Microarray)"
         ),
         type = "warning", duration = 5
       )
@@ -1098,8 +1098,21 @@ server_validation <- function(input, output, session, rv) {
         paste0("Second filter on '", fcol, "': kept ", sum(valid), " of ", n_before_f, " categorized samples."),
         type = "message", duration = 6)
     }
-    ext_expr_t <- t(rv$ext_val_raw_expr)[valid, , drop = FALSE]
+    # Rows of `meta` (and so `valid`/`outcome`) must line up with the expression
+    # columns. Match by sample ID; never fall back to position silently.
+    raw_val <- rv$ext_val_raw_expr
+    if (!identical(colnames(raw_val), rownames(meta))) {
+      if (!anyDuplicated(rownames(meta)) && all(rownames(meta) %in% colnames(raw_val))) {
+        raw_val <- raw_val[, rownames(meta), drop = FALSE]
+      } else {
+        showNotification("Validation phenodata rows do not match the expression sample IDs; re-run the download (or Re-fetch phenodata) before validating.",
+                         type = "error", duration = 10)
+        return()
+      }
+    }
+    ext_expr_t <- t(raw_val)[valid, , drop = FALSE]
     outcome <- outcome[valid]
+    rv$external_validation_sample_ids <- rownames(ext_expr_t)
 
     if (nrow(ext_expr_t) < 5) {
       showNotification("Too few valid samples after categorization.", type = "error", duration = 6); return()

@@ -14,6 +14,21 @@ gexp_get_saved_workspaces_dir <- function() {
   file.path(getwd(), "saved_workspaces")
 }
 
+#' Workspace file name from the sidebar "File name" box
+#'
+#' Unsafe characters become "_"; an empty box gives "my_analysis.rds".
+#' @param custom Text typed in the file-name box.
+#' @return File name ending in ".rds".
+#' @noRd
+gexp_workspace_file_name <- function(custom) {
+  custom <- if (is.null(custom) || !length(custom)) "" else trimws(as.character(custom)[1L])
+  base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
+  base <- sub("_+$", "", base)
+  base <- sub("\\.rds$", "", base, ignore.case = TRUE)
+  if (!nzchar(base)) base <- "my_analysis"
+  paste0(base, ".rds")
+}
+
 #' Skip values that cannot be saved (do not serialize() a copy of huge matrices)
 #' @noRd
 .gexp_workspace_value_ok <- function(x) {
@@ -199,19 +214,8 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
     downloadHandler(
       filename = function() {
         tryCatch(
-          {
-            custom <- trimws(input$workspace_save_filename)
-            if (is.null(custom) || !nzchar(custom)) {
-              step <- input$sidebar_menu
-              if (is.null(step) || !nzchar(step)) step <- "workspace"
-              return(paste0("app_saved_state_", step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds"))
-            }
-            base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
-            base <- sub("_+$", "", base)
-            if (!nzchar(base)) base <- "workspace"
-            paste0(base, ".rds")
-          },
-          error = function(e) paste0("workspace_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
+          gexp_workspace_file_name(input$workspace_save_filename),
+          error = function(e) "my_analysis.rds"
         )
       },
       content = function(file) {
@@ -220,19 +224,10 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
         tryCatch(
           {
             state <- gexp_make_workspace_state(input, rv)
-            current_step <- state$saved_step
             save_subdir <- "saved_workspaces"
             save_dir <- file.path(getwd(), save_subdir)
             if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-            custom <- trimws(input$workspace_save_filename)
-            if (nzchar(custom)) {
-              base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
-              base <- sub("_+$", "", base)
-              if (!nzchar(base)) base <- "workspace"
-              fname <- paste0(base, ".rds")
-            } else {
-              fname <- paste0("app_saved_state_", current_step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
-            }
+            fname <- gexp_workspace_file_name(input$workspace_save_filename)
             app_path <- file.path(save_dir, fname)
             saved_to_disk <- FALSE
             if (dir.exists(save_dir)) {
@@ -247,7 +242,7 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
             saveRDS(state, file)
             if (saved_to_disk) {
               shiny::showNotification(
-                paste0("Saved! File is in folder '", save_subdir, "'. Load it at Step 1 to return to this step."),
+                paste0("Saved as '", fname, "' (downloaded, and a copy in folder '", save_subdir, "'). Load it at Step 1 to return to this step."),
                 type = "message", duration = 8
               )
             } else {
@@ -337,52 +332,6 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
     shiny::removeNotification("auto_save_download")
   })
 
-  shiny::observeEvent(input$save_workspace_to_folder, {
-    tryCatch(
-      {
-        state <- gexp_make_workspace_state(input, rv)
-        current_step <- state$saved_step
-        save_subdir <- "saved_workspaces"
-        save_dir <- file.path(getwd(), save_subdir)
-        if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-        custom <- trimws(input$workspace_save_filename)
-        if (is.null(custom)) custom <- ""
-        if (nzchar(custom)) {
-          base <- gsub("[^A-Za-z0-9_.-]+", "_", custom)
-          base <- sub("_+$", "", base)
-          if (!nzchar(base)) base <- "workspace"
-          fname <- paste0(base, ".rds")
-        } else {
-          fname <- paste0("app_saved_state_", current_step, "_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
-        }
-        app_path <- file.path(save_dir, fname)
-        saveRDS(state, app_path)
-        shiny::showNotification(
-          paste0("Saved to '", save_subdir, "/", fname, "'. Load it at Step 1 (Download) to return to this step."),
-          type = "message", duration = 8
-        )
-      },
-      error = function(e) {
-        tryCatch(
-          {
-            minimal <- list(
-              saved_step = if (is.null(input$sidebar_menu) || !nzchar(input$sidebar_menu)) "download" else input$sidebar_menu,
-              saved_note = "Minimal save."
-            )
-            save_dir <- file.path(getwd(), "saved_workspaces")
-            if (!dir.exists(save_dir)) dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
-            fname <- paste0("workspace_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".rds")
-            saveRDS(minimal, file.path(save_dir, fname))
-            shiny::showNotification(paste0("Saved minimal state to saved_workspaces/", fname, ". Load at Step 1."), type = "warning", duration = 8)
-          },
-          error = function(e2) {
-            shiny::showNotification(paste("Save failed:", conditionMessage(e)), type = "error", duration = 10)
-          }
-        )
-      }
-    )
-  })
-
   output$load_from_folder_ui <- shiny::renderUI({
     save_dir <- gexp_get_saved_workspaces_dir()
     if (!dir.exists(save_dir)) {
@@ -392,7 +341,10 @@ gexp_register_workspace_observers <- function(input, output, session, rv) {
     if (length(f) == 0) {
       return(shiny::selectInput("load_from_folder_file", NULL, choices = c("(No .rds files)" = ""), width = "100%"))
     }
-    choices <- stats::setNames(f, f)
+    info <- file.info(file.path(save_dir, f))
+    f <- f[order(info$mtime, decreasing = TRUE)]
+    mb <- round(file.size(file.path(save_dir, f)) / 1024^2)
+    choices <- stats::setNames(f, paste0(f, " (", mb, " MB)"))
     shiny::selectInput("load_from_folder_file", NULL, choices = c("\u2014 Select file \u2014" = "", choices), width = "100%")
   })
 

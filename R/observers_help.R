@@ -22,7 +22,7 @@ gexp_user_guideline_modal_ui <- function() {
       style = "padding-left: 22px; line-height: 1.85; color: #334155;",
       shiny::tags$li(shiny::tags$strong("Step 1 - Download:"), " GEO access (GSE IDs). Four types: RNA-seq, microarray, Merged (Both), Parallel DE then merge. Each platform box accepts one or more GSE IDs."),
       shiny::tags$li(shiny::tags$strong("Step 2 - Normalize:"), " Platform-specific methods first (RMA, TMM, quantile, etc.)."),
-      shiny::tags$li(shiny::tags$strong("Step 3 - QC & Visualization:"), " Outliers, gene overlap / common genes after normalization."),
+      shiny::tags$li(shiny::tags$strong("Step 3 - QC & Visualization:"), " QC plots, gene overlap / common genes after normalization."),
       shiny::tags$li(shiny::tags$strong("Steps 4-5 - Groups, Batch:"), " Normal vs Disease labels, then batch correction. Parallel DE corrects each platform separately; Merged (Both) uses one joint correction."),
       shiny::tags$li(shiny::tags$strong("Step 6 - Differential Expression:"), " limma, DESeq2, edgeR; volcano plot, heatmaps, DEG tables. Merged (Both) is one joint limma. Parallel DE runs RNA-seq and microarray separately."),
       shiny::tags$li(shiny::tags$strong("Step 7 - RNA-seq \u2229 microarray:"), " Genes significant on both platforms (same direction). Then one WGCNA on one processed platform matrix (top variable genes, not this DEG list). Step 9 overlaps the two."),

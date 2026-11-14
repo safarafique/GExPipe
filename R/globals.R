@@ -4,7 +4,7 @@ utils::globalVariables(c(
   # NSE / ggplot aesthetic columns
   ".data", "ylab", "label", "AUC", "After", "Before", "Condition", "Connectivity", "Correlation",
   "Count", "Dataset", "Description", "Direction", "Disease", "Expression",
-  "Factor", "GS_trait", "Gene", "Group", "IsOutlier", "Kept", "Label",
+  "Factor", "GS_trait", "Gene", "Group", "Kept", "Label",
   "ME1", "ME2", "MM", "Mean", "Module", "N", "Normal", "Observed", "Outcome",
   "PC1", "PC2", "Platform", "Predicted", "Predicted_Prob", "SYMBOL", "SE",
   "Sample", "Sample1", "Sample2", "Significance", "Significant", "Size",

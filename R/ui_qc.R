@@ -15,7 +15,7 @@ ui_qc <- tabItem(
         box(
           title = tags$span(icon("info-circle"), " About this step"),
           width = 12, status = "info", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-          tags$p(tags$strong("Purpose:"), " After per-dataset normalization, check sample quality, flag outliers, and confirm common genes across datasets.", style = "margin-bottom: 8px;"),
+          tags$p(tags$strong("Purpose:"), " After per-dataset normalization, check sample quality and confirm common genes across datasets.", style = "margin-bottom: 8px;"),
           tags$p(tags$strong("Plots:"), " Venn and UpSet show gene overlap after Step 2; boxplot and density show normalized expression. Remove failed samples here, then re-normalize if needed.", style = "margin-bottom: 0;")
         )
       ),
@@ -136,45 +136,6 @@ ui_qc <- tabItem(
             gexp_ui_plot_download_bar("download_upset_plot_micro_png", "download_upset_plot_micro_jpg", "download_upset_plot_micro_pdf", "btn-warning btn-xs")
           )
         )
-      )
-    ),
-
-    # ---- Sample Outlier Detection (shared; one run) ----
-    fluidRow(
-      box(
-        title = tags$span(icon("search"), " Sample Outlier Detection",
-                          tags$span("AFTER NORMALIZATION", class = "label label-success",
-                                    style = "margin-left: 8px; font-size: 10px;")),
-        width = 12, status = "danger", solidHeader = TRUE, collapsible = TRUE, collapsed = FALSE,
-        tags$div(
-          style = "padding: 10px 14px; background: linear-gradient(135deg, #fef9e7, #fdebd0); border-left: 4px solid #f39c12; border-radius: 4px; margin-bottom: 15px;",
-          icon("lightbulb", style = "color: #f39c12; margin-right: 6px;"),
-          tags$strong("Optional: flag possible outlier samples after normalization. "),
-          tags$span("Each GSE is tested on its own samples (this step is before batch correction, so a pooled test would mostly flag study differences). ",
-                    "Nothing is removed unless you tick it. If samples are removed, GExPipe re-normalizes the remaining data and re-computes common genes.",
-                    style = "font-size: 13px;"),
-          tags$br(),
-          tags$span(icon("chart-area", style = "margin-right: 4px;"), tags$strong("PCA + Mahalanobis distance:"),
-                    " Identifies samples far from their GSE's center in PC1-PC2 space (97.5% chi-squared threshold).",
-                    style = "font-size: 12px; display: block; margin-top: 4px;"),
-          tags$span(icon("project-diagram", style = "margin-right: 4px;"), tags$strong("Sample connectivity (signed network):"),
-                    " Flags samples with low correlation to the rest of their GSE (z < -2, i.e. mean - 2*SD).",
-                    style = "font-size: 12px; display: block; margin-top: 2px;"),
-          tags$span(icon("lightbulb", style = "margin-right: 4px;"), tags$strong("Advice:"),
-                    " a flag is not proof of a bad sample. Strong disease samples often look 'different'. Exclude only clear technical failures (STRONG = both tests), and check that DE is similar with and without them.",
-                    style = "font-size: 12px; display: block; margin-top: 2px;")
-        ),
-        uiOutput("qc_excluded_info_ui"),
-        fluidRow(
-          column(3,
-            actionButton("run_outlier_detection",
-              tagList(icon("play"), " Run Outlier Detection"),
-              class = "btn-danger btn-lg",
-              style = "font-weight: bold; width: 100%; background: #e74c3c !important; background-image: none !important; border-color: #c0392b !important; color: #fff !important;")
-          ),
-          column(9, uiOutput("qc_outlier_summary_ui"))
-        ),
-        uiOutput("qc_outlier_results_ui")
       )
     ),
 

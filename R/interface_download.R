@@ -83,7 +83,19 @@ gexp_ui_download <- function() {
             style = "margin-top: 25px;",
             actionButton("load_uploaded_btn", tagList(icon("upload"), " Load uploaded file"), class = "btn-info btn-block")
           ))
-        )
+        ),
+        fluidRow(
+          column(
+            6, tags$p(tags$strong("Or load from 'saved_workspaces' (no size limit):"), style = "margin-bottom: 4px;"),
+            uiOutput("load_from_folder_ui")
+          ),
+          column(4, tags$div(
+            style = "margin-top: 25px;",
+            actionButton("load_from_folder_btn", tagList(icon("folder-open"), " Load from folder"), class = "btn-info btn-block")
+          ))
+        ),
+        tags$p(icon("info-circle"), " Uploads are limited to 2 GB. For a larger workspace, copy the .rds into 'saved_workspaces' in the app directory and use Load from folder.",
+               style = "font-size: 12px; color: #6c757d; margin-bottom: 0;")
       )
     ),
     fluidRow(
