@@ -1,3 +1,34 @@
+# GExPipe 0.99.119
+
+- Probe-to-symbol mapping: GPL1291 (e.g. GSE17755) used the GeneName column, so the volcano plot and all
+  results showed full gene names ("thioredoxin interacting protein") instead of symbols (TXNIP). Symbol
+  columns are now preferred, and a column whose values look like full names is never used as symbols.
+  Affymetrix gene_assignment columns (GPL6244, HuGene 1.0 ST; e.g. GSE32537, GSE110147) gave transcript
+  accessions (NM_/ENST) instead of the symbol field; the symbol field is now taken. Other platforms
+  checked (GPL570, GPL96, GPL10558, GPL6947, GPL6884) give identical results.
+- Nomogram (Step 13): every gene selected in the previous step is now used in the model. The sample-size
+  trim (events per variable / 15-gene cap), correlation pruning (|r| > 0.8) and VIF pruning (VIF > 10) no
+  longer remove genes. Highly correlated pairs and a low events-per-variable ratio are reported instead,
+  and when the maximum-likelihood fit is singular or does not converge a ridge-penalized rms::lrm fit
+  (penalty 2, 10 or 50) is used with all genes. Genes not measured on both platforms (parallel mode) are
+  still excluded, because their values are missing.
+- WGCNA (Step 8): "GS vs MM for all modules - Download all as PDF" produced a PDF with 0 pages (the plots
+  were built in a loop but never printed). It now has one page per module. "Download Gene Lists per
+  Module" also works when the GS/MM table is missing (falls back to the module assignment). When a
+  .zip download cannot be created, the app now saves a real zip with a README.txt instead of a text file.
+- WGCNA (Step 8): "Download Gene Lists per Module" now always downloads a zip. It failed when no module
+  passed the significance thresholds (it now exports all modules with a README note) and on computers
+  without an external zip program (the zip package is used when installed; added to Suggests). CSVs in the
+  archive have plain names (module_<colour>_genes.csv) instead of full folder paths. The GS-vs-MM
+  "all modules" zip uses the same helper.
+- Nomogram (Step 13): the Panel A downloads (PNG, JPG 300 DPI, PDF) failed with "no applicable
+- Example GSE IDs: the systemic lupus erythematosus examples were replaced with idiopathic pulmonary
+  fibrosis (IPF) lung datasets: RNA-seq GSE92592 and microarray GSE32537 in the Step 1 dataset boxes
+  and the vignette (GSE112087 and GSE49454 removed), and microarray GSE110147 in the external
+  validation examples (Step 12; GSE72509 removed).
+- Nomogram, internal 70/30 mode: with pruning removed, the panel-score signs and the correlation
+  report are the data-driven choices that use the training split only.
+
 # GExPipe 0.99.118
 
 - QC (Step 3): the "Sample Outlier Detection" box (PCA / connectivity flags and the "Exclude

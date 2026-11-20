@@ -100,10 +100,10 @@ server_validation <- function(input, output, session, rv) {
               ),
               value = "",
               rows = 2,
-              placeholder = "e.g. GSE162462, GSE72509 (RNA-seq) or GSE13159 (Microarray)"
+              placeholder = "e.g. GSE162462 (RNA-seq) or GSE13159, GSE110147 (Microarray)"
             ),
             tags$p(
-              tags$strong("Examples: "), "GSE162462, GSE72509 (RNA-seq) or GSE13159 (Microarray) as the validation dataset.",
+              tags$strong("Examples: "), "GSE162462 (RNA-seq) or GSE13159, GSE110147 (Microarray) as the validation dataset.",
               style = "margin: -6px 0 0 0; font-size: 11px; color: #999;"
             )
           ),
@@ -264,7 +264,7 @@ server_validation <- function(input, output, session, rv) {
         tags$div(
           icon("exclamation-triangle"),
           tags$strong(" Enter at least one GSE ID."),
-          " Examples: GSE162462, GSE72509 (RNA-seq), GSE13159 (Microarray)"
+          " Examples: GSE162462 (RNA-seq), GSE13159, GSE110147 (Microarray)"
         ),
         type = "warning", duration = 5
       )

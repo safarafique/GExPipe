@@ -1,6 +1,6 @@
 Package: GExPipe
 Title: GExPipe: Gene Expression Pipeline Shiny Application
-Version: 0.99.118
+Version: 0.99.119
 Authors@R: c(
     person(
         given = "Safa",
@@ -132,7 +132,8 @@ Suggests:
     httpuv,
     shinytest2,
     stringi,
-    testthat
+    testthat,
+    zip
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 SystemRequirements: GNU make

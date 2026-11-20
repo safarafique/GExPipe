@@ -346,7 +346,7 @@ server_nomogram <- function(input, output, session, rv) {
     outcome       <- outcome[valid]
 
     # Internal mode: draw the 70/30 split NOW, so every data-driven predictor
-    # choice below (trim, correlation/VIF pruning, panel-score signs) uses the
+    # choice below (panel-score signs, correlation report) uses the
     # training split only. Same seed and outcome vector as the split further
     # down, so the partition itself is unchanged.
     sel_rows <- seq_along(outcome)
@@ -444,7 +444,7 @@ server_nomogram <- function(input, output, session, rv) {
       }
     }, error = function(e) NULL)
     # Composite panel score: co-expressed panels (e.g. interferon genes, |r| > 0.8)
-    # lose all but one gene to the collinearity pruning below. Collapsing them into
+    # are kept as separate (correlated) predictors in the individual-genes mode. Collapsing them into
     # one predictor - the mean of per-gene z-scores, each sign-aligned so higher =
     # more disease-like - keeps every selected gene in the model. Each cohort is
     # z-scored on its own (same rationale as the cross-cohort harmonization below).
@@ -474,125 +474,36 @@ server_nomogram <- function(input, output, session, rv) {
     }
     min_events <- min(sum(outcome == 1), sum(outcome == 0))
     epv <- min_events / length(available_genes)
-    # If sample size or panel size forces a reduction, rank by each gene's
-    # actual association with the disease outcome (point-biserial
-    # correlation) - NOT raw expression variance, which is blind to
-    # relevance and could silently drop a gene the user specifically
-    # validated in Step 12 (ROC) in favor of an unvalidated, merely
-    # high-variance one. Any trim is also reported to the user, never silent.
-    .gexpipe_nomogram_trim <- function(genes, keep_n) {
-      if (length(genes) <= keep_n) return(genes)
-      # expr_nomogram (samples x genes) is already filtered to `valid` and
-      # aligned with `outcome`; sel_rows limits it to the training rows.
-      assoc <- .gexpipe_outcome_assoc(genes)
-      kept <- .gexpipe_rank_genes(assoc)[seq_len(keep_n)]
-      dropped <- setdiff(genes, kept)
-      .log_pred(dropped, "Sample-size trim", "Removed", sprintf("|r| with outcome = %.4f; limit %d predictors", assoc[dropped], keep_n))
+    # Every gene selected in the previous steps is used. No gene is removed here
+    # for sample size, pairwise correlation or VIF. Collinearity and a low
+    # events-per-variable ratio are handled in the model itself: when the
+    # maximum-likelihood fit fails, is near-singular, or is extremely steep, a
+    # ridge-penalized rms::lrm fit is used, which keeps all genes and gives
+    # stable coefficients. Correlation and VIF are still reported (Model
+    # Diagnostics) so the user can judge the panel.
+    .log_pred(available_genes, "Model predictors", "Kept", "All genes from the previous step are used (no trimming or pruning)")
+    high_cor_pairs <- character(0)
+    if (length(available_genes) >= 2 && !identical(available_genes, "Panel_score")) {
+      cm <- suppressWarnings(stats::cor(expr_nomogram[sel_rows, available_genes, drop = FALSE], use = "pairwise.complete.obs"))
+      idx <- which(abs(cm) > 0.8 & upper.tri(cm), arr.ind = TRUE)
+      if (nrow(idx) > 0) {
+        high_cor_pairs <- sprintf("%s-%s (r = %.2f)", rownames(cm)[idx[, 1]], colnames(cm)[idx[, 2]], cm[idx])
+        qc_notes <- c(qc_notes, paste0("Highly correlated predictor pairs kept in the model: ", paste(high_cor_pairs, collapse = "; ")))
+      }
+    }
+    if (epv < 10 || length(high_cor_pairs) > 0) {
       showNotification(
         tags$div(
-          icon("exclamation-triangle"),
-          tags$strong(paste0(" Sample size limits the nomogram to ", keep_n, " gene(s).")),
-          tags$br(), "Kept (highest association with outcome): ", tags$strong(paste(kept, collapse = ", ")),
-          tags$br(), "Dropped: ", paste(dropped, collapse = ", ")
+          icon("info-circle"),
+          tags$strong(paste0(" All ", length(available_genes), " selected gene(s) are used in the nomogram.")),
+          if (epv < 10) tags$div(tags$small(sprintf("Events per variable = %.1f (below 10): coefficients may be unstable; a ridge-penalized fit is used if needed.", epv))),
+          if (length(high_cor_pairs) > 0) tags$div(tags$small(paste0("Highly correlated pairs (|r| > 0.8) kept: ",
+            paste(utils::head(high_cor_pairs, 6), collapse = "; "), if (length(high_cor_pairs) > 6) " ..." else "",
+            ". Their individual odds ratios are not interpretable on their own; the model's predictions are.")))
         ),
-        type = "warning", duration = 12
+        type = "message", duration = 15
       )
-      kept
     }
-    if (epv < 10) {
-      max_predictors <- max(3, floor(min_events / 10))
-      available_genes <- .gexpipe_nomogram_trim(available_genes, min(max_predictors, length(available_genes)))
-      epv <- min_events / length(available_genes)
-    } else if (length(available_genes) > 15) {
-      available_genes <- .gexpipe_nomogram_trim(available_genes, 15L)
-      epv <- min_events / length(available_genes)
-    }
-    # Drop redundant, highly-correlated genes (e.g. co-expressed cell-cycle
-    # markers like CHEK1/CCNB2) BEFORE fitting - two near-collinear
-    # predictors in a multivariable logistic model inflate coefficient
-    # variance and drive the kind of unstable, exploding ORs seen under
-    # separation. Keep the more outcome-associated gene of each
-    # highly-correlated pair; never silent.
-    .gexpipe_nomogram_corr_prune <- function(genes, corr_cutoff = 0.8) {
-      if (length(genes) < 2) return(genes)
-      assoc <- .gexpipe_outcome_assoc(genes)
-      ordered_genes <- .gexpipe_rank_genes(assoc)
-      kept <- character(0)
-      dropped_info <- character(0)
-      for (g in ordered_genes) {
-        redundant_with <- NA_character_
-        for (k in kept) {
-          r <- suppressWarnings(stats::cor(expr_nomogram[[g]][sel_rows], expr_nomogram[[k]][sel_rows], use = "pairwise.complete.obs"))
-          if (!is.na(r) && abs(r) > corr_cutoff) {
-            redundant_with <- k
-            .log_pred(g, "Correlation pruning", "Removed",
-                      sprintf("|r| = %.3f with %s (kept); |r| with outcome %.4f vs %.4f", abs(r), k, assoc[[g]], assoc[[k]]))
-            break
-          }
-        }
-        if (is.na(redundant_with)) kept <- c(kept, g)
-        else dropped_info[g] <- redundant_with
-      }
-      if (length(dropped_info) > 0) {
-        msg_lines <- paste0(names(dropped_info), " (redundant with ", dropped_info, ")")
-        showNotification(
-          tags$div(
-            icon("exclamation-triangle"),
-            tags$strong(paste0(" Removed ", length(dropped_info), " highly correlated gene(s) (|r| > ", corr_cutoff, "):")),
-            tags$br(), paste(msg_lines, collapse = "; "),
-            tags$br(), tags$small("Keeping the more outcome-associated gene from each correlated pair avoids collinear, unstable coefficients.")
-          ),
-          type = "warning", duration = 12
-        )
-      }
-      kept
-    }
-    available_genes <- .gexpipe_nomogram_corr_prune(available_genes)
-
-    # Pairwise correlation only catches two genes that move together. It
-    # misses a gene that is a near-linear COMBINATION of several others
-    # (multi-way collinearity), which shows up as a high VIF (Variance
-    # Inflation Factor) even when every individual pairwise correlation
-    # looks fine. A VIF above 10 means that gene's coefficient/SE cannot
-    # be trusted. Iteratively drop the worst offender and refit until
-    # every remaining gene's VIF is acceptable, same transparency as the
-    # correlation pruning above.
-    .gexpipe_nomogram_vif_prune <- function(genes, vif_cutoff = 10, min_genes = 2) {
-      if (length(genes) < min_genes || !requireNamespace("car", quietly = TRUE)) return(genes)
-      dropped <- character(0)
-      repeat {
-        if (length(genes) < min_genes) break
-        fit_data <- cbind(expr_nomogram[sel_rows, genes, drop = FALSE], Outcome = outcome[sel_rows])
-        glm_fit <- tryCatch(
-          glm(as.formula(paste("Outcome ~", paste(genes, collapse = " + "))), data = fit_data, family = binomial()),
-          error = function(e) NULL
-        )
-        if (is.null(glm_fit)) break
-        vifs <- tryCatch(car::vif(glm_fit), error = function(e) NULL)
-        if (is.null(vifs) || length(vifs) != length(genes) || all(vifs <= vif_cutoff, na.rm = TRUE)) break
-        worst <- names(vifs)[which.max(vifs)]
-        dropped[worst] <- sprintf("VIF = %.1f", max(vifs, na.rm = TRUE))
-        .log_pred(worst, "VIF pruning", "Removed", dropped[[worst]])
-        genes <- setdiff(genes, worst)
-      }
-      if (length(dropped) > 0) {
-        msg_lines <- paste0(names(dropped), " (", dropped, ")")
-        showNotification(
-          tags$div(
-            icon("exclamation-triangle"),
-            tags$strong(paste0(" Removed ", length(dropped), " gene(s) with severe multi-way collinearity (VIF > ", vif_cutoff, "):")),
-            tags$br(), paste(msg_lines, collapse = "; "),
-            tags$br(), tags$small(
-              "These genes are a near-linear combination of the others in the panel, not just pairwise correlated. ",
-              "Their coefficient and standard error cannot be trusted while they remain in the model."
-            )
-          ),
-          type = "warning", duration = 15
-        )
-      }
-      genes
-    }
-    available_genes <- .gexpipe_nomogram_vif_prune(available_genes)
 
     if (sum(outcome == 1) < 10 || sum(outcome == 0) < 10) {
       showNotification("Need at least 10 samples per group.", type = "error", duration = 6)
@@ -805,13 +716,36 @@ server_nomogram <- function(input, output, session, rv) {
     options(datadist = dd)
     on.exit({ options(datadist = old_dd) }, add = TRUE)
 
+    ml_error <- NULL
     nomogram_model <- tryCatch(
       rms::lrm(formula_obj, data = train_data, x = TRUE, y = TRUE),
-      error = function(e) { showNotification(paste("Model failed:", e$message), type = "error", duration = 8); NULL }
+      error = function(e) { ml_error <<- conditionMessage(e); NULL }
     )
-    if (is.null(nomogram_model) || (isTRUE(nomogram_model$fail))) {
-      showNotification("Model did not converge. Try fewer predictors or more samples.", type = "error", duration = 8)
-      return()
+    ridge_applied <- FALSE
+    ridge_penalty <- 2
+    if (is.null(nomogram_model) || isTRUE(nomogram_model$fail)) {
+      # All selected genes are kept (no pruning), so correlated genes can make
+      # the maximum-likelihood fit singular. Fit the same genes with a ridge
+      # penalty instead of dropping any of them.
+      nomogram_model <- NULL
+      for (pen in c(2, 10, 50)) {
+        fit_pen <- tryCatch(rms::lrm(formula_obj, data = train_data, x = TRUE, y = TRUE, penalty = pen),
+                            error = function(e) NULL)
+        if (!is.null(fit_pen) && !isTRUE(fit_pen$fail)) { nomogram_model <- fit_pen; ridge_penalty <- pen; break }
+      }
+      if (is.null(nomogram_model)) {
+        showNotification(paste0("Model could not be fitted with all ", length(available_genes), " genes",
+                                if (!is.null(ml_error)) paste0(": ", ml_error) else ".",
+                                " Try the composite panel score option, or select fewer genes in the previous step."),
+                         type = "error", duration = 12)
+        return()
+      }
+      ridge_applied <- TRUE
+      showNotification(
+        tags$div(icon("info-circle"), tags$strong(" Correlated genes: ridge-penalized fit used (all genes kept)."),
+                 tags$br(), tags$small(sprintf("The unpenalized fit was singular or did not converge; rms::lrm with penalty = %g was used for all %d gene(s).",
+                                               ridge_penalty, length(available_genes)))),
+        type = "warning", duration = 15)
     }
 
     # Quasi-separation fallback: if any slope's SE blows up, the fitted
@@ -824,14 +758,13 @@ server_nomogram <- function(input, output, session, rv) {
     }
     initial_se <- .gexpipe_lrm_se(nomogram_model)
     initial_coef <- tryCatch(abs(coef(nomogram_model)[-1]), error = function(e) numeric(0))
-    ridge_applied <- FALSE
     # Predictors are z-scored, so a slope is "log-odds per 1 SD". |slope| > 5
     # means an odds ratio above ~150 per SD - near-perfect separation even
     # when the SE (e.g. 3.2) stays under 5. Such a steep model saturates to
     # 0/1 on any cohort whose expression distribution differs slightly, so
     # penalize it too, not only when the SE explodes.
-    if ((length(initial_se) > 0 && any(initial_se > 3, na.rm = TRUE)) ||
-        (length(initial_coef) > 0 && any(initial_coef > 5, na.rm = TRUE))) {
+    if (!ridge_applied && ((length(initial_se) > 0 && any(initial_se > 3, na.rm = TRUE)) ||
+        (length(initial_coef) > 0 && any(initial_coef > 5, na.rm = TRUE)))) {
       penalized_fit <- tryCatch(
         rms::lrm(formula_obj, data = train_data, x = TRUE, y = TRUE, penalty = 2),
         error = function(e) NULL
@@ -926,7 +859,7 @@ server_nomogram <- function(input, output, session, rv) {
     )
     model_diagnostics$VIF_Status <- ifelse(is.na(model_diagnostics$VIF), "Unknown",
       ifelse(model_diagnostics$VIF > 10, "High (>10)", ifelse(model_diagnostics$VIF > 5, "Moderate (5-10)", "Low (<5)")))
-    model_diagnostics$Fit_Type <- if (ridge_applied) "Ridge-penalized (penalty = 2); Wald CI/p" else "Maximum likelihood; Wald CI/p"
+    model_diagnostics$Fit_Type <- if (ridge_applied) sprintf("Ridge-penalized (penalty = %g); Wald CI/p", ridge_penalty) else "Maximum likelihood; Wald CI/p"
 
     # Firth's penalized-likelihood logistic regression: when a gene (or
     # combination) near-perfectly separates the two groups, ordinary MLE
@@ -1097,7 +1030,7 @@ server_nomogram <- function(input, output, session, rv) {
         val_dataset_label, outcome_coding$group_col,
         paste0("1 = Disease ('", outcome_coding$disease_label, "'); 0 = Normal ('", outcome_coding$normal_label, "'). ", outcome_coding$rule),
         length(available_genes), paste(available_genes, collapse = ", "),
-        if (ridge_applied) "Ridge-penalized logistic (rms::lrm, penalty = 2) after separation was detected" else "Logistic regression, maximum likelihood (rms::lrm)",
+        if (ridge_applied) sprintf("Ridge-penalized logistic (rms::lrm, penalty = %g; all selected genes kept)", ridge_penalty) else "Logistic regression, maximum likelihood (rms::lrm)",
         paste0("Youden index on the TRAINING ROC = ", signif(optimal_threshold, 5), " (applied unchanged to validation)"),
         "Training intercept + coefficients applied directly; no refit and no recalibration on validation data",
         std_label,
@@ -1392,7 +1325,7 @@ server_nomogram <- function(input, output, session, rv) {
   # ============================================================================
   nomogram_plot_to_file <- function(file, dev_open, dev_close = function() dev.off()) {
     req(rv$nomogram_model, rv$nomogram_available_genes)
-    validate(need(!gexp_nomogram_is_univariable(rv$nomogram_available_genes),
+    shiny::validate(shiny::need(!gexp_nomogram_is_univariable(rv$nomogram_available_genes),
                   "Nomogram omitted for a one-predictor model; download the ROC, calibration and DCA plots instead."))
     dd <- rms::datadist(rv$nomogram_train_data[, rv$nomogram_available_genes, drop = FALSE])
     options(datadist = dd)

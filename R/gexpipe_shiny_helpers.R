@@ -191,6 +191,14 @@ gexp_write_placeholder_file <- function(file, message) {
     graphics::text(0.5, 0.5, paste(strwrap(message, 70), collapse = "\n"), cex = 1.1, col = "#7f8c8d")
   } else if (ext %in% c("csv", "tsv")) {
     utils::write.csv(data.frame(Note = message), file, row.names = FALSE)
+  } else if (ext == "zip") {
+    # A real zip (with README.txt inside), not a text file named .zip
+    readme <- file.path(tempfile("gexp_note_"), "README.txt")
+    dir.create(dirname(readme), recursive = TRUE)
+    on.exit(unlink(dirname(readme), recursive = TRUE), add = TRUE)
+    writeLines(message, readme)
+    ok <- tryCatch({ gexpipe_zip_files(file, readme); TRUE }, error = function(e) FALSE)
+    if (!ok) writeLines(message, file)
   } else {
     writeLines(message, file)
   }
@@ -1096,6 +1104,26 @@ gexp_draw_ml_methods_venn <- function(sets,
   invisible(NULL)
 }
 
+# Zip files into `zipfile` with flat names (no folder paths inside the archive).
+# Uses the 'zip' package when installed (no external tool needed); otherwise
+# utils::zip(), which needs a zip program (e.g. Rtools) on Windows. Stops with a
+# clear message when no archive could be written, so a download never "succeeds"
+# with a missing file.
+gexpipe_zip_files <- function(zipfile, files) {
+  files <- files[file.exists(files)]
+  if (length(files) == 0L) stop("There are no files to put in the zip archive.")
+  if (file.exists(zipfile)) unlink(zipfile)
+  if (requireNamespace("zip", quietly = TRUE)) {
+    zip::zipr(zipfile, files = files)
+  } else {
+    status <- suppressWarnings(utils::zip(zipfile, files = files, flags = "-j9Xq"))
+    if (!identical(as.integer(status), 0L) || !file.exists(zipfile)) {
+      stop("Could not create the zip file: install the 'zip' package (install.packages(\"zip\")) or Rtools.")
+    }
+  }
+  invisible(zipfile)
+}
+
 # CSV export directory: all CSV downloads are also written here (app working directory)
 CSV_EXPORT_DIR <- function() {
   d <- file.path(getwd(), "csv_exports")
@@ -1218,6 +1246,26 @@ GPL_to_biomart_probe_attr <- c(
   }, logical(1))
 }
 
+#' Fraction of values that look like full gene NAMES, not gene symbols
+#'
+#' Gene symbols have no spaces and are not lower-case words
+#' ("TXNIP", "CXCL9", "C1orf201"). Gene names do ("thioredoxin interacting
+#' protein", "interferon", "chemokine (C-X-C motif) ligand 9"). Some platforms
+#' (e.g. GPL1291) have both a Symbol and a GeneName column; picking GeneName put
+#' full names on the volcano plot and broke overlap with other datasets.
+#' Multi-symbol cells ("DDR1 /// MIR4640") are not counted as names.
+#' @noRd
+.gexpipe_frac_gene_names <- function(v) {
+  v <- trimws(as.character(v))
+  v <- v[!is.na(v) & nzchar(v) & !v %in% c("---", "null", "NA")]
+  if (length(v) == 0L) return(0)
+  v <- utils::head(v, 5000L)
+  v <- gsub("\\s*(///|//|;|,)\\s*", "|", v)   # separators between symbols
+  name_like <- grepl("\\s", v) & grepl("(^|[\\s(|])[a-z]{3,}([\\s),|]|$)", v, perl = TRUE)
+  name_like <- name_like | grepl("^[a-z]{4,}$", v)
+  mean(name_like)
+}
+
 #' Accept mapped symbols for multi-dataset overlap (STEP 2b)
 #' @keywords internal
 .gexpipe_accept_overlap_mapping <- function(sym, rn, min_rate = 0.03) {
@@ -1228,6 +1276,10 @@ GPL_to_biomart_probe_attr <- c(
   }
   valid <- !is.na(sym) & nzchar(trimws(sym))
   if (sum(valid) < max(3L, ceiling(length(rn) * min_rate))) {
+    return(FALSE)
+  }
+  # Full gene names (from a description/GeneName column) are not symbols
+  if (.gexpipe_frac_gene_names(sym[valid]) > 0.2) {
     return(FALSE)
   }
   mapped_rate <- mean(sym[valid] != rn[valid], na.rm = TRUE)
@@ -1259,6 +1311,9 @@ GPL_to_biomart_probe_attr <- c(
     return(FALSE)
   }
   if (mean(.gexpipe_id_looks_like_probe(sym[valid]), na.rm = TRUE) > 0.1) {
+    return(FALSE)
+  }
+  if (.gexpipe_frac_gene_names(sym[valid]) > 0.2) {
     return(FALSE)
   }
   TRUE
@@ -2022,10 +2077,12 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
 
     # --- Gene symbol column (case-insensitive; includes Arraystar GeneName) ---
     symbol_col <- NULL
+    # Symbol columns first; "genename"/"gene name" only after them (on
+    # Arraystar it holds symbols, on GPL1291 it holds full gene names).
     sym_cands_low <- c(
-      "gene symbol", "gene.symbol", "gene_symbol", "genesymbol", "genename",
-      "gene name", "gene_name", "symbol", "hgnc_symbol", "hgnc symbol",
-      "hgnc.symbol", "gene sym", "genesym", "official symbol", "official_symbol",
+      "gene symbol", "gene.symbol", "gene_symbol", "genesymbol", "symbol",
+      "hgnc_symbol", "hgnc symbol", "hgnc.symbol", "gene sym", "genesym",
+      "official symbol", "official_symbol", "genename", "gene name", "gene_name",
       "gene", "orf", "associated_gene", "associated gene"
     )
     # Pick by PREFERENCE (a real symbol column beats a generic "GENE" column,
@@ -2035,7 +2092,8 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
       v <- trimws(as.character(v)); v <- v[!is.na(v) & nzchar(v) & !v %in% c("---", "null", "NA")]
       if (length(v) < 10L) return(FALSE)
       v <- utils::head(v, 2000L)
-      mean(grepl("^[0-9]+$|^[A-Z]{1,2}_?[0-9]{5,}([.][0-9]+)?$|^ENS[A-Z]*[0-9]+", v)) < 0.5
+      mean(grepl("^[0-9]+$|^[A-Z]{1,2}_?[0-9]{5,}([.][0-9]+)?$|^ENS[A-Z]*[0-9]+", v)) < 0.5 &&
+        .gexpipe_frac_gene_names(v) <= 0.2
     }
     for (cand in sym_cands_low) {
       hit <- cn[cn_low == cand]
@@ -2108,9 +2166,19 @@ probe_ids_to_symbol_gpl <- function(probe_ids, gpl_id, gse_id = NULL) {
         if (length(x) == 0 || is.na(x) || !nzchar(trimws(x))) return(NA_character_)
         x <- trimws(x)
         if (grepl("//", x, fixed = TRUE)) {
+          # Affymetrix gene_assignment: "accession // SYMBOL // name // ... /// next record".
+          # Take the SYMBOL field of the first record; never an accession
+          # (NM_/NR_/XM_/ENST..., which the old code returned for GPL6244).
+          .is_acc <- function(p) grepl("^(N[MRGPC]_|X[MRP]_|ENS[A-Z]*[0-9]|NONHSAT|[A-Z]{1,2}[0-9]{5,})|^[0-9]+$", p)
+          rec <- trimws(unlist(strsplit(x, "\\s*///\\s*")))[1]
+          fields <- trimws(unlist(strsplit(rec, "\\s*//\\s*")))
+          if (length(fields) >= 2L && grepl("^[A-Za-z][A-Za-z0-9._-]*$", fields[2]) && !.is_acc(fields[2])) {
+            return(fields[2])
+          }
           parts <- trimws(unlist(strsplit(x, "\\s*//\\s*")))
-          cand <- parts[grepl("^[A-Za-z][A-Za-z0-9._-]*$", parts)]
+          cand <- parts[grepl("^[A-Za-z][A-Za-z0-9._-]*$", parts) & !.is_acc(parts)]
           if (length(cand) > 0) return(cand[1])
+          return(NA_character_)
         }
         toks <- trimws(unlist(strsplit(x, "\\s*///\\s*|\\s*;\\s*|\\s*,\\s*")))
         toks <- toks[grepl("^[A-Za-z][A-Za-z0-9._-]*$", toks)]

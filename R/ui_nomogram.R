@@ -50,7 +50,7 @@ ui_nomogram <- tabItem(
       radioButtons("nomogram_predictor_mode",
         tags$span("Model predictors:"),
         choices = c(
-          "Individual genes (correlated genes are pruned; may leave one gene)" = "genes",
+          "Individual genes (all genes selected in the previous step are used)" = "genes",
           "Composite panel score (mean z-score of all selected genes; one predictor)" = "score"
         ),
         selected = "genes"),

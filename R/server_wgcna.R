@@ -2010,9 +2010,19 @@ server_wgcna <- function(input, output, session, rv) {
       if (length(modules) == 0) modules <- unique(rv$gene_metrics$Module)
       grDevices::pdf(file, width = 7, height = 5, bg = "white")
       on.exit(dev.off(), add = TRUE)
+      n_pages <- 0L
       for (mod in modules) {
         p <- make_gs_mm_plot(mod, trait_col, rv$gene_metrics, rv$datExpr, rv$trait_data, gs_pval, mm_cor)
-        if (!is.null(p)) p
+        # ggplot objects are only drawn when printed; inside a loop nothing is
+        # auto-printed, which left this PDF with 0 pages.
+        if (!is.null(p)) {
+          print(p)
+          n_pages <- n_pages + 1L
+        }
+      }
+      if (n_pages == 0L) {
+        graphics::plot.new()
+        graphics::text(0.5, 0.5, paste0("No module had genes to plot for trait '", trait_col, "'."), col = "#7f8c8d")
       }
     }
   )
@@ -2042,7 +2052,7 @@ server_wgcna <- function(input, output, session, rv) {
           ggplot2::ggsave(fpath, plot = p, width = 7, height = 5, dpi = IMAGE_DPI, units = "in", bg = "white", device = "png")
         }
       }
-      zip(file, list.files(tmp_dir, full.names = TRUE), flags = "-j")
+      gexpipe_zip_files(file, list.files(tmp_dir, full.names = TRUE))
     }
   )
   
@@ -2102,18 +2112,44 @@ server_wgcna <- function(input, output, session, rv) {
   output$download_sig_modules_genes <- downloadHandler(
     filename = function() "wgcna_module_genes.zip",
     content = function(file) {
-      req(rv$gene_metrics, rv$significant_modules)
+      gm <- rv$gene_metrics
+      if (is.null(gm) || !nrow(gm)) {
+        # GS/MM not calculated (or not restored from a workspace): fall back to
+        # the module assignment itself so the gene lists can still be exported.
+        req(rv$moduleColors, rv$datExpr)
+        gm <- data.frame(Gene = colnames(rv$datExpr), Module = as.character(rv$moduleColors),
+                         stringsAsFactors = FALSE)
+      }
       export_dir <- CSV_EXPORT_DIR()
-      sig_modules <- rv$significant_modules$Module
+      sig_modules <- if (is.null(rv$significant_modules)) character(0) else as.character(rv$significant_modules$Module)
+      sig_modules <- unique(sig_modules[!is.na(sig_modules) & nzchar(sig_modules)])
+      note <- NULL
+      if (length(sig_modules) == 0L) {
+        # No significant module at the current thresholds: export every module
+        # (except grey) so the download still works, and say so in a README.
+        all_mods <- sort(unique(as.character(gm$Module)))
+        sig_modules <- paste0("ME", all_mods[all_mods != "grey"])
+        if (length(sig_modules) == 0L) sig_modules <- paste0("ME", all_mods)
+        note <- c("No module passed the significance thresholds in Module-Trait Analysis.",
+                  "This archive therefore contains the gene lists of ALL modules (grey = unassigned genes is left out).")
+      }
+      tmp_dir <- tempfile("wgcna_module_genes_")
+      dir.create(tmp_dir, recursive = TRUE)
+      on.exit(unlink(tmp_dir, recursive = TRUE), add = TRUE)
       out_files <- character(0)
       for (mod in sig_modules) {
         mod_color <- if (grepl("^ME", mod)) substring(mod, 3) else mod
-        mod_genes <- rv$gene_metrics[rv$gene_metrics$Module == mod_color, ]
-        fname <- file.path(export_dir, paste0("module_", mod, "_genes.csv"))
-        write.csv(mod_genes, fname, row.names = FALSE)
-        out_files <- c(out_files, fname)
+        mod_genes <- gm[gm$Module == mod_color, , drop = FALSE]
+        fname <- paste0("module_", mod_color, "_genes.csv")
+        write.csv(mod_genes, file.path(tmp_dir, fname), row.names = FALSE)
+        write.csv(mod_genes, file.path(export_dir, fname), row.names = FALSE)
+        out_files <- c(out_files, file.path(tmp_dir, fname))
       }
-      if (length(out_files) > 0) zip(file, files = out_files)
+      if (!is.null(note)) {
+        writeLines(note, file.path(tmp_dir, "README.txt"))
+        out_files <- c(out_files, file.path(tmp_dir, "README.txt"))
+      }
+      gexpipe_zip_files(file, out_files)
     }
   )
   
