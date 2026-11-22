@@ -24,8 +24,11 @@ gexp_sig_gene_z <- function(expr, y) {
   tt <- (m1 - m0) / sqrt(se2)
   df <- se2^2 / ((v1 / pmax(n1, 1))^2 / pmax(n1 - 1, 1) + (v0 / pmax(n0, 1))^2 / pmax(n0 - 1, 1))
   ok <- n1 >= 2L & n0 >= 2L & is.finite(tt) & is.finite(df) & df > 0
-  z <- rep(NA_real_, length(tt)); z[ok] <- stats::qnorm(stats::pt(tt[ok], df[ok]))
-  z[ok & is.infinite(z)] <- NA_real_
+  # Convert t to z on the log scale of the lower tail of -|t|, so very strong
+  # differences keep a finite z instead of overflowing to Inf (and being dropped).
+  z <- rep(NA_real_, length(tt))
+  z[ok] <- -sign(tt[ok]) * stats::qnorm(stats::pt(-abs(tt[ok]), df[ok], log.p = TRUE), log.p = TRUE)
+  z[ok & !is.finite(z)] <- NA_real_
   list(z = stats::setNames(z, rownames(expr)), logFC = stats::setNames(m1 - m0, rownames(expr)),
        n = stats::setNames(n1 + n0, rownames(expr)))
 }

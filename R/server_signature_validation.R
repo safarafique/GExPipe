@@ -53,7 +53,7 @@ server_signature_validation <- function(input, output, session, rv) {
           "Every run is added to the log below; report all validation sets you tried, not only the best one."),
         fluidRow(
           column(4, selectInput("sigval_source", "Signature genes:", choices = choices, selected = "meta", width = "100%")),
-          column(2, numericInput("sigval_top_n", "Top N genes:", value = 100, min = 5, max = 5000, step = 25)),
+          column(2, numericInput("sigval_top_n", "Top N genes:", value = 100, min = 3, max = 5000, step = 25)),
           column(2, numericInput("sigval_perm", "Random sets:", value = 1000, min = 200, max = 5000, step = 200)),
           column(2, numericInput("sigval_seed", "Seed:", value = 123, min = 1, step = 1)),
           column(2, tags$div(style = "margin-top: 25px;",
@@ -85,7 +85,7 @@ server_signature_validation <- function(input, output, session, rv) {
     }
     source <- if (length(input$sigval_source) == 1L) input$sigval_source else "meta"
     top_n <- suppressWarnings(as.integer(input$sigval_top_n)); if (length(top_n) != 1L || is.na(top_n)) top_n <- 100L
-    top_n <- max(5L, min(5000L, top_n))
+    top_n <- max(3L, min(5000L, top_n))
     n_perm <- suppressWarnings(as.integer(input$sigval_perm)); if (length(n_perm) != 1L || is.na(n_perm)) n_perm <- 1000L
     n_perm <- max(200L, min(5000L, n_perm))
     seed <- suppressWarnings(as.integer(input$sigval_seed)); if (length(seed) != 1L || is.na(seed)) seed <- 123L

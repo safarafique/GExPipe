@@ -1,3 +1,13 @@
+# GExPipe 0.99.120
+
+- Signature validation: the t-to-z conversion overflowed to infinity for genes with very large group
+  differences, so the strongest genes (e.g. COL1A1 in IPF) were treated as missing. This blanked their
+  row in the per-gene replication table, lowered the replicated fraction, and dropped them from the
+  per-dataset meta-analysis that sets gene directions, the training-significant pool (null B) and the
+  leave-one-dataset-out selection. The conversion is now done on the log scale and stays finite.
+- Signature validation: Top N genes can now be set as low as 3 (was 5), so the leave-one-dataset-out
+  check can use the same number of genes as a small custom panel.
+
 # GExPipe 0.99.119
 
 - Probe-to-symbol mapping: GPL1291 (e.g. GSE17755) used the GeneName column, so the volcano plot and all
